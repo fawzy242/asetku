@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Whitebird.Domain\Whitebird.Domain.csproj" />
+    <ProjectReference Include="..\Whitebird.Infra\Whitebird.Infra.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Mapping -->
+    <PackageReference Include="Mapster" />
+    <PackageReference Include="Mapster.DependencyInjection" />
+    
+    <!-- Password Hashing -->
+    <PackageReference Include="BCrypt.Net-Next" />
+    
+    <!-- Email Service - No Version (will use central management) -->
+    <PackageReference Include="MailKit" />
+    <PackageReference Include="MimeKit" />
+    
+    <!-- Excel Export -->
+    <PackageReference Include="EPPlus" />
+    
+    <!-- Microsoft Extensions -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

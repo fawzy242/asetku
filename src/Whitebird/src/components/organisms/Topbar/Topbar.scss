@@ -1,0 +1,328 @@
+@use '../../../styles/variables' as *;
+@use '../../../styles/mixins' as *;
+
+.topbar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: $sidebar-width;
+    height: $topbar-height;
+    background-color: var(--card-bg);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 $spacing-xl;
+    z-index: $z-index-sticky;
+    transition: left $transition-base;
+
+    .sidebar--collapsed~& {
+        left: $sidebar-collapsed-width;
+    }
+
+    &__left {
+        display: flex;
+        align-items: center;
+    }
+
+    &__title {
+        font-size: $font-size-xl;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    &__center {
+        flex: 1;
+        max-width: 500px;
+        margin: 0 $spacing-xl;
+    }
+
+    &__search {
+        position: relative;
+        width: 100%;
+    }
+
+    &__search-input {
+        width: 100%;
+        padding: $spacing-sm $spacing-lg;
+        padding-right: 50px;
+        font-size: $font-size-sm;
+        color: var(--text-primary);
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: $radius-full;
+        transition: all $transition-fast;
+
+        &:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+        }
+
+        &::placeholder {
+            color: var(--text-secondary);
+        }
+    }
+
+    &__search-btn {
+        position: absolute;
+        right: $spacing-sm;
+        top: 50%;
+        transform: translateY(-50%);
+        padding: $spacing-xs;
+        color: var(--text-secondary);
+        transition: color $transition-fast;
+
+        &:hover {
+            color: var(--primary);
+        }
+    }
+
+    &__right {
+        display: flex;
+        align-items: center;
+        gap: $spacing-md;
+    }
+
+    &__theme-toggle {
+        @include flex-center;
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+        background-color: var(--surface);
+        border-radius: $radius-full;
+        transition: all $transition-fast;
+
+        &:hover {
+            background-color: var(--primary);
+            color: white;
+        }
+    }
+
+    &__notifications {
+        position: relative;
+    }
+
+    &__notification-btn {
+        @include flex-center;
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+        background-color: var(--surface);
+        border-radius: $radius-full;
+        transition: all $transition-fast;
+        position: relative;
+
+        &:hover {
+            background-color: var(--primary);
+            color: white;
+        }
+    }
+
+    &__notification-badge {
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 4px;
+        background-color: var(--error);
+        color: white;
+        font-size: 10px;
+        font-weight: 600;
+        border-radius: $radius-full;
+        @include flex-center;
+    }
+
+    &__notification-dropdown {
+        position: absolute;
+        top: calc(100% + 10px);
+        right: 0;
+        width: 360px;
+        background-color: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: $radius-lg;
+        box-shadow: $shadow-xl;
+        z-index: $z-index-dropdown;
+        animation: slideIn $transition-base;
+    }
+
+    &__notification-header {
+        @include flex-between;
+        padding: $spacing-md $spacing-lg;
+        border-bottom: 1px solid var(--border);
+
+        h4 {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+    }
+
+    &__notification-mark-all {
+        font-size: $font-size-xs;
+        color: var(--primary);
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+
+    &__notification-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    &__notification-item {
+        display: flex;
+        gap: $spacing-md;
+        padding: $spacing-md $spacing-lg;
+        border-bottom: 1px solid var(--border);
+        transition: background-color $transition-fast;
+
+        &:hover {
+            background-color: var(--surface);
+        }
+
+        &--unread {
+            background-color: rgba(220, 38, 38, 0.05);
+        }
+    }
+
+    &__notification-icon {
+        @include flex-center;
+        width: 32px;
+        height: 32px;
+        background-color: var(--surface);
+        border-radius: $radius-full;
+    }
+
+    &__notification-content {
+        flex: 1;
+    }
+
+    &__notification-title {
+        font-size: $font-size-sm;
+        color: var(--text-primary);
+        margin-bottom: 2px;
+    }
+
+    &__notification-time {
+        font-size: $font-size-xs;
+        color: var(--text-secondary);
+    }
+
+    &__notification-empty {
+        padding: $spacing-xl;
+        text-align: center;
+        color: var(--text-secondary);
+    }
+
+    &__user {
+        position: relative;
+    }
+
+    &__user-btn {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        padding: $spacing-xs;
+        padding-right: $spacing-md;
+        background-color: var(--surface);
+        border-radius: $radius-full;
+        transition: all $transition-fast;
+
+        &:hover {
+            background-color: var(--primary);
+
+            .topbar__user-name,
+            .topbar__user-arrow {
+                color: white;
+            }
+        }
+    }
+
+    &__user-avatar {
+        @include flex-center;
+        width: 36px;
+        height: 36px;
+        background-color: var(--primary);
+        color: white;
+        font-weight: 600;
+        border-radius: $radius-full;
+        text-transform: uppercase;
+    }
+
+    &__user-name {
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+
+    &__user-arrow {
+        font-size: 10px;
+        color: var(--text-secondary);
+    }
+
+    &__user-dropdown {
+        position: absolute;
+        top: calc(100% + 10px);
+        right: 0;
+        width: 280px;
+        background-color: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: $radius-lg;
+        box-shadow: $shadow-xl;
+        z-index: $z-index-dropdown;
+        animation: slideIn $transition-base;
+    }
+
+    &__user-header {
+        display: flex;
+        align-items: center;
+        gap: $spacing-md;
+        padding: $spacing-lg;
+        border-bottom: 1px solid var(--border);
+    }
+
+    &__user-avatar--large {
+        @include flex-center;
+        width: 48px;
+        height: 48px;
+        background-color: var(--primary);
+        color: white;
+        font-size: $font-size-lg;
+        font-weight: 600;
+        border-radius: $radius-full;
+        text-transform: uppercase;
+    }
+
+    &__user-fullname {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 2px;
+    }
+
+    &__user-email {
+        font-size: $font-size-xs;
+        color: var(--text-secondary);
+    }
+
+    &__user-menu {
+        padding: $spacing-sm;
+
+        button {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: $spacing-md;
+            padding: $spacing-md;
+            color: var(--text-primary);
+            border-radius: $radius-md;
+            transition: all $transition-fast;
+            text-align: left;
+
+            &:hover {
+                background-color: var(--surface);
+            }
+        }
+    }
+}

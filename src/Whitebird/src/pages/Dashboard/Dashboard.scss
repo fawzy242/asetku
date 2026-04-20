@@ -1,0 +1,114 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.dashboard {
+    &__stats {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: $spacing-lg;
+        margin-bottom: $spacing-xl;
+
+        @include respond-to('lg') {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        @include respond-to('md') {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    &__stat-card {
+        @include flex-center;
+        gap: $spacing-md;
+        padding: $spacing-lg;
+    }
+
+    &__stat-icon {
+        font-size: 32px;
+    }
+
+    &__stat-content {
+        flex: 1;
+
+        h3 {
+            font-size: $font-size-sm;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: $spacing-xs;
+        }
+    }
+
+    &__stat-value {
+        font-size: $font-size-2xl;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    &__charts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: $spacing-lg;
+        margin-bottom: $spacing-xl;
+
+        @include respond-to('md') {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    &__chart-card {
+        height: 300px;
+    }
+
+    &__alerts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: $spacing-lg;
+        margin-bottom: $spacing-xl;
+
+        @include respond-to('md') {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    &__alert-list {
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-sm;
+    }
+
+    &__alert-item {
+        @include flex-between;
+        padding: $spacing-sm 0;
+        border-bottom: 1px solid var(--border);
+
+        &:last-child {
+            border-bottom: none;
+        }
+    }
+
+    &__alert-code {
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    &__alert-name {
+        flex: 1;
+        margin: 0 $spacing-md;
+        color: var(--text-secondary);
+        @include truncate;
+    }
+
+    &__alert-date {
+        font-size: $font-size-xs;
+        color: var(--warning);
+    }
+
+    &__transactions {
+        margin-bottom: $spacing-xl;
+    }
+}
+
+.dashboard-loading {
+    @include flex-center;
+    min-height: 400px;
+}

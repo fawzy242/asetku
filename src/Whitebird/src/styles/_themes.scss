@@ -1,0 +1,51 @@
+@use 'variables' as *;
+
+[data-theme='light'] {
+    --primary: #{$primary-light};
+    --primary-hover: #{$primary-dark};
+    --secondary: #{$secondary-light};
+    --secondary-hover: #{$secondary-dark};
+    --background: #{$background-light};
+    --surface: #{$surface-light};
+    --text-primary: #{$text-primary-light};
+    --text-secondary: #{$text-secondary-light};
+    --border: #{$border-light};
+    --success: #{$success-light};
+    --warning: #{$warning-light};
+    --error: #{$error-light};
+    --info: #{$info-light};
+    --scrollbar-thumb: #d1d5db;
+    --scrollbar-thumb-hover: #9ca3af;
+    --card-bg: #ffffff;
+    --input-bg: #ffffff;
+    --input-border: #d1d5db;
+    --sidebar-bg: #1f2937;
+    --sidebar-text: #9ca3af;
+    --sidebar-text-active: #ffffff;
+    --sidebar-hover: #374151;
+}
+
+[data-theme='dark'] {
+    --primary: #{$primary-dark-mode};
+    --primary-hover: #{$primary-dark-mode-dark};
+    --secondary: #{$secondary-dark-mode};
+    --secondary-hover: #{$secondary-dark-mode-dark};
+    --background: #{$background-dark};
+    --surface: #{$surface-dark};
+    --text-primary: #{$text-primary-dark};
+    --text-secondary: #{$text-secondary-dark};
+    --border: #{$border-dark};
+    --success: #{$success-dark};
+    --warning: #{$warning-dark};
+    --error: #{$error-dark};
+    --info: #{$info-dark};
+    --scrollbar-thumb: #4b5563;
+    --scrollbar-thumb-hover: #6b7280;
+    --card-bg: #1f2937;
+    --input-bg: #374151;
+    --input-border: #4b5563;
+    --sidebar-bg: #0f172a;
+    --sidebar-text: #94a3b8;
+    --sidebar-text-active: #ef4444;
+    --sidebar-hover: #1e293b;
+}

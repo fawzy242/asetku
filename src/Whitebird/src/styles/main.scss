@@ -1,0 +1,218 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+@use 'themes';
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    font-size: $font-size-base;
+    @include scrollbar;
+}
+
+body {
+    font-family: $font-family-base;
+    background-color: var(--background);
+    color: var(--text-primary);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+button {
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: inherit;
+}
+
+input,
+select,
+textarea {
+    font-family: inherit;
+    font-size: inherit;
+}
+
+ul,
+ol {
+    list-style: none;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+// Utility Classes
+.container {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 $spacing-lg;
+}
+
+.page-title {
+    font-size: $font-size-2xl;
+    font-weight: 600;
+    margin-bottom: $spacing-lg;
+    color: var(--text-primary);
+}
+
+.page-header {
+    @include flex-between;
+    margin-bottom: $spacing-lg;
+
+    h1 {
+        font-size: $font-size-2xl;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+}
+
+.card {
+    background: var(--card-bg);
+    border-radius: $radius-lg;
+    padding: $spacing-lg;
+    box-shadow: $shadow-sm;
+    border: 1px solid var(--border);
+}
+
+.grid {
+    display: grid;
+    gap: $spacing-lg;
+}
+
+.flex {
+    display: flex;
+}
+
+.flex-col {
+    flex-direction: column;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.justify-between {
+    justify-content: space-between;
+}
+
+.gap-sm {
+    gap: $spacing-sm;
+}
+
+.gap-md {
+    gap: $spacing-md;
+}
+
+.gap-lg {
+    gap: $spacing-lg;
+}
+
+.mt-sm {
+    margin-top: $spacing-sm;
+}
+
+.mt-md {
+    margin-top: $spacing-md;
+}
+
+.mt-lg {
+    margin-top: $spacing-lg;
+}
+
+.mb-sm {
+    margin-bottom: $spacing-sm;
+}
+
+.mb-md {
+    margin-bottom: $spacing-md;
+}
+
+.mb-lg {
+    margin-bottom: $spacing-lg;
+}
+
+.text-primary {
+    color: var(--primary);
+}
+
+.text-secondary {
+    color: var(--text-secondary);
+}
+
+.text-success {
+    color: var(--success);
+}
+
+.text-warning {
+    color: var(--warning);
+}
+
+.text-error {
+    color: var(--error);
+}
+
+.bg-primary {
+    background-color: var(--primary);
+}
+
+.bg-surface {
+    background-color: var(--surface);
+}
+
+// Animation
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn $transition-base;
+}
+
+.slide-in {
+    animation: slideIn $transition-base;
+}
+
+// Loading spinner
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

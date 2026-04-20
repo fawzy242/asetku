@@ -1,0 +1,86 @@
+@use '../../../styles/variables' as *;
+
+.input-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    width: 100%;
+}
+
+.input__label {
+    font-size: $font-size-sm;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.input__required {
+    color: var(--error);
+    margin-left: 2px;
+}
+
+.input__container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input {
+    width: 100%;
+    padding: $spacing-sm $spacing-md;
+    font-size: $font-size-sm;
+    color: var(--text-primary);
+    background-color: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: $radius-md;
+    transition: border-color $transition-fast, box-shadow $transition-fast;
+    outline: none;
+
+    &:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+    }
+
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        background-color: var(--surface);
+    }
+
+    &--error {
+        border-color: var(--error);
+
+        &:focus {
+            border-color: var(--error);
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+        }
+    }
+
+    &--with-start {
+        padding-left: 40px;
+    }
+
+    &--with-end {
+        padding-right: 40px;
+    }
+}
+
+.input__adornment {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+
+    &--start {
+        left: $spacing-md;
+    }
+
+    &--end {
+        right: $spacing-md;
+    }
+}
+
+.input__error {
+    font-size: $font-size-xs;
+    color: var(--error);
+}

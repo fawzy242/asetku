@@ -1,0 +1,85 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.transactions-menu {
+    &__header {
+        @include flex-between;
+        margin-bottom: $spacing-lg;
+    }
+
+    &__title {
+        font-size: $font-size-2xl;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    &__toolbar {
+        display: flex;
+        gap: $spacing-md;
+        margin-bottom: $spacing-lg;
+        flex-wrap: wrap;
+    }
+
+    &__tabs {
+        display: flex;
+        gap: $spacing-xs;
+        margin-bottom: $spacing-lg;
+        border-bottom: 1px solid var(--border);
+    }
+
+    &__tab {
+        padding: $spacing-sm $spacing-lg;
+        font-weight: 500;
+        color: var(--text-secondary);
+        border-bottom: 2px solid transparent;
+        transition: all $transition-fast;
+
+        &:hover {
+            color: var(--text-primary);
+        }
+
+        &.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+    }
+
+    &__table {
+        background-color: var(--card-bg);
+        border-radius: $radius-lg;
+        overflow: hidden;
+        margin-bottom: $spacing-lg;
+    }
+}
+
+.transaction-form {
+    &__grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: $spacing-md;
+    }
+
+    &__full-width {
+        grid-column: span 2;
+    }
+}
+
+.return-form {
+    &__asset {
+        padding: $spacing-md;
+        background-color: var(--surface);
+        border-radius: $radius-md;
+        margin-bottom: $spacing-lg;
+        color: var(--text-primary);
+    }
+}
+
+.table-actions {
+    display: flex;
+    gap: $spacing-xs;
+}
+
+.transactions-loading {
+    @include flex-center;
+    min-height: 400px;
+}

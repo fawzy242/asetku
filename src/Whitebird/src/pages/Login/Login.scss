@@ -1,0 +1,48 @@
+@use '../../styles/variables' as *;
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-lg;
+
+    &__forgot {
+        text-align: right;
+    }
+
+    &__link {
+        color: var(--primary);
+        font-size: $font-size-sm;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+
+    &__reset {
+        text-align: center;
+        margin-top: $spacing-md;
+    }
+}
+
+.forgot-password-form {
+    &__text {
+        color: var(--text-secondary);
+        margin-bottom: $spacing-lg;
+    }
+}
+
+.reset-password-form {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+}
+
+.modal-actions {
+    display: flex;
+    gap: $spacing-md;
+    margin-top: $spacing-lg;
+
+    >* {
+        flex: 1;
+    }
+}

@@ -1,0 +1,113 @@
+@use '../../../styles/variables' as *;
+@use '../../../styles/mixins' as *;
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: $spacing-sm;
+    padding: $spacing-sm $spacing-lg;
+    border-radius: $radius-md;
+    font-weight: 500;
+    font-size: $font-size-sm;
+    line-height: 1.5;
+    transition: all $transition-fast;
+    cursor: pointer;
+    border: 1px solid transparent;
+    white-space: nowrap;
+
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    &--primary {
+        background-color: var(--primary);
+        color: white;
+
+        &:hover:not(:disabled) {
+            background-color: var(--primary-hover);
+        }
+    }
+
+    &--secondary {
+        background-color: var(--secondary);
+        color: white;
+
+        &:hover:not(:disabled) {
+            background-color: var(--secondary-hover);
+        }
+    }
+
+    &--outline {
+        background-color: transparent;
+        border-color: var(--border);
+        color: var(--text-primary);
+
+        &:hover:not(:disabled) {
+            background-color: var(--surface);
+            border-color: var(--primary);
+        }
+    }
+
+    &--text {
+        background-color: transparent;
+        color: var(--text-primary);
+
+        &:hover:not(:disabled) {
+            background-color: var(--surface);
+        }
+    }
+
+    &--danger {
+        background-color: var(--error);
+        color: white;
+
+        &:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+    }
+
+    &--sm {
+        padding: $spacing-xs $spacing-md;
+        font-size: $font-size-xs;
+    }
+
+    &--lg {
+        padding: $spacing-md $spacing-xl;
+        font-size: $font-size-base;
+    }
+
+    &--full-width {
+        width: 100%;
+    }
+
+    &--loading {
+        position: relative;
+        color: transparent;
+
+        .btn__spinner {
+            @include absolute-center;
+            width: 16px;
+            height: 16px;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+    }
+
+    &__icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+
+        &--start {
+            margin-right: $spacing-xs;
+        }
+
+        &--end {
+            margin-left: $spacing-xs;
+        }
+    }
+}

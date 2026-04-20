@@ -1,0 +1,53 @@
+@use '../../../styles/variables' as *;
+
+.card {
+    background-color: var(--card-bg);
+    border-radius: $radius-lg;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    transition: box-shadow $transition-base, transform $transition-base;
+
+    &--hoverable:hover {
+        box-shadow: $shadow-lg;
+        transform: translateY(-2px);
+    }
+
+    &--no-padding {
+        .card__body {
+            padding: 0;
+        }
+    }
+
+    &__header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        padding: $spacing-lg $spacing-lg $spacing-md;
+        border-bottom: 1px solid var(--border);
+    }
+
+    &__header-content {
+        flex: 1;
+    }
+
+    &__title {
+        font-size: $font-size-lg;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: $spacing-xs;
+    }
+
+    &__subtitle {
+        font-size: $font-size-sm;
+        color: var(--text-secondary);
+    }
+
+    &__actions {
+        display: flex;
+        gap: $spacing-sm;
+    }
+
+    &__body {
+        padding: $spacing-lg;
+    }
+}

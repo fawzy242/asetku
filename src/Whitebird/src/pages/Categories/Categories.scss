@@ -1,0 +1,45 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.categories-menu {
+    &__header {
+        @include flex-between;
+        margin-bottom: $spacing-lg;
+    }
+
+    &__title {
+        font-size: $font-size-2xl;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    &__toolbar {
+        display: flex;
+        gap: $spacing-md;
+        margin-bottom: $spacing-lg;
+        flex-wrap: wrap;
+    }
+
+    &__table {
+        background-color: var(--card-bg);
+        border-radius: $radius-lg;
+        overflow: hidden;
+        margin-bottom: $spacing-lg;
+    }
+}
+
+.category-form {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+}
+
+.table-actions {
+    display: flex;
+    gap: $spacing-xs;
+}
+
+.categories-loading {
+    @include flex-center;
+    min-height: 400px;
+}

@@ -1,0 +1,21 @@
+@use '../../styles/variables' as *;
+
+.main-layout {
+    min-height: 100vh;
+    background-color: var(--background);
+
+    &__content {
+        margin-left: $sidebar-width;
+        transition: margin-left $transition-base;
+
+        &--expanded {
+            margin-left: $sidebar-collapsed-width;
+        }
+    }
+
+    &__main {
+        padding: $spacing-xl;
+        margin-top: $topbar-height;
+        min-height: calc(100vh - #{$topbar-height});
+    }
+}

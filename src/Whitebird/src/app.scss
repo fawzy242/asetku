@@ -1,0 +1,16 @@
+@use './styles/variables' as *;
+@use './styles/mixins' as *;
+
+.app {
+    min-height: 100vh;
+    background-color: var(--background);
+
+    &__loading {
+        @include flex-center;
+        min-height: 100vh;
+    }
+}
+
+#app {
+    min-height: 100vh;
+}

@@ -1,0 +1,58 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.auth-layout {
+    min-height: 100vh;
+    @include flex-center;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+    padding: $spacing-xl;
+
+    &__container {
+        width: 100%;
+        max-width: 450px;
+    }
+
+    &__card {
+        background-color: var(--card-bg);
+        border-radius: $radius-2xl;
+        padding: $spacing-2xl;
+        box-shadow: $shadow-xl;
+        animation: slideIn $transition-base;
+    }
+
+    &__logo {
+        @include flex-center;
+        flex-direction: column;
+        margin-bottom: $spacing-xl;
+    }
+
+    &__logo-icon {
+        font-size: 48px;
+        margin-bottom: $spacing-sm;
+    }
+
+    &__logo-text {
+        font-size: $font-size-2xl;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: -0.5px;
+    }
+
+    &__title {
+        font-size: $font-size-xl;
+        font-weight: 600;
+        color: var(--text-primary);
+        text-align: center;
+        margin-bottom: $spacing-xl;
+    }
+
+    &__footer {
+        position: fixed;
+        bottom: $spacing-lg;
+        left: 0;
+        right: 0;
+        text-align: center;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: $font-size-sm;
+    }
+}

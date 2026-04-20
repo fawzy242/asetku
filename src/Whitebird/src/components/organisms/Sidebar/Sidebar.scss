@@ -1,0 +1,176 @@
+@use '../../../styles/variables' as *;
+@use '../../../styles/mixins' as *;
+
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: $sidebar-width;
+    background-color: var(--sidebar-bg);
+    display: flex;
+    flex-direction: column;
+    transition: width $transition-base;
+    z-index: $z-index-fixed;
+    box-shadow: $shadow-lg;
+
+    &--collapsed {
+        width: $sidebar-collapsed-width;
+
+        .sidebar__link {
+            justify-content: center;
+            padding: $spacing-md;
+        }
+
+        .sidebar__logo {
+            justify-content: center;
+        }
+    }
+
+    &__header {
+        height: $topbar-height;
+        @include flex-center;
+        padding: 0 $spacing-lg;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    &__logo {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+
+        &--collapsed {
+            .sidebar__logo-icon {
+                font-size: 28px;
+            }
+        }
+    }
+
+    &__logo-icon {
+        font-size: 32px;
+    }
+
+    &__logo-text {
+        font-size: $font-size-xl;
+        font-weight: 700;
+        color: white;
+        letter-spacing: -0.5px;
+    }
+
+    &__nav {
+        flex: 1;
+        overflow-y: auto;
+        padding: $spacing-lg 0;
+        @include scrollbar;
+    }
+
+    &__menu {
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-xs;
+    }
+
+    &__item {
+        list-style: none;
+    }
+
+    &__link {
+        display: flex;
+        align-items: center;
+        gap: $spacing-md;
+        padding: $spacing-md $spacing-lg;
+        color: var(--sidebar-text);
+        text-decoration: none;
+        transition: all $transition-fast;
+        position: relative;
+        white-space: nowrap;
+
+        &:hover {
+            background-color: var(--sidebar-hover);
+            color: var(--sidebar-text-active);
+        }
+
+        &--active {
+            background-color: var(--primary);
+            color: white;
+
+            &:hover {
+                background-color: var(--primary-hover);
+            }
+        }
+
+        &--child {
+            padding-left: $spacing-3xl;
+            font-size: $font-size-sm;
+        }
+    }
+
+    &__icon {
+        @include flex-center;
+        width: 24px;
+        height: 24px;
+        font-size: 20px;
+    }
+
+    &__label {
+        flex: 1;
+        font-weight: 500;
+    }
+
+    &__arrow {
+        font-size: 10px;
+        transition: transform $transition-fast;
+
+        &--expanded {
+            transform: rotate(180deg);
+        }
+    }
+
+    &__badge {
+        padding: 2px $spacing-sm;
+        font-size: $font-size-xs;
+        font-weight: 600;
+        border-radius: $radius-full;
+
+        &--primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        &--warning {
+            background-color: var(--warning);
+            color: white;
+        }
+
+        &--info {
+            background-color: var(--info);
+            color: white;
+        }
+    }
+
+    &__submenu {
+        display: flex;
+        flex-direction: column;
+        animation: slideIn $transition-base;
+    }
+
+    &__footer {
+        padding: $spacing-lg;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    &__toggle {
+        width: 100%;
+        padding: $spacing-md;
+        background-color: var(--sidebar-hover);
+        color: var(--sidebar-text);
+        border-radius: $radius-md;
+        @include flex-center;
+        transition: all $transition-fast;
+
+        &:hover {
+            background-color: var(--primary);
+            color: white;
+        }
+    }
+}

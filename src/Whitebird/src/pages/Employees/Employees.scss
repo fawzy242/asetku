@@ -1,0 +1,47 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.employees-menu {
+    &__header {
+        @include flex-between;
+        margin-bottom: $spacing-lg;
+    }
+
+    &__title {
+        font-size: $font-size-2xl;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    &__toolbar {
+        display: flex;
+        gap: $spacing-md;
+        margin-bottom: $spacing-lg;
+        flex-wrap: wrap;
+    }
+
+    &__table {
+        background-color: var(--card-bg);
+        border-radius: $radius-lg;
+        overflow: hidden;
+        margin-bottom: $spacing-lg;
+    }
+}
+
+.employee-form {
+    &__grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: $spacing-md;
+    }
+}
+
+.table-actions {
+    display: flex;
+    gap: $spacing-xs;
+}
+
+.employees-loading {
+    @include flex-center;
+    min-height: 400px;
+}
