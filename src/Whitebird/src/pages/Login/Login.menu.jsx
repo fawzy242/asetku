@@ -1,20 +1,25 @@
 import React, { useState } from 'react';
 import Swal from 'sweetalert2';
-import LoginData from './Login.data';
+import { useAuth } from '../../context/AuthContext';
 import Input from '../../components/atoms/Input/Input';
 import Button from '../../components/atoms/Button/Button';
 import Modal from '../../components/molecules/Modal/Modal';
+import utilsHelper from '../../core/utils/utils.helper';
 
 const LoginMenu = ({ onLoginSuccess }) => {
+  const { login, forgotPassword, resetPassword } = useAuth();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
-  const [resetData, setResetData] = useState({ email: '', token: '', newPassword: '', confirmPassword: '' });
-  
-  const loginData = new LoginData();
+  const [resetData, setResetData] = useState({ 
+    email: '', 
+    token: '', 
+    newPassword: '', 
+    confirmPassword: '' 
+  });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -27,7 +32,7 @@ const LoginMenu = ({ onLoginSuccess }) => {
     
     if (!formData.email) {
       newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    } else if (!utilsHelper.validateEmail(formData.email)) {
       newErrors.email = 'Invalid email format';
     }
     
@@ -46,10 +51,10 @@ const LoginMenu = ({ onLoginSuccess }) => {
     
     setLoading(true);
     
-    const result = await loginData.handleLogin(formData.email, formData.password);
+    const result = await login(formData.email, formData.password);
     
     if (result.success) {
-      onLoginSuccess?.(result.data);
+      onLoginSuccess?.();
     } else {
       Swal.fire({
         title: 'Login Failed',
@@ -74,29 +79,17 @@ const LoginMenu = ({ onLoginSuccess }) => {
     }
     
     setLoading(true);
-    const result = await loginData.handleForgotPassword(forgotEmail);
+    const result = await forgotPassword(forgotEmail);
     setLoading(false);
     
     if (result.success) {
       setShowForgotModal(false);
-      Swal.fire({
-        title: 'Reset Email Sent',
-        text: result.message,
-        icon: 'success',
-        confirmButtonColor: '#dc2626'
-      });
-    } else {
-      Swal.fire({
-        title: 'Error',
-        text: result.error,
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
+      setForgotEmail('');
     }
   };
 
   const handleResetPassword = async () => {
-    const result = await loginData.handleResetPassword(
+    const result = await resetPassword(
       resetData.email,
       resetData.token,
       resetData.newPassword,
@@ -106,19 +99,6 @@ const LoginMenu = ({ onLoginSuccess }) => {
     if (result.success) {
       setShowResetModal(false);
       setResetData({ email: '', token: '', newPassword: '', confirmPassword: '' });
-      Swal.fire({
-        title: 'Password Reset',
-        text: result.message,
-        icon: 'success',
-        confirmButtonColor: '#dc2626'
-      });
-    } else {
-      Swal.fire({
-        title: 'Error',
-        text: result.error,
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
     }
   };
 

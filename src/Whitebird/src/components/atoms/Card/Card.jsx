@@ -1,21 +1,23 @@
-import React from 'react';
-import './Card.scss';
+import React from "react";
+import "./Card.scss";
 
 const Card = ({
   children,
   title = null,
   subtitle = null,
   actions = null,
-  className = '',
+  className = "",
   hoverable = false,
-  padding = true
+  padding = true,
 }) => {
   const classNames = [
-    'card',
-    hoverable ? 'card--hoverable' : '',
-    padding ? '' : 'card--no-padding',
-    className
-  ].filter(Boolean).join(' ');
+    "card",
+    hoverable ? "card--hoverable" : "",
+    padding ? "" : "card--no-padding",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div className={classNames}>
@@ -28,9 +30,7 @@ const Card = ({
           {actions && <div className="card__actions">{actions}</div>}
         </div>
       )}
-      <div className="card__body">
-        {children}
-      </div>
+      <div className="card__body">{children}</div>
     </div>
   );
 };

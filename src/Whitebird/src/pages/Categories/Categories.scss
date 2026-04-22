@@ -2,22 +2,86 @@
 @use '../../styles/mixins' as *;
 
 .categories-menu {
-    &__header {
-        @include flex-between;
+    &__tabs {
+        display: flex;
+        gap: $spacing-xs;
         margin-bottom: $spacing-lg;
+        border-bottom: 1px solid var(--border);
     }
 
-    &__title {
-        font-size: $font-size-2xl;
-        font-weight: 600;
-        color: var(--text-primary);
+    &__tab {
+        padding: $spacing-sm $spacing-lg;
+        font-weight: 500;
+        color: var(--text-secondary);
+        border-bottom: 2px solid transparent;
+        transition: all $transition-fast;
+
+        &:hover {
+            color: var(--primary);
+        }
+
+        &.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
     }
 
     &__toolbar {
         display: flex;
+        align-items: center;
         gap: $spacing-md;
         margin-bottom: $spacing-lg;
-        flex-wrap: wrap;
+    }
+
+    &__search {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        position: relative;
+
+        &-icon {
+            position: absolute;
+            left: $spacing-md;
+            color: var(--text-secondary);
+            font-size: 18px;
+            z-index: 1;
+        }
+
+        &-input {
+            flex: 1;
+            padding: $spacing-sm $spacing-md;
+            padding-left: 44px;
+            font-size: $font-size-sm;
+            color: var(--text-primary);
+            background-color: var(--input-bg);
+            border: 1px solid var(--input-border);
+            border-radius: $radius-md;
+            transition: all $transition-fast;
+
+            &:focus {
+                outline: none;
+                border-color: var(--primary);
+                box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+            }
+        }
+
+        &-clear {
+            position: absolute;
+            right: 90px;
+            @include flex-center;
+            width: 20px;
+            height: 20px;
+            color: var(--text-secondary);
+            background-color: var(--surface);
+            border-radius: $radius-full;
+            font-size: 14px;
+
+            &:hover {
+                background-color: var(--border);
+                color: var(--text-primary);
+            }
+        }
     }
 
     &__table {
@@ -25,6 +89,7 @@
         border-radius: $radius-lg;
         overflow: hidden;
         margin-bottom: $spacing-lg;
+        border: 1px solid var(--border);
     }
 }
 
@@ -42,4 +107,11 @@
 .categories-loading {
     @include flex-center;
     min-height: 400px;
+}
+
+.modal-actions {
+    display: flex;
+    gap: $spacing-md;
+    justify-content: flex-end;
+    margin-top: $spacing-lg;
 }

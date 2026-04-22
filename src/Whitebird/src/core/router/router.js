@@ -4,6 +4,7 @@ class Router {
     this.guards = [];
     this.currentRoute = null;
     this.layoutComponent = null;
+    this.root = null;
     
     window.addEventListener('popstate', () => this.handleRoute());
   }
@@ -49,7 +50,6 @@ class Router {
       return;
     }
 
-    // Run guards
     for (const guard of this.guards) {
       const result = await guard(route, path);
       if (result === false) {
@@ -62,7 +62,6 @@ class Router {
       }
     }
 
-    // Check auth requirement
     if (route.requiresAuth) {
       const token = localStorage.getItem('whitebird_session_token');
       if (!token) {
@@ -117,32 +116,45 @@ class Router {
     }
 
     try {
-      const component = await route.component();
-      const ComponentClass = component.default || component;
+      const componentModule = await route.component();
+      const ComponentClass = componentModule.default || componentModule;
       
-      let content;
+      const React = await import('react');
+      const ReactDOMClient = await import('react-dom/client');
+      
+      // Create root only once
+      if (!this.root) {
+        this.root = ReactDOMClient.createRoot(app);
+      }
+      
+      const componentProps = { params: route.params };
       
       if (this.layoutComponent && route.layout !== 'none') {
-        const Layout = await this.layoutComponent();
-        const LayoutClass = Layout.default || Layout;
-        const layoutInstance = new LayoutClass();
-        content = layoutInstance.render(ComponentClass, route);
+        const layoutModule = await this.layoutComponent();
+        const LayoutClass = layoutModule.default || layoutModule;
+        
+        this.root.render(
+          React.createElement(
+            LayoutClass,
+            { title: route.title },
+            React.createElement(ComponentClass, componentProps)
+          )
+        );
       } else {
-        const instance = new ComponentClass();
-        content = instance.render();
+        this.root.render(React.createElement(ComponentClass, componentProps));
       }
       
-      app.innerHTML = '';
-      app.appendChild(content);
-      
-      // Call mounted lifecycle if exists
-      const instance = new ComponentClass();
-      if (instance.mounted) {
-        await instance.mounted(route.params);
-      }
     } catch (error) {
       console.error('Failed to render route:', error);
-      app.innerHTML = '<div class="error-container"><h2>Failed to load page</h2></div>';
+      app.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; flex-direction: column; font-family: sans-serif; padding: 20px; text-align: center;">
+          <h1 style="color: #dc2626; font-size: 2rem; margin-bottom: 1rem;">Failed to load page</h1>
+          <p style="color: #6b7280; margin-bottom: 1rem;">${error.message}</p>
+          <button onclick="window.location.href='/dashboard'" style="padding: 0.5rem 1rem; background: #dc2626; color: white; border: none; border-radius: 0.375rem; cursor: pointer;">
+            Go to Dashboard
+          </button>
+        </div>
+      `;
     }
   }
 

@@ -80,6 +80,20 @@
     }
 }
 
+.input__password-toggle {
+    position: absolute;
+    right: $spacing-md;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    transition: color $transition-fast;
+
+    &:hover {
+        color: var(--text-primary);
+    }
+}
+
 .input__error {
     font-size: $font-size-xs;
     color: var(--error);

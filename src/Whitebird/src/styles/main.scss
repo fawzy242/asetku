@@ -11,6 +11,7 @@
 html {
     font-size: $font-size-base;
     @include scrollbar;
+    scroll-behavior: smooth;
 }
 
 body {
@@ -20,6 +21,16 @@ body {
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+
+    // Fix untuk Swal
+    &.swal2-shown {
+        overflow: hidden !important;
+        padding-right: 0 !important;
+    }
+
+    &.swal2-height-auto {
+        height: 100% !important;
+    }
 }
 
 a {
@@ -51,123 +62,82 @@ img {
     height: auto;
 }
 
-// Utility Classes
-.container {
-    width: 100%;
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 0 $spacing-lg;
+// Page Header
+.page-header {
+    @include flex-between;
+    margin-bottom: $spacing-lg;
 }
 
 .page-title {
     font-size: $font-size-2xl;
-    font-weight: 600;
-    margin-bottom: $spacing-lg;
+    font-weight: 700;
     color: var(--text-primary);
 }
 
-.page-header {
-    @include flex-between;
-    margin-bottom: $spacing-lg;
+// Smooth page transitions
+.fade-transition {
+    animation: fadeIn 0.3s ease-in-out;
+}
 
-    h1 {
-        font-size: $font-size-2xl;
-        font-weight: 600;
-        color: var(--text-primary);
+.slide-transition {
+    animation: slideIn 0.3s ease-in-out;
+}
+
+// SweetAlert2 Global Styles
+.swal2-container {
+    z-index: 9999 !important;
+}
+
+.swal-popup {
+    border-radius: $radius-xl !important;
+    padding: $spacing-xl !important;
+}
+
+.swal-title {
+    font-size: $font-size-xl !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+}
+
+.swal-text {
+    font-size: $font-size-base !important;
+    color: var(--text-secondary) !important;
+}
+
+.swal-confirm-btn {
+    background-color: var(--primary) !important;
+    border-radius: $radius-md !important;
+    padding: $spacing-sm $spacing-xl !important;
+    font-size: $font-size-sm !important;
+    font-weight: 500 !important;
+    transition: all $transition-fast !important;
+
+    &:hover {
+        background-color: var(--primary-hover) !important;
+        transform: translateY(-1px);
+    }
+
+    &:focus {
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.3) !important;
     }
 }
 
-.card {
-    background: var(--card-bg);
-    border-radius: $radius-lg;
-    padding: $spacing-lg;
-    box-shadow: $shadow-sm;
-    border: 1px solid var(--border);
-}
+.swal-cancel-btn {
+    background-color: var(--surface) !important;
+    color: var(--text-primary) !important;
+    border-radius: $radius-md !important;
+    padding: $spacing-sm $spacing-xl !important;
+    font-size: $font-size-sm !important;
+    font-weight: 500 !important;
+    transition: all $transition-fast !important;
 
-.grid {
-    display: grid;
-    gap: $spacing-lg;
-}
+    &:hover {
+        background-color: var(--border) !important;
+    }
 
-.flex {
-    display: flex;
-}
-
-.flex-col {
-    flex-direction: column;
-}
-
-.items-center {
-    align-items: center;
-}
-
-.justify-between {
-    justify-content: space-between;
-}
-
-.gap-sm {
-    gap: $spacing-sm;
-}
-
-.gap-md {
-    gap: $spacing-md;
-}
-
-.gap-lg {
-    gap: $spacing-lg;
-}
-
-.mt-sm {
-    margin-top: $spacing-sm;
-}
-
-.mt-md {
-    margin-top: $spacing-md;
-}
-
-.mt-lg {
-    margin-top: $spacing-lg;
-}
-
-.mb-sm {
-    margin-bottom: $spacing-sm;
-}
-
-.mb-md {
-    margin-bottom: $spacing-md;
-}
-
-.mb-lg {
-    margin-bottom: $spacing-lg;
-}
-
-.text-primary {
-    color: var(--primary);
-}
-
-.text-secondary {
-    color: var(--text-secondary);
-}
-
-.text-success {
-    color: var(--success);
-}
-
-.text-warning {
-    color: var(--warning);
-}
-
-.text-error {
-    color: var(--error);
-}
-
-.bg-primary {
-    background-color: var(--primary);
-}
-
-.bg-surface {
-    background-color: var(--surface);
+    &:focus {
+        box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.3) !important;
+    }
 }
 
 // Animation
@@ -184,7 +154,7 @@ img {
 @keyframes slideIn {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(8px);
     }
 
     to {
@@ -194,11 +164,11 @@ img {
 }
 
 .fade-in {
-    animation: fadeIn $transition-base;
+    animation: fadeIn 0.3s ease-in-out;
 }
 
 .slide-in {
-    animation: slideIn $transition-base;
+    animation: slideIn 0.3s ease-in-out;
 }
 
 // Loading spinner
@@ -214,5 +184,26 @@ img {
 @keyframes spin {
     to {
         transform: rotate(360deg);
+    }
+}
+
+// Responsive utilities
+@include respond-to('lg') {
+    .page-title {
+        font-size: $font-size-xl;
+    }
+}
+
+@include respond-to('md') {
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: $spacing-md;
+    }
+}
+
+@include respond-to('sm') {
+    .page-title {
+        font-size: $font-size-lg;
     }
 }

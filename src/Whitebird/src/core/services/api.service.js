@@ -1,7 +1,7 @@
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://localhost:5001/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 const SESSION_TOKEN_KEY = import.meta.env.VITE_SESSION_TOKEN_KEY || 'whitebird_session_token';
 
 class ApiService {
@@ -19,7 +19,6 @@ class ApiService {
   }
 
   setupInterceptors() {
-    // Request Interceptor
     this.instance.interceptors.request.use(
       (config) => {
         const token = localStorage.getItem(SESSION_TOKEN_KEY);
@@ -33,7 +32,6 @@ class ApiService {
       }
     );
 
-    // Response Interceptor
     this.instance.interceptors.response.use(
       (response) => {
         return response;
@@ -52,7 +50,9 @@ class ApiService {
         case 401:
           localStorage.removeItem(SESSION_TOKEN_KEY);
           localStorage.removeItem('user');
-          window.location.href = '/login';
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
           Swal.fire({
             title: 'Session Expired',
             text: 'Please login again to continue.',
@@ -68,10 +68,6 @@ class ApiService {
             icon: 'error',
             confirmButtonColor: '#dc2626'
           });
-          break;
-          
-        case 404:
-          // Handled locally in data layer
           break;
           
         case 500:

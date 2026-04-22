@@ -1,22 +1,18 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import AuthLayout from '../../layouts/AuthLayout/AuthLayout';
 import LoginMenu from './Login.menu';
 import './Login.scss';
 
 const Login = () => {
-  const { login } = useAuth();
+  const navigate = useNavigate();
+  const auth = useAuth();
 
-  const handleLoginSuccess = async (data) => {
-    // Redirect to dashboard
-    window.location.href = '/dashboard';
+  const handleLoginSuccess = () => {
+    navigate('/dashboard');
   };
 
-  return (
-    <AuthLayout title="Sign in to your account">
-      <LoginMenu onLoginSuccess={handleLoginSuccess} />
-    </AuthLayout>
-  );
+  return <LoginMenu onLoginSuccess={handleLoginSuccess} />;
 };
 
 export default Login;

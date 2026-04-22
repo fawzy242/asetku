@@ -1,0 +1,97 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.reports-menu {
+    &__stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: $spacing-lg;
+        margin-bottom: $spacing-xl;
+
+        @include respond-to('lg') {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        @include respond-to('sm') {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    &__stat-card {
+        display: flex;
+        align-items: center;
+        gap: $spacing-md;
+        padding: $spacing-lg;
+    }
+
+    &__stat-icon {
+        font-size: 32px;
+        color: var(--primary);
+    }
+
+    &__tabs {
+        display: flex;
+        gap: $spacing-xs;
+        margin-bottom: $spacing-lg;
+        border-bottom: 1px solid var(--border);
+    }
+
+    &__tab {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        padding: $spacing-sm $spacing-lg;
+        font-weight: 500;
+        color: var(--text-secondary);
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s ease;
+
+        &:hover {
+            color: var(--primary);
+        }
+
+        &.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+    }
+
+    &__filters {
+        margin-bottom: $spacing-lg;
+    }
+
+    &__filter-header {
+        display: flex;
+        gap: $spacing-md;
+        margin-bottom: $spacing-md;
+    }
+
+    &__filter-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: $spacing-md;
+        margin-bottom: $spacing-lg;
+
+        @include respond-to('md') {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        @include respond-to('sm') {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    &__filter-actions {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    &__table {
+        min-height: 400px;
+    }
+
+    &__loading {
+        @include flex-center;
+        min-height: 400px;
+    }
+}

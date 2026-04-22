@@ -12,6 +12,14 @@ import {
   LineElement
 } from 'chart.js';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
+import { 
+  FiPackage, 
+  FiCheckCircle, 
+  FiUser, 
+  FiTool, 
+  FiDollarSign, 
+  FiClock 
+} from 'react-icons/fi';
 import DashboardData from './Dashboard.data';
 import Card from '../../components/atoms/Card/Card';
 import DataTable from '../../components/molecules/DataTable/DataTable';
@@ -117,10 +125,9 @@ const DashboardMenu = () => {
 
   return (
     <div className="dashboard">
-      {/* Stats Cards */}
       <div className="dashboard__stats">
         <Card className="dashboard__stat-card">
-          <div className="dashboard__stat-icon">📦</div>
+          <div className="dashboard__stat-icon"><FiPackage /></div>
           <div className="dashboard__stat-content">
             <h3>Total Assets</h3>
             <p className="dashboard__stat-value">{stats.totalAssets || 0}</p>
@@ -128,7 +135,7 @@ const DashboardMenu = () => {
         </Card>
         
         <Card className="dashboard__stat-card">
-          <div className="dashboard__stat-icon">✅</div>
+          <div className="dashboard__stat-icon"><FiCheckCircle /></div>
           <div className="dashboard__stat-content">
             <h3>Available</h3>
             <p className="dashboard__stat-value">{stats.availableAssets || 0}</p>
@@ -136,7 +143,7 @@ const DashboardMenu = () => {
         </Card>
         
         <Card className="dashboard__stat-card">
-          <div className="dashboard__stat-icon">👤</div>
+          <div className="dashboard__stat-icon"><FiUser /></div>
           <div className="dashboard__stat-content">
             <h3>Assigned</h3>
             <p className="dashboard__stat-value">{stats.assignedAssets || 0}</p>
@@ -144,7 +151,7 @@ const DashboardMenu = () => {
         </Card>
         
         <Card className="dashboard__stat-card">
-          <div className="dashboard__stat-icon">🔧</div>
+          <div className="dashboard__stat-icon"><FiTool /></div>
           <div className="dashboard__stat-content">
             <h3>Under Repair</h3>
             <p className="dashboard__stat-value">{stats.underRepairAssets || 0}</p>
@@ -152,7 +159,7 @@ const DashboardMenu = () => {
         </Card>
         
         <Card className="dashboard__stat-card">
-          <div className="dashboard__stat-icon">💰</div>
+          <div className="dashboard__stat-icon"><FiDollarSign /></div>
           <div className="dashboard__stat-content">
             <h3>Total Value</h3>
             <p className="dashboard__stat-value">
@@ -162,7 +169,7 @@ const DashboardMenu = () => {
         </Card>
         
         <Card className="dashboard__stat-card">
-          <div className="dashboard__stat-icon">⏳</div>
+          <div className="dashboard__stat-icon"><FiClock /></div>
           <div className="dashboard__stat-content">
             <h3>Pending Approvals</h3>
             <p className="dashboard__stat-value">{stats.pendingTransactions || 0}</p>
@@ -170,7 +177,6 @@ const DashboardMenu = () => {
         </Card>
       </div>
 
-      {/* Charts */}
       <div className="dashboard__charts">
         <Card title="Asset Status Distribution" className="dashboard__chart-card">
           <Doughnut 
@@ -203,7 +209,6 @@ const DashboardMenu = () => {
         </Card>
       </div>
 
-      {/* Alerts Section */}
       <div className="dashboard__alerts">
         {expiredWarranty.length > 0 && (
           <Card 
@@ -242,7 +247,6 @@ const DashboardMenu = () => {
         )}
       </div>
 
-      {/* Recent Transactions */}
       <Card title="Recent Transactions" className="dashboard__transactions">
         <DataTable
           rows={recentTransactions.data || []}

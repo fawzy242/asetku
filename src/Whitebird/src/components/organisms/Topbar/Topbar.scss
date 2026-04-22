@@ -5,7 +5,6 @@
     position: fixed;
     top: 0;
     right: 0;
-    left: $sidebar-width;
     height: $topbar-height;
     background-color: var(--card-bg);
     border-bottom: 1px solid var(--border);
@@ -14,49 +13,67 @@
     justify-content: space-between;
     padding: 0 $spacing-xl;
     z-index: $z-index-sticky;
-    transition: left $transition-base;
+    transition: left $transition-base, width $transition-base;
+    left: var(--sidebar-width, $sidebar-width);
+    width: calc(100% - var(--sidebar-width, $sidebar-width));
+    backdrop-filter: blur(10px);
+    background-color: rgba(var(--card-bg-rgb, 255, 255, 255), 0.95);
 
-    .sidebar--collapsed~& {
-        left: $sidebar-collapsed-width;
+    [data-theme='dark'] & {
+        background-color: rgba(31, 41, 55, 0.95);
     }
 
     &__left {
         display: flex;
         align-items: center;
+        min-width: 180px;
     }
 
     &__title {
         font-size: $font-size-xl;
-        font-weight: 600;
+        font-weight: 700;
         color: var(--text-primary);
+        letter-spacing: -0.5px;
     }
 
     &__center {
         flex: 1;
-        max-width: 500px;
+        display: flex;
+        justify-content: center;
         margin: 0 $spacing-xl;
     }
 
     &__search {
         position: relative;
         width: 100%;
+        max-width: 480px;
+    }
+
+    &__search-icon {
+        position: absolute;
+        left: $spacing-md;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-secondary);
+        pointer-events: none;
     }
 
     &__search-input {
         width: 100%;
         padding: $spacing-sm $spacing-lg;
-        padding-right: 50px;
+        padding-left: 44px;
+        padding-right: 40px;
         font-size: $font-size-sm;
         color: var(--text-primary);
         background-color: var(--surface);
         border: 1px solid var(--border);
-        border-radius: $radius-full;
+        border-radius: $radius-lg;
         transition: all $transition-fast;
 
         &:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+            box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.1);
         }
 
         &::placeholder {
@@ -64,38 +81,96 @@
         }
     }
 
-    &__search-btn {
+    &__search-clear {
         position: absolute;
         right: $spacing-sm;
         top: 50%;
         transform: translateY(-50%);
-        padding: $spacing-xs;
+        @include flex-center;
+        width: 28px;
+        height: 28px;
         color: var(--text-secondary);
-        transition: color $transition-fast;
+        border-radius: $radius-full;
 
         &:hover {
-            color: var(--primary);
+            background-color: var(--border);
+            color: var(--text-primary);
         }
+    }
+
+    &__search-results {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        right: 0;
+        background-color: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: $radius-lg;
+        box-shadow: $shadow-xl;
+        max-height: 400px;
+        overflow-y: auto;
+        z-index: $z-index-dropdown;
+    }
+
+    &__search-result {
+        display: flex;
+        align-items: center;
+        padding: $spacing-md $spacing-lg;
+        cursor: pointer;
+        transition: background-color $transition-fast;
+
+        &:hover {
+            background-color: var(--surface);
+        }
+
+        &-type {
+            text-transform: uppercase;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--primary);
+            background-color: rgba(220, 38, 38, 0.1);
+            padding: 2px 8px;
+            border-radius: $radius-sm;
+            margin-right: $spacing-md;
+        }
+
+        &-title {
+            flex: 1;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        &-code {
+            font-size: $font-size-xs;
+            color: var(--text-secondary);
+        }
+    }
+
+    &__search-loading,
+    &__search-empty {
+        padding: $spacing-xl;
+        text-align: center;
+        color: var(--text-secondary);
     }
 
     &__right {
         display: flex;
         align-items: center;
-        gap: $spacing-md;
+        gap: $spacing-sm;
     }
 
     &__theme-toggle {
         @include flex-center;
         width: 40px;
         height: 40px;
-        font-size: 20px;
-        background-color: var(--surface);
-        border-radius: $radius-full;
+        color: var(--text-secondary);
+        background-color: transparent;
+        border-radius: $radius-lg;
         transition: all $transition-fast;
 
         &:hover {
-            background-color: var(--primary);
-            color: white;
+            background-color: var(--surface);
+            color: var(--primary);
         }
     }
 
@@ -107,22 +182,22 @@
         @include flex-center;
         width: 40px;
         height: 40px;
-        font-size: 20px;
-        background-color: var(--surface);
-        border-radius: $radius-full;
+        color: var(--text-secondary);
+        background-color: transparent;
+        border-radius: $radius-lg;
         transition: all $transition-fast;
         position: relative;
 
         &:hover {
-            background-color: var(--primary);
-            color: white;
+            background-color: var(--surface);
+            color: var(--primary);
         }
     }
 
     &__notification-badge {
         position: absolute;
-        top: -2px;
-        right: -2px;
+        top: 2px;
+        right: 2px;
         min-width: 18px;
         height: 18px;
         padding: 0 4px;
@@ -178,6 +253,7 @@
         padding: $spacing-md $spacing-lg;
         border-bottom: 1px solid var(--border);
         transition: background-color $transition-fast;
+        cursor: pointer;
 
         &:hover {
             background-color: var(--surface);
@@ -193,7 +269,8 @@
         width: 32px;
         height: 32px;
         background-color: var(--surface);
-        border-radius: $radius-full;
+        border-radius: $radius-md;
+        color: var(--primary);
     }
 
     &__notification-content {
@@ -225,19 +302,13 @@
         display: flex;
         align-items: center;
         gap: $spacing-sm;
-        padding: $spacing-xs;
-        padding-right: $spacing-md;
-        background-color: var(--surface);
-        border-radius: $radius-full;
+        padding: $spacing-xs $spacing-sm;
+        background-color: transparent;
+        border-radius: $radius-lg;
         transition: all $transition-fast;
 
         &:hover {
-            background-color: var(--primary);
-
-            .topbar__user-name,
-            .topbar__user-arrow {
-                color: white;
-            }
+            background-color: var(--surface);
         }
     }
 
@@ -245,20 +316,21 @@
         @include flex-center;
         width: 36px;
         height: 36px;
-        background-color: var(--primary);
+        background: linear-gradient(135deg, var(--primary), var(--primary-hover));
         color: white;
         font-weight: 600;
-        border-radius: $radius-full;
+        font-size: $font-size-base;
+        border-radius: $radius-md;
         text-transform: uppercase;
     }
 
     &__user-name {
         font-weight: 500;
         color: var(--text-primary);
+        font-size: $font-size-sm;
     }
 
     &__user-arrow {
-        font-size: 10px;
         color: var(--text-secondary);
     }
 
@@ -266,7 +338,7 @@
         position: absolute;
         top: calc(100% + 10px);
         right: 0;
-        width: 280px;
+        width: 260px;
         background-color: var(--card-bg);
         border: 1px solid var(--border);
         border-radius: $radius-lg;
@@ -287,11 +359,11 @@
         @include flex-center;
         width: 48px;
         height: 48px;
-        background-color: var(--primary);
+        background: linear-gradient(135deg, var(--primary), var(--primary-hover));
         color: white;
         font-size: $font-size-lg;
         font-weight: 600;
-        border-radius: $radius-full;
+        border-radius: $radius-md;
         text-transform: uppercase;
     }
 
@@ -309,20 +381,31 @@
     &__user-menu {
         padding: $spacing-sm;
 
+        li {
+            list-style: none;
+        }
+
         button {
             width: 100%;
             display: flex;
             align-items: center;
             gap: $spacing-md;
-            padding: $spacing-md;
+            padding: $spacing-sm $spacing-md;
             color: var(--text-primary);
             border-radius: $radius-md;
             transition: all $transition-fast;
             text-align: left;
+            font-size: $font-size-sm;
 
             &:hover {
                 background-color: var(--surface);
             }
         }
+    }
+
+    &__user-menu-divider {
+        height: 1px;
+        background-color: var(--border);
+        margin: $spacing-sm 0;
     }
 }

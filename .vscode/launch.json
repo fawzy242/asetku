@@ -2,21 +2,79 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch Whitebird",
+      "name": "🚀 Full Stack (Backend + Frontend)",
+      "type": "node",
+      "request": "launch",
+      "preLaunchTask": "start-fullstack",
+      "program": "${workspaceFolder}/src/Whitebird/node_modules/vite/bin/vite.js",
+      "args": ["--host"],
+      "cwd": "${workspaceFolder}/src/Whitebird",
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "Local:\\s+(http://localhost:\\d+)",
+        "uriFormat": "%s"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "name": "🔧 Backend Only",
       "type": "coreclr",
       "request": "launch",
-      "preLaunchTask": "build Whitebird",
+      "preLaunchTask": "build-backend",
       "program": "${workspaceFolder}/src/Whitebird/bin/Debug/net8.0/Whitebird.dll",
       "args": [],
       "cwd": "${workspaceFolder}/src/Whitebird",
       "stopAtEntry": false,
       "serverReadyAction": {
         "action": "openExternally",
-        "pattern": "Now listening on: (https?://\\S+)"
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+        "uriFormat": "%s/swagger"
       },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "name": "🎨 Frontend Only",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/Whitebird/node_modules/vite/bin/vite.js",
+      "args": ["--host"],
+      "cwd": "${workspaceFolder}/src/Whitebird",
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "Local:\\s+(http://localhost:\\d+)",
+        "uriFormat": "%s"
+      },
+      "env": {
+        "VITE_BACKEND_URL": "https://localhost:5001"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "name": "📦 Backend (No Browser)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-backend",
+      "program": "${workspaceFolder}/src/Whitebird/bin/Debug/net8.0/Whitebird.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/src/Whitebird",
+      "stopAtEntry": false,
+      "launchBrowser": false,
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     }
-  ]
+  ],
+  "compounds": []
 }

@@ -1,4 +1,5 @@
 @use '../../../styles/variables' as *;
+@use '../../../styles/mixins' as *;
 
 .card {
     background-color: var(--card-bg);
@@ -19,10 +20,8 @@
     }
 
     &__header {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        padding: $spacing-lg $spacing-lg $spacing-md;
+        @include flex-between;
+        padding: $spacing-lg;
         border-bottom: 1px solid var(--border);
     }
 

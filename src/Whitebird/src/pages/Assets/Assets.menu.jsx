@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import Swal from 'sweetalert2';
+import { FiEdit2, FiTrash2, FiPlus, FiFilter, FiSearch, FiX } from 'react-icons/fi';
 import AssetsData from './Assets.data';
 import DataTable from '../../components/molecules/DataTable/DataTable';
 import Pagination from '../../components/molecules/Pagination/Pagination';
-import SearchBar from '../../components/molecules/SearchBar/SearchBar';
-import FilterBar from '../../components/molecules/FilterBar/FilterBar';
 import Button from '../../components/atoms/Button/Button';
 import Badge from '../../components/atoms/Badge/Badge';
 import Modal from '../../components/molecules/Modal/Modal';
 import Input from '../../components/atoms/Input/Input';
 import Select from '../../components/atoms/Select/Select';
 import Spinner from '../../components/atoms/Spinner/Spinner';
+import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
 import utilsHelper from '../../core/utils/utils.helper';
+import './Assets.scss';
 
 const AssetsMenu = () => {
   const [loading, setLoading] = useState(true);
@@ -19,8 +21,11 @@ const AssetsMenu = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState('assetCode');
-  const [sortDescending, setSortDescending] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
   
   const [showModal, setShowModal] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
@@ -51,7 +56,23 @@ const AssetsMenu = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     
-    const result = await assetsData.loadGridData(page, pageSize, search, sortBy, sortDescending);
+    const filters = {};
+    if (statusFilter) filters.status = statusFilter;
+    if (categoryFilter) filters.categoryId = categoryFilter;
+    
+    let apiStatus = '';
+    if (activeTab === 'available') apiStatus = 'Available';
+    else if (activeTab === 'assigned') apiStatus = 'Assigned';
+    else if (activeTab === 'maintenance') apiStatus = 'Under Repair';
+    
+    const result = await assetsData.loadGridData(
+      page, 
+      pageSize, 
+      search, 
+      'assetCode', 
+      false, 
+      { ...filters, ...(apiStatus && { status: apiStatus }) }
+    );
     
     if (result.success) {
       setAssets(result.data.data || []);
@@ -59,7 +80,7 @@ const AssetsMenu = () => {
     }
     
     setLoading(false);
-  }, [page, pageSize, search, sortBy, sortDescending]);
+  }, [page, pageSize, search, statusFilter, categoryFilter, activeTab]);
 
   const loadDropdowns = async () => {
     const result = await assetsData.loadDropdownData();
@@ -73,13 +94,16 @@ const AssetsMenu = () => {
     loadDropdowns();
   }, [loadData]);
 
-  const handleSearch = (value) => {
-    setSearch(value);
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setSearch(searchInput);
     setPage(1);
   };
 
-  const handleFilter = (filters) => {
-    console.log('Filters:', filters);
+  const handleClearSearch = () => {
+    setSearchInput('');
+    setSearch('');
+    setPage(1);
   };
 
   const handleCreate = () => {
@@ -126,9 +150,16 @@ const AssetsMenu = () => {
   };
 
   const handleDelete = async (asset) => {
-    const result = await assetsData.deleteAsset(asset.assetId);
-    if (result.success) {
-      loadData();
+    const confirmed = await ConfirmDialog.showDelete(
+      'Delete Asset',
+      `Are you sure you want to delete ${asset.assetName}?`
+    );
+    
+    if (confirmed) {
+      const result = await assetsData.deleteAsset(asset.assetId);
+      if (result.success) {
+        loadData();
+      }
     }
   };
 
@@ -154,11 +185,10 @@ const AssetsMenu = () => {
     { field: 'categoryName', headerName: 'Category', width: 150 },
     { field: 'brand', headerName: 'Brand', width: 120 },
     { field: 'model', headerName: 'Model', width: 120 },
-    { field: 'serialNumber', headerName: 'Serial Number', width: 150 },
     {
       field: 'status',
       headerName: 'Status',
-      width: 120,
+      width: 130,
       renderCell: (params) => (
         <Badge variant={utilsHelper.getStatusColor(params.value)}>
           {params.value}
@@ -179,27 +209,26 @@ const AssetsMenu = () => {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 150,
+      width: 120,
       sortable: false,
       renderCell: (params) => (
         <div className="table-actions">
-          <Button
-            variant="text"
-            size="sm"
-            onClick={() => handleEdit(params.row)}
-          >
-            ✏️
+          <Button variant="text" size="sm" onClick={() => handleEdit(params.row)} title="Edit">
+            <FiEdit2 />
           </Button>
-          <Button
-            variant="text"
-            size="sm"
-            onClick={() => handleDelete(params.row)}
-          >
-            🗑️
+          <Button variant="text" size="sm" onClick={() => handleDelete(params.row)} title="Delete">
+            <FiTrash2 />
           </Button>
         </div>
       )
     }
+  ];
+
+  const tabs = [
+    { id: 'all', label: 'All Assets' },
+    { id: 'available', label: 'Available' },
+    { id: 'assigned', label: 'Assigned' },
+    { id: 'maintenance', label: 'Under Repair' },
   ];
 
   if (loading && assets.length === 0) {
@@ -212,34 +241,86 @@ const AssetsMenu = () => {
 
   return (
     <div className="assets-menu">
-      <div className="assets-menu__header">
-        <h2 className="assets-menu__title">Asset Management</h2>
-        <Button variant="primary" onClick={handleCreate}>
-          + Add Asset
+      <div className="page-header">
+        <h1 className="page-title">Asset Management</h1>
+        <Button variant="primary" onClick={handleCreate} startIcon={<FiPlus />}>
+          Add Asset
         </Button>
       </div>
       
+      <div className="assets-menu__tabs">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            className={`assets-menu__tab ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      
       <div className="assets-menu__toolbar">
-        <SearchBar
-          placeholder="Search assets..."
-          onSearch={handleSearch}
-          debounceTime={300}
-        />
-        <FilterBar
-          filters={[
-            { field: 'status', label: 'Status', type: 'select', options: [
+        <form className="assets-menu__search" onSubmit={handleSearch}>
+          <FiSearch className="assets-menu__search-icon" />
+          <input
+            type="text"
+            className="assets-menu__search-input"
+            placeholder="Search by code, name, serial number..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+          {searchInput && (
+            <button type="button" className="assets-menu__search-clear" onClick={handleClearSearch}>
+              <FiX />
+            </button>
+          )}
+          <Button type="submit" variant="primary" size="sm">
+            Search
+          </Button>
+        </form>
+        
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => setShowFilters(!showFilters)}
+          startIcon={<FiFilter />}
+        >
+          Filter
+        </Button>
+      </div>
+      
+      {showFilters && (
+        <div className="assets-menu__filters">
+          <Select
+            label="Status"
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
+            options={[
+              { value: '', label: 'All Status' },
               { value: 'Available', label: 'Available' },
               { value: 'Assigned', label: 'Assigned' },
               { value: 'Under Repair', label: 'Under Repair' },
               { value: 'Retired', label: 'Retired' }
-            ]},
-            { field: 'categoryId', label: 'Category', type: 'select', options: 
-              dropdownData.categories.map(c => ({ value: c.categoryId, label: c.categoryName }))
-            }
-          ]}
-          onFilter={handleFilter}
-        />
-      </div>
+            ]}
+          />
+          <Select
+            label="Category"
+            value={categoryFilter}
+            onChange={(e) => {
+              setCategoryFilter(e.target.value);
+              setPage(1);
+            }}
+            options={[
+              { value: '', label: 'All Categories' },
+              ...dropdownData.categories.map(c => ({ value: c.categoryId, label: c.categoryName }))
+            ]}
+          />
+        </div>
+      )}
       
       <div className="assets-menu__table">
         <DataTable
@@ -263,7 +344,6 @@ const AssetsMenu = () => {
         }}
       />
 
-      {/* Asset Form Modal */}
       <Modal
         isOpen={showModal}
         onClose={() => setShowModal(false)}

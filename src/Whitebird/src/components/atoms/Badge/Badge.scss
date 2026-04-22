@@ -1,0 +1,52 @@
+@use '../../../styles/variables' as *;
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px;
+    font-size: $font-size-xs;
+    font-weight: 500;
+    border-radius: $radius-full;
+    white-space: nowrap;
+
+    &--primary {
+        background-color: var(--primary);
+        color: white;
+    }
+
+    &--secondary {
+        background-color: var(--secondary);
+        color: white;
+    }
+
+    &--success {
+        background-color: var(--success);
+        color: white;
+    }
+
+    &--warning {
+        background-color: var(--warning);
+        color: white;
+    }
+
+    &--error {
+        background-color: var(--error);
+        color: white;
+    }
+
+    &--info {
+        background-color: var(--info);
+        color: white;
+    }
+
+    &--sm {
+        padding: 0 6px;
+        font-size: 10px;
+    }
+
+    &--lg {
+        padding: 4px 12px;
+        font-size: $font-size-sm;
+    }
+}

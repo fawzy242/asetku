@@ -1,116 +1,73 @@
-import React, { useState, useEffect } from 'react';
-import Sidebar from '../../components/organisms/Sidebar/Sidebar';
-import Topbar from '../../components/organisms/Topbar/Topbar';
-import './MainLayout.scss';
+import React, { useState, useEffect } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import Sidebar from "../../components/organisms/Sidebar/Sidebar";
+import Topbar from "../../components/organisms/Topbar/Topbar";
+import Footer from "../../components/organisms/Footer/Footer";
+import { useTheme } from "../../context/ThemeContext";
+import { useAuth } from "../../context/AuthContext";
+import "./MainLayout.scss";
 
-const menuItems = [
-  {
-    id: 'dashboard',
-    label: 'Dashboard',
-    icon: '📊',
-    path: '/dashboard'
-  },
-  {
-    id: 'assets',
-    label: 'Assets',
-    icon: '📦',
-    path: '/assets'
-  },
-  {
-    id: 'transactions',
-    label: 'Transactions',
-    icon: '🔄',
-    path: '/transactions'
-  },
-  {
-    id: 'employees',
-    label: 'Employees',
-    icon: '👥',
-    path: '/employees'
-  },
-  {
-    id: 'master-data',
-    label: 'Master Data',
-    icon: '📋',
-    path: null,
-    children: [
-      {
-        id: 'categories',
-        label: 'Categories',
-        path: '/categories'
-      },
-      {
-        id: 'suppliers',
-        label: 'Suppliers',
-        path: '/suppliers'
-      },
-      {
-        id: 'locations',
-        label: 'Locations',
-        path: '/locations'
-      }
-    ]
-  },
-  {
-    id: 'reports',
-    label: 'Reports',
-    icon: '📈',
-    path: '/reports'
-  }
-];
+const pageTitles = {
+  "/dashboard": "Dashboard",
+  "/assets": "Asset Management",
+  "/transactions": "Asset Transactions",
+  "/employees": "Employee Management",
+  "/categories": "Category Management",
+  "/suppliers": "Supplier Management",
+  "/locations": "Location Management",
+  "/reports": "Reports & Analytics",
+  "/profile": "My Profile",
+  "/settings": "Settings",
+};
 
-const MainLayout = ({
-  children,
-  title = 'Dashboard',
-  onSearch,
-  onLogout,
-  onProfileClick,
-  theme = 'light',
-  onThemeToggle,
-  user = null
-}) => {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+const MainLayout = () => {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem("sidebar-collapsed");
+    return saved === "true";
+  });
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
+
+  const currentPath = location.pathname;
+  const title = pageTitles[currentPath] || "Dashboard";
 
   useEffect(() => {
-    const handleRouteChange = () => {
-      setCurrentPath(window.location.pathname);
-    };
-    
-    window.addEventListener('popstate', handleRouteChange);
-    return () => window.removeEventListener('popstate', handleRouteChange);
-  }, []);
+    const sidebarWidth = sidebarCollapsed ? "80" : "260";
+    document.documentElement.style.setProperty("--sidebar-width", `${sidebarWidth}px`);
+    localStorage.setItem("sidebar-collapsed", sidebarCollapsed);
+  }, [sidebarCollapsed]);
 
   const handleNavigate = (path) => {
-    window.history.pushState({}, '', path);
-    setCurrentPath(path);
-    window.dispatchEvent(new PopStateEvent('popstate'));
+    navigate(path);
   };
 
   return (
     <div className="main-layout" data-theme={theme}>
       <Sidebar
-        menuItems={menuItems}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        activePath={currentPath}
         onNavigate={handleNavigate}
       />
-      
-      <div className={`main-layout__content ${sidebarCollapsed ? 'main-layout__content--expanded' : ''}`}>
+
+      <div
+        className={`main-layout__content ${
+          sidebarCollapsed ? "main-layout__content--expanded" : ""
+        }`}
+      >
         <Topbar
           title={title}
           user={user}
-          onSearch={onSearch}
-          onThemeToggle={onThemeToggle}
-          onLogout={onLogout}
-          onProfileClick={onProfileClick}
+          onThemeToggle={toggleTheme}
           theme={theme}
         />
-        
+
         <main className="main-layout__main">
-          {children}
+          <Outlet />
         </main>
+
+        <Footer />
       </div>
     </div>
   );

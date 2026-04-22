@@ -5,6 +5,7 @@
     @include flex-center;
     min-height: 100vh;
     padding: $spacing-xl;
+    background-color: var(--background);
 
     &__content {
         text-align: center;

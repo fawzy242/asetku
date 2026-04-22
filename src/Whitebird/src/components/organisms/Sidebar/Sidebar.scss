@@ -7,67 +7,97 @@
     top: 0;
     bottom: 0;
     width: $sidebar-width;
-    background-color: var(--sidebar-bg);
+    background: linear-gradient(180deg, var(--sidebar-bg) 0%, darken(#1f2937, 5%) 100%);
     display: flex;
     flex-direction: column;
     transition: width $transition-base;
     z-index: $z-index-fixed;
-    box-shadow: $shadow-lg;
+    box-shadow: $shadow-xl;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
 
     &--collapsed {
         width: $sidebar-collapsed-width;
 
+        .sidebar__header {
+            justify-content: center;
+            padding: 0;
+        }
+
         .sidebar__link {
             justify-content: center;
-            padding: $spacing-md;
+            padding: 12px;
+            margin: 0 $spacing-xs;
         }
 
         .sidebar__logo {
-            justify-content: center;
+            display: none;
         }
     }
 
     &__header {
         height: $topbar-height;
-        @include flex-center;
-        padding: 0 $spacing-lg;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 $spacing-md 0 $spacing-lg;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     &__logo {
         display: flex;
         align-items: center;
         gap: $spacing-sm;
-
-        &--collapsed {
-            .sidebar__logo-icon {
-                font-size: 28px;
-            }
-        }
     }
 
     &__logo-icon {
-        font-size: 32px;
+        @include flex-center;
+        width: 34px;
+        height: 34px;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+        color: white;
+        font-weight: 700;
+        font-size: 18px;
+        border-radius: $radius-md;
+        box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
     }
 
     &__logo-text {
-        font-size: $font-size-xl;
+        font-size: $font-size-lg;
         font-weight: 700;
         color: white;
         letter-spacing: -0.5px;
     }
 
+    &__toggle-btn {
+        @include flex-center;
+        width: 34px;
+        height: 34px;
+        color: var(--sidebar-text);
+        border-radius: $radius-md;
+        transition: all $transition-fast;
+
+        &:hover {
+            background-color: var(--sidebar-hover);
+            color: white;
+        }
+
+        &--expand {
+            width: 40px;
+            height: 40px;
+        }
+    }
+
     &__nav {
         flex: 1;
         overflow-y: auto;
-        padding: $spacing-lg 0;
+        padding: $spacing-md $spacing-sm;
         @include scrollbar;
     }
 
     &__menu {
         display: flex;
         flex-direction: column;
-        gap: $spacing-xs;
+        gap: 2px;
     }
 
     &__item {
@@ -78,47 +108,72 @@
         display: flex;
         align-items: center;
         gap: $spacing-md;
-        padding: $spacing-md $spacing-lg;
+        padding: 10px $spacing-md;
         color: var(--sidebar-text);
         text-decoration: none;
         transition: all $transition-fast;
-        position: relative;
         white-space: nowrap;
+        border-radius: $radius-md;
+        position: relative;
 
         &:hover {
             background-color: var(--sidebar-hover);
-            color: var(--sidebar-text-active);
+            color: white;
         }
 
         &--active {
-            background-color: var(--primary);
+            background: linear-gradient(90deg, var(--primary) 0%, rgba(220, 38, 38, 0.15) 100%);
             color: white;
 
+            &::before {
+                content: '';
+                position: absolute;
+                left: 0;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 3px;
+                height: 20px;
+                background-color: var(--primary);
+                border-radius: 0 $radius-sm $radius-sm 0;
+            }
+
             &:hover {
-                background-color: var(--primary-hover);
+                background: linear-gradient(90deg, var(--primary-hover) 0%, rgba(220, 38, 38, 0.25) 100%);
             }
         }
 
         &--child {
-            padding-left: $spacing-3xl;
+            padding-left: $spacing-2xl;
             font-size: $font-size-sm;
+        }
+
+        &--logout {
+            color: var(--error);
+
+            &:hover {
+                background-color: rgba(239, 68, 68, 0.1);
+                color: var(--error);
+            }
         }
     }
 
     &__icon {
-        @include flex-center;
-        width: 24px;
-        height: 24px;
-        font-size: 20px;
+        flex-shrink: 0;
+        transition: transform $transition-fast;
+
+        .sidebar__link:hover & {
+            transform: scale(1.05);
+        }
     }
 
     &__label {
         flex: 1;
         font-weight: 500;
+        font-size: $font-size-sm;
     }
 
     &__arrow {
-        font-size: 10px;
+        flex-shrink: 0;
         transition: transform $transition-fast;
 
         &--expanded {
@@ -126,51 +181,32 @@
         }
     }
 
-    &__badge {
-        padding: 2px $spacing-sm;
-        font-size: $font-size-xs;
-        font-weight: 600;
-        border-radius: $radius-full;
-
-        &--primary {
-            background-color: var(--primary);
-            color: white;
-        }
-
-        &--warning {
-            background-color: var(--warning);
-            color: white;
-        }
-
-        &--info {
-            background-color: var(--info);
-            color: white;
-        }
-    }
-
     &__submenu {
         display: flex;
         flex-direction: column;
-        animation: slideIn $transition-base;
+        margin-left: 28px;
+        padding-left: $spacing-md;
+        border-left: 1px dashed rgba(255, 255, 255, 0.15);
+        margin-top: 2px;
+        margin-bottom: 2px;
     }
 
     &__footer {
-        padding: $spacing-lg;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding: $spacing-md;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        margin-top: auto;
     }
 
-    &__toggle {
-        width: 100%;
-        padding: $spacing-md;
-        background-color: var(--sidebar-hover);
-        color: var(--sidebar-text);
-        border-radius: $radius-md;
-        @include flex-center;
-        transition: all $transition-fast;
+    &__version {
+        text-align: center;
+        margin-top: $spacing-md;
 
-        &:hover {
-            background-color: var(--primary);
-            color: white;
+        span {
+            font-size: 10px;
+            color: var(--sidebar-text);
+            opacity: 0.4;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
     }
 }

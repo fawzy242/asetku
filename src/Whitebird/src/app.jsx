@@ -1,71 +1,114 @@
-import React, { useEffect } from 'react';
-import { AuthProvider } from './context/AuthContext';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
-import router from './core/router/router';
-import MainLayout from './layouts/MainLayout/MainLayout';
+import { NotificationProvider } from './context/NotificationContext';
 import './app.scss';
 
-// Lazy load pages
-const Login = React.lazy(() => import('./pages/Login/Login'));
-const Dashboard = React.lazy(() => import('./pages/Dashboard/Dashboard'));
-const Assets = React.lazy(() => import('./pages/Assets/Assets'));
-const NotFound = React.lazy(() => import('./pages/NotFound/NotFound'));
+import MainLayout from './layouts/MainLayout/MainLayout';
+import AuthLayout from './layouts/AuthLayout/AuthLayout';
+
+import Login from './pages/Login/Login';
+import Dashboard from './pages/Dashboard/Dashboard';
+import Assets from './pages/Assets/Assets';
+import AssetTransactions from './pages/AssetTransactions/AssetTransactions';
+import Employees from './pages/Employees/Employees';
+import Categories from './pages/Categories/Categories';
+import Suppliers from './pages/Suppliers/Suppliers';
+import Locations from './pages/Locations/Locations';
+import Reports from './pages/Reports/Reports';
+import Profile from './pages/Profile/Profile';
+import NotFound from './pages/NotFound/NotFound';
+
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
+  const location = useLocation();
+  
+  if (loading) {
+    return (
+      <div className="app__loading">
+        <div className="spinner" />
+      </div>
+    );
+  }
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  
+  return children;
+};
+
+const PublicRoute = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="app__loading">
+        <div className="spinner" />
+      </div>
+    );
+  }
+  
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return children;
+};
+
+const AppRoutes = () => {
+  return (
+    <Routes>
+      <Route path="/login" element={
+        <PublicRoute>
+          <AuthLayout title="Sign in to your account">
+            <Login />
+          </AuthLayout>
+        </PublicRoute>
+      } />
+      
+      <Route path="/" element={
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      }>
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="assets" element={<Assets />} />
+        <Route path="transactions" element={<AssetTransactions />} />
+        <Route path="employees" element={<Employees />} />
+        <Route path="categories" element={<Categories />} />
+        <Route path="suppliers" element={<Suppliers />} />
+        <Route path="locations" element={<Locations />} />
+        <Route path="reports" element={<Reports />} />
+        <Route path="profile" element={<Profile />} />
+      </Route>
+      
+      <Route path="/404" element={<NotFound />} />
+      <Route path="*" element={<Navigate to="/404" replace />} />
+    </Routes>
+  );
+};
 
 const App = () => {
-  useEffect(() => {
-    // Setup router
-    router.setLayout(() => MainLayout);
-    
-    router
-      .register('/', () => Dashboard, { title: 'Dashboard', requiresAuth: true })
-      .register('/dashboard', () => Dashboard, { title: 'Dashboard', requiresAuth: true })
-      .register('/assets', () => Assets, { title: 'Assets', requiresAuth: true })
-      .register('/transactions', () => NotFound, { title: 'Transactions', requiresAuth: true })
-      .register('/employees', () => NotFound, { title: 'Employees', requiresAuth: true })
-      .register('/categories', () => NotFound, { title: 'Categories', requiresAuth: true })
-      .register('/suppliers', () => NotFound, { title: 'Suppliers', requiresAuth: true })
-      .register('/locations', () => NotFound, { title: 'Locations', requiresAuth: true })
-      .register('/reports', () => NotFound, { title: 'Reports', requiresAuth: true })
-      .register('/profile', () => NotFound, { title: 'Profile', requiresAuth: true })
-      .register('/login', () => Login, { title: 'Login', layout: 'none' })
-      .register('/404', () => NotFound, { title: 'Not Found' });
-
-    // Auth guard
-    router.guard((route) => {
-      if (route.requiresAuth) {
-        const token = localStorage.getItem('whitebird_session_token');
-        if (!token) {
-          return '/login';
-        }
-      }
-      
-      if (route.path === '/login') {
-        const token = localStorage.getItem('whitebird_session_token');
-        if (token) {
-          return '/dashboard';
-        }
-      }
-      
-      return true;
-    });
-
-    // Start router
-    router.handleRoute();
-  }, []);
-
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <div className="app">
-          <React.Suspense fallback={
-            <div className="app__loading">
-              <div className="spinner" />
+      <NotificationProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <div className="app">
+              <React.Suspense fallback={
+                <div className="app__loading">
+                  <div className="spinner" />
+                </div>
+              }>
+                <AppRoutes />
+              </React.Suspense>
             </div>
-          }>
-            <div id="app" />
-          </React.Suspense>
-        </div>
-      </AuthProvider>
+          </BrowserRouter>
+        </AuthProvider>
+      </NotificationProvider>
     </ThemeProvider>
   );
 };
