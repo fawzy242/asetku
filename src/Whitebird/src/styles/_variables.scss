@@ -13,6 +13,12 @@ $warning-light: #f59e0b;
 $error-light: #ef4444;
 $info-light: #3b82f6;
 
+// Sidebar Light Mode
+$sidebar-bg-light: #1f2937;
+$sidebar-text-light: #9ca3af;
+$sidebar-text-active-light: #ffffff;
+$sidebar-hover-light: #374151;
+
 // Color System - Dark Mode
 $primary-dark-mode: #ef4444;
 $primary-dark-mode-dark: #dc2626;
@@ -27,6 +33,12 @@ $success-dark: #34d399;
 $warning-dark: #fbbf24;
 $error-dark: #f87171;
 $info-dark: #60a5fa;
+
+// Sidebar Dark Mode
+$sidebar-bg-dark: #0f172a;
+$sidebar-text-dark: #94a3b8;
+$sidebar-text-active-dark: #ef4444;
+$sidebar-hover-dark: #1e293b;
 
 // Spacing
 $spacing-xs: 4px;
@@ -77,7 +89,26 @@ $z-index-popover: 1060;
 $z-index-tooltip: 1070;
 $z-index-toast: 1080;
 
-// Sidebar
+// Sidebar Dimensions
 $sidebar-width: 260px;
 $sidebar-collapsed-width: 80px;
 $topbar-height: 64px;
+
+// CSS Variables untuk MUI Theme
+:root {
+    --primary: #{$primary-light};
+    --primary-hover: #{$primary-dark};
+    --secondary: #{$secondary-light};
+    --background: #{$background-light};
+    --surface: #{$surface-light};
+    --text-primary: #{$text-primary-light};
+    --text-secondary: #{$text-secondary-light};
+    --border: #{$border-light};
+    --success: #{$success-light};
+    --warning: #{$warning-light};
+    --error: #{$error-light};
+    --info: #{$info-light};
+    --card-bg: #ffffff;
+    --input-bg: #ffffff;
+    --input-border: #d1d5db;
+}

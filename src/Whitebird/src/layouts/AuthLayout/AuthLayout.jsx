@@ -17,8 +17,8 @@ const AuthLayout = ({ children, title = "Welcome Back" }) => {
       <div className="auth-layout__container">
         <div className="auth-layout__card">
           <div className="auth-layout__logo">
-            <span className="auth-layout__logo-icon">W</span>
-            <h1 className="auth-layout__logo-text">Whitebird</h1>
+            <span className="auth-layout__logo-icon">A</span>
+            <h1 className="auth-layout__logo-text">AsetKu</h1>
           </div>
           <h2 className="auth-layout__title">{title}</h2>
           {children}

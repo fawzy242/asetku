@@ -1,99 +1,24 @@
 import ProfileApi from './Profile.api';
-import Swal from 'sweetalert2';
+import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
 
 class ProfileData {
-  constructor() {
-    this.api = ProfileApi;
-  }
+  constructor() { this.api = ProfileApi; }
 
-  async loadProfile() {
-    try {
-      const result = await this.api.getCurrentUser();
-      
-      if (result.isSuccess) {
-        return {
-          success: true,
-          data: result.data
-        };
-      }
-      
-      return {
-        success: false,
-        error: result.message
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Failed to load profile'
-      };
-    }
+  async fetchProfile() {
+    try { const r = await this.api.getCurrentUser(); return r.isSuccess ? { success: true, data: r.data } : { success: false, error: r.message }; }
+    catch { return { success: false, error: 'Failed to load profile' }; }
   }
 
   async updateProfile(data) {
-    try {
-      const result = await this.api.updateProfile(data);
-      
-      if (result.isSuccess) {
-        return {
-          success: true,
-          data: result.data
-        };
-      }
-      
-      return {
-        success: false,
-        error: result.message
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.response?.data?.message || 'Failed to update profile'
-      };
-    }
+    try { const r = await this.api.updateProfile(data); if (r.isSuccess) { await ConfirmDialog.showSuccess('Success', 'Profile updated'); return { success: true }; } await ConfirmDialog.showError('Error', r.message || 'Failed'); return { success: false }; }
+    catch { await ConfirmDialog.showError('Error', 'Failed to update'); return { success: false }; }
   }
 
   async changePassword(oldPassword, newPassword, confirmPassword) {
-    if (newPassword !== confirmPassword) {
-      Swal.fire({
-        title: 'Error',
-        text: 'Passwords do not match',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      return { success: false };
-    }
-    
-    if (newPassword.length < 4) {
-      Swal.fire({
-        title: 'Error',
-        text: 'Password must be at least 4 characters',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      return { success: false };
-    }
-    
-    try {
-      const result = await this.api.changePassword({
-        oldPassword,
-        newPassword,
-        confirmPassword
-      });
-      
-      if (result.isSuccess) {
-        return { success: true };
-      }
-      
-      return { 
-        success: false, 
-        error: result.message || 'Failed to change password' 
-      };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to change password' 
-      };
-    }
+    if (newPassword !== confirmPassword) { await ConfirmDialog.showError('Error', 'Passwords do not match'); return { success: false }; }
+    if (newPassword.length < 4) { await ConfirmDialog.showError('Error', 'Min 4 characters'); return { success: false }; }
+    try { const r = await this.api.changePassword({ oldPassword, newPassword, confirmPassword }); if (r.isSuccess) { await ConfirmDialog.showSuccess('Success', 'Password changed'); return { success: true }; } await ConfirmDialog.showError('Error', r.message || 'Failed'); return { success: false }; }
+    catch { await ConfirmDialog.showError('Error', 'Failed to change'); return { success: false }; }
   }
 }
 

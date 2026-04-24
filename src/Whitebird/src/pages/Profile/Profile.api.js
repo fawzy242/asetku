@@ -1,32 +1,9 @@
 import apiService from '../../core/services/api.service';
 
 class ProfileApi {
-  async getCurrentUser() {
-    const response = await apiService.get('/auth/me');
-    return response.data;
-  }
-
-  async updateProfile(data) {
-    const response = await apiService.put('/users/profile', data);
-    return response.data;
-  }
-
-  async changePassword(data) {
-    const response = await apiService.post('/auth/change-password', data);
-    return response.data;
-  }
-
-  async uploadAvatar(file) {
-    const formData = new FormData();
-    formData.append('avatar', file);
-    
-    const response = await apiService.post('/users/avatar', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    });
-    return response.data;
-  }
+  async getCurrentUser() { return (await apiService.get('/Auth/me')).data; }
+  async updateProfile(data) { return (await apiService.put('/Users/profile', data)).data; }
+  async changePassword(data) { return (await apiService.post('/Auth/change-password', data)).data; }
 }
 
 export default new ProfileApi();

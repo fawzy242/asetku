@@ -19,10 +19,11 @@
     --card-bg: #ffffff;
     --input-bg: #ffffff;
     --input-border: #d1d5db;
-    --sidebar-bg: #1f2937;
-    --sidebar-text: #9ca3af;
-    --sidebar-text-active: #ffffff;
-    --sidebar-hover: #374151;
+    --sidebar-bg: #{$sidebar-bg-light};
+    --sidebar-text: #{$sidebar-text-light};
+    --sidebar-text-active: #{$sidebar-text-active-light};
+    --sidebar-hover: #{$sidebar-hover-light};
+    --mui-input-bg: #ffffff;
 }
 
 [data-theme='dark'] {
@@ -44,8 +45,9 @@
     --card-bg: #1f2937;
     --input-bg: #374151;
     --input-border: #4b5563;
-    --sidebar-bg: #0f172a;
-    --sidebar-text: #94a3b8;
-    --sidebar-text-active: #ef4444;
-    --sidebar-hover: #1e293b;
+    --sidebar-bg: #{$sidebar-bg-dark};
+    --sidebar-text: #{$sidebar-text-dark};
+    --sidebar-text-active: #{$sidebar-text-active-dark};
+    --sidebar-hover: #{$sidebar-hover-dark};
+    --mui-input-bg: #374151;
 }

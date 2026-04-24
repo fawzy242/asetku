@@ -1,0 +1,13 @@
+@use '../../../styles/variables' as *;
+@use '../../../styles/mixins' as *;
+
+.page-header {
+    @include flex-between;
+    margin-bottom: $spacing-lg;
+}
+
+.page-title {
+    font-size: $font-size-2xl;
+    font-weight: 700;
+    color: var(--text-primary);
+}

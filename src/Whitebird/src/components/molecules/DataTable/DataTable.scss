@@ -3,14 +3,16 @@
 
 .data-table {
     width: 100%;
-    height: auto;
-    min-height: 300px;
     background-color: transparent;
     border-radius: $radius-lg;
     overflow: hidden;
 
     .MuiDataGrid-root {
         width: 100% !important;
+    }
+
+    .MuiDataGrid-virtualScroller {
+        @include scrollbar;
     }
 
     @include respond-to('md') {

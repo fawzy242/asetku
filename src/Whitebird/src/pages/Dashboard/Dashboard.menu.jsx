@@ -1,261 +1,69 @@
-import React, { useEffect, useState } from 'react';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-  PointElement,
-  LineElement
-} from 'chart.js';
-import { Bar, Doughnut, Line } from 'react-chartjs-2';
-import { 
-  FiPackage, 
-  FiCheckCircle, 
-  FiUser, 
-  FiTool, 
-  FiDollarSign, 
-  FiClock 
-} from 'react-icons/fi';
-import DashboardData from './Dashboard.data';
-import Card from '../../components/atoms/Card/Card';
-import DataTable from '../../components/molecules/DataTable/DataTable';
-import Badge from '../../components/atoms/Badge/Badge';
-import Spinner from '../../components/atoms/Spinner/Spinner';
-import utilsHelper from '../../core/utils/utils.helper';
+import React, { useEffect, useState } from "react";
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement } from 'chart.js';
+import { Doughnut, Line } from 'react-chartjs-2';
+import { FiPackage, FiCheckCircle, FiUser, FiTool, FiDollarSign, FiClock, FiAlertTriangle, FiCalendar } from "react-icons/fi";
+import DashboardData from "./Dashboard.data";
+import Card from "../../components/atoms/Card/Card";
+import DataTable from "../../components/molecules/DataTable/DataTable";
+import Spinner from "../../components/atoms/Spinner/Spinner";
+import utilsHelper from "../../core/utils/utils.helper";
+import "./Dashboard.scss";
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-  PointElement,
-  LineElement
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement);
+
+const dashboardData = new DashboardData();
 
 const DashboardMenu = () => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({});
   const [expiredWarranty, setExpiredWarranty] = useState([]);
   const [upcomingMaintenance, setUpcomingMaintenance] = useState([]);
-  const [pendingApprovals, setPendingApprovals] = useState([]);
   const [recentTransactions, setRecentTransactions] = useState({ data: [] });
 
-  const dashboardData = new DashboardData();
-
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     setLoading(true);
-    const result = await dashboardData.loadDashboardData();
-    
-    if (result.success) {
-      setStats(result.data.stats);
-      setExpiredWarranty(result.data.expiredWarranty);
-      setUpcomingMaintenance(result.data.upcomingMaintenance);
-      setPendingApprovals(result.data.pendingApprovals);
-      setRecentTransactions(result.data.recentTransactions);
-    }
-    
+    const result = await dashboardData.fetchDashboardData();
+    if (result.success) { setStats(result.data.stats); setExpiredWarranty(result.data.expiredWarranty); setUpcomingMaintenance(result.data.upcomingMaintenance); setRecentTransactions(result.data.recentTransactions); }
     setLoading(false);
   };
 
-  const assetStatusChartData = {
-    labels: ['Available', 'Assigned', 'Under Repair', 'Retired'],
-    datasets: [{
-      data: [
-        stats.availableAssets || 0,
-        stats.assignedAssets || 0,
-        stats.underRepairAssets || 0,
-        stats.retiredAssets || 0
-      ],
-      backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#6b7280'],
-      borderWidth: 0
-    }]
-  };
-
-  const monthlyTransactionData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-    datasets: [{
-      label: 'Transactions',
-      data: [65, 59, 80, 81, 56, 55, 40, 45, 60, 70, 75, 80],
-      borderColor: '#dc2626',
-      backgroundColor: 'rgba(220, 38, 38, 0.1)',
-      tension: 0.4
-    }]
-  };
+  const statusChartData = { labels: ['Available', 'Assigned', 'Under Repair', 'Retired'], datasets: [{ data: [stats.availableAssets || 0, stats.assignedAssets || 0, stats.underRepairAssets || 0, stats.retiredAssets || 0], backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#6b7280'], borderWidth: 0 }] };
+  const transactionChartData = { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], datasets: [{ label: 'Transactions', data: [65, 59, 80, 81, 56, 55, 40, 45, 60, 70, 75, 80], borderColor: '#dc2626', backgroundColor: 'rgba(220, 38, 38, 0.1)', tension: 0.4 }] };
 
   const transactionColumns = [
-    { field: 'assetCode', headerName: 'Asset Code', width: 120 },
-    { field: 'assetName', headerName: 'Asset Name', width: 200 },
-    { field: 'transactionType', headerName: 'Type', width: 120 },
-    {
-      field: 'transactionStatus',
-      headerName: 'Status',
-      width: 120,
-      renderCell: (params) => (
-        <Badge variant={utilsHelper.getStatusColor(params.value)}>
-          {params.value}
-        </Badge>
-      )
-    },
-    {
-      field: 'transactionDate',
-      headerName: 'Date',
-      width: 160,
-      valueFormatter: (params) => utilsHelper.formatDateTime(params.value)
-    }
+    { field: "assetCode", headerName: "Asset Code", width: 120 },
+    { field: "assetName", headerName: "Asset Name", width: 200 },
+    { field: "transactionType", headerName: "Type", width: 120 },
+    { field: "transactionStatus", headerName: "Status", width: 120, renderCell: (p) => <span className={`status-badge status-badge--${utilsHelper.getStatusColor(p.value)}`}>{p.value}</span> },
+    { field: "transactionDate", headerName: "Date", width: 160, valueFormatter: (p) => utilsHelper.formatDateTime(p.value) },
   ];
 
-  if (loading) {
-    return (
-      <div className="dashboard-loading">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
+  if (loading) return <div className="dashboard-loading"><Spinner size="lg" /></div>;
 
   return (
-    <div className="dashboard">
+    <div className="dashboard fade-transition">
       <div className="dashboard__stats">
-        <Card className="dashboard__stat-card">
-          <div className="dashboard__stat-icon"><FiPackage /></div>
-          <div className="dashboard__stat-content">
-            <h3>Total Assets</h3>
-            <p className="dashboard__stat-value">{stats.totalAssets || 0}</p>
-          </div>
-        </Card>
-        
-        <Card className="dashboard__stat-card">
-          <div className="dashboard__stat-icon"><FiCheckCircle /></div>
-          <div className="dashboard__stat-content">
-            <h3>Available</h3>
-            <p className="dashboard__stat-value">{stats.availableAssets || 0}</p>
-          </div>
-        </Card>
-        
-        <Card className="dashboard__stat-card">
-          <div className="dashboard__stat-icon"><FiUser /></div>
-          <div className="dashboard__stat-content">
-            <h3>Assigned</h3>
-            <p className="dashboard__stat-value">{stats.assignedAssets || 0}</p>
-          </div>
-        </Card>
-        
-        <Card className="dashboard__stat-card">
-          <div className="dashboard__stat-icon"><FiTool /></div>
-          <div className="dashboard__stat-content">
-            <h3>Under Repair</h3>
-            <p className="dashboard__stat-value">{stats.underRepairAssets || 0}</p>
-          </div>
-        </Card>
-        
-        <Card className="dashboard__stat-card">
-          <div className="dashboard__stat-icon"><FiDollarSign /></div>
-          <div className="dashboard__stat-content">
-            <h3>Total Value</h3>
-            <p className="dashboard__stat-value">
-              {utilsHelper.formatCurrency(stats.totalAssetValue)}
-            </p>
-          </div>
-        </Card>
-        
-        <Card className="dashboard__stat-card">
-          <div className="dashboard__stat-icon"><FiClock /></div>
-          <div className="dashboard__stat-content">
-            <h3>Pending Approvals</h3>
-            <p className="dashboard__stat-value">{stats.pendingTransactions || 0}</p>
-          </div>
-        </Card>
+        <Card className="dashboard__stat-card"><FiPackage /><div><h3>Total Assets</h3><p>{stats.totalAssets || 0}</p></div></Card>
+        <Card className="dashboard__stat-card"><FiCheckCircle /><div><h3>Available</h3><p>{stats.availableAssets || 0}</p></div></Card>
+        <Card className="dashboard__stat-card"><FiUser /><div><h3>Assigned</h3><p>{stats.assignedAssets || 0}</p></div></Card>
+        <Card className="dashboard__stat-card"><FiTool /><div><h3>Under Repair</h3><p>{stats.underRepairAssets || 0}</p></div></Card>
+        <Card className="dashboard__stat-card"><FiDollarSign /><div><h3>Total Value</h3><p>{utilsHelper.formatCurrency(stats.totalAssetValue)}</p></div></Card>
+        <Card className="dashboard__stat-card"><FiClock /><div><h3>Pending</h3><p>{stats.pendingTransactions || 0}</p></div></Card>
       </div>
 
       <div className="dashboard__charts">
-        <Card title="Asset Status Distribution" className="dashboard__chart-card">
-          <Doughnut 
-            data={assetStatusChartData}
-            options={{
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {
-                  position: 'bottom'
-                }
-              }
-            }}
-          />
-        </Card>
-        
-        <Card title="Monthly Transactions" className="dashboard__chart-card">
-          <Line
-            data={monthlyTransactionData}
-            options={{
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {
-                  display: false
-                }
-              }
-            }}
-          />
-        </Card>
+        <Card title="Asset Status"><Doughnut data={statusChartData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} /></Card>
+        <Card title="Monthly Transactions"><Line data={transactionChartData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }} /></Card>
       </div>
 
       <div className="dashboard__alerts">
-        {expiredWarranty.length > 0 && (
-          <Card 
-            title={`Expired Warranty (${expiredWarranty.length})`}
-            className="dashboard__alert-card"
-          >
-            <ul className="dashboard__alert-list">
-              {expiredWarranty.slice(0, 5).map(item => (
-                <li key={item.assetId} className="dashboard__alert-item">
-                  <span className="dashboard__alert-code">{item.assetCode}</span>
-                  <span className="dashboard__alert-name">{item.assetName}</span>
-                  <Badge variant="error">Expired</Badge>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
-        
-        {upcomingMaintenance.length > 0 && (
-          <Card 
-            title={`Upcoming Maintenance (${upcomingMaintenance.length})`}
-            className="dashboard__alert-card"
-          >
-            <ul className="dashboard__alert-list">
-              {upcomingMaintenance.slice(0, 5).map(item => (
-                <li key={item.assetId} className="dashboard__alert-item">
-                  <span className="dashboard__alert-code">{item.assetCode}</span>
-                  <span className="dashboard__alert-name">{item.assetName}</span>
-                  <span className="dashboard__alert-date">
-                    {utilsHelper.formatDate(item.nextMaintenanceDate)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
+        {expiredWarranty.length > 0 && <Card title={<><FiAlertTriangle /> Expired Warranty ({expiredWarranty.length})</>}><ul>{expiredWarranty.slice(0, 5).map(item => <li key={item.assetId}><span>{item.assetCode}</span><span>{item.assetName}</span><span className="badge badge--error">Expired</span></li>)}</ul></Card>}
+        {upcomingMaintenance.length > 0 && <Card title={<><FiCalendar /> Upcoming Maintenance ({upcomingMaintenance.length})</>}><ul>{upcomingMaintenance.slice(0, 5).map(item => <li key={item.assetId}><span>{item.assetCode}</span><span>{item.assetName}</span><span>{utilsHelper.formatDate(item.nextMaintenanceDate)}</span></li>)}</ul></Card>}
       </div>
 
-      <Card title="Recent Transactions" className="dashboard__transactions">
-        <DataTable
-          rows={recentTransactions.data || []}
-          columns={transactionColumns}
-          pageSize={5}
-          autoHeight
-          getRowId={(row) => row.assetTransactionId}
-        />
-      </Card>
+      <Card title="Recent Transactions"><DataTable rows={recentTransactions.data || []} columns={transactionColumns} pageSize={5} getRowId={(row) => row.assetTransactionId} hideFooter={true} /></Card>
     </div>
   );
 };

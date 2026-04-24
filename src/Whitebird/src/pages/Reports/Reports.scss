@@ -22,37 +22,21 @@
         align-items: center;
         gap: $spacing-md;
         padding: $spacing-lg;
-    }
 
-    &__stat-icon {
-        font-size: 32px;
-        color: var(--primary);
-    }
-
-    &__tabs {
-        display: flex;
-        gap: $spacing-xs;
-        margin-bottom: $spacing-lg;
-        border-bottom: 1px solid var(--border);
-    }
-
-    &__tab {
-        display: flex;
-        align-items: center;
-        gap: $spacing-sm;
-        padding: $spacing-sm $spacing-lg;
-        font-weight: 500;
-        color: var(--text-secondary);
-        border-bottom: 2px solid transparent;
-        transition: all 0.2s ease;
-
-        &:hover {
+        svg {
+            font-size: 32px;
             color: var(--primary);
         }
 
-        &.active {
-            color: var(--primary);
-            border-bottom-color: var(--primary);
+        h3 {
+            font-size: $font-size-sm;
+            color: var(--text-secondary);
+        }
+
+        p {
+            font-size: $font-size-xl;
+            font-weight: 700;
+            color: var(--text-primary);
         }
     }
 
@@ -62,8 +46,14 @@
 
     &__filter-header {
         display: flex;
-        gap: $spacing-md;
+        align-items: center;
+        justify-content: space-between;
         margin-bottom: $spacing-md;
+    }
+
+    &__filter-actions-left {
+        display: flex;
+        gap: $spacing-md;
     }
 
     &__filter-grid {

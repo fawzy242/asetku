@@ -1,95 +1,20 @@
 import apiService from '../../core/services/api.service';
 
 class ReportsApi {
-  async getDashboardStats() {
-    const response = await apiService.get('/Asset/dashboard-stats');
-    return response.data;
-  }
-
-  async getAssetTransactionData(params) {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await apiService.get(`/Reports/asset-transaction/data?${queryString}`);
-    return response.data;
-  }
-
-  async exportAssetTransactionExcel(params) {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await apiService.get(`/Reports/asset-transaction/excel?${queryString}`, {
-      responseType: 'blob'
-    });
-    return response.data;
-  }
-
-  async getAssetInventoryData(params) {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await apiService.get(`/Reports/asset-inventory/data?${queryString}`);
-    return response.data;
-  }
-
-  async exportAssetInventoryExcel(params) {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await apiService.get(`/Reports/asset-inventory/excel?${queryString}`, {
-      responseType: 'blob'
-    });
-    return response.data;
-  }
-
-  async getEmployeeAssetData(params) {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await apiService.get(`/Reports/employee-asset/data?${queryString}`);
-    return response.data;
-  }
-
-  async exportEmployeeAssetExcel(params) {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await apiService.get(`/Reports/employee-asset/excel?${queryString}`, {
-      responseType: 'blob'
-    });
-    return response.data;
-  }
-
-  async getMaintenanceData(params) {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await apiService.get(`/Reports/maintenance/data?${queryString}`);
-    return response.data;
-  }
-
-  async exportMaintenanceExcel(params) {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await apiService.get(`/Reports/maintenance/excel?${queryString}`, {
-      responseType: 'blob'
-    });
-    return response.data;
-  }
-
-  async getFinancialData(params) {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await apiService.get(`/Reports/financial/data?${queryString}`);
-    return response.data;
-  }
-
-  async exportFinancialExcel(params) {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await apiService.get(`/Reports/financial/excel?${queryString}`, {
-      responseType: 'blob'
-    });
-    return response.data;
-  }
-
-  async getCategories() {
-    const response = await apiService.get('/Category/active');
-    return response.data;
-  }
-
-  async getSuppliers() {
-    const response = await apiService.get('/Supplier/active');
-    return response.data;
-  }
-
-  async getEmployees() {
-    const response = await apiService.get('/Employee');
-    return response.data;
-  }
+  async getDashboardStats() { return (await apiService.get('/Reports/dashboard/stats')).data; }
+  async getAssetTransactionData(params) { return (await apiService.get(`/Reports/asset-transaction/data?${new URLSearchParams(params)}`)).data; }
+  async exportAssetTransactionExcel(params) { return (await apiService.get(`/Reports/asset-transaction/excel?${new URLSearchParams(params)}`, { responseType: 'blob' })).data; }
+  async getAssetInventoryData(params) { return (await apiService.get(`/Reports/asset-inventory/data?${new URLSearchParams(params)}`)).data; }
+  async exportAssetInventoryExcel(params) { return (await apiService.get(`/Reports/asset-inventory/excel?${new URLSearchParams(params)}`, { responseType: 'blob' })).data; }
+  async getEmployeeAssetData(params) { return (await apiService.get(`/Reports/employee-asset/data?${new URLSearchParams(params)}`)).data; }
+  async exportEmployeeAssetExcel(params) { return (await apiService.get(`/Reports/employee-asset/excel?${new URLSearchParams(params)}`, { responseType: 'blob' })).data; }
+  async getMaintenanceData(params) { return (await apiService.get(`/Reports/maintenance/data?${new URLSearchParams(params)}`)).data; }
+  async exportMaintenanceExcel(params) { return (await apiService.get(`/Reports/maintenance/excel?${new URLSearchParams(params)}`, { responseType: 'blob' })).data; }
+  async getFinancialData(params) { return (await apiService.get(`/Reports/financial/data?${new URLSearchParams(params)}`)).data; }
+  async exportFinancialExcel(params) { return (await apiService.get(`/Reports/financial/excel?${new URLSearchParams(params)}`, { responseType: 'blob' })).data; }
+  async getCategories() { return (await apiService.get('/Category/active')).data; }
+  async getSuppliers() { return (await apiService.get('/Supplier/active')).data; }
+  async getEmployees() { return (await apiService.get('/Employee')).data; }
 }
 
 export default new ReportsApi();

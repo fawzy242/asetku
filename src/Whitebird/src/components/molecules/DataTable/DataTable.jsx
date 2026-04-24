@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { memo, useMemo } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
+import { useTheme } from "../../../context/ThemeContext";
 import "./DataTable.scss";
 
-const DataTable = ({
+const DataTable = memo(({
   rows = [],
   columns = [],
   loading = false,
@@ -14,55 +15,54 @@ const DataTable = ({
   onSelectionChange = null,
   rowHeight = 52,
   headerHeight = 56,
-  autoHeight = true,
+  autoHeight = false,
   getRowId = (row) => row.id,
-  hideFooter = false,
+  hideFooter = true,
   className = "",
 }) => {
-  const [isDark, setIsDark] = useState(() => {
-    return document.documentElement.getAttribute("data-theme") === "dark";
-  });
+  const { theme: appTheme } = useTheme();
+  const isDark = appTheme === "dark";
 
-  useEffect(() => {
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.attributeName === "data-theme") {
-          const newTheme = document.documentElement.getAttribute("data-theme");
-          setIsDark(newTheme === "dark");
-        }
-      });
-    });
+  // Calculate dynamic height based on pageSize
+  const gridHeight = useMemo(() => {
+    if (autoHeight) return undefined;
+    const headerFooterHeight = 120;
+    const calculatedHeight = Math.min(rows.length, pageSize) * rowHeight + headerFooterHeight;
+    return Math.max(400, Math.min(800, calculatedHeight));
+  }, [rows.length, pageSize, rowHeight, autoHeight]);
 
-    observer.observe(document.documentElement, { attributes: true });
-    return () => observer.disconnect();
-  }, []);
-
-  const theme = createTheme({
+  const muiTheme = React.useMemo(() => createTheme({
     palette: {
       mode: isDark ? "dark" : "light",
       primary: { main: "#dc2626" },
-      background: {
-        default: isDark ? "#111827" : "#ffffff",
-        paper: isDark ? "#1f2937" : "#ffffff",
+      background: { 
+        default: isDark ? "#111827" : "#ffffff", 
+        paper: isDark ? "#1f2937" : "#ffffff" 
       },
-      text: {
-        primary: isDark ? "#f9fafb" : "#111827",
-        secondary: isDark ? "#9ca3af" : "#6b7280",
+      text: { 
+        primary: isDark ? "#f9fafb" : "#111827", 
+        secondary: isDark ? "#9ca3af" : "#6b7280" 
       },
     },
-    typography: {
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    typography: { 
+      fontFamily: "'Inter', sans-serif", 
       fontSize: 14,
     },
     shape: { borderRadius: 8 },
     components: {
       MuiDataGrid: {
+        defaultProps: {
+          disableColumnResize: false,
+        },
         styleOverrides: {
           root: {
             border: "none",
             backgroundColor: "transparent",
-            width: "100%",
-            "& .MuiDataGrid-main": { borderRadius: 0 },
+            height: gridHeight,
+            minHeight: 400,
+            '& .MuiDataGrid-columnHeader--resizable': {
+              cursor: 'col-resize',
+            },
             "& .MuiDataGrid-columnHeaders": {
               backgroundColor: isDark ? "#374151" : "#f9fafb",
               color: isDark ? "#f9fafb" : "#374151",
@@ -85,57 +85,54 @@ const DataTable = ({
               padding: "0 16px",
               "&:focus, &:focus-within": { outline: "none" },
             },
-            "& .MuiDataGrid-row": {
-              "&:hover": { backgroundColor: isDark ? "#374151" : "#f9fafb" },
-              "&.Mui-selected": {
-                backgroundColor: isDark ? "rgba(220, 38, 38, 0.15)" : "rgba(220, 38, 38, 0.08)",
-                "&:hover": {
-                  backgroundColor: isDark ? "rgba(220, 38, 38, 0.25)" : "rgba(220, 38, 38, 0.12)",
-                },
-              },
+            "& .MuiDataGrid-row:hover": {
+              backgroundColor: isDark ? "#374151" : "#f9fafb",
             },
             "& .MuiDataGrid-footerContainer": {
+              display: hideFooter ? "none" : "flex",
               borderTop: `1px solid ${isDark ? "#4b5563" : "#e5e7eb"}`,
-              backgroundColor: "transparent",
-              minHeight: 52,
             },
-            "& .MuiTablePagination-root": {
-              color: isDark ? "#9ca3af" : "#6b7280",
-              fontSize: "0.875rem",
-            },
-            "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": {
-              fontSize: "0.875rem",
-              margin: 0,
-            },
-            "& .MuiTablePagination-select": {
-              paddingTop: 4,
-              paddingBottom: 4,
-            },
-            "& .MuiSvgIcon-root": { color: isDark ? "#9ca3af" : "#6b7280" },
             "& .MuiDataGrid-overlay": {
               backgroundColor: "transparent",
               color: isDark ? "#9ca3af" : "#6b7280",
             },
-            "& .MuiDataGrid-columnSeparator, & .MuiDataGrid-menuIcon": { display: "none" },
-            "& .MuiDataGrid-sortIcon": { color: isDark ? "#9ca3af" : "#6b7280" },
+            "& .MuiDataGrid-columnSeparator": {
+              display: "none",
+            },
+            "& .MuiDataGrid-menuIcon": {
+              display: "none",
+            },
             "& .MuiCheckbox-root": {
               color: isDark ? "#9ca3af" : "#6b7280",
               "&.Mui-checked": { color: "#dc2626" },
             },
           },
+          columnHeader: {
+            '& .MuiDataGrid-iconButtonContainer': {
+              visibility: 'visible',
+              width: 'auto',
+            },
+            '& .MuiDataGrid-columnHeaderTitleContainer': {
+              overflow: 'visible',
+            },
+          },
         },
       },
     },
-  });
+  }), [isDark, gridHeight, hideFooter, rows.length, pageSize]);
 
   return (
-    <div className={`data-table ${className}`}>
-      <ThemeProvider theme={theme}>
+    <div className={`data-table ${className}`} style={{ height: gridHeight, minHeight: 400 }}>
+      <ThemeProvider theme={muiTheme}>
         <DataGrid
           rows={rows}
           columns={columns}
           loading={loading}
-          initialState={{ pagination: { paginationModel: { pageSize, page: 0 } } }}
+          initialState={{ 
+            pagination: { 
+              paginationModel: { pageSize, page: 0 } 
+            } 
+          }}
           pageSizeOptions={pageSizeOptions}
           onRowClick={onRowClick}
           checkboxSelection={checkboxSelection}
@@ -145,10 +142,11 @@ const DataTable = ({
           autoHeight={autoHeight}
           getRowId={getRowId}
           disableRowSelectionOnClick
-          disableColumnMenu
           hideFooter={hideFooter}
+          resizable={true}
           sx={{
             "& .MuiDataGrid-virtualScroller": {
+              overflow: "auto",
               minHeight: rows.length === 0 ? "200px" : "auto",
             },
           }}
@@ -156,6 +154,7 @@ const DataTable = ({
       </ThemeProvider>
     </div>
   );
-};
+});
 
+DataTable.displayName = "DataTable";
 export default DataTable;

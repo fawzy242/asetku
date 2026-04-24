@@ -1,253 +1,34 @@
 import ReportsApi from './Reports.api';
 import utilsHelper from '../../core/utils/utils.helper';
-import Swal from 'sweetalert2';
+import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
 
 class ReportsData {
-  constructor() {
-    this.api = ReportsApi;
+  constructor() { this.api = ReportsApi; }
+
+  async fetchDashboardStats() {
+    try { const result = await this.api.getDashboardStats(); return { success: true, data: result.data || {} }; }
+    catch { return { success: false, error: 'Failed to load stats' }; }
   }
 
-  async loadDashboardStats() {
+  async fetchFilterOptions() {
     try {
-      const result = await this.api.getDashboardStats();
-      return {
-        success: true,
-        data: result.data || {}
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Failed to load dashboard stats'
-      };
-    }
+      const [categories, suppliers, employees] = await Promise.all([this.api.getCategories(), this.api.getSuppliers(), this.api.getEmployees()]);
+      const departments = [...new Set((employees.data || []).map(e => e.department).filter(Boolean))];
+      return { success: true, data: { categories: categories.data || [], suppliers: suppliers.data || [], employees: employees.data || [], departments } };
+    } catch { return { success: false, error: 'Failed to load filter options' }; }
   }
 
-  async loadAssetTransactionData(filters) {
-    try {
-      const result = await this.api.getAssetTransactionData(filters);
-      return {
-        success: true,
-        data: result.data || []
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Failed to load transaction data'
-      };
-    }
-  }
+  async fetchTransactionData(params) { try { const r = await this.api.getAssetTransactionData(params); return { success: true, data: r.data || [] }; } catch { return { success: false, data: [] }; } }
+  async fetchInventoryData(params) { try { const r = await this.api.getAssetInventoryData(params); return { success: true, data: r.data || [] }; } catch { return { success: false, data: [] }; } }
+  async fetchEmployeeAssetData(params) { try { const r = await this.api.getEmployeeAssetData(params); return { success: true, data: r.data || [] }; } catch { return { success: false, data: [] }; } }
+  async fetchMaintenanceData(params) { try { const r = await this.api.getMaintenanceData(params); return { success: true, data: r.data || [] }; } catch { return { success: false, data: [] }; } }
+  async fetchFinancialData(params) { try { const r = await this.api.getFinancialData(params); return { success: true, data: r.data || [] }; } catch { return { success: false, data: [] }; } }
 
-  async exportAssetTransaction(filters) {
-    try {
-      const blob = await this.api.exportAssetTransactionExcel(filters);
-      const fileName = `Asset_Transaction_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
-      utilsHelper.downloadFile(blob, fileName);
-      
-      Swal.fire({
-        title: 'Success',
-        text: 'Report exported successfully',
-        icon: 'success',
-        confirmButtonColor: '#dc2626'
-      });
-      
-      return { success: true };
-    } catch (error) {
-      Swal.fire({
-        title: 'Error',
-        text: 'Failed to export report',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      return { success: false };
-    }
-  }
-
-  async loadAssetInventoryData(filters) {
-    try {
-      const result = await this.api.getAssetInventoryData(filters);
-      return {
-        success: true,
-        data: result.data || []
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Failed to load inventory data'
-      };
-    }
-  }
-
-  async exportAssetInventory(filters) {
-    try {
-      const blob = await this.api.exportAssetInventoryExcel(filters);
-      const fileName = `Asset_Inventory_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
-      utilsHelper.downloadFile(blob, fileName);
-      
-      Swal.fire({
-        title: 'Success',
-        text: 'Report exported successfully',
-        icon: 'success',
-        confirmButtonColor: '#dc2626'
-      });
-      
-      return { success: true };
-    } catch (error) {
-      Swal.fire({
-        title: 'Error',
-        text: 'Failed to export report',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      return { success: false };
-    }
-  }
-
-  async loadEmployeeAssetData(filters) {
-    try {
-      const result = await this.api.getEmployeeAssetData(filters);
-      return {
-        success: true,
-        data: result.data || []
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Failed to load employee asset data'
-      };
-    }
-  }
-
-  async exportEmployeeAsset(filters) {
-    try {
-      const blob = await this.api.exportEmployeeAssetExcel(filters);
-      const fileName = `Employee_Asset_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
-      utilsHelper.downloadFile(blob, fileName);
-      
-      Swal.fire({
-        title: 'Success',
-        text: 'Report exported successfully',
-        icon: 'success',
-        confirmButtonColor: '#dc2626'
-      });
-      
-      return { success: true };
-    } catch (error) {
-      Swal.fire({
-        title: 'Error',
-        text: 'Failed to export report',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      return { success: false };
-    }
-  }
-
-  async loadMaintenanceData(filters) {
-    try {
-      const result = await this.api.getMaintenanceData(filters);
-      return {
-        success: true,
-        data: result.data || []
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Failed to load maintenance data'
-      };
-    }
-  }
-
-  async exportMaintenance(filters) {
-    try {
-      const blob = await this.api.exportMaintenanceExcel(filters);
-      const fileName = `Maintenance_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
-      utilsHelper.downloadFile(blob, fileName);
-      
-      Swal.fire({
-        title: 'Success',
-        text: 'Report exported successfully',
-        icon: 'success',
-        confirmButtonColor: '#dc2626'
-      });
-      
-      return { success: true };
-    } catch (error) {
-      Swal.fire({
-        title: 'Error',
-        text: 'Failed to export report',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      return { success: false };
-    }
-  }
-
-  async loadFinancialData(filters) {
-    try {
-      const result = await this.api.getFinancialData(filters);
-      return {
-        success: true,
-        data: result.data || []
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Failed to load financial data'
-      };
-    }
-  }
-
-  async exportFinancial(filters) {
-    try {
-      const blob = await this.api.exportFinancialExcel(filters);
-      const fileName = `Financial_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
-      utilsHelper.downloadFile(blob, fileName);
-      
-      Swal.fire({
-        title: 'Success',
-        text: 'Report exported successfully',
-        icon: 'success',
-        confirmButtonColor: '#dc2626'
-      });
-      
-      return { success: true };
-    } catch (error) {
-      Swal.fire({
-        title: 'Error',
-        text: 'Failed to export report',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      return { success: false };
-    }
-  }
-
-  async loadFilterOptions() {
-    try {
-      const [categories, suppliers, employees] = await Promise.all([
-        this.api.getCategories(),
-        this.api.getSuppliers(),
-        this.api.getEmployees()
-      ]);
-      
-      const departments = [...new Set(employees.data?.map(e => e.department).filter(Boolean))];
-      
-      return {
-        success: true,
-        data: {
-          categories: categories.data || [],
-          suppliers: suppliers.data || [],
-          employees: employees.data || [],
-          departments
-        }
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Failed to load filter options'
-      };
-    }
-  }
+  async exportTransaction(params) { try { const b = await this.api.exportAssetTransactionExcel(params); utilsHelper.downloadFile(b, `Transaction_${new Date().toISOString().split('T')[0]}.xlsx`); await ConfirmDialog.showSuccess('Success', 'Exported'); return { success: true }; } catch { await ConfirmDialog.showError('Error', 'Export failed'); return { success: false }; } }
+  async exportInventory(params) { try { const b = await this.api.exportAssetInventoryExcel(params); utilsHelper.downloadFile(b, `Inventory_${new Date().toISOString().split('T')[0]}.xlsx`); await ConfirmDialog.showSuccess('Success', 'Exported'); return { success: true }; } catch { await ConfirmDialog.showError('Error', 'Export failed'); return { success: false }; } }
+  async exportEmployee(params) { try { const b = await this.api.exportEmployeeAssetExcel(params); utilsHelper.downloadFile(b, `Employee_${new Date().toISOString().split('T')[0]}.xlsx`); await ConfirmDialog.showSuccess('Success', 'Exported'); return { success: true }; } catch { await ConfirmDialog.showError('Error', 'Export failed'); return { success: false }; } }
+  async exportMaintenance(params) { try { const b = await this.api.exportMaintenanceExcel(params); utilsHelper.downloadFile(b, `Maintenance_${new Date().toISOString().split('T')[0]}.xlsx`); await ConfirmDialog.showSuccess('Success', 'Exported'); return { success: true }; } catch { await ConfirmDialog.showError('Error', 'Export failed'); return { success: false }; } }
+  async exportFinancial(params) { try { const b = await this.api.exportFinancialExcel(params); utilsHelper.downloadFile(b, `Financial_${new Date().toISOString().split('T')[0]}.xlsx`); await ConfirmDialog.showSuccess('Success', 'Exported'); return { success: true }; } catch { await ConfirmDialog.showError('Error', 'Export failed'); return { success: false }; } }
 }
 
 export default ReportsData;

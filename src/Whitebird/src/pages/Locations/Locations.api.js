@@ -2,51 +2,14 @@ import apiService from '../../core/services/api.service';
 import utilsHelper from '../../core/utils/utils.helper';
 
 class LocationsApi {
-  async getAll() {
-    const response = await apiService.get('/location');
-    return response.data;
-  }
-
-  async getById(id) {
-    const response = await apiService.get(`/location/${id}`);
-    return response.data;
-  }
-
-  async getGridData(params) {
-    const queryString = utilsHelper.buildQueryString(params);
-    const response = await apiService.get(`/location/grid${queryString}`);
-    return response.data;
-  }
-
-  async getActiveOnly() {
-    const response = await apiService.get('/location/active');
-    return response.data;
-  }
-
-  async getSubLocations(parentId) {
-    const response = await apiService.get(`/location/sublocations/${parentId}`);
-    return response.data;
-  }
-
-  async create(data) {
-    const response = await apiService.post('/location', data);
-    return response.data;
-  }
-
-  async update(id, data) {
-    const response = await apiService.put(`/location/${id}`, data);
-    return response.data;
-  }
-
-  async delete(id) {
-    const response = await apiService.delete(`/location/${id}`);
-    return response.data;
-  }
-
-  async softDelete(id) {
-    const response = await apiService.delete(`/location/${id}/soft`);
-    return response.data;
-  }
+  async getAll() { return (await apiService.get('/Location')).data; }
+  async getById(id) { return (await apiService.get(`/Location/${id}`)).data; }
+  async getGridData(params) { return (await apiService.get(`/Location/grid${utilsHelper.buildQueryString(params)}`)).data; }
+  async getActiveOnly() { return (await apiService.get('/Location/active')).data; }
+  async getSubLocations(parentId) { return (await apiService.get(`/Location/sublocations/${parentId}`)).data; }
+  async create(data) { return (await apiService.post('/Location', data)).data; }
+  async update(id, data) { return (await apiService.put(`/Location/${id}`, data)).data; }
+  async delete(id) { return (await apiService.delete(`/Location/${id}`)).data; }
 }
 
 export default new LocationsApi();

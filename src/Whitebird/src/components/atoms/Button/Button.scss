@@ -79,14 +79,23 @@
         }
     }
 
+    // Size variants
     &--sm {
-        padding: $spacing-xs $spacing-md;
+        padding: 6px 12px;
         font-size: $font-size-xs;
+        height: 32px;
+    }
+
+    &--md {
+        padding: 8px 20px;
+        font-size: $font-size-sm;
+        height: 38px;
     }
 
     &--lg {
-        padding: $spacing-md $spacing-xl;
+        padding: 10px 24px;
         font-size: $font-size-base;
+        height: 44px;
     }
 
     &--full-width {

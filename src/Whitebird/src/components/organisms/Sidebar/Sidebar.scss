@@ -7,13 +7,17 @@
     top: 0;
     bottom: 0;
     width: $sidebar-width;
-    background: linear-gradient(180deg, var(--sidebar-bg) 0%, darken(#1f2937, 5%) 100%);
+    background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
     display: flex;
     flex-direction: column;
     transition: width $transition-base;
     z-index: $z-index-fixed;
     box-shadow: $shadow-xl;
     border-right: 1px solid rgba(255, 255, 255, 0.05);
+
+    [data-theme='dark'] & {
+        background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+    }
 
     &--collapsed {
         width: $sidebar-collapsed-width;
@@ -47,18 +51,13 @@
         display: flex;
         align-items: center;
         gap: $spacing-sm;
+        cursor: pointer;
     }
 
-    &__logo-icon {
-        @include flex-center;
+    &__logo-img {
         width: 34px;
         height: 34px;
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
-        color: white;
-        font-weight: 700;
-        font-size: 18px;
-        border-radius: $radius-md;
-        box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
+        object-fit: contain;
     }
 
     &__logo-text {
@@ -72,12 +71,12 @@
         @include flex-center;
         width: 34px;
         height: 34px;
-        color: var(--sidebar-text);
+        color: $sidebar-text-light;
         border-radius: $radius-md;
         transition: all $transition-fast;
 
         &:hover {
-            background-color: var(--sidebar-hover);
+            background-color: $sidebar-hover-light;
             color: white;
         }
 
@@ -109,7 +108,7 @@
         align-items: center;
         gap: $spacing-md;
         padding: 10px $spacing-md;
-        color: var(--sidebar-text);
+        color: $sidebar-text-light;
         text-decoration: none;
         transition: all $transition-fast;
         white-space: nowrap;
@@ -117,12 +116,12 @@
         position: relative;
 
         &:hover {
-            background-color: var(--sidebar-hover);
+            background-color: $sidebar-hover-light;
             color: white;
         }
 
         &--active {
-            background: linear-gradient(90deg, var(--primary) 0%, rgba(220, 38, 38, 0.15) 100%);
+            background: linear-gradient(90deg, $primary-light 0%, rgba(220, 38, 38, 0.15) 100%);
             color: white;
 
             &::before {
@@ -133,27 +132,18 @@
                 transform: translateY(-50%);
                 width: 3px;
                 height: 20px;
-                background-color: var(--primary);
+                background-color: $primary-light;
                 border-radius: 0 $radius-sm $radius-sm 0;
             }
 
             &:hover {
-                background: linear-gradient(90deg, var(--primary-hover) 0%, rgba(220, 38, 38, 0.25) 100%);
+                background: linear-gradient(90deg, $primary-dark 0%, rgba(220, 38, 38, 0.25) 100%);
             }
         }
 
         &--child {
             padding-left: $spacing-2xl;
             font-size: $font-size-sm;
-        }
-
-        &--logout {
-            color: var(--error);
-
-            &:hover {
-                background-color: rgba(239, 68, 68, 0.1);
-                color: var(--error);
-            }
         }
     }
 
@@ -203,10 +193,36 @@
 
         span {
             font-size: 10px;
-            color: var(--sidebar-text);
+            color: $sidebar-text-light;
             opacity: 0.4;
             text-transform: uppercase;
             letter-spacing: 1px;
+        }
+    }
+}
+
+[data-theme='dark'] {
+    .sidebar {
+        background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+
+        &__toggle-btn {
+            color: $sidebar-text-dark;
+
+            &:hover {
+                background-color: $sidebar-hover-dark;
+            }
+        }
+
+        &__link {
+            color: $sidebar-text-dark;
+
+            &:hover {
+                background-color: $sidebar-hover-dark;
+            }
+        }
+
+        &__version span {
+            color: $sidebar-text-dark;
         }
     }
 }

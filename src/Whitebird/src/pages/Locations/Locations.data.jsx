@@ -1,175 +1,57 @@
 import LocationsApi from './Locations.api';
-import Swal from 'sweetalert2';
+import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
 
 class LocationsData {
-  constructor() {
-    this.api = LocationsApi;
-  }
+  constructor() { this.api = LocationsApi; }
 
-  async loadGridData(page, pageSize, search) {
+  async fetchGridData({ page, pageSize, search = '' }) {
     try {
       const result = await this.api.getGridData({ page, pageSize, search });
-      
-      return {
-        success: true,
-        data: result.data
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Failed to load locations'
-      };
-    }
+      return { success: true, data: result.data };
+    } catch { return { success: false, error: 'Failed to load locations' }; }
   }
 
-  async loadLocation(id) {
+  async fetchById(id) {
     try {
       const result = await this.api.getById(id);
-      
-      if (result.isSuccess) {
-        return {
-          success: true,
-          data: result.data
-        };
-      }
-      
-      return {
-        success: false,
-        error: result.message
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Failed to load location'
-      };
-    }
+      return result.isSuccess ? { success: true, data: result.data } : { success: false, error: result.message };
+    } catch { return { success: false, error: 'Failed to load location' }; }
   }
 
-  async loadParentLocations() {
+  async fetchParentLocations() {
     try {
       const result = await this.api.getActiveOnly();
-      return {
-        success: true,
-        data: result.data || []
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Failed to load parent locations'
-      };
-    }
+      return { success: true, data: result.data || [] };
+    } catch { return { success: false, error: 'Failed to load parent locations' }; }
   }
 
-  async createLocation(data) {
+  async create(data) {
     try {
       const result = await this.api.create(data);
-      
-      if (result.isSuccess) {
-        Swal.fire({
-          title: 'Success',
-          text: 'Location created successfully',
-          icon: 'success',
-          confirmButtonColor: '#dc2626'
-        });
-        return { success: true, data: result.data };
-      }
-      
-      Swal.fire({
-        title: 'Error',
-        text: result.message || 'Failed to create location',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      
-      return { success: false, error: result.message };
-    } catch (error) {
-      Swal.fire({
-        title: 'Error',
-        text: 'Failed to create location',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      return { success: false, error: 'Failed to create location' };
-    }
+      if (result.isSuccess) { await ConfirmDialog.showSuccess('Success', 'Location created'); return { success: true }; }
+      await ConfirmDialog.showError('Error', result.message || 'Failed to create');
+      return { success: false };
+    } catch { await ConfirmDialog.showError('Error', 'Failed to create'); return { success: false }; }
   }
 
-  async updateLocation(id, data) {
+  async update(id, data) {
     try {
       const result = await this.api.update(id, data);
-      
-      if (result.isSuccess) {
-        Swal.fire({
-          title: 'Success',
-          text: 'Location updated successfully',
-          icon: 'success',
-          confirmButtonColor: '#dc2626'
-        });
-        return { success: true, data: result.data };
-      }
-      
-      Swal.fire({
-        title: 'Error',
-        text: result.message || 'Failed to update location',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      
-      return { success: false, error: result.message };
-    } catch (error) {
-      Swal.fire({
-        title: 'Error',
-        text: 'Failed to update location',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      return { success: false, error: 'Failed to update location' };
-    }
+      if (result.isSuccess) { await ConfirmDialog.showSuccess('Success', 'Location updated'); return { success: true }; }
+      await ConfirmDialog.showError('Error', result.message || 'Failed to update');
+      return { success: false };
+    } catch { await ConfirmDialog.showError('Error', 'Failed to update'); return { success: false }; }
   }
 
-  async deleteLocation(id) {
+  async delete(id) {
+    const confirmed = await ConfirmDialog.showDelete('Delete Location', 'Are you sure?');
+    if (!confirmed) return { success: false, cancelled: true };
     try {
-      const result = await Swal.fire({
-        title: 'Are you sure?',
-        text: 'This location will be deleted.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#dc2626',
-        confirmButtonText: 'Yes, delete it'
-      });
-      
-      if (!result.isConfirmed) {
-        return { success: false, cancelled: true };
-      }
-      
-      const deleteResult = await this.api.delete(id);
-      
-      if (deleteResult.isSuccess) {
-        Swal.fire({
-          title: 'Deleted',
-          text: 'Location has been deleted.',
-          icon: 'success',
-          confirmButtonColor: '#dc2626'
-        });
-        return { success: true };
-      }
-      
-      Swal.fire({
-        title: 'Error',
-        text: deleteResult.message || 'Failed to delete location',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      
+      const result = await this.api.delete(id);
+      if (result.isSuccess) { await ConfirmDialog.showSuccess('Deleted', 'Location deleted'); return { success: true }; }
+      await ConfirmDialog.showError('Error', result.message || 'Failed to delete');
       return { success: false };
-    } catch (error) {
-      Swal.fire({
-        title: 'Error',
-        text: 'Failed to delete location',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      return { success: false };
-    }
+    } catch { await ConfirmDialog.showError('Error', 'Failed to delete'); return { success: false }; }
   }
 }
 

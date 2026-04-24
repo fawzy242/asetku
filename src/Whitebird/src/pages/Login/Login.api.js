@@ -1,25 +1,9 @@
 import apiService from '../../core/services/api.service';
 
 class LoginApi {
-  async login(email, password) {
-    const response = await apiService.post('/auth/login', { email, password });
-    return response.data;
-  }
-
-  async forgotPassword(email) {
-    const response = await apiService.post('/auth/forgot-password', { email });
-    return response.data;
-  }
-
-  async resetPassword(email, resetToken, newPassword, confirmPassword) {
-    const response = await apiService.post('/auth/reset-password-with-token', {
-      email,
-      resetToken,
-      newPassword,
-      confirmPassword
-    });
-    return response.data;
-  }
+  async login(email, password) { return (await apiService.post('/Auth/login', { email, password })).data; }
+  async forgotPassword(email) { return (await apiService.post('/Auth/forgot-password', { email })).data; }
+  async resetPassword(email, resetToken, newPassword, confirmPassword) { return (await apiService.post('/Auth/reset-password-with-token', { email, resetToken, newPassword, confirmPassword })).data; }
 }
 
 export default new LoginApi();

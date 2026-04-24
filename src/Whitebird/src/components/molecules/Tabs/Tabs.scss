@@ -1,0 +1,34 @@
+@use '../../../styles/variables' as *;
+
+.tabs {
+    display: flex;
+    gap: $spacing-xs;
+    margin-bottom: $spacing-lg;
+    border-bottom: 1px solid var(--border);
+}
+
+.tabs__tab {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    padding: $spacing-sm $spacing-lg;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    transition: all $transition-fast;
+
+    &:hover {
+        color: var(--primary);
+    }
+
+    &.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+    }
+}
+
+.tabs__tab-icon {
+    display: flex;
+    align-items: center;
+    font-size: 18px;
+}

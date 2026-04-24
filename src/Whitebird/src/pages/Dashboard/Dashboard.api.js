@@ -1,30 +1,11 @@
 import apiService from '../../core/services/api.service';
 
 class DashboardApi {
-  async getStats() {
-    const response = await apiService.get('/reports/dashboard/stats');
-    return response.data;
-  }
-
-  async getExpiredWarranty() {
-    const response = await apiService.get('/asset/expired-warranty');
-    return response.data;
-  }
-
-  async getUpcomingMaintenance(daysAhead = 30) {
-    const response = await apiService.get(`/asset/upcoming-maintenance?daysAhead=${daysAhead}`);
-    return response.data;
-  }
-
-  async getPendingApprovals() {
-    const response = await apiService.get('/assetTransaction/pending-approvals');
-    return response.data;
-  }
-
-  async getRecentTransactions() {
-    const response = await apiService.get('/assetTransaction/grid?page=1&pageSize=5');
-    return response.data;
-  }
+  async getStats() { return (await apiService.get('/Reports/dashboard/stats')).data; }
+  async getExpiredWarranty() { return (await apiService.get('/Asset/expired-warranty')).data; }
+  async getUpcomingMaintenance(daysAhead = 30) { return (await apiService.get(`/Asset/upcoming-maintenance?daysAhead=${daysAhead}`)).data; }
+  async getPendingApprovals() { return (await apiService.get('/AssetTransaction/pending-approvals')).data; }
+  async getRecentTransactions() { return (await apiService.get('/AssetTransaction/grid?page=1&pageSize=5')).data; }
 }
 
 export default new DashboardApi();

@@ -1,265 +1,75 @@
 import AssetTransactionsApi from './AssetTransactions.api';
-import Swal from 'sweetalert2';
-import utilsHelper from '../../core/utils/utils.helper';
+import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
 
 class AssetTransactionsData {
-  constructor() {
-    this.api = AssetTransactionsApi;
-  }
+  constructor() { this.api = AssetTransactionsApi; }
 
-  async loadGridData(page, pageSize, search, status, assetId) {
+  async fetchGridData({ page, pageSize, search = '', status = '', type = '' }) {
     try {
-      const params = { page, pageSize };
-      if (search) params.search = search;
-      if (status) params.status = status;
-      if (assetId) params.assetId = assetId;
-
-      const result = await this.api.getGridData(params);
-      
-      return {
-        success: true,
-        data: result.data
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Failed to load transactions'
-      };
-    }
+      const result = await this.api.getGridData({ page, pageSize, search, status, type });
+      return { success: true, data: result.data };
+    } catch { return { success: false, error: 'Failed to load transactions' }; }
   }
 
-  async loadTransaction(id) {
+  async fetchById(id) {
     try {
       const result = await this.api.getById(id);
-      
-      if (result.isSuccess) {
-        return {
-          success: true,
-          data: result.data
-        };
-      }
-      
-      return {
-        success: false,
-        error: result.message
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Failed to load transaction'
-      };
-    }
+      return result.isSuccess ? { success: true, data: result.data } : { success: false, error: result.message };
+    } catch { return { success: false, error: 'Failed to load transaction' }; }
   }
 
-  async createTransaction(data) {
+  async fetchDropdownData() {
+    try {
+      const [assets, employees, locations] = await Promise.all([this.api.getAssets(), this.api.getEmployees(), this.api.getLocations()]);
+      return { success: true, data: { assets: assets.data || [], employees: employees.data || [], locations: locations.data || [] } };
+    } catch { return { success: false, error: 'Failed to load dropdown data' }; }
+  }
+
+  async create(data) {
     try {
       const result = await this.api.create(data);
-      
-      if (result.isSuccess) {
-        Swal.fire({
-          title: 'Success',
-          text: 'Transaction created successfully',
-          icon: 'success',
-          confirmButtonColor: '#dc2626'
-        });
-        return { success: true, data: result.data };
-      }
-      
-      Swal.fire({
-        title: 'Error',
-        text: result.message || 'Failed to create transaction',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      
-      return { success: false, error: result.message };
-    } catch (error) {
-      Swal.fire({
-        title: 'Error',
-        text: 'Failed to create transaction',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      return { success: false, error: 'Failed to create transaction' };
-    }
+      if (result.isSuccess) { await ConfirmDialog.showSuccess('Success', 'Transaction created'); return { success: true, data: result.data }; }
+      await ConfirmDialog.showError('Error', result.message || 'Failed to create');
+      return { success: false };
+    } catch { await ConfirmDialog.showError('Error', 'Failed to create'); return { success: false }; }
   }
 
-  async updateTransaction(id, data) {
+  async update(id, data) {
     try {
       const result = await this.api.update(id, data);
-      
-      if (result.isSuccess) {
-        Swal.fire({
-          title: 'Success',
-          text: 'Transaction updated successfully',
-          icon: 'success',
-          confirmButtonColor: '#dc2626'
-        });
-        return { success: true, data: result.data };
-      }
-      
-      Swal.fire({
-        title: 'Error',
-        text: result.message || 'Failed to update transaction',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      
-      return { success: false, error: result.message };
-    } catch (error) {
-      Swal.fire({
-        title: 'Error',
-        text: 'Failed to update transaction',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      return { success: false, error: 'Failed to update transaction' };
-    }
+      if (result.isSuccess) { await ConfirmDialog.showSuccess('Success', 'Transaction updated'); return { success: true }; }
+      await ConfirmDialog.showError('Error', result.message || 'Failed to update');
+      return { success: false };
+    } catch { await ConfirmDialog.showError('Error', 'Failed to update'); return { success: false }; }
   }
 
-  async approveTransaction(id, isApproved, notes) {
+  async approve(id, isApproved) {
     try {
-      const result = await this.api.approve(id, { 
-        assetTransactionId: id,
-        isApproved,
-        approvalNotes: notes 
-      });
-      
-      if (result.isSuccess) {
-        Swal.fire({
-          title: 'Success',
-          text: isApproved ? 'Transaction approved' : 'Transaction rejected',
-          icon: 'success',
-          confirmButtonColor: '#dc2626'
-        });
-        return { success: true };
-      }
-      
-      Swal.fire({
-        title: 'Error',
-        text: result.message || 'Failed to process approval',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      
+      const result = await this.api.approve(id, { assetTransactionId: id, isApproved, approvalNotes: '' });
+      if (result.isSuccess) { await ConfirmDialog.showSuccess('Success', isApproved ? 'Approved' : 'Rejected'); return { success: true }; }
+      await ConfirmDialog.showError('Error', result.message || 'Failed');
       return { success: false };
-    } catch (error) {
-      Swal.fire({
-        title: 'Error',
-        text: 'Failed to process approval',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      return { success: false };
-    }
+    } catch { await ConfirmDialog.showError('Error', 'Failed to process'); return { success: false }; }
   }
 
   async returnAsset(transactionId, actualReturnDate, conditionAfter, notes) {
     try {
-      const result = await this.api.returnAsset({
-        assetTransactionId: transactionId,
-        actualReturnDate,
-        conditionAfter,
-        notes
-      });
-      
-      if (result.isSuccess) {
-        Swal.fire({
-          title: 'Success',
-          text: 'Asset returned successfully',
-          icon: 'success',
-          confirmButtonColor: '#dc2626'
-        });
-        return { success: true };
-      }
-      
-      Swal.fire({
-        title: 'Error',
-        text: result.message || 'Failed to return asset',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      
+      const result = await this.api.returnAsset({ assetTransactionId: transactionId, actualReturnDate, conditionAfter, notes });
+      if (result.isSuccess) { await ConfirmDialog.showSuccess('Success', 'Asset returned'); return { success: true }; }
+      await ConfirmDialog.showError('Error', result.message || 'Failed');
       return { success: false };
-    } catch (error) {
-      Swal.fire({
-        title: 'Error',
-        text: 'Failed to return asset',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      return { success: false };
-    }
+    } catch { await ConfirmDialog.showError('Error', 'Failed to return'); return { success: false }; }
   }
 
-  async cancelTransaction(id) {
+  async cancel(id) {
+    const confirmed = await ConfirmDialog.show({ title: 'Cancel Transaction', text: 'Are you sure?', icon: 'warning', confirmButtonText: 'Yes, cancel' });
+    if (!confirmed) return { success: false, cancelled: true };
     try {
-      const result = await Swal.fire({
-        title: 'Cancel Transaction?',
-        text: 'This transaction will be cancelled.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#dc2626',
-        confirmButtonText: 'Yes, cancel it'
-      });
-      
-      if (!result.isConfirmed) {
-        return { success: false, cancelled: true };
-      }
-      
-      const cancelResult = await this.api.cancel(id);
-      
-      if (cancelResult.isSuccess) {
-        Swal.fire({
-          title: 'Cancelled',
-          text: 'Transaction has been cancelled.',
-          icon: 'success',
-          confirmButtonColor: '#dc2626'
-        });
-        return { success: true };
-      }
-      
-      Swal.fire({
-        title: 'Error',
-        text: cancelResult.message || 'Failed to cancel transaction',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      
+      const result = await this.api.cancel(id);
+      if (result.isSuccess) { await ConfirmDialog.showSuccess('Cancelled', 'Transaction cancelled'); return { success: true }; }
+      await ConfirmDialog.showError('Error', result.message || 'Failed');
       return { success: false };
-    } catch (error) {
-      Swal.fire({
-        title: 'Error',
-        text: 'Failed to cancel transaction',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      return { success: false };
-    }
-  }
-
-  async loadDropdownData() {
-    try {
-      const [assets, employees, locations] = await Promise.all([
-        this.api.getAssets(),
-        this.api.getEmployees(),
-        this.api.getLocations()
-      ]);
-      
-      return {
-        success: true,
-        data: {
-          assets: assets.data || [],
-          employees: employees.data || [],
-          locations: locations.data || []
-        }
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'Failed to load dropdown data'
-      };
-    }
+    } catch { await ConfirmDialog.showError('Error', 'Failed to cancel'); return { success: false }; }
   }
 }
 

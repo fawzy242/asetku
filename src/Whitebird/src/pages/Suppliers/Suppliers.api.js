@@ -2,46 +2,13 @@ import apiService from '../../core/services/api.service';
 import utilsHelper from '../../core/utils/utils.helper';
 
 class SuppliersApi {
-  async getAll() {
-    const response = await apiService.get('/supplier');
-    return response.data;
-  }
-
-  async getById(id) {
-    const response = await apiService.get(`/supplier/${id}`);
-    return response.data;
-  }
-
-  async getGridData(params) {
-    const queryString = utilsHelper.buildQueryString(params);
-    const response = await apiService.get(`/supplier/grid${queryString}`);
-    return response.data;
-  }
-
-  async getActiveOnly() {
-    const response = await apiService.get('/supplier/active');
-    return response.data;
-  }
-
-  async create(data) {
-    const response = await apiService.post('/supplier', data);
-    return response.data;
-  }
-
-  async update(id, data) {
-    const response = await apiService.put(`/supplier/${id}`, data);
-    return response.data;
-  }
-
-  async delete(id) {
-    const response = await apiService.delete(`/supplier/${id}`);
-    return response.data;
-  }
-
-  async softDelete(id) {
-    const response = await apiService.delete(`/supplier/${id}/soft`);
-    return response.data;
-  }
+  async getAll() { return (await apiService.get('/Supplier')).data; }
+  async getById(id) { return (await apiService.get(`/Supplier/${id}`)).data; }
+  async getGridData(params) { return (await apiService.get(`/Supplier/grid${utilsHelper.buildQueryString(params)}`)).data; }
+  async getActiveOnly() { return (await apiService.get('/Supplier/active')).data; }
+  async create(data) { return (await apiService.post('/Supplier', data)).data; }
+  async update(id, data) { return (await apiService.put(`/Supplier/${id}`, data)).data; }
+  async delete(id) { return (await apiService.delete(`/Supplier/${id}`)).data; }
 }
 
 export default new SuppliersApi();

@@ -1,17 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
-  FiHome,
-  FiBox,
-  FiRefreshCw,
-  FiUsers,
-  FiFolder,
-  FiBarChart2,
-  FiChevronDown,
-  FiChevronLeft,
-  FiGrid,
-  FiTruck,
-  FiMapPin,
-  FiMenu,
+  FiHome, FiBox, FiRefreshCw, FiUsers, FiFolder, FiBarChart2,
+  FiChevronDown, FiChevronLeft, FiGrid, FiTruck, FiMapPin, FiMenu, FiCrosshair, FiUserCheck
 } from "react-icons/fi";
 import { useNavigate, useLocation } from "react-router-dom";
 import "./Sidebar.scss";
@@ -19,47 +9,22 @@ import "./Sidebar.scss";
 const menuItems = [
   { id: "dashboard", label: "Dashboard", icon: FiHome, path: "/dashboard" },
   { id: "assets", label: "Assets", icon: FiBox, path: "/assets" },
-  {
-    id: "transactions",
-    label: "Transactions",
-    icon: FiRefreshCw,
-    path: "/transactions",
-  },
+  { id: "tracking", label: "Asset Tracking", icon: FiCrosshair, path: "/tracking" },
+  { id: "transactions", label: "Transactions", icon: FiRefreshCw, path: "/transactions" },
   { id: "employees", label: "Employees", icon: FiUsers, path: "/employees" },
+  { id: "employee-summary", label: "Employee Summary", icon: FiUserCheck, path: "/employee-summary" },
   {
-    id: "master-data",
-    label: "Master Data",
-    icon: FiFolder,
-    path: null,
+    id: "master-data", label: "Master Data", icon: FiFolder, path: null,
     children: [
-      {
-        id: "categories",
-        label: "Categories",
-        icon: FiGrid,
-        path: "/categories",
-      },
-      {
-        id: "suppliers",
-        label: "Suppliers",
-        icon: FiTruck,
-        path: "/suppliers",
-      },
-      {
-        id: "locations",
-        label: "Locations",
-        icon: FiMapPin,
-        path: "/locations",
-      },
+      { id: "categories", label: "Categories", icon: FiGrid, path: "/categories" },
+      { id: "suppliers", label: "Suppliers", icon: FiTruck, path: "/suppliers" },
+      { id: "locations", label: "Locations", icon: FiMapPin, path: "/locations" },
     ],
   },
   { id: "reports", label: "Reports", icon: FiBarChart2, path: "/reports" },
 ];
 
-const Sidebar = ({
-  menuItems: customMenuItems,
-  collapsed = false,
-  onToggle,
-}) => {
+const Sidebar = ({ menuItems: customMenuItems, collapsed = false, onToggle }) => {
   const items = customMenuItems || menuItems;
   const [expandedItems, setExpandedItems] = useState(new Set());
   const navigate = useNavigate();
@@ -69,12 +34,8 @@ const Sidebar = ({
   useEffect(() => {
     items.forEach((item) => {
       if (item.children) {
-        const hasActiveChild = item.children.some(
-          (child) => child.path === activePath
-        );
-        if (hasActiveChild) {
-          setExpandedItems((prev) => new Set([...prev, item.id]));
-        }
+        const hasActiveChild = item.children.some((child) => child.path === activePath);
+        if (hasActiveChild) setExpandedItems((prev) => new Set([...prev, item.id]));
       }
     });
   }, [activePath, items]);
@@ -82,65 +43,26 @@ const Sidebar = ({
   const toggleExpand = (itemId) => {
     setExpandedItems((prev) => {
       const next = new Set(prev);
-      if (next.has(itemId)) {
-        next.delete(itemId);
-      } else {
-        next.add(itemId);
-      }
+      next.has(itemId) ? next.delete(itemId) : next.add(itemId);
       return next;
     });
   };
 
-  const handleNavigate = (path) => {
-    if (path) navigate(path);
-  };
+  const handleNavigate = (path) => { if (path) navigate(path); };
 
   const renderMenuItem = (item, level = 0) => {
-    const hasChildren = item.children && item.children.length > 0;
+    const hasChildren = item.children?.length > 0;
     const isExpanded = expandedItems.has(item.id);
-    const isActive =
-      item.path === activePath ||
-      (item.children &&
-        item.children.some((child) => child.path === activePath));
-
+    const isActive = item.path === activePath || (item.children?.some((child) => child.path === activePath));
     const IconComponent = item.icon;
 
     return (
       <li key={item.id} className="sidebar__item">
-        <a
-          href={item.path || "#"}
-          className={`sidebar__link ${
-            isActive ? "sidebar__link--active" : ""
-          } ${level > 0 ? "sidebar__link--child" : ""}`}
-          onClick={(e) => {
-            e.preventDefault();
-            if (hasChildren) {
-              toggleExpand(item.id);
-            } else if (item.path) {
-              handleNavigate(item.path);
-            }
-          }}
-        >
+        <a href={item.path || "#"} className={`sidebar__link ${isActive ? "sidebar__link--active" : ""} ${level > 0 ? "sidebar__link--child" : ""}`} onClick={(e) => { e.preventDefault(); hasChildren ? toggleExpand(item.id) : item.path && handleNavigate(item.path); }}>
           <IconComponent className="sidebar__icon" size={level > 0 ? 18 : 20} />
-          {!collapsed && (
-            <>
-              <span className="sidebar__label">{item.label}</span>
-              {hasChildren && (
-                <FiChevronDown
-                  className={`sidebar__arrow ${
-                    isExpanded ? "sidebar__arrow--expanded" : ""
-                  }`}
-                  size={14}
-                />
-              )}
-            </>
-          )}
+          {!collapsed && (<><span className="sidebar__label">{item.label}</span>{hasChildren && <FiChevronDown className={`sidebar__arrow ${isExpanded ? "sidebar__arrow--expanded" : ""}`} size={14} />}</>)}
         </a>
-        {hasChildren && isExpanded && !collapsed && (
-          <ul className="sidebar__submenu">
-            {item.children.map((child) => renderMenuItem(child, level + 1))}
-          </ul>
-        )}
+        {hasChildren && isExpanded && !collapsed && (<ul className="sidebar__submenu">{item.children.map((child) => renderMenuItem(child, level + 1))}</ul>)}
       </li>
     );
   };
@@ -148,48 +70,18 @@ const Sidebar = ({
   return (
     <aside className={`sidebar ${collapsed ? "sidebar--collapsed" : ""}`}>
       <div className="sidebar__header">
-        {!collapsed ? (
-          <>
-            <div
-              className="sidebar__logo"
-              onClick={() => navigate("/dashboard")}
-              style={{ cursor: "pointer" }}
-            >
-              <div className="sidebar__logo-icon">W</div>
-              <span className="sidebar__logo-text">Whitebird</span>
-            </div>
-            <button
-              className="sidebar__toggle-btn"
-              onClick={onToggle}
-              aria-label="Collapse sidebar"
-            >
-              <FiChevronLeft size={20} />
-            </button>
-          </>
-        ) : (
-          <button
-            className="sidebar__toggle-btn sidebar__toggle-btn--expand"
-            onClick={onToggle}
-            aria-label="Expand sidebar"
-          >
-            <FiMenu size={22} />
-          </button>
-        )}
-      </div>
-
-      <nav className="sidebar__nav">
-        <ul className="sidebar__menu">
-          {items.map((item) => renderMenuItem(item))}
-        </ul>
-      </nav>
-
-      <div className="sidebar__footer">
-        {!collapsed && (
-          <div className="sidebar__version">
-            <span>v1.0.0</span>
+        {!collapsed ? (<>
+          <div className="sidebar__logo" onClick={() => navigate("/dashboard")} style={{ cursor: "pointer" }}>
+            <img src="/logo.png" alt="Whitebird" className="sidebar__logo-img" />
+            <span className="sidebar__logo-text">AsetKu</span>
           </div>
+          <button className="sidebar__toggle-btn" onClick={onToggle} aria-label="Collapse"><FiChevronLeft size={20} /></button>
+        </>) : (
+          <button className="sidebar__toggle-btn sidebar__toggle-btn--expand" onClick={onToggle} aria-label="Expand"><FiMenu size={22} /></button>
         )}
       </div>
+      <nav className="sidebar__nav"><ul className="sidebar__menu">{items.map((item) => renderMenuItem(item))}</ul></nav>
+      <div className="sidebar__footer">{!collapsed && <div className="sidebar__version"><span>v1.0.0</span></div>}</div>
     </aside>
   );
 };
