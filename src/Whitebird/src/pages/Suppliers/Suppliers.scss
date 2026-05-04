@@ -1,7 +1,10 @@
 @use '../../styles/variables' as *;
 @use '../../styles/mixins' as *;
+@use '../../styles/shared';
 
 .suppliers-menu {
+    color: var(--text-primary);
+
     &__table {
         background-color: var(--card-bg);
         border-radius: $radius-lg;
@@ -9,55 +12,4 @@
         margin-bottom: $spacing-lg;
         border: 1px solid var(--border);
     }
-}
-
-.table-actions {
-    display: flex;
-    gap: $spacing-xs;
-    align-items: center;
-}
-
-.icon-btn {
-    @include flex-center;
-    width: 36px;
-    height: 36px;
-    color: var(--text-secondary);
-    background: transparent;
-    border-radius: $radius-md;
-
-    &:hover {
-        background: var(--surface);
-        color: var(--primary);
-    }
-
-    &--danger:hover {
-        color: var(--error);
-    }
-
-    &--lg {
-        width: 40px;
-        height: 40px;
-    }
-}
-
-.status-badge {
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 500;
-
-    &--success {
-        background: #10b981;
-        color: white;
-    }
-
-    &--secondary {
-        background: #6b7280;
-        color: white;
-    }
-}
-
-.suppliers-loading {
-    @include flex-center;
-    min-height: 400px;
 }

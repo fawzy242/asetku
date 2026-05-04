@@ -3,8 +3,8 @@ $primary-light: #dc2626;
 $primary-dark: #b91c1c;
 $secondary-light: #6b7280;
 $secondary-dark: #4b5563;
-$background-light: #ffffff;
-$surface-light: #f9fafb;
+$background-light: #f9fafb;
+$surface-light: #f3f4f6;
 $text-primary-light: #111827;
 $text-secondary-light: #6b7280;
 $border-light: #e5e7eb;
@@ -12,12 +12,6 @@ $success-light: #10b981;
 $warning-light: #f59e0b;
 $error-light: #ef4444;
 $info-light: #3b82f6;
-
-// Sidebar Light Mode
-$sidebar-bg-light: #1f2937;
-$sidebar-text-light: #9ca3af;
-$sidebar-text-active-light: #ffffff;
-$sidebar-hover-light: #374151;
 
 // Color System - Dark Mode
 $primary-dark-mode: #ef4444;
@@ -33,12 +27,6 @@ $success-dark: #34d399;
 $warning-dark: #fbbf24;
 $error-dark: #f87171;
 $info-dark: #60a5fa;
-
-// Sidebar Dark Mode
-$sidebar-bg-dark: #0f172a;
-$sidebar-text-dark: #94a3b8;
-$sidebar-text-active-dark: #ef4444;
-$sidebar-hover-dark: #1e293b;
 
 // Spacing
 $spacing-xs: 4px;
@@ -94,11 +82,26 @@ $sidebar-width: 260px;
 $sidebar-collapsed-width: 80px;
 $topbar-height: 64px;
 
-// CSS Variables untuk MUI Theme
+// Sidebar Light Mode
+$sidebar-bg-light: #1f2937;
+$sidebar-text-light: #9ca3af;
+$sidebar-text-active-light: #ffffff;
+$sidebar-hover-light: #374151;
+
+// Sidebar Dark Mode
+$sidebar-bg-dark: #0f172a;
+$sidebar-text-dark: #94a3b8;
+$sidebar-text-active-dark: #ef4444;
+$sidebar-hover-dark: #1e293b;
+
+// ============================================================
+// DEFAULT: Light mode (fallback jika data-theme tidak diset)
+// ============================================================
 :root {
     --primary: #{$primary-light};
     --primary-hover: #{$primary-dark};
     --secondary: #{$secondary-light};
+    --secondary-hover: #{$secondary-dark};
     --background: #{$background-light};
     --surface: #{$surface-light};
     --text-primary: #{$text-primary-light};
@@ -108,7 +111,13 @@ $topbar-height: 64px;
     --warning: #{$warning-light};
     --error: #{$error-light};
     --info: #{$info-light};
+    --scrollbar-thumb: #d1d5db;
+    --scrollbar-thumb-hover: #9ca3af;
     --card-bg: #ffffff;
     --input-bg: #ffffff;
     --input-border: #d1d5db;
+    --sidebar-bg: #{$sidebar-bg-light};
+    --sidebar-text: #{$sidebar-text-light};
+    --sidebar-text-active: #{$sidebar-text-active-light};
+    --sidebar-hover: #{$sidebar-hover-light};
 }

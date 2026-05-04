@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import ConfirmDialog from '../components/molecules/ConfirmDialog/ConfirmDialog';
+import toast from 'react-hot-toast';
 
 const NotificationContext = createContext(null);
 
@@ -16,8 +16,15 @@ export const NotificationProvider = ({ children }) => {
     const id = Date.now();
     const newNotification = { id, ...notification, read: false, createdAt: new Date().toISOString() };
     setNotifications(prev => [newNotification, ...prev].slice(0, 50));
+    
+    // Gunakan react-hot-toast untuk toast
     if (notification.showToast !== false) {
-      ConfirmDialog.showInfo(notification.title, notification.message);
+      switch (notification.type) {
+        case 'success': toast.success(notification.title); break;
+        case 'error': toast.error(notification.title); break;
+        case 'warning': toast(notification.title, { icon: '⚠️' }); break;
+        default: toast(notification.title, { icon: 'ℹ️' }); break;
+      }
     }
     return id;
   }, []);

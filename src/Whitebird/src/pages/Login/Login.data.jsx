@@ -8,25 +8,22 @@ class LoginData {
   async handleLogin(email, password) {
     if (!utilsHelper.validateEmail(email)) return { success: false, error: 'Invalid email' };
     if (!password || password.length < 4) return { success: false, error: 'Min 4 characters' };
-    try {
-      const result = await this.api.login(email, password);
-      if (result.isSuccess) return { success: true, data: result.data };
-      return { success: false, error: result.message || 'Login failed' };
-    } catch { return { success: false, error: 'Invalid credentials' }; }
+    try { const r = await this.api.login(email, password); if (r.isSuccess) return { success: true, data: r.data }; return { success: false, error: r.message || 'Login failed' }; }
+    catch { return { success: false, error: 'Invalid credentials' }; }
   }
 
   async handleForgotPassword(email) {
-    if (!utilsHelper.validateEmail(email)) return { success: false, error: 'Invalid email' };
-    try { const r = await this.api.forgotPassword(email); return { success: r.isSuccess, message: r.message }; }
-    catch { return { success: false, error: 'Failed' }; }
+    if (!utilsHelper.validateEmail(email)) { ConfirmDialog.toast.error('Invalid email'); return { success: false }; }
+    try { const r = await this.api.forgotPassword(email); if (r.isSuccess) ConfirmDialog.toast.success('Reset code sent'); return { success: r.isSuccess, message: r.message }; }
+    catch { ConfirmDialog.toast.error('Failed'); return { success: false }; }
   }
 
   async handleResetPassword(email, token, newPass, confirmPass) {
-    if (!email || !token) return { success: false, error: 'Email and token required' };
-    if (newPass !== confirmPass) { await ConfirmDialog.showError('Error', 'Passwords do not match'); return { success: false }; }
-    if (newPass.length < 4) { await ConfirmDialog.showError('Error', 'Min 4 characters'); return { success: false }; }
-    try { const r = await this.api.resetPassword(email, token, newPass, confirmPass); return { success: r.isSuccess, message: r.message }; }
-    catch { return { success: false, error: 'Failed' }; }
+    if (!email || !token) { ConfirmDialog.toast.error('Email and token required'); return { success: false }; }
+    if (newPass !== confirmPass) { ConfirmDialog.toast.error('Passwords do not match'); return { success: false }; }
+    if (newPass.length < 4) { ConfirmDialog.toast.error('Min 4 characters'); return { success: false }; }
+    try { const r = await this.api.resetPassword(email, token, newPass, confirmPass); if (r.isSuccess) ConfirmDialog.toast.success('Password reset'); return { success: r.isSuccess, message: r.message }; }
+    catch { ConfirmDialog.toast.error('Failed'); return { success: false }; }
   }
 }
 

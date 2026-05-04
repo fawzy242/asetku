@@ -2,17 +2,33 @@
 @use '../../../styles/mixins' as *;
 
 .data-table {
-    width: 100%;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
     background-color: transparent;
     border-radius: $radius-lg;
     overflow: hidden;
+    display: block;
+    position: relative;
 
     .MuiDataGrid-root {
         width: 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .MuiDataGrid-main {
+        width: 100% !important;
+        min-width: 100% !important;
     }
 
     .MuiDataGrid-virtualScroller {
         @include scrollbar;
+        width: 100% !important;
+    }
+
+    .MuiDataGrid-columnHeaders {
+        width: 100% !important;
     }
 
     @include respond-to('md') {

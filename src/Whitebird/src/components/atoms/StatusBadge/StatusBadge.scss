@@ -1,0 +1,40 @@
+@use '../../../styles/variables' as *;
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+
+    &--success {
+        background: #10b981;
+        color: white;
+    }
+
+    &--primary {
+        background: #3b82f6;
+        color: white;
+    }
+
+    &--warning {
+        background: #f59e0b;
+        color: white;
+    }
+
+    &--error {
+        background: #ef4444;
+        color: white;
+    }
+
+    &--secondary {
+        background: #6b7280;
+        color: white;
+    }
+
+    &--info {
+        background: #3b82f6;
+        color: white;
+    }
+}

@@ -1,0 +1,76 @@
+@use '../../../styles/variables' as *;
+@use '../../../styles/mixins' as *;
+
+.error-fallback {
+    @include flex-center;
+    min-height: 100vh;
+    padding: $spacing-xl;
+    background-color: var(--background);
+
+    &__content {
+        text-align: center;
+        max-width: 560px;
+        padding: $spacing-2xl;
+        background-color: var(--card-bg);
+        border-radius: $radius-xl;
+        border: 1px solid var(--border);
+        box-shadow: $shadow-lg;
+    }
+
+    &__icon {
+        @include flex-center;
+        width: 80px;
+        height: 80px;
+        margin: 0 auto $spacing-lg;
+        background-color: rgba(239, 68, 68, 0.1);
+        color: var(--error);
+        border-radius: $radius-full;
+    }
+
+    &__title {
+        font-size: $font-size-2xl;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: $spacing-md;
+    }
+
+    &__message {
+        font-size: $font-size-sm;
+        color: var(--text-secondary);
+        margin-bottom: $spacing-xl;
+        line-height: 1.6;
+    }
+
+    &__details {
+        text-align: left;
+        padding: $spacing-md;
+        margin-bottom: $spacing-lg;
+        background-color: var(--surface);
+        border-radius: $radius-md;
+        border: 1px solid var(--border);
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    &__error-name {
+        font-size: $font-size-xs;
+        font-weight: 600;
+        color: var(--error);
+        margin-bottom: $spacing-sm;
+        word-break: break-word;
+    }
+
+    &__stack {
+        font-size: 11px;
+        color: var(--text-secondary);
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    &__actions {
+        display: flex;
+        gap: $spacing-md;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+}

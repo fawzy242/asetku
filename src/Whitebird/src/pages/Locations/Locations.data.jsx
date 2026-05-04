@@ -1,58 +1,25 @@
 import LocationsApi from './Locations.api';
-import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
+import BaseData from '../../core/services/BaseData';
 
-class LocationsData {
-  constructor() { this.api = LocationsApi; }
-
-  async fetchGridData({ page, pageSize, search = '' }) {
-    try {
-      const result = await this.api.getGridData({ page, pageSize, search });
-      return { success: true, data: result.data };
-    } catch { return { success: false, error: 'Failed to load locations' }; }
-  }
-
-  async fetchById(id) {
-    try {
-      const result = await this.api.getById(id);
-      return result.isSuccess ? { success: true, data: result.data } : { success: false, error: result.message };
-    } catch { return { success: false, error: 'Failed to load location' }; }
+class LocationsData extends BaseData {
+  constructor() {
+    super(LocationsApi);
   }
 
   async fetchParentLocations() {
     try {
       const result = await this.api.getActiveOnly();
       return { success: true, data: result.data || [] };
-    } catch { return { success: false, error: 'Failed to load parent locations' }; }
+    } catch {
+      return { success: false, error: 'Failed to load parent locations' };
+    }
   }
 
-  async create(data) {
-    try {
-      const result = await this.api.create(data);
-      if (result.isSuccess) { await ConfirmDialog.showSuccess('Success', 'Location created'); return { success: true }; }
-      await ConfirmDialog.showError('Error', result.message || 'Failed to create');
-      return { success: false };
-    } catch { await ConfirmDialog.showError('Error', 'Failed to create'); return { success: false }; }
-  }
-
-  async update(id, data) {
-    try {
-      const result = await this.api.update(id, data);
-      if (result.isSuccess) { await ConfirmDialog.showSuccess('Success', 'Location updated'); return { success: true }; }
-      await ConfirmDialog.showError('Error', result.message || 'Failed to update');
-      return { success: false };
-    } catch { await ConfirmDialog.showError('Error', 'Failed to update'); return { success: false }; }
-  }
-
-  async delete(id) {
-    const confirmed = await ConfirmDialog.showDelete('Delete Location', 'Are you sure?');
-    if (!confirmed) return { success: false, cancelled: true };
-    try {
-      const result = await this.api.delete(id);
-      if (result.isSuccess) { await ConfirmDialog.showSuccess('Deleted', 'Location deleted'); return { success: true }; }
-      await ConfirmDialog.showError('Error', result.message || 'Failed to delete');
-      return { success: false };
-    } catch { await ConfirmDialog.showError('Error', 'Failed to delete'); return { success: false }; }
-  }
+  getCreateMessage() { return 'Location created successfully'; }
+  getUpdateMessage() { return 'Location updated successfully'; }
+  getDeleteMessage() { return 'Location deleted successfully'; }
+  getDeleteTitle() { return 'Delete Location'; }
+  getDeleteText() { return 'Are you sure you want to delete this location?'; }
 }
 
 export default LocationsData;

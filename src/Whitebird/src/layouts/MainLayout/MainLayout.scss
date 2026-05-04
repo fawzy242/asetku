@@ -1,9 +1,11 @@
 @use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
 
 .main-layout {
     min-height: 100vh;
     background-color: var(--background);
     display: flex;
+    color: var(--text-primary);
 
     &__content {
         flex: 1;
@@ -13,6 +15,7 @@
         margin-left: var(--sidebar-width, $sidebar-width);
         transition: margin-left $transition-base;
         width: calc(100% - var(--sidebar-width, $sidebar-width));
+        background-color: var(--background);
 
         &--expanded {
             margin-left: var(--sidebar-width, $sidebar-collapsed-width);
@@ -24,5 +27,31 @@
         flex: 1;
         padding: $spacing-xl;
         margin-top: $topbar-height;
+        background-color: var(--background);
+        color: var(--text-primary);
+    }
+
+    .page-title {
+        font-size: $font-size-2xl;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: $spacing-lg;
+    }
+
+    @include respond-to('md') {
+        &__main {
+            padding: $spacing-md;
+        }
+    }
+
+    @include respond-to('sm') {
+        &__content {
+            margin-left: 0 !important;
+            width: 100% !important;
+        }
+
+        &__main {
+            padding: $spacing-sm;
+        }
     }
 }

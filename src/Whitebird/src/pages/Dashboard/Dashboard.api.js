@@ -6,6 +6,12 @@ class DashboardApi {
   async getUpcomingMaintenance(daysAhead = 30) { return (await apiService.get(`/Asset/upcoming-maintenance?daysAhead=${daysAhead}`)).data; }
   async getPendingApprovals() { return (await apiService.get('/AssetTransaction/pending-approvals')).data; }
   async getRecentTransactions() { return (await apiService.get('/AssetTransaction/grid?page=1&pageSize=5')).data; }
+  
+  async getMonthlyStats() { 
+    return (await apiService.get('/Reports/asset-transaction/data?groupBy=month'))
+      .data
+      .catch(() => ({ data: null }));
+  }
 }
 
 export default new DashboardApi();

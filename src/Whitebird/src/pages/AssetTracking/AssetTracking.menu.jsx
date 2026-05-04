@@ -1,16 +1,25 @@
-import React, { useState, useEffect } from "react";
-import { FiSearch, FiBox, FiUser, FiMapPin, FiCalendar, FiRefreshCw, FiClock, FiArrowRight, FiInfo } from "react-icons/fi";
-import { Grid, Box, Typography, Chip } from "@mui/material";
+import React, { useState, useEffect, useCallback } from "react";
+import { FiSearch, FiBox, FiUser, FiMapPin, FiRefreshCw, FiArrowRight, FiInfo, FiCalendar, FiClock } from "react-icons/fi";
+import { Grid, Box, Typography, Avatar, Chip } from "@mui/material";
 import { Chrono } from "react-chrono";
 import AssetTrackingData from "./AssetTracking.data";
 import DataTable from "../../components/molecules/DataTable/DataTable";
 import Card from "../../components/atoms/Card/Card";
 import Select from "../../components/atoms/Select/Select";
 import Spinner from "../../components/atoms/Spinner/Spinner";
+import { useUIStore } from "../../stores/uiStore";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./AssetTracking.scss";
 
 const trackingData = new AssetTrackingData();
+
+const STATUS_CHIP_COLORS = {
+  'Available': { bg: 'rgba(16, 185, 129, 0.1)', color: '#10b981' },
+  'Assigned': { bg: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' },
+  'Under Repair': { bg: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' },
+  'Retired': { bg: 'rgba(107, 114, 128, 0.1)', color: '#6b7280' },
+  'Disposed': { bg: 'rgba(107, 114, 128, 0.1)', color: '#6b7280' },
+};
 
 const AssetTrackingMenu = () => {
   const [loading, setLoading] = useState(true);
@@ -19,19 +28,12 @@ const AssetTrackingMenu = () => {
   const [assetDetail, setAssetDetail] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
-  const [isDark, setIsDark] = useState(() => document.documentElement.getAttribute("data-theme") === "dark");
+
+  const theme = useUIStore((s) => s.theme);
+  const isDark = theme === 'dark';
 
   useEffect(() => {
     loadInitialData();
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.attributeName === "data-theme") {
-          setIsDark(document.documentElement.getAttribute("data-theme") === "dark");
-        }
-      });
-    });
-    observer.observe(document.documentElement, { attributes: true });
-    return () => observer.disconnect();
   }, []);
 
   const loadInitialData = async () => {
@@ -41,22 +43,40 @@ const AssetTrackingMenu = () => {
     setLoading(false);
   };
 
-  const handleAssetSelect = async (assetId) => {
-    if (!assetId) { setSelectedAsset(null); setAssetDetail(null); setTransactions([]); return; }
+  const handleAssetSelect = useCallback(async (assetId) => {
+    if (!assetId) {
+      setSelectedAsset(null);
+      setAssetDetail(null);
+      setTransactions([]);
+      return;
+    }
     setSelectedAsset(assetId);
     setLoadingTransactions(true);
     const [detailRes, transRes] = await Promise.all([
       trackingData.fetchAssetDetail(assetId),
-      trackingData.fetchTransactions(assetId)
+      trackingData.fetchTransactions(assetId),
     ]);
     if (detailRes.success) setAssetDetail(detailRes.data);
     if (transRes.success) setTransactions(transRes.data);
     setLoadingTransactions(false);
-  };
+  }, []);
 
-  const getStatusColor = (status) => {
-    const colors = { Pending: '#f59e0b', Approved: '#10b981', Rejected: '#ef4444', Completed: '#3b82f6', Cancelled: '#6b7280' };
-    return colors[status] || '#6b7280';
+  const getStatusChip = (status) => {
+    const colors = STATUS_CHIP_COLORS[status] || { bg: 'rgba(107, 114, 128, 0.1)', color: '#6b7280' };
+    return (
+      <Chip
+        label={status || '-'}
+        size="small"
+        sx={{
+          bgcolor: colors.bg,
+          color: colors.color,
+          fontWeight: 500,
+          fontSize: '0.75rem',
+          height: 24,
+          borderRadius: '4px',
+        }}
+      />
+    );
   };
 
   const getTransactionIcon = (type) => {
@@ -69,9 +89,8 @@ const AssetTrackingMenu = () => {
     }
   };
 
-  // Build timeline items
   const timelineItems = transactions.map((tx) => ({
-    title: `${utilsHelper.formatDateTime(tx.transactionDate)}`,
+    title: utilsHelper.formatDateTime(tx.transactionDate),
     cardTitle: `${getTransactionIcon(tx.transactionType)} ${tx.transactionType}`,
     cardSubtitle: (
       <Box sx={{ mt: 1 }}>
@@ -91,20 +110,10 @@ const AssetTrackingMenu = () => {
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
           <FiInfo size={14} />
-          <Typography variant="body2">
-            <strong>Status:</strong> {' '}
-            <Chip 
-              label={tx.transactionStatus} 
-              size="small" 
-              sx={{ 
-                bgcolor: getStatusColor(tx.transactionStatus) + '20', 
-                color: getStatusColor(tx.transactionStatus), 
-                fontWeight: 500, 
-                fontSize: 11,
-                height: 20
-              }} 
-            />
+          <Typography variant="body2" component="span">
+            <strong>Status:</strong>{' '}
           </Typography>
+          {getStatusChip(tx.transactionStatus)}
         </Box>
         {tx.expectedReturnDate && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
@@ -139,21 +148,33 @@ const AssetTrackingMenu = () => {
     ),
   }));
 
-  // Reverse untuk tampilan kronologis (terbaru di atas)
   const chronologicalItems = [...timelineItems].reverse();
 
-  const assetOptions = assets.map(a => ({ value: a.assetId, label: `${a.assetCode} - ${a.assetName}` }));
+  const assetOptions = useCallback(() => [
+    { value: "", label: "Choose an asset to track..." },
+    ...assets.map(a => ({ value: a.assetId, label: `${a.assetCode} - ${a.assetName}` })),
+  ], [assets]);
 
   const transactionColumns = [
-    { field: "transactionDate", headerName: "Date", width: 160, valueFormatter: (p) => utilsHelper.formatDateTime(p.value) },
+    {
+      field: "transactionDate",
+      headerName: "Date",
+      width: 160,
+      valueFormatter: (p) => utilsHelper.formatDateTime(p.value),
+    },
     { field: "transactionType", headerName: "Type", width: 130 },
     { field: "fromEmployeeName", headerName: "From", width: 160 },
     { field: "toEmployeeName", headerName: "To", width: 160 },
-    { field: "transactionStatus", headerName: "Status", width: 110, renderCell: (p) => <Chip label={p.value} size="small" sx={{ bgcolor: getStatusColor(p.value) + '20', color: getStatusColor(p.value), fontWeight: 500 }} /> },
+    {
+      field: "transactionStatus",
+      headerName: "Status",
+      width: 120,
+      renderCell: (p) => getStatusChip(p.value),
+    },
     { field: "notes", headerName: "Notes", width: 200 },
   ];
 
-  if (loading) return <div className="tracking-loading"><Spinner size="lg" /></div>;
+  if (loading) return <div className="page-loading"><Spinner size="lg" /></div>;
 
   return (
     <div className="asset-tracking">
@@ -162,7 +183,6 @@ const AssetTrackingMenu = () => {
       </div>
 
       <Grid container spacing={3}>
-        {/* Asset Selector */}
         <Grid item xs={12}>
           <Card>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -174,9 +194,8 @@ const AssetTrackingMenu = () => {
                   onChange={e => handleAssetSelect(e.target.value)}
                   options={[
                     { value: "", label: "Choose an asset to track..." },
-                    ...assetOptions
+                    ...assets.map(a => ({ value: a.assetId, label: `${a.assetCode} - ${a.assetName}` })),
                   ]}
-                  placeholder="Choose an asset to track..."
                 />
               </Box>
             </Box>
@@ -185,14 +204,13 @@ const AssetTrackingMenu = () => {
 
         {selectedAsset && (
           <>
-            {/* Asset Info Card */}
             <Grid item xs={12}>
               <Card>
                 <Grid container spacing={2} alignItems="center">
                   <Grid item>
-                    <Box sx={{ width: 64, height: 64, borderRadius: 2, bgcolor: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Avatar sx={{ width: 64, height: 64, bgcolor: 'var(--primary)', fontSize: 28 }}>
                       <FiBox size={32} color="white" />
-                    </Box>
+                    </Avatar>
                   </Grid>
                   <Grid item xs>
                     <Typography variant="h5" fontWeight={700}>{assetDetail?.assetName || '-'}</Typography>
@@ -201,67 +219,84 @@ const AssetTrackingMenu = () => {
                       <Chip icon={<FiBox />} label={`Category: ${assetDetail?.categoryName || '-'}`} size="small" variant="outlined" />
                       <Chip icon={<FiUser />} label={`Holder: ${assetDetail?.currentHolderName || 'None'}`} size="small" variant="outlined" />
                       <Chip icon={<FiMapPin />} label={`Location: ${assetDetail?.location || '-'}`} size="small" variant="outlined" />
-                      <Chip 
-                        label={assetDetail?.status || '-'} 
-                        size="small" 
-                        sx={{ bgcolor: utilsHelper.getStatusColor(assetDetail?.status) === 'success' ? '#10b98120' : '#f59e0b20', color: utilsHelper.getStatusColor(assetDetail?.status) === 'success' ? '#10b981' : '#f59e0b' }} 
-                      />
+                      {getStatusChip(assetDetail?.status)}
                     </Box>
                   </Grid>
                   <Grid item>
                     <Box sx={{ textAlign: 'right' }}>
                       <Typography variant="body2" color="text.secondary">Purchase Date</Typography>
-                      <Typography variant="body1" fontWeight={600}>{utilsHelper.formatDate(assetDetail?.purchaseDate) || '-'}</Typography>
+                      <Typography variant="body1" fontWeight={600}>
+                        {utilsHelper.formatDate(assetDetail?.purchaseDate) || '-'}
+                      </Typography>
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Purchase Price</Typography>
-                      <Typography variant="body1" fontWeight={600} color="primary">{utilsHelper.formatCurrency(assetDetail?.purchasePrice)}</Typography>
+                      <Typography variant="body1" fontWeight={600} color="primary">
+                        {utilsHelper.formatCurrency(assetDetail?.purchasePrice)}
+                      </Typography>
                     </Box>
                   </Grid>
                 </Grid>
               </Card>
             </Grid>
 
-            {/* Asset Specifications */}
             <Grid item xs={12} md={4}>
               <Card title="Specifications">
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">Brand</Typography><Typography variant="body2" fontWeight={500}>{assetDetail?.brand || '-'}</Typography></Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">Model</Typography><Typography variant="body2" fontWeight={500}>{assetDetail?.model || '-'}</Typography></Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">Serial Number</Typography><Typography variant="body2" fontWeight={500}>{assetDetail?.serialNumber || '-'}</Typography></Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">Condition</Typography><Typography variant="body2" fontWeight={500}>{assetDetail?.condition || '-'}</Typography></Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">Warranty</Typography><Typography variant="body2" fontWeight={500}>{assetDetail?.warrantyPeriod ? `${assetDetail.warrantyPeriod} months` : '-'}</Typography></Box>
+                  {[
+                    ['Brand', assetDetail?.brand],
+                    ['Model', assetDetail?.model],
+                    ['Serial Number', assetDetail?.serialNumber],
+                    ['Condition', assetDetail?.condition],
+                    ['Warranty', assetDetail?.warrantyPeriod ? `${assetDetail.warrantyPeriod} months` : '-'],
+                  ].map(([label, value]) => (
+                    <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary">{label}</Typography>
+                      <Typography variant="body2" fontWeight={500}>{value || '-'}</Typography>
+                    </Box>
+                  ))}
                 </Box>
               </Card>
             </Grid>
 
-            {/* Maintenance Info */}
             <Grid item xs={12} md={4}>
               <Card title="Maintenance">
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">Last Maintenance</Typography><Typography variant="body2" fontWeight={500}>{utilsHelper.formatDate(assetDetail?.lastMaintenanceDate) || '-'}</Typography></Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">Next Maintenance</Typography><Typography variant="body2" fontWeight={500} color={assetDetail?.nextMaintenanceDate && new Date(assetDetail.nextMaintenanceDate) < new Date() ? 'error' : 'text.primary'}>{utilsHelper.formatDate(assetDetail?.nextMaintenanceDate) || '-'}</Typography></Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">Residual Value</Typography><Typography variant="body2" fontWeight={500}>{utilsHelper.formatCurrency(assetDetail?.residualValue)}</Typography></Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">Useful Life</Typography><Typography variant="body2" fontWeight={500}>{assetDetail?.usefulLife ? `${assetDetail.usefulLife} years` : '-'}</Typography></Box>
+                  {[
+                    ['Last Maintenance', utilsHelper.formatDate(assetDetail?.lastMaintenanceDate)],
+                    ['Next Maintenance', utilsHelper.formatDate(assetDetail?.nextMaintenanceDate)],
+                    ['Residual Value', utilsHelper.formatCurrency(assetDetail?.residualValue)],
+                    ['Useful Life', assetDetail?.usefulLife ? `${assetDetail.usefulLife} years` : '-'],
+                  ].map(([label, value]) => (
+                    <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary">{label}</Typography>
+                      <Typography variant="body2" fontWeight={500}>{value || '-'}</Typography>
+                    </Box>
+                  ))}
                 </Box>
               </Card>
             </Grid>
 
-            {/* Depreciation Info */}
             <Grid item xs={12} md={4}>
               <Card title="Depreciation">
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">Start Date</Typography><Typography variant="body2" fontWeight={500}>{utilsHelper.formatDate(assetDetail?.depreciationStartDate) || '-'}</Typography></Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">Purchase Price</Typography><Typography variant="body2" fontWeight={500}>{utilsHelper.formatCurrency(assetDetail?.purchasePrice)}</Typography></Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">Residual Value</Typography><Typography variant="body2" fontWeight={500}>{utilsHelper.formatCurrency(assetDetail?.residualValue)}</Typography></Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}><Typography variant="body2" color="text.secondary">Supplier</Typography><Typography variant="body2" fontWeight={500}>{assetDetail?.supplierName || '-'}</Typography></Box>
+                  {[
+                    ['Start Date', utilsHelper.formatDate(assetDetail?.depreciationStartDate)],
+                    ['Purchase Price', utilsHelper.formatCurrency(assetDetail?.purchasePrice)],
+                    ['Residual Value', utilsHelper.formatCurrency(assetDetail?.residualValue)],
+                    ['Supplier', assetDetail?.supplierName],
+                  ].map(([label, value]) => (
+                    <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary">{label}</Typography>
+                      <Typography variant="body2" fontWeight={500}>{value || '-'}</Typography>
+                    </Box>
+                  ))}
                 </Box>
               </Card>
             </Grid>
 
-            {/* Transaction History - TIMELINE */}
             <Grid item xs={12}>
               <Card title={`Transaction History (${transactions.length})`}>
                 {loadingTransactions ? (
-                  <div className="tracking-loading"><Spinner size="lg" /></div>
+                  <div className="page-loading"><Spinner size="lg" /></div>
                 ) : transactions.length === 0 ? (
                   <Box sx={{ textAlign: 'center', py: 4, color: 'var(--text-secondary)' }}>
                     <FiRefreshCw size={40} style={{ marginBottom: 8 }} />
@@ -269,12 +304,11 @@ const AssetTrackingMenu = () => {
                   </Box>
                 ) : (
                   <Box>
-                    {/* Desktop: Chrono Timeline */}
                     <Box sx={{ display: { xs: 'none', md: 'block' } }}>
                       <Chrono
                         items={chronologicalItems}
                         mode="VERTICAL_ALTERNATING"
-                        scrollable={{ scrollbar: true }}
+                        scrollable={true}
                         cardHeight={50}
                         cardWidth={450}
                         timelinePointShape="circle"
@@ -292,31 +326,21 @@ const AssetTrackingMenu = () => {
                           cardTitle: '0.85rem',
                           title: '0.75rem',
                         }}
-                        classNames={{
-                          card: 'chrono-card',
-                          cardMedia: 'chrono-card-media',
-                          cardSubTitle: 'chrono-card-subtitle',
-                          cardText: 'chrono-card-text',
-                          cardTitle: 'chrono-card-title',
-                          controls: 'chrono-controls',
-                          title: 'chrono-title',
-                        }}
-                        slideShow
-                        slideItemDuration={3000}
-                        slideShowType="reveal"
-                        hideControls={false}
-                        disableToolbar={false}
-                        borderLessCards={false}
+                        borderlessCards={false}
                         lineWidth={3}
                         disableClickOnCircle={false}
-                        enableDarkToggle={false}
                         allowDynamicUpdate={true}
                       />
                     </Box>
-
-                    {/* Mobile: Table View */}
                     <Box sx={{ display: { xs: 'block', md: 'none' } }}>
-                      <DataTable rows={transactions} columns={transactionColumns} pageSize={10} getRowId={(row, i) => i} hideFooter={true} />
+                      <DataTable
+                        rows={transactions}
+                        columns={transactionColumns}
+                        pageSize={10}
+                        getRowId={(_, i) => `tx-${i}`}
+                        hideFooter={true}
+                        ariaLabel="Transaction history table"
+                      />
                     </Box>
                   </Box>
                 )}

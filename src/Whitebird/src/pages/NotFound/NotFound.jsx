@@ -1,10 +1,13 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import Button from '../../components/atoms/Button/Button';
 import './NotFound.scss';
 
 const NotFound = () => {
+  const navigate = useNavigate();
+
   const handleGoHome = () => {
-    window.location.href = '/dashboard';
+    navigate('/dashboard');
   };
 
   return (

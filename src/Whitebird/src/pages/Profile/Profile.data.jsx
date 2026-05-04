@@ -10,15 +10,15 @@ class ProfileData {
   }
 
   async updateProfile(data) {
-    try { const r = await this.api.updateProfile(data); if (r.isSuccess) { await ConfirmDialog.showSuccess('Success', 'Profile updated'); return { success: true }; } await ConfirmDialog.showError('Error', r.message || 'Failed'); return { success: false }; }
-    catch { await ConfirmDialog.showError('Error', 'Failed to update'); return { success: false }; }
+    try { const r = await this.api.updateProfile(data); if (r.isSuccess) { ConfirmDialog.toast.success('Profile updated'); return { success: true }; } ConfirmDialog.toast.error(r.message || 'Failed'); return { success: false }; }
+    catch { ConfirmDialog.toast.error('Failed to update'); return { success: false }; }
   }
 
   async changePassword(oldPassword, newPassword, confirmPassword) {
-    if (newPassword !== confirmPassword) { await ConfirmDialog.showError('Error', 'Passwords do not match'); return { success: false }; }
-    if (newPassword.length < 4) { await ConfirmDialog.showError('Error', 'Min 4 characters'); return { success: false }; }
-    try { const r = await this.api.changePassword({ oldPassword, newPassword, confirmPassword }); if (r.isSuccess) { await ConfirmDialog.showSuccess('Success', 'Password changed'); return { success: true }; } await ConfirmDialog.showError('Error', r.message || 'Failed'); return { success: false }; }
-    catch { await ConfirmDialog.showError('Error', 'Failed to change'); return { success: false }; }
+    if (newPassword !== confirmPassword) { ConfirmDialog.toast.error('Passwords do not match'); return { success: false }; }
+    if (newPassword.length < 4) { ConfirmDialog.toast.error('Min 4 characters'); return { success: false }; }
+    try { const r = await this.api.changePassword({ oldPassword, newPassword, confirmPassword }); if (r.isSuccess) { ConfirmDialog.toast.success('Password changed'); return { success: true }; } ConfirmDialog.toast.error(r.message || 'Failed'); return { success: false }; }
+    catch { ConfirmDialog.toast.error('Failed to change'); return { success: false }; }
   }
 }
 

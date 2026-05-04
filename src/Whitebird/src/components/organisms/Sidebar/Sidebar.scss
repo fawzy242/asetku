@@ -15,10 +15,6 @@
     box-shadow: $shadow-xl;
     border-right: 1px solid rgba(255, 255, 255, 0.05);
 
-    [data-theme='dark'] & {
-        background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
-    }
-
     &--collapsed {
         width: $sidebar-collapsed-width;
 
@@ -60,6 +56,17 @@
         object-fit: contain;
     }
 
+    &__logo-fallback {
+        @include flex-center;
+        width: 34px;
+        height: 34px;
+        background: linear-gradient(135deg, #dc2626, #b91c1c);
+        color: white;
+        font-weight: 700;
+        font-size: 18px;
+        border-radius: $radius-md;
+    }
+
     &__logo-text {
         font-size: $font-size-lg;
         font-weight: 700;
@@ -71,12 +78,12 @@
         @include flex-center;
         width: 34px;
         height: 34px;
-        color: $sidebar-text-light;
+        color: #9ca3af;
         border-radius: $radius-md;
         transition: all $transition-fast;
 
         &:hover {
-            background-color: $sidebar-hover-light;
+            background-color: #374151;
             color: white;
         }
 
@@ -108,7 +115,7 @@
         align-items: center;
         gap: $spacing-md;
         padding: 10px $spacing-md;
-        color: $sidebar-text-light;
+        color: #9ca3af;
         text-decoration: none;
         transition: all $transition-fast;
         white-space: nowrap;
@@ -116,12 +123,12 @@
         position: relative;
 
         &:hover {
-            background-color: $sidebar-hover-light;
+            background-color: #374151;
             color: white;
         }
 
         &--active {
-            background: linear-gradient(90deg, $primary-light 0%, rgba(220, 38, 38, 0.15) 100%);
+            background: linear-gradient(90deg, #dc2626 0%, rgba(220, 38, 38, 0.15) 100%);
             color: white;
 
             &::before {
@@ -132,12 +139,12 @@
                 transform: translateY(-50%);
                 width: 3px;
                 height: 20px;
-                background-color: $primary-light;
+                background-color: #dc2626;
                 border-radius: 0 $radius-sm $radius-sm 0;
             }
 
             &:hover {
-                background: linear-gradient(90deg, $primary-dark 0%, rgba(220, 38, 38, 0.25) 100%);
+                background: linear-gradient(90deg, #b91c1c 0%, rgba(220, 38, 38, 0.25) 100%);
             }
         }
 
@@ -150,10 +157,6 @@
     &__icon {
         flex-shrink: 0;
         transition: transform $transition-fast;
-
-        .sidebar__link:hover & {
-            transform: scale(1.05);
-        }
     }
 
     &__label {
@@ -193,36 +196,10 @@
 
         span {
             font-size: 10px;
-            color: $sidebar-text-light;
+            color: #9ca3af;
             opacity: 0.4;
             text-transform: uppercase;
             letter-spacing: 1px;
-        }
-    }
-}
-
-[data-theme='dark'] {
-    .sidebar {
-        background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
-
-        &__toggle-btn {
-            color: $sidebar-text-dark;
-
-            &:hover {
-                background-color: $sidebar-hover-dark;
-            }
-        }
-
-        &__link {
-            color: $sidebar-text-dark;
-
-            &:hover {
-                background-color: $sidebar-hover-dark;
-            }
-        }
-
-        &__version span {
-            color: $sidebar-text-dark;
         }
     }
 }

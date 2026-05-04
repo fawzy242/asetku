@@ -23,7 +23,6 @@
     --sidebar-text: #{$sidebar-text-light};
     --sidebar-text-active: #{$sidebar-text-active-light};
     --sidebar-hover: #{$sidebar-hover-light};
-    --mui-input-bg: #ffffff;
 }
 
 [data-theme='dark'] {
@@ -49,5 +48,4 @@
     --sidebar-text: #{$sidebar-text-dark};
     --sidebar-text-active: #{$sidebar-text-active-dark};
     --sidebar-hover: #{$sidebar-hover-dark};
-    --mui-input-bg: #374151;
 }

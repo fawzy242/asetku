@@ -1,8 +1,8 @@
-import React, { memo, useMemo } from "react";
-import { DataGrid } from "@mui/x-data-grid";
-import { createTheme, ThemeProvider } from "@mui/material/styles";
-import { useTheme } from "../../../context/ThemeContext";
-import "./DataTable.scss";
+import React, { memo, useMemo } from 'react';
+import { DataGrid } from '@mui/x-data-grid';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { useUIStore } from '../../../stores/uiStore';
+import './DataTable.scss';
 
 const DataTable = memo(({
   rows = [],
@@ -16,139 +16,174 @@ const DataTable = memo(({
   rowHeight = 52,
   headerHeight = 56,
   autoHeight = false,
-  getRowId = (row) => row.id,
+  getRowId = null,
   hideFooter = true,
-  className = "",
+  className = '',
+  ariaLabel = 'Data table',
 }) => {
-  const { theme: appTheme } = useTheme();
-  const isDark = appTheme === "dark";
+  const theme = useUIStore((s) => s.theme);
+  const isDark = theme === 'dark';
 
-  // Calculate dynamic height based on pageSize
-  const gridHeight = useMemo(() => {
-    if (autoHeight) return undefined;
-    const headerFooterHeight = 120;
-    const calculatedHeight = Math.min(rows.length, pageSize) * rowHeight + headerFooterHeight;
-    return Math.max(400, Math.min(800, calculatedHeight));
-  }, [rows.length, pageSize, rowHeight, autoHeight]);
+  // Safe rows — selalu array
+  const safeRows = useMemo(() => {
+    if (!rows) return [];
+    if (Array.isArray(rows)) return rows;
+    return [];
+  }, [rows]);
 
-  const muiTheme = React.useMemo(() => createTheme({
+  // Safe columns — selalu array
+  const safeColumns = useMemo(() => {
+    if (!columns || !Array.isArray(columns)) return [];
+    return columns;
+  }, [columns]);
+
+  /**
+   * CRITICAL: getRowId yang robust.
+   * 
+   * Prioritas:
+   * 1. Gunakan fungsi getRowId dari props jika mengembalikan nilai valid (bukan undefined/null/NaN)
+   * 2. Coba field-field ID umum secara otomatis
+   * 3. Fallback terakhir: gunakan indeks array (stabil untuk sesi render yang sama)
+   * 
+   * PASTIKAN tidak pernah mengembalikan undefined/null.
+   */
+  const safeGetRowId = useMemo(() => {
+    return (row) => {
+      // Jika props menyediakan getRowId, coba gunakan
+      if (typeof getRowId === 'function') {
+        const customId = getRowId(row);
+        if (customId !== undefined && customId !== null && customId !== '' && !Number.isNaN(customId)) {
+          return customId;
+        }
+      }
+
+      // Coba field ID umum
+      if (row?.id !== undefined && row?.id !== null) return row.id;
+      if (row?.assetId !== undefined && row?.assetId !== null) return row.assetId;
+      if (row?.categoryId !== undefined && row?.categoryId !== null) return row.categoryId;
+      if (row?.supplierId !== undefined && row?.supplierId !== null) return row.supplierId;
+      if (row?.locationId !== undefined && row?.locationId !== null) return row.locationId;
+      if (row?.employeeId !== undefined && row?.employeeId !== null) return row.employeeId;
+      if (row?.assetTransactionId !== undefined && row?.assetTransactionId !== null) return row.assetTransactionId;
+
+      // Fallback: gunakan kombinasi field untuk unique key
+      const fallback = row?.assetCode || row?.categoryName || row?.supplierName || 
+                       row?.locationName || row?.fullName || row?.employeeCode || '';
+      if (fallback) return fallback;
+
+      // Last resort: JSON stringify (tidak ideal tapi mencegah error)
+      return JSON.stringify(row);
+    };
+  }, [getRowId]);
+
+  const effectiveAutoHeight = autoHeight || hideFooter;
+
+  // MUI Theme untuk DataGrid — full dark/light support
+  const muiTheme = useMemo(() => createTheme({
     palette: {
-      mode: isDark ? "dark" : "light",
-      primary: { main: "#dc2626" },
-      background: { 
-        default: isDark ? "#111827" : "#ffffff", 
-        paper: isDark ? "#1f2937" : "#ffffff" 
+      mode: isDark ? 'dark' : 'light',
+      primary: { main: '#dc2626' },
+      background: {
+        default: isDark ? '#111827' : '#ffffff',
+        paper: isDark ? '#1f2937' : '#ffffff',
       },
-      text: { 
-        primary: isDark ? "#f9fafb" : "#111827", 
-        secondary: isDark ? "#9ca3af" : "#6b7280" 
+      text: {
+        primary: isDark ? '#f9fafb' : '#111827',
+        secondary: isDark ? '#9ca3af' : '#6b7280',
       },
     },
-    typography: { 
-      fontFamily: "'Inter', sans-serif", 
+    typography: {
+      fontFamily: "'Inter', sans-serif",
       fontSize: 14,
     },
     shape: { borderRadius: 8 },
     components: {
       MuiDataGrid: {
-        defaultProps: {
-          disableColumnResize: false,
-        },
         styleOverrides: {
           root: {
-            border: "none",
-            backgroundColor: "transparent",
-            height: gridHeight,
-            minHeight: 400,
-            '& .MuiDataGrid-columnHeader--resizable': {
-              cursor: 'col-resize',
-            },
-            "& .MuiDataGrid-columnHeaders": {
-              backgroundColor: isDark ? "#374151" : "#f9fafb",
-              color: isDark ? "#f9fafb" : "#374151",
+            border: 'none',
+            backgroundColor: 'transparent',
+            width: '100%',
+            minWidth: '100%',
+            '& .MuiDataGrid-main': { width: '100%' },
+            '& .MuiDataGrid-virtualScroller': { width: '100%' },
+            '& .MuiDataGrid-columnHeaders': {
+              backgroundColor: isDark ? '#374151' : '#f9fafb',
+              color: isDark ? '#f9fafb' : '#374151',
               fontWeight: 600,
-              fontSize: "0.875rem",
-              borderBottom: `1px solid ${isDark ? "#4b5563" : "#e5e7eb"}`,
+              fontSize: '0.875rem',
+              borderBottom: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}`,
             },
-            "& .MuiDataGrid-columnHeader": {
-              padding: "0 16px",
-              "&:focus, &:focus-within": { outline: "none" },
+            '& .MuiDataGrid-cell': {
+              borderBottom: `1px solid ${isDark ? '#374151' : '#f3f4f6'}`,
+              color: isDark ? '#f9fafb' : '#1f2937',
+              fontSize: '0.875rem',
+              '&:focus, &:focus-within': { outline: 'none' },
             },
-            "& .MuiDataGrid-columnHeaderTitle": {
-              fontWeight: 600,
-              fontSize: "0.875rem",
+            '& .MuiDataGrid-row:hover': {
+              backgroundColor: isDark ? '#374151' : '#f9fafb',
             },
-            "& .MuiDataGrid-cell": {
-              borderBottom: `1px solid ${isDark ? "#374151" : "#f3f4f6"}`,
-              color: isDark ? "#f9fafb" : "#1f2937",
-              fontSize: "0.875rem",
-              padding: "0 16px",
-              "&:focus, &:focus-within": { outline: "none" },
+            '& .MuiDataGrid-footerContainer': {
+              display: hideFooter ? 'none' : 'flex',
+              backgroundColor: isDark ? '#374151' : '#f9fafb',
+              color: isDark ? '#f9fafb' : '#374151',
+              borderTop: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}`,
             },
-            "& .MuiDataGrid-row:hover": {
-              backgroundColor: isDark ? "#374151" : "#f9fafb",
+            '& .MuiTablePagination-root': {
+              color: isDark ? '#f9fafb' : '#374151',
             },
-            "& .MuiDataGrid-footerContainer": {
-              display: hideFooter ? "none" : "flex",
-              borderTop: `1px solid ${isDark ? "#4b5563" : "#e5e7eb"}`,
+            '& .MuiTablePagination-selectIcon, & .MuiSvgIcon-root': {
+              color: isDark ? '#9ca3af' : '#6b7280',
             },
-            "& .MuiDataGrid-overlay": {
-              backgroundColor: "transparent",
-              color: isDark ? "#9ca3af" : "#6b7280",
+            '& .MuiDataGrid-overlay': {
+              backgroundColor: isDark ? 'rgba(17, 24, 39, 0.7)' : 'rgba(255, 255, 255, 0.7)',
+              color: isDark ? '#9ca3af' : '#6b7280',
             },
-            "& .MuiDataGrid-columnSeparator": {
-              display: "none",
-            },
-            "& .MuiDataGrid-menuIcon": {
-              display: "none",
-            },
-            "& .MuiCheckbox-root": {
-              color: isDark ? "#9ca3af" : "#6b7280",
-              "&.Mui-checked": { color: "#dc2626" },
-            },
-          },
-          columnHeader: {
-            '& .MuiDataGrid-iconButtonContainer': {
-              visibility: 'visible',
-              width: 'auto',
-            },
-            '& .MuiDataGrid-columnHeaderTitleContainer': {
-              overflow: 'visible',
+            '& .MuiDataGrid-columnSeparator, & .MuiDataGrid-menuIcon': {
+              display: 'none',
             },
           },
         },
       },
+      MuiCheckbox: {
+        styleOverrides: {
+          root: {
+            color: isDark ? '#9ca3af' : '#6b7280',
+            '&.Mui-checked': { color: '#dc2626' },
+          },
+        },
+      },
     },
-  }), [isDark, gridHeight, hideFooter, rows.length, pageSize]);
+  }), [isDark, hideFooter]);
 
   return (
-    <div className={`data-table ${className}`} style={{ height: gridHeight, minHeight: 400 }}>
+    <div
+      className={`data-table ${className}`}
+      role="region"
+      aria-label={ariaLabel}
+      aria-busy={loading}
+      style={{ width: '100%', minWidth: '100%' }}
+    >
       <ThemeProvider theme={muiTheme}>
         <DataGrid
-          rows={rows}
-          columns={columns}
+          rows={safeRows}
+          columns={safeColumns}
           loading={loading}
-          initialState={{ 
-            pagination: { 
-              paginationModel: { pageSize, page: 0 } 
-            } 
-          }}
+          initialState={{ pagination: { paginationModel: { pageSize, page: 0 } } }}
           pageSizeOptions={pageSizeOptions}
           onRowClick={onRowClick}
           checkboxSelection={checkboxSelection}
           onRowSelectionModelChange={onSelectionChange}
           rowHeight={rowHeight}
           columnHeaderHeight={headerHeight}
-          autoHeight={autoHeight}
-          getRowId={getRowId}
+          autoHeight={effectiveAutoHeight}
+          getRowId={safeGetRowId}
           disableRowSelectionOnClick
           hideFooter={hideFooter}
-          resizable={true}
           sx={{
-            "& .MuiDataGrid-virtualScroller": {
-              overflow: "auto",
-              minHeight: rows.length === 0 ? "200px" : "auto",
-            },
+            width: '100%',
+            minWidth: '100%',
+            minHeight: effectiveAutoHeight ? undefined : 400,
           }}
         />
       </ThemeProvider>
@@ -156,5 +191,5 @@ const DataTable = memo(({
   );
 });
 
-DataTable.displayName = "DataTable";
+DataTable.displayName = 'DataTable';
 export default DataTable;

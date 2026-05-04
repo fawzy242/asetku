@@ -18,22 +18,31 @@
     width: calc(100% - var(--sidebar-width, $sidebar-width));
     backdrop-filter: blur(10px);
 
-    [data-theme='light'] & {
-        background-color: rgba(255, 255, 255, 0.95);
-    }
-
-    [data-theme='dark'] & {
-        background-color: rgba(31, 41, 55, 0.95);
-    }
-
     &__left {
         display: flex;
         align-items: center;
         min-width: 180px;
     }
 
-    &__title {
-        font-size: $font-size-xl;
+    &__brand {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+    }
+
+    &__brand-icon {
+        @include flex-center;
+        width: 34px;
+        height: 34px;
+        background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+        color: white;
+        font-weight: 700;
+        font-size: 18px;
+        border-radius: $radius-md;
+    }
+
+    &__brand-text {
+        font-size: $font-size-lg;
         font-weight: 700;
         color: var(--text-primary);
         letter-spacing: -0.5px;
@@ -189,6 +198,7 @@
         background-color: transparent;
         border-radius: $radius-lg;
         transition: all $transition-fast;
+        color: var(--text-primary);
 
         &:hover {
             background-color: var(--surface);
@@ -213,10 +223,6 @@
         font-size: $font-size-sm;
     }
 
-    &__user-arrow {
-        color: var(--text-secondary);
-    }
-
     &__user-dropdown {
         position: absolute;
         top: calc(100% + 10px);
@@ -228,6 +234,7 @@
         box-shadow: $shadow-xl;
         z-index: $z-index-dropdown;
         animation: slideIn $transition-base;
+        overflow: hidden;
     }
 
     &__user-header {
@@ -282,10 +289,6 @@
 
             &:hover {
                 background-color: var(--surface);
-            }
-
-            svg {
-                font-size: 18px;
             }
         }
     }

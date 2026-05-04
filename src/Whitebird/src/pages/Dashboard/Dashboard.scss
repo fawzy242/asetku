@@ -1,7 +1,10 @@
 @use '../../styles/variables' as *;
 @use '../../styles/mixins' as *;
+@use '../../styles/shared';
 
 .dashboard {
+    color: var(--text-primary);
+
     &__stats {
         display: grid;
         grid-template-columns: repeat(6, 1fr);
@@ -14,6 +17,10 @@
 
         @include respond-to('md') {
             grid-template-columns: repeat(2, 1fr);
+        }
+
+        @include respond-to('sm') {
+            grid-template-columns: 1fr;
         }
     }
 
@@ -55,6 +62,24 @@
         }
     }
 
+    &__chart-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--text-secondary);
+        gap: $spacing-md;
+
+        svg {
+            color: var(--text-secondary);
+        }
+
+        p {
+            font-size: $font-size-sm;
+        }
+    }
+
     &__alerts {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -77,6 +102,7 @@
             justify-content: space-between;
             padding: $spacing-sm 0;
             border-bottom: 1px solid var(--border);
+            color: var(--text-primary);
 
             span:first-child {
                 font-weight: 600;
@@ -89,54 +115,5 @@
                 @include truncate;
             }
         }
-    }
-
-    .status-badge {
-        padding: 4px 10px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 500;
-
-        &--success {
-            background: #10b981;
-            color: white;
-        }
-
-        &--primary {
-            background: #3b82f6;
-            color: white;
-        }
-
-        &--warning {
-            background: #f59e0b;
-            color: white;
-        }
-
-        &--error {
-            background: #ef4444;
-            color: white;
-        }
-
-        &--secondary {
-            background: #6b7280;
-            color: white;
-        }
-    }
-
-    .badge {
-        padding: 2px 8px;
-        border-radius: 20px;
-        font-size: 11px;
-        font-weight: 500;
-
-        &--error {
-            background: #ef4444;
-            color: white;
-        }
-    }
-
-    .dashboard-loading {
-        @include flex-center;
-        min-height: 400px;
     }
 }

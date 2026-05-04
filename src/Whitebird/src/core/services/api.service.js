@@ -1,20 +1,17 @@
 import axios from 'axios';
-import Swal from 'sweetalert2';
+import toast from 'react-hot-toast';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 const SESSION_TOKEN_KEY = import.meta.env.VITE_SESSION_TOKEN_KEY || 'whitebird_session_token';
 
 class ApiService {
   constructor() {
+    this.pendingRequests = new Map();
     this.instance = axios.create({
       baseURL: API_BASE_URL,
       timeout: 30000,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
     });
-
     this.setupInterceptors();
   }
 
@@ -22,22 +19,20 @@ class ApiService {
     this.instance.interceptors.request.use(
       (config) => {
         const token = localStorage.getItem(SESSION_TOKEN_KEY);
-        if (token) {
-          config.headers['X-Session-Token'] = token;
-        }
+        if (token) config.headers['X-Session-Token'] = token;
         return config;
       },
-      (error) => {
-        return Promise.reject(error);
-      }
+      (error) => Promise.reject(error)
     );
 
     this.instance.interceptors.response.use(
-      (response) => {
-        return response;
-      },
+      (response) => response,
       (error) => {
-        return this.handleError(error);
+        if (axios.isCancel(error)) {
+          return Promise.reject(error);
+        }
+        this.handleError(error);
+        return Promise.reject(error);
       }
     );
   }
@@ -45,7 +40,6 @@ class ApiService {
   handleError(error) {
     if (error.response) {
       const { status, data } = error.response;
-      
       switch (status) {
         case 401:
           localStorage.removeItem(SESSION_TOKEN_KEY);
@@ -53,56 +47,43 @@ class ApiService {
           if (window.location.pathname !== '/login') {
             window.location.href = '/login';
           }
-          Swal.fire({
-            title: 'Session Expired',
-            text: 'Please login again to continue.',
-            icon: 'warning',
-            confirmButtonColor: '#dc2626'
-          });
+          toast.error('Session expired. Please login again.');
           break;
-          
         case 403:
-          Swal.fire({
-            title: 'Access Denied',
-            text: 'You do not have permission to perform this action.',
-            icon: 'error',
-            confirmButtonColor: '#dc2626'
-          });
+          toast.error('Access denied.');
           break;
-          
         case 500:
-          Swal.fire({
-            title: 'Server Error',
-            text: 'An unexpected error occurred. Please try again later.',
-            icon: 'error',
-            confirmButtonColor: '#dc2626'
-          });
+          toast.error('Server error. Please try again later.');
           break;
-          
         default:
           if (data?.errors?.length > 0) {
-            Swal.fire({
-              title: data.message || 'Error',
-              text: data.errors.join('\n'),
-              icon: 'error',
-              confirmButtonColor: '#dc2626'
-            });
+            toast.error(data.errors.join('\n'));
           }
       }
     } else if (error.request) {
-      Swal.fire({
-        title: 'Network Error',
-        text: 'Unable to connect to the server. Please check your internet connection.',
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
+      toast.error('Network error. Please check your connection.');
     }
-    
-    return Promise.reject(error);
+  }
+
+  cancelPendingRequest(key) {
+    if (this.pendingRequests.has(key)) {
+      this.pendingRequests.get(key).abort();
+      this.pendingRequests.delete(key);
+    }
   }
 
   get(url, config = {}) {
-    return this.instance.get(url, config);
+    const controller = new AbortController();
+    const requestKey = `GET:${url}`;
+    this.cancelPendingRequest(requestKey);
+    this.pendingRequests.set(requestKey, controller);
+
+    return this.instance.get(url, { ...config, signal: controller.signal })
+      .finally(() => {
+        if (this.pendingRequests.get(requestKey) === controller) {
+          this.pendingRequests.delete(requestKey);
+        }
+      });
   }
 
   post(url, data = {}, config = {}) {

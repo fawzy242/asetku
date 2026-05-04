@@ -16,6 +16,7 @@
     color: var(--text-secondary);
     border-bottom: 2px solid transparent;
     transition: all $transition-fast;
+    background: transparent;
 
     &:hover {
         color: var(--primary);

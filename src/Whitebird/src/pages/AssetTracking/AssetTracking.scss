@@ -1,18 +1,21 @@
 @use '../../styles/variables' as *;
 @use '../../styles/mixins' as *;
+@use '../../styles/shared';
 
 .asset-tracking {
+    color: var(--text-primary);
 
-    // Chrono Timeline Custom Styles
     .chrono-card {
         border-radius: $radius-lg !important;
         border: 1px solid var(--border) !important;
         box-shadow: $shadow-sm !important;
+        background-color: var(--card-bg) !important;
     }
 
     .chrono-card-title {
         font-weight: 600 !important;
         font-size: 14px !important;
+        color: var(--text-primary) !important;
     }
 
     .chrono-card-subtitle {
@@ -23,9 +26,4 @@
         color: var(--text-secondary) !important;
         font-size: 12px !important;
     }
-}
-
-.tracking-loading {
-    @include flex-center;
-    min-height: 400px;
 }

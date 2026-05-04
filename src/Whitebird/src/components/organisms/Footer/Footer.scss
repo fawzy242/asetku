@@ -26,6 +26,7 @@
     &__link {
         font-size: $font-size-xs;
         color: var(--text-secondary);
+        background: transparent;
         transition: color $transition-fast;
 
         &:hover {

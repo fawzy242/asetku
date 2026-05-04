@@ -1,0 +1,12 @@
+@use '../../../styles/variables' as *;
+
+.filter-panel {
+    background-color: var(--surface);
+    border-radius: $radius-md;
+    padding: $spacing-md;
+    margin-bottom: $spacing-lg;
+
+    >* {
+        min-width: 180px;
+    }
+}

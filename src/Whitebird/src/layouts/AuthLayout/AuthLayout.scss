@@ -4,6 +4,7 @@
 .auth-layout {
     min-height: 100vh;
     @include flex-center;
+    flex-direction: column;
     position: relative;
     padding: $spacing-xl;
 
@@ -62,15 +63,7 @@
         padding: $spacing-2xl;
         box-shadow: $shadow-xl;
         animation: slideIn $transition-base;
-        backdrop-filter: blur(10px);
-
-        [data-theme='dark'] & {
-            background-color: rgba(31, 41, 55, 0.95);
-        }
-
-        [data-theme='light'] & {
-            background-color: rgba(255, 255, 255, 0.98);
-        }
+        border: 1px solid var(--border);
     }
 
     &__logo {
@@ -107,20 +100,14 @@
     }
 
     &__footer {
-        position: absolute;
-        bottom: $spacing-lg;
-        left: 0;
-        right: 0;
-        text-align: center;
-        color: rgba(255, 255, 255, 0.7);
-        font-size: $font-size-sm;
+        position: relative;
         z-index: 2;
-        padding: 0 $spacing-lg;
+        text-align: center;
+        margin-top: $spacing-xl;
+        color: var(--text-secondary);
+        font-size: $font-size-sm;
 
         @include respond-to('sm') {
-            position: relative;
-            bottom: auto;
-            margin-top: $spacing-lg;
             color: var(--text-secondary);
         }
     }

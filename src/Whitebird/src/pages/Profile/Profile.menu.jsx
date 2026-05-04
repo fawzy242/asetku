@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { FiUser, FiMail, FiShield, FiLock, FiSave, FiX, FiBriefcase, FiCalendar, FiEdit2, FiCheck, FiAlertCircle } from "react-icons/fi";
-import { Grid, Box, Avatar, Divider, Typography } from "@mui/material";
+import { FiUser, FiMail, FiShield, FiLock, FiSave, FiX, FiBriefcase, FiCalendar, FiEdit2, FiCheck } from "react-icons/fi";
+import { Grid, Box, Avatar, Typography } from "@mui/material";
 import ProfileData from "./Profile.data";
 import Card from "../../components/atoms/Card/Card";
 import Button from "../../components/atoms/Button/Button";
@@ -80,43 +80,29 @@ const ProfileMenu = () => {
   return (
     <div className="profile-menu fade-transition">
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight={700} color="text.primary" gutterBottom>My Profile</Typography>
+        <Typography variant="h4" fontWeight={700} gutterBottom>My Profile</Typography>
         <Typography variant="body2" color="text.secondary">Manage your account settings and preferences</Typography>
       </Box>
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={7}>
-          <Card className="profile-menu__info-card">
+          <Card>
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 3, mb: 3, pb: 3, borderBottom: '1px solid var(--border)' }}>
               <Avatar sx={{ width: 80, height: 80, bgcolor: 'var(--primary)', fontSize: 32, fontWeight: 600 }}>{userInitial}</Avatar>
               <Box sx={{ flex: 1 }}>
                 <Typography variant="h6" fontWeight={600}>{profile?.fullName}</Typography>
                 <Typography variant="body2" color="text.secondary">{profile?.roleId}</Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                  <FiCalendar size={12} /> Member since {utilsHelper.formatDate(profile?.createdDate, 'MMMM D, YYYY')}
-                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}><FiCalendar size={12} /> Member since {utilsHelper.formatDate(profile?.createdDate, 'MMMM D, YYYY')}</Typography>
               </Box>
               {!editMode && <Button variant="outline" size="sm" onClick={() => setEditMode(true)} startIcon={<FiEdit2 />}>Edit</Button>}
             </Box>
 
             {!editMode ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'var(--surface)', borderRadius: 2, color: 'var(--primary)' }}><FiUser size={20} /></Box>
-                  <Box><Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Full Name</Typography><Typography variant="body1" fontWeight={500}>{profile?.fullName}</Typography></Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'var(--surface)', borderRadius: 2, color: 'var(--primary)' }}><FiMail size={20} /></Box>
-                  <Box><Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Email</Typography><Typography variant="body1" fontWeight={500}>{profile?.email}</Typography></Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'var(--surface)', borderRadius: 2, color: 'var(--primary)' }}><FiBriefcase size={20} /></Box>
-                  <Box><Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Username</Typography><Typography variant="body1" fontWeight={500}>@{profile?.username}</Typography></Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'var(--surface)', borderRadius: 2, color: 'var(--primary)' }}><FiShield size={20} /></Box>
-                  <Box><Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Role</Typography><Typography variant="body1" fontWeight={500}>{profile?.roleId}</Typography></Box>
-                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}><Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'var(--surface)', borderRadius: 2, color: 'var(--primary)' }}><FiUser size={20} /></Box><Box><Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Full Name</Typography><Typography variant="body1" fontWeight={500}>{profile?.fullName}</Typography></Box></Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}><Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'var(--surface)', borderRadius: 2, color: 'var(--primary)' }}><FiMail size={20} /></Box><Box><Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Email</Typography><Typography variant="body1" fontWeight={500}>{profile?.email}</Typography></Box></Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}><Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'var(--surface)', borderRadius: 2, color: 'var(--primary)' }}><FiBriefcase size={20} /></Box><Box><Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Username</Typography><Typography variant="body1" fontWeight={500}>@{profile?.username}</Typography></Box></Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}><Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'var(--surface)', borderRadius: 2, color: 'var(--primary)' }}><FiShield size={20} /></Box><Box><Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Role</Typography><Typography variant="body1" fontWeight={500}>{profile?.roleId}</Typography></Box></Box>
               </Box>
             ) : (
               <form onSubmit={handleProfileUpdate}>
@@ -124,12 +110,7 @@ const ProfileMenu = () => {
                   <Grid item xs={12}><Input label="Full Name" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} error={errors.fullName} startAdornment={<FiUser />} required /></Grid>
                   <Grid item xs={12}><Input label="Email" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} error={errors.email} startAdornment={<FiMail />} required /></Grid>
                   <Grid item xs={12}><Input label="Phone (Optional)" value={formData.phoneNumber} onChange={e => setFormData({...formData, phoneNumber: e.target.value})} startAdornment={<FiBriefcase />} /></Grid>
-                  <Grid item xs={12}>
-                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                      <Button type="button" variant="outline" onClick={handleCancelEdit} startIcon={<FiX />}>Cancel</Button>
-                      <Button type="submit" variant="primary" loading={saving} startIcon={<FiCheck />}>Save Changes</Button>
-                    </Box>
-                  </Grid>
+                  <Grid item xs={12}><Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}><Button type="button" variant="outline" onClick={handleCancelEdit} startIcon={<FiX />}>Cancel</Button><Button type="submit" variant="primary" loading={saving} startIcon={<FiCheck />}>Save Changes</Button></Box></Grid>
                 </Grid>
               </form>
             )}
@@ -137,29 +118,18 @@ const ProfileMenu = () => {
         </Grid>
 
         <Grid item xs={12} md={5}>
-          <Card className="profile-menu__security-card">
+          <Card>
             <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
               <Box sx={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(220,38,38,0.1)', borderRadius: 2, color: 'var(--primary)' }}><FiLock size={24} /></Box>
               <Box><Typography variant="h6" fontWeight={600}>Security</Typography><Typography variant="body2" color="text.secondary">Update your password</Typography></Box>
             </Box>
-
-            {!showPasswordForm ? (
-              <Button variant="outline" onClick={() => setShowPasswordForm(true)} startIcon={<FiLock />} fullWidth>Change Password</Button>
-            ) : (
+            {!showPasswordForm ? <Button variant="outline" onClick={() => setShowPasswordForm(true)} startIcon={<FiLock />} fullWidth>Change Password</Button> : (
               <form onSubmit={handlePasswordChange}>
                 <Grid container spacing={2}>
                   <Grid item xs={12}><Input label="Current Password" type="password" value={passwordData.oldPassword} onChange={e => setPasswordData({...passwordData, oldPassword: e.target.value})} error={errors.oldPassword} /></Grid>
                   <Grid item xs={12}><Input label="New Password" type="password" value={passwordData.newPassword} onChange={e => setPasswordData({...passwordData, newPassword: e.target.value})} error={errors.newPassword} /></Grid>
                   <Grid item xs={12}><Input label="Confirm New Password" type="password" value={passwordData.confirmPassword} onChange={e => setPasswordData({...passwordData, confirmPassword: e.target.value})} error={errors.confirmPassword} /></Grid>
-                  <Grid item xs={12}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, color: 'var(--text-secondary)', fontSize: 12 }}>
-                      <FiAlertCircle size={14} color="var(--warning)" /><span>Password must be at least 4 characters</span>
-                    </Box>
-                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                      <Button type="button" variant="outline" onClick={handleCancelPassword} startIcon={<FiX />}>Cancel</Button>
-                      <Button type="submit" variant="primary" loading={saving} startIcon={<FiSave />}>Update Password</Button>
-                    </Box>
-                  </Grid>
+                  <Grid item xs={12}><Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}><Button type="button" variant="outline" onClick={handleCancelPassword} startIcon={<FiX />}>Cancel</Button><Button type="submit" variant="primary" loading={saving} startIcon={<FiSave />}>Update Password</Button></Box></Grid>
                 </Grid>
               </form>
             )}

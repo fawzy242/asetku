@@ -1,7 +1,10 @@
 @use '../../styles/variables' as *;
 @use '../../styles/mixins' as *;
+@use '../../styles/shared';
 
 .employee-summary {
+    color: var(--text-primary);
+
     .summary-stat-card {
         display: flex;
         flex-direction: column;
@@ -10,9 +13,4 @@
         gap: $spacing-sm;
         padding: $spacing-lg;
     }
-}
-
-.summary-loading {
-    @include flex-center;
-    min-height: 400px;
 }

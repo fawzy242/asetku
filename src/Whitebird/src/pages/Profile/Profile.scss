@@ -1,9 +1,11 @@
 @use '../../styles/variables' as *;
 @use '../../styles/mixins' as *;
+@use '../../styles/shared';
 
 .profile-menu {
     max-width: 1100px;
     margin: 0 auto;
+    color: var(--text-primary);
 
     &__info-card {
         padding: $spacing-xl;
@@ -12,21 +14,5 @@
     &__security-card {
         padding: $spacing-xl;
         height: fit-content;
-    }
-}
-
-.profile-loading {
-    @include flex-center;
-    min-height: 400px;
-}
-
-// Override MUI dark mode text colors
-[data-theme='dark'] {
-    .MuiTypography-root {
-        color: var(--text-primary) !important;
-    }
-
-    .MuiTypography-colorTextSecondary {
-        color: var(--text-secondary) !important;
     }
 }
