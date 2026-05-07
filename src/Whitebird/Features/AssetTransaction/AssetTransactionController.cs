@@ -32,6 +32,12 @@ public class AssetTransactionController : ControllerBase
     [HttpGet("pending-approvals")]
     public async Task<IActionResult> GetPendingApprovals() => this.HandleResult(await _transactionService.GetPendingApprovalsAsync());
 
+    [HttpGet("active-loans")]
+    public async Task<IActionResult> GetActiveLoans() => this.HandleResult(await _transactionService.GetActiveLoansAsync());
+
+    [HttpGet("overdue-loans")]
+    public async Task<IActionResult> GetOverdueLoans() => this.HandleResult(await _transactionService.GetOverdueLoansAsync());
+
     [HttpGet("grid")]
     public async Task<IActionResult> GetGridData([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string? search = null, [FromQuery] string? status = null, [FromQuery] int? assetId = null)
         => this.HandleResult(await _transactionService.GetGridDataAsync(page, pageSize, search, status, assetId));

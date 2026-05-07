@@ -118,6 +118,7 @@ img {
 // ============================================================
 // MUI SCROLLBAR
 // ============================================================
+
 .MuiDataGrid-virtualScroller {
     &::-webkit-scrollbar {
         width: 6px;
@@ -126,6 +127,35 @@ img {
 
     &::-webkit-scrollbar-track {
         background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: var(--scrollbar-thumb);
+        border-radius: 3px;
+
+        &:hover {
+            background: var(--scrollbar-thumb-hover);
+        }
+    }
+}
+
+// ============================================================
+// FIX: Global scrollbar untuk semua MUI dropdown/menu/list
+// ============================================================
+
+.MuiPaper-root,
+.MuiMenu-paper,
+.MuiList-root,
+.MuiAutocomplete-listbox,
+.MuiSelect-selectMenu {
+    &::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: var(--surface);
+        border-radius: 3px;
     }
 
     &::-webkit-scrollbar-thumb {

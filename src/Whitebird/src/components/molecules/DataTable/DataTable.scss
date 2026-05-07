@@ -8,13 +8,15 @@
     background-color: transparent;
     border-radius: $radius-lg;
     overflow: hidden;
-    display: block;
+    display: flex;
+    flex-direction: column;
     position: relative;
 
     .MuiDataGrid-root {
         width: 100% !important;
         min-width: 100% !important;
         max-width: 100% !important;
+        flex: 1;
     }
 
     .MuiDataGrid-main {
@@ -22,13 +24,45 @@
         min-width: 100% !important;
     }
 
+    // FIX: Scrollbar horizontal & vertical ikut tema
     .MuiDataGrid-virtualScroller {
-        @include scrollbar;
         width: 100% !important;
+
+        &::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        &::-webkit-scrollbar-track {
+            background: var(--surface);
+            border-radius: 3px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: var(--scrollbar-thumb);
+            border-radius: 3px;
+
+            &:hover {
+                background: var(--scrollbar-thumb-hover);
+            }
+        }
+
+        &::-webkit-scrollbar-corner {
+            background: var(--surface);
+        }
     }
 
     .MuiDataGrid-columnHeaders {
         width: 100% !important;
+    }
+
+    .MuiDataGrid-columnSeparator {
+        display: flex !important;
+        visibility: visible !important;
+    }
+
+    .MuiDataGrid-iconSeparator {
+        cursor: col-resize !important;
     }
 
     @include respond-to('md') {

@@ -19,4 +19,10 @@ public interface IAssetReps
     Task<bool> IsAssetCodeExistsAsync(string assetCode, int? excludeAssetId = null);
     Task<int> GetNextAssetNumberAsync();
     Task<PaginatedResult<AssetEntity>> GetPagedWithRelationsAsync(int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false, Dictionary<string, object>? filters = null);
+
+    // NEW: Dashboard stats
+    Task<Dictionary<string, int>> GetStatusCountsAsync();
+    Task<int> GetExpiredWarrantyCountAsync();
+    Task<int> GetUpcomingMaintenanceCountAsync(int daysAhead = 30);
+    Task<decimal> GetTotalAssetValueAsync();
 }

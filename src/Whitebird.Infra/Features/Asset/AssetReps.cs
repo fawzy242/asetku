@@ -143,8 +143,51 @@ public class AssetReps : IAssetReps
     public async Task<int> GetNextAssetNumberAsync()
     {
         const string sql = @"SELECT ISNULL(MAX(CAST(SUBSTRING(AssetCode, 5, LEN(AssetCode)) AS INT)), 0) + 1 
-                             FROM Asset WHERE AssetCode LIKE 'AST-%' AND IsActive = 1";
+                             FROM Asset WHERE AssetCode LIKE 'AST-%'";
         return await _context.ExecuteScalarAsync<int>(sql);
+    }
+
+    // NEW: Get status counts for dashboard
+    public async Task<Dictionary<string, int>> GetStatusCountsAsync()
+    {
+        const string sql = @"
+            SELECT Status, COUNT(*) as Count
+            FROM Asset
+            WHERE IsActive = 1
+            GROUP BY Status";
+
+        var results = await _context.QueryAsync<(string Status, int Count)>(sql);
+        return results.ToDictionary(r => r.Status, r => r.Count);
+    }
+
+    // NEW: Get expired warranty count
+    public async Task<int> GetExpiredWarrantyCountAsync()
+    {
+        const string sql = @"
+            SELECT COUNT(*) FROM Asset 
+            WHERE WarrantyExpiryDate < GETDATE() 
+              AND WarrantyExpiryDate IS NOT NULL 
+              AND IsActive = 1";
+
+        return await _context.ExecuteScalarAsync<int>(sql);
+    }
+
+    // NEW: Get upcoming maintenance count
+    public async Task<int> GetUpcomingMaintenanceCountAsync(int daysAhead = 30)
+    {
+        const string sql = @"
+            SELECT COUNT(*) FROM Asset 
+            WHERE NextMaintenanceDate BETWEEN GETDATE() AND DATEADD(DAY, @DaysAhead, GETDATE()) 
+              AND IsActive = 1";
+
+        return await _context.ExecuteScalarAsync<int>(sql, new { DaysAhead = daysAhead });
+    }
+
+    // NEW: Get total asset value
+    public async Task<decimal> GetTotalAssetValueAsync()
+    {
+        const string sql = "SELECT ISNULL(SUM(PurchasePrice), 0) FROM Asset WHERE IsActive = 1";
+        return await _context.ExecuteScalarAsync<decimal>(sql);
     }
 
     public async Task<PaginatedResult<AssetEntity>> GetPagedWithRelationsAsync(int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false, Dictionary<string, object>? filters = null)

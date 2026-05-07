@@ -4,7 +4,9 @@ using Whitebird.App.Features.Asset.Interfaces;
 using Whitebird.App.Features.Common.Service;
 using Whitebird.Domain.Features.Asset.Entities;
 using Whitebird.Domain.Features.Asset.View;
+using Whitebird.Domain.Features.AssetTransaction.Enums;
 using Whitebird.Infra.Features.Asset;
+using Whitebird.Infra.Features.AssetTransaction;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.App.Features.Asset.Service;
@@ -13,18 +15,21 @@ public class AssetService : BaseService, IAssetService
 {
     private readonly IGenericRepository<AssetEntity> _repository;
     private readonly IAssetReps _assetReps;
+    private readonly IAssetTransactionReps _transactionReps;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
 
     public AssetService(
         IGenericRepository<AssetEntity> repository,
         IAssetReps assetReps,
+        IAssetTransactionReps transactionReps,
         ICurrentUserService currentUserService,
         IActivityLogService activityLogService,
         ILogger<AssetService> logger) : base(logger)
     {
         _repository = repository;
         _assetReps = assetReps;
+        _transactionReps = transactionReps;
         _currentUserService = currentUserService;
         _activityLogService = activityLogService;
     }
@@ -145,7 +150,7 @@ public class AssetService : BaseService, IAssetService
             await _activityLogService.LogUpdateAsync(
                 "Asset",
                 id,
-                $"Asset updated: Code '{oldCode}' -> '{existing.AssetCode}', Name '{oldName}' -> '{existing.AssetName}', Status '{oldStatus}' -> '{existing.Status}'",
+                $"Asset updated: Code '{oldCode}', Name '{oldName}' -> '{model.AssetName}', Status '{oldStatus}' -> '{model.Status}'",
                 _currentUserService.GetDisplayName());
 
             return ServiceResult<AssetDetailViewModel>.Success(updated!.Adapt<AssetDetailViewModel>(), "Asset updated successfully");
@@ -162,8 +167,8 @@ public class AssetService : BaseService, IAssetService
             var existing = await _assetReps.GetByIdRawAsync(id);
             if (existing == null)
                 return ServiceResult.NotFound($"Asset with id {id} not found");
-            if (existing.Status == "Assigned")
-                return ServiceResult.BadRequest("Cannot delete asset that is currently assigned");
+            if (existing.Status == "Assigned" || existing.Status == "On Loan")
+                return ServiceResult.BadRequest("Cannot delete asset that is currently assigned or on loan");
 
             var result = await _repository.DeleteAsync(id);
 
@@ -247,11 +252,11 @@ public class AssetService : BaseService, IAssetService
 
             var assets = await _assetReps.GetAllWithRelationsAsync();
             var filtered = assets.Where(a =>
-                a.AssetCode.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
-                a.AssetName.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
-                (a.SerialNumber?.Contains(keyword, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                (a.Brand?.Contains(keyword, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                (a.Model?.Contains(keyword, StringComparison.OrdinalIgnoreCase) ?? false)
+                (a.AssetCode != null && a.AssetCode.Contains(keyword, StringComparison.OrdinalIgnoreCase)) ||
+                (a.AssetName != null && a.AssetName.Contains(keyword, StringComparison.OrdinalIgnoreCase)) ||
+                (a.SerialNumber != null && a.SerialNumber.Contains(keyword, StringComparison.OrdinalIgnoreCase)) ||
+                (a.Brand != null && a.Brand.Contains(keyword, StringComparison.OrdinalIgnoreCase)) ||
+                (a.Model != null && a.Model.Contains(keyword, StringComparison.OrdinalIgnoreCase))
             );
 
             return ServiceResult<IEnumerable<AssetListViewModel>>.Success(filtered.Adapt<IEnumerable<AssetListViewModel>>());
@@ -280,20 +285,82 @@ public class AssetService : BaseService, IAssetService
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var assets = await _assetReps.GetAllWithRelationsAsync();
+            var statusCounts = await _assetReps.GetStatusCountsAsync();
+            var expiredWarranty = await _assetReps.GetExpiredWarrantyCountAsync();
+            var upcomingMaintenance = await _assetReps.GetUpcomingMaintenanceCountAsync(30);
+            var totalValue = await _assetReps.GetTotalAssetValueAsync();
+            var overdueLoans = await _transactionReps.GetOverdueLoansWithRelationsAsync();
+
             var stats = new DashboardStatsViewModel
             {
-                TotalAssets = assets.Count(),
-                AvailableAssets = assets.Count(a => a.Status == "Available"),
-                AssignedAssets = assets.Count(a => a.Status == "Assigned"),
-                UnderRepairAssets = assets.Count(a => a.Status == "Under Repair"),
-                RetiredAssets = assets.Count(a => a.Status == "Retired"),
-                ExpiredWarrantyCount = assets.Count(a => a.WarrantyExpiryDate < DateTime.Now && a.WarrantyExpiryDate != null),
-                UpcomingMaintenanceCount = assets.Count(a => a.NextMaintenanceDate.HasValue && a.NextMaintenanceDate.Value <= DateTime.Now.AddDays(30) && a.NextMaintenanceDate.Value >= DateTime.Now),
-                TotalAssetValue = assets.Sum(a => a.PurchasePrice ?? 0)
+                TotalAssets = statusCounts.Values.Sum(),
+                AvailableAssets = statusCounts.GetValueOrDefault("Available", 0),
+                AssignedAssets = statusCounts.GetValueOrDefault("Assigned", 0),
+                AssetsOnLoan = statusCounts.GetValueOrDefault("On Loan", 0),
+                AssetsInMaintenance = statusCounts.GetValueOrDefault("In Maintenance", 0),
+                UnderRepairAssets = statusCounts.GetValueOrDefault("Under Repair", 0),
+                DamagedAssets = statusCounts.GetValueOrDefault("Damaged", 0),
+                RetiredAssets = statusCounts.GetValueOrDefault("Retired", 0),
+                ExpiredWarrantyCount = expiredWarranty,
+                UpcomingMaintenanceCount = upcomingMaintenance,
+                OverdueLoanCount = overdueLoans.Count(),
+                TotalAssetValue = totalValue
             };
+
             return ServiceResult<DashboardStatsViewModel>.Success(stats);
         }, "get dashboard stats");
+    }
+
+    public async Task<ServiceResult<AssetTrackingViewModel>> GetAssetTrackingAsync(int assetId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var asset = await _assetReps.GetByIdWithRelationsAsync(assetId);
+            if (asset == null)
+                return ServiceResult<AssetTrackingViewModel>.NotFound($"Asset with id {assetId} not found");
+
+            var history = await _transactionReps.GetAssetTransactionHistoryAsync(assetId);
+            var activeLoan = history.FirstOrDefault(t =>
+                t.TransactionType == TransactionTypeConstants.Loan &&
+                t.TransactionStatus == "Approved" &&
+                t.PairedTransactionId == null);
+
+            var timeline = new List<AssetTimelineEntry>();
+            foreach (var txn in history.OrderByDescending(t => t.TransactionDate))
+            {
+                timeline.Add(new AssetTimelineEntry
+                {
+                    Date = txn.TransactionDate,
+                    ActivityType = txn.TransactionType,
+                    Description = txn.Notes ?? $"Transaction: {txn.TransactionType}",
+                    PreviousHolder = txn.FromEmployeeName,
+                    NewHolder = txn.ToEmployeeName,
+                    PreviousStatus = txn.ConditionBefore,
+                    NewStatus = txn.ConditionAfter,
+                    Notes = txn.Notes
+                });
+            }
+
+            var tracking = new AssetTrackingViewModel
+            {
+                AssetId = asset.AssetId,
+                AssetCode = asset.AssetCode,
+                AssetName = asset.AssetName,
+                CurrentStatus = asset.Status,
+                CategoryName = asset.CategoryName,
+                CurrentHolderName = asset.CurrentHolderName,
+                CurrentLocation = asset.Location,
+                Condition = asset.Condition,
+                IsOnLoan = asset.Status == "On Loan",
+                IsInMaintenance = asset.Status == "In Maintenance",
+                IsOverdue = activeLoan?.ExpectedReturnDate.HasValue == true && activeLoan.ExpectedReturnDate.Value < DateTime.Now,
+                LoanDueDate = activeLoan?.ExpectedReturnDate,
+                TotalTransactions = history.Count(),
+                Timeline = timeline
+            };
+
+            return ServiceResult<AssetTrackingViewModel>.Success(tracking);
+        }, "get asset tracking");
     }
 
     private async Task<string> GenerateAssetCodeAsync()

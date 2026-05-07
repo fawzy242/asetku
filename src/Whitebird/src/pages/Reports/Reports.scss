@@ -43,22 +43,6 @@
         }
     }
 
-    &__filters {
-        margin-bottom: $spacing-lg;
-    }
-
-    &__filter-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: $spacing-md;
-    }
-
-    &__filter-actions-left {
-        display: flex;
-        gap: $spacing-md;
-    }
-
     &__table {
         min-height: 400px;
     }

@@ -11,4 +11,11 @@ public interface IEmployeeReps
     Task<bool> IsEmployeeCodeExistsAsync(string employeeCode, int? excludeEmployeeId = null);
     Task<string> GenerateEmployeeCodeAsync();
     Task<int> GetActiveAssetsCountAsync(int employeeId);
+
+    // NEW
+    Task<int> GetAssetsOnLoanCountAsync(int employeeId);
+    Task<int> GetOverdueLoansCountAsync(int employeeId);
+    Task<int> GetTotalHistoricalAssetsAsync(int employeeId);
+    Task<int> GetReturnedAssetsCountAsync(int employeeId);
+    Task<int> GetDamagedReturnsCountAsync(int employeeId);
 }

@@ -12,7 +12,7 @@ namespace Whitebird.Migrations.Features.Location
                 BEGIN
                     CREATE TABLE Location (
                         LocationId INT NOT NULL CONSTRAINT DF_Location_LocationId DEFAULT NEXT VALUE FOR Seq_LocationId,
-                        LocationCode NVARCHAR(50) NOT NULL UNIQUE,
+                        LocationCode NVARCHAR(50) NOT NULL,
                         LocationName NVARCHAR(100) NOT NULL,
                         LocationType NVARCHAR(50) NULL,
                         Address NVARCHAR(500) NULL,
@@ -25,26 +25,15 @@ namespace Whitebird.Migrations.Features.Location
                         ModifiedBy NVARCHAR(50) NULL,
                         
                         CONSTRAINT PK_Location PRIMARY KEY (LocationId),
+                        CONSTRAINT UQ_Location_LocationCode UNIQUE (LocationCode),
                         CONSTRAINT FK_Location_ParentLocation FOREIGN KEY (ParentLocationId) 
                             REFERENCES Location(LocationId)
                     );
                 END;
                 GO
                 
-                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Location_LocationCode' AND object_id = OBJECT_ID('Location'))
-                    CREATE INDEX IX_Location_LocationCode ON Location(LocationCode);
-                GO
-                
                 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Location_LocationName' AND object_id = OBJECT_ID('Location'))
                     CREATE INDEX IX_Location_LocationName ON Location(LocationName);
-                GO
-                
-                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Location_ParentLocationId' AND object_id = OBJECT_ID('Location'))
-                    CREATE INDEX IX_Location_ParentLocationId ON Location(ParentLocationId);
-                GO
-                
-                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Location_IsActive' AND object_id = OBJECT_ID('Location'))
-                    CREATE INDEX IX_Location_IsActive ON Location(IsActive);
                 GO
             ");
         }

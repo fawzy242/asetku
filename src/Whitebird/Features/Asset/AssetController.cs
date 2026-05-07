@@ -29,6 +29,9 @@ public class AssetController : ControllerBase
     [HttpGet("holder/{employeeId:int}")]
     public async Task<IActionResult> GetByHolder(int employeeId) => this.HandleResult(await _assetService.GetByHolderAsync(employeeId));
 
+    [HttpGet("tracking/{assetId:int}")]
+    public async Task<IActionResult> GetAssetTracking(int assetId) => this.HandleResult(await _assetService.GetAssetTrackingAsync(assetId));
+
     [HttpGet("grid")]
     public async Task<IActionResult> GetGridData([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string? search = null, [FromQuery] string? sortBy = null, [FromQuery] bool sortDescending = false)
         => this.HandleResult(await _assetService.GetGridDataAsync(page, pageSize, search, sortBy, sortDescending));

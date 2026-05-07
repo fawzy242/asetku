@@ -28,14 +28,6 @@ namespace Whitebird.Migrations.Features.Category
                 END;
                 GO
                 
-                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Category_ParentCategoryId' AND object_id = OBJECT_ID('Category'))
-                    CREATE INDEX IX_Category_ParentCategoryId ON Category(ParentCategoryId);
-                GO
-                
-                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Category_IsActive' AND object_id = OBJECT_ID('Category'))
-                    CREATE INDEX IX_Category_IsActive ON Category(IsActive);
-                GO
-                
                 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Category_CategoryName' AND object_id = OBJECT_ID('Category'))
                     CREATE INDEX IX_Category_CategoryName ON Category(CategoryName);
                 GO

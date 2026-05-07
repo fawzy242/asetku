@@ -80,6 +80,14 @@ public class LocationService : BaseService, ILocationService
             var parentExists = await _locationReps.GetByIdRawAsync(model.ParentLocationId.Value);
             if (parentExists == null)
                 return ServiceResult<LocationDetailViewModel>.BadRequest($"Parent location with id {model.ParentLocationId} does not exist");
+
+            // Prevent excessive nesting
+            if (parentExists.ParentLocationId.HasValue)
+            {
+                var grandParent = await _locationReps.GetByIdRawAsync(parentExists.ParentLocationId.Value);
+                if (grandParent != null)
+                    return ServiceResult<LocationDetailViewModel>.BadRequest("Cannot create nested location beyond 2 levels");
+            }
         }
 
         return await ExecuteWithTransactionAsync(async () =>
@@ -118,6 +126,22 @@ public class LocationService : BaseService, ILocationService
             var existing = await _locationReps.GetByIdRawAsync(id);
             if (existing == null)
                 return ServiceResult<LocationDetailViewModel>.NotFound($"Location with id {id} not found");
+
+            // Validate parent
+            if (model.ParentLocationId.HasValue && model.ParentLocationId.Value > 0)
+            {
+                if (model.ParentLocationId.Value == id)
+                    return ServiceResult<LocationDetailViewModel>.BadRequest("Location cannot be parent of itself");
+
+                var parent = await _locationReps.GetByIdRawAsync(model.ParentLocationId.Value);
+                if (parent == null)
+                    return ServiceResult<LocationDetailViewModel>.BadRequest($"Parent location with id {model.ParentLocationId} does not exist");
+
+                // Check circular reference
+                var children = await _locationReps.GetSubLocationAsync(id);
+                if (children.Any(c => c.LocationId == model.ParentLocationId.Value))
+                    return ServiceResult<LocationDetailViewModel>.BadRequest("Circular reference detected: child cannot become parent");
+            }
 
             var oldCode = existing.LocationCode;
             var oldName = existing.LocationName;
@@ -244,8 +268,12 @@ public class LocationService : BaseService, ILocationService
     {
         var locations = await _locationReps.GetAllWithRelationsAsync();
         var maxNumber = locations
-            .Where(l => l.LocationCode.StartsWith("LOC-"))
-            .Select(l => int.TryParse(l.LocationCode[4..], out var n) ? n : 0)
+            .Where(l => l.LocationCode != null && l.LocationCode.StartsWith("LOC-"))
+            .Select(l =>
+            {
+                var numPart = l.LocationCode.Length > 4 ? l.LocationCode[4..] : "0";
+                return int.TryParse(numPart, out var n) ? n : 0;
+            })
             .DefaultIfEmpty(0)
             .Max();
         return $"LOC-{(maxNumber + 1):D6}";

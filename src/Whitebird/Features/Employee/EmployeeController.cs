@@ -26,6 +26,9 @@ public class EmployeeController : ControllerBase
     [HttpGet("status/{status}")]
     public async Task<IActionResult> GetByStatus(string status) => this.HandleResult(await _employeeService.GetByStatusAsync(status));
 
+    [HttpGet("{id:int}/asset-summary")]
+    public async Task<IActionResult> GetAssetSummary(int id) => this.HandleResult(await _employeeService.GetAssetSummaryAsync(id));
+
     [HttpGet("grid")]
     public async Task<IActionResult> GetGridData([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string? search = null, [FromQuery] string? sortBy = null, [FromQuery] bool sortDescending = false)
         => this.HandleResult(await _employeeService.GetGridDataAsync(page, pageSize, search, sortBy, sortDescending));

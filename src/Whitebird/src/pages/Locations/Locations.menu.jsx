@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from "react";
 import { FiEdit2, FiTrash2, FiPlus } from "react-icons/fi";
 import { Grid, Box, Chip } from "@mui/material";
+import { useQueryClient } from "@tanstack/react-query";
 import LocationsData from "./Locations.data";
 import DataTable from "../../components/molecules/DataTable/DataTable";
 import Pagination from "../../components/molecules/Pagination/Pagination";
@@ -40,6 +41,7 @@ const TABS = [
 
 const LocationsMenu = () => {
   const [activeTab, setActiveTab] = useState("all");
+  const queryClient = useQueryClient();
 
   const { locations: parentLocations } = useReferenceData();
 
@@ -97,19 +99,34 @@ const LocationsMenu = () => {
 
   const handleDelete = useCallback(async (loc) => {
     const r = await locationsData.delete(loc.locationId);
-    if (r.success) reload();
-  }, [reload]);
+    if (r.success) {
+      // Invalidate reference cache agar parent dropdown terupdate
+      queryClient.invalidateQueries({ queryKey: ['reference', 'locations'] });
+      reload();
+    }
+  }, [reload, queryClient]);
 
   const onSubmit = useCallback(async (e) => {
     e.preventDefault();
     if (!formData.locationName.trim()) return;
     if (isSubmitting) return;
+    
+    // FIX: Convert empty string to null for parentLocationId
     const data = { ...formData, isActive: editingLocation ? editingLocation.isActive : true };
+    if (data.parentLocationId === "" || data.parentLocationId === undefined || data.parentLocationId === null) {
+      data.parentLocationId = null;
+    }
+    
     const r = editingLocation
       ? await locationsData.update(editingLocation.locationId, data)
       : await locationsData.create(data);
-    if (r.success) { handleClose(); reload(); }
-  }, [formData, isSubmitting, editingLocation, handleClose, reload]);
+    if (r.success) {
+      // Invalidate reference cache agar parent dropdown terupdate
+      queryClient.invalidateQueries({ queryKey: ['reference', 'locations'] });
+      handleClose();
+      reload();
+    }
+  }, [formData, isSubmitting, editingLocation, handleClose, reload, queryClient]);
 
   const columns = useMemo(() => [
     { field: "locationCode", headerName: "Code", width: 120 },
@@ -156,7 +173,7 @@ const LocationsMenu = () => {
   ], [handleEdit, handleDelete]);
 
   const parentLocationOptions = useMemo(() => [
-    { value: "", label: "None" },
+    { value: "", label: "None (Top Level)" },
     ...parentLocations
       .filter(l => !editingLocation || l.value !== editingLocation.locationId)
       .map(l => ({ value: l.value, label: l.label }))
@@ -171,7 +188,8 @@ const LocationsMenu = () => {
 
   return (
     <div className="locations-menu">
-      <PageHeader title="Location Management" buttonText="Add Location" onButtonClick={handleCreate} buttonIcon={<FiPlus />} />
+      <div className="page-header"><h1 className="page-title">Location</h1>      <PageHeader title="Location Management" buttonText="Add Location" onButtonClick={handleCreate} buttonIcon={<FiPlus />} /></div>
+
       <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar onSearch={handleSearch} placeholder="Search by name, code..." />
       <div className="locations-menu__table">
@@ -201,13 +219,13 @@ const LocationsMenu = () => {
               <Input label="Location Name" value={formData.locationName} onChange={e => setFormData({ ...formData, locationName: e.target.value })} required />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Select label="Location Type" value={formData.locationType} onChange={e => setFormData({ ...formData, locationType: e.target.value })} options={LOCATION_TYPE_OPTIONS} />
+              <Select label="Location Type" value={formData.locationType || ""} onChange={e => setFormData({ ...formData, locationType: e.target.value || "" })} options={LOCATION_TYPE_OPTIONS} />
             </Grid>
             <Grid item xs={12} sm={6}>
               <Input label="City" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Select label="Parent Location" value={formData.parentLocationId} onChange={e => setFormData({ ...formData, parentLocationId: e.target.value })} options={parentLocationOptions} />
+              <Select label="Parent Location" value={formData.parentLocationId || ""} onChange={e => setFormData({ ...formData, parentLocationId: e.target.value || "" })} options={parentLocationOptions} />
             </Grid>
             <Grid item xs={12}>
               <Input label="Address" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} multiline rows={2} />

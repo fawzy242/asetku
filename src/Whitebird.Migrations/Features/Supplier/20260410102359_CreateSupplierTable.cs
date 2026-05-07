@@ -31,14 +31,6 @@ namespace Whitebird.Migrations.Features.Supplier
                 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Supplier_SupplierName' AND object_id = OBJECT_ID('Supplier'))
                     CREATE INDEX IX_Supplier_SupplierName ON Supplier(SupplierName);
                 GO
-                
-                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Supplier_IsActive' AND object_id = OBJECT_ID('Supplier'))
-                    CREATE INDEX IX_Supplier_IsActive ON Supplier(IsActive);
-                GO
-                
-                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Supplier_Email' AND object_id = OBJECT_ID('Supplier'))
-                    CREATE INDEX IX_Supplier_Email ON Supplier(Email);
-                GO
             ");
         }
 

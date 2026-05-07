@@ -26,13 +26,14 @@ class AssetTransactionsData extends BaseData {
     }
   }
 
-  async returnAsset(transactionId, actualReturnDate, conditionAfter, notes) {
+  async returnAsset(transactionId, actualReturnDate, conditionAfter, notes, damageReason) {
     try {
       const result = await this.api.returnAsset({ 
         assetTransactionId: transactionId, 
         actualReturnDate, 
         conditionAfter, 
-        notes 
+        notes,
+        damageReason: damageReason || null,
       });
       if (result.isSuccess) { 
         ConfirmDialog.toast.success('Asset returned'); 
@@ -54,7 +55,18 @@ class AssetTransactionsData extends BaseData {
       confirmButtonText: 'Yes, cancel' 
     });
     if (!confirmed) return { success: false, cancelled: true };
-    return this.delete(id);
+    try {
+      const result = await this.api.cancel(id);
+      if (result.isSuccess) { 
+        ConfirmDialog.toast.success('Transaction cancelled'); 
+        return { success: true }; 
+      }
+      ConfirmDialog.toast.error(result.message || 'Failed');
+      return { success: false };
+    } catch {
+      ConfirmDialog.toast.error('Failed to cancel');
+      return { success: false };
+    }
   }
 
   getCreateMessage() { return 'Transaction created successfully'; }

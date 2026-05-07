@@ -12,8 +12,8 @@ namespace Whitebird.Migrations.Features.Users
                 BEGIN
                     CREATE TABLE Users (
                         UserId INT NOT NULL CONSTRAINT DF_Users_UserId DEFAULT NEXT VALUE FOR Seq_UserId,
-                        Username NVARCHAR(100) NOT NULL UNIQUE,
-                        Email NVARCHAR(100) NOT NULL UNIQUE,
+                        Username NVARCHAR(100) NOT NULL,
+                        Email NVARCHAR(100) NOT NULL,
                         PasswordHash NVARCHAR(255) NOT NULL,
                         FullName NVARCHAR(100) NOT NULL,
                         PhoneNumber NVARCHAR(20) NULL,
@@ -30,25 +30,15 @@ namespace Whitebird.Migrations.Features.Users
                         ModifiedDate DATETIME NULL,
                         ModifiedBy NVARCHAR(50) NULL,
                         
-                        CONSTRAINT PK_Users PRIMARY KEY (UserId)
+                        CONSTRAINT PK_Users PRIMARY KEY (UserId),
+                        CONSTRAINT UQ_Users_Username UNIQUE (Username),
+                        CONSTRAINT UQ_Users_Email UNIQUE (Email)
                     );
                 END;
                 GO
                 
-                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Users_Username' AND object_id = OBJECT_ID('Users'))
-                    CREATE INDEX IX_Users_Username ON Users(Username);
-                GO
-                
-                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Users_Email' AND object_id = OBJECT_ID('Users'))
-                    CREATE INDEX IX_Users_Email ON Users(Email);
-                GO
-                
-                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Users_IsActive' AND object_id = OBJECT_ID('Users'))
-                    CREATE INDEX IX_Users_IsActive ON Users(IsActive);
-                GO
-                
                 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_Users_RoleId' AND object_id = OBJECT_ID('Users'))
-                    CREATE INDEX IX_Users_RoleId ON Users(RoleId);
+                    CREATE INDEX IX_Users_RoleId ON Users(RoleId) WHERE IsActive = 1;
                 GO
             ");
         }

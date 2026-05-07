@@ -19,4 +19,12 @@ public interface IAssetTransactionReps
     Task<AssetTransactionEntity?> GetActiveTransactionByAssetIdWithRelationsAsync(int assetId);
     Task<int> GetTransactionCountByAssetAsync(int assetId);
     Task<PaginatedResult<AssetTransactionEntity>> GetPagedWithRelationsAsync(int page, int pageSize, string? search = null, string? status = null, int? assetId = null);
+
+    // NEW: Pairing & tracking queries
+    Task<AssetTransactionEntity?> GetPairedTransactionAsync(int transactionId);
+    Task<bool> HasOpenPairedTransactionAsync(int assetId, string transactionType);
+    Task<IEnumerable<AssetTransactionEntity>> GetActiveLoansWithRelationsAsync();
+    Task<IEnumerable<AssetTransactionEntity>> GetOverdueLoansWithRelationsAsync();
+    Task<IEnumerable<AssetTransactionEntity>> GetAssetTransactionHistoryAsync(int assetId);
+    Task<IEnumerable<AssetTransactionEntity>> GetEmployeeTransactionHistoryAsync(int employeeId);
 }

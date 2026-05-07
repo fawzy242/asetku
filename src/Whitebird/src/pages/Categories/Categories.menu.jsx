@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from "react";
 import { FiEdit2, FiTrash2, FiPlus } from "react-icons/fi";
 import { Grid, Box, Chip } from "@mui/material";
+import { useQueryClient } from "@tanstack/react-query";
 import CategoriesData from "./Categories.data";
 import DataTable from "../../components/molecules/DataTable/DataTable";
 import Pagination from "../../components/molecules/Pagination/Pagination";
@@ -36,6 +37,7 @@ const TABS = [
 
 const CategoriesMenu = () => {
   const [activeTab, setActiveTab] = useState("all");
+  const queryClient = useQueryClient();
 
   const { categories: parentCategories } = useReferenceData();
 
@@ -50,7 +52,6 @@ const CategoriesMenu = () => {
     handleClose,
   } = useCrudForm(INITIAL_FORM_DATA, categoriesData, CRUD_OPTIONS);
 
-  // Fetch function: ambil data + filter by tab
   const fetchGridData = useCallback(async (params) => {
     const result = await categoriesData.fetchGridData(params);
     if (result.success) {
@@ -76,7 +77,6 @@ const CategoriesMenu = () => {
     return result;
   }, [activeTab]);
 
-  // KRITIS: Query key HARUS menyertakan activeTab agar React Query refetch saat tab berubah
   const {
     data: categories,
     totalCount,
@@ -95,19 +95,34 @@ const CategoriesMenu = () => {
 
   const handleDelete = useCallback(async (cat) => {
     const r = await categoriesData.delete(cat.categoryId);
-    if (r.success) reload();
-  }, [reload]);
+    if (r.success) {
+      // Invalidate reference cache agar parent dropdown terupdate
+      queryClient.invalidateQueries({ queryKey: ['reference', 'categories'] });
+      reload();
+    }
+  }, [reload, queryClient]);
 
   const onSubmit = useCallback(async (e) => {
     e.preventDefault();
     if (!formData.categoryName.trim()) return;
     if (isSubmitting) return;
+    
+    // FIX: Convert empty string to null for parentCategoryId
     const data = { ...formData, isActive: editingCategory ? editingCategory.isActive : true };
+    if (data.parentCategoryId === "" || data.parentCategoryId === undefined || data.parentCategoryId === null) {
+      data.parentCategoryId = null;
+    }
+    
     const r = editingCategory
       ? await categoriesData.update(editingCategory.categoryId, data)
       : await categoriesData.create(data);
-    if (r.success) { handleClose(); reload(); }
-  }, [formData, isSubmitting, editingCategory, handleClose, reload]);
+    if (r.success) {
+      // Invalidate reference cache agar parent dropdown terupdate
+      queryClient.invalidateQueries({ queryKey: ['reference', 'categories'] });
+      handleClose();
+      reload();
+    }
+  }, [formData, isSubmitting, editingCategory, handleClose, reload, queryClient]);
 
   const columns = useMemo(() => [
     { field: "categoryName", headerName: "Name", flex: 1, minWidth: 200 },
@@ -160,7 +175,8 @@ const CategoriesMenu = () => {
 
   return (
     <div className="categories-menu">
-      <PageHeader title="Category Management" buttonText="Add Category" onButtonClick={handleCreate} buttonIcon={<FiPlus />} />
+      <div className="page-header"><h1 className="page-title">Category</h1>      <PageHeader title="Category Management" buttonText="Add Category" onButtonClick={handleCreate} buttonIcon={<FiPlus />} /></div>
+
       <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar onSearch={handleSearch} placeholder="Search by name..." />
       <div className="categories-menu__table">
@@ -195,8 +211,8 @@ const CategoriesMenu = () => {
             <Grid item xs={12}>
               <Select
                 label="Parent Category"
-                value={formData.parentCategoryId}
-                onChange={e => setFormData({ ...formData, parentCategoryId: e.target.value })}
+                value={formData.parentCategoryId || ""}
+                onChange={e => setFormData({ ...formData, parentCategoryId: e.target.value || "" })}
                 options={[
                   { value: "", label: "None (Top Level)" },
                   ...parentCategories

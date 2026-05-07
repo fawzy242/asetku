@@ -61,8 +61,13 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
                 continue;
 
             var propType = prop.PropertyType;
-            if (!propType.IsValueType && propType != typeof(string))
+            if (!propType.IsValueType && propType != typeof(string) && propType != typeof(DateTime) && propType != typeof(DateTime?))
                 continue;
+
+            if (Nullable.GetUnderlyingType(propType) is Type underlyingType)
+            {
+                if (!underlyingType.IsValueType) continue;
+            }
 
             columnProperties.Add(prop);
         }
@@ -104,36 +109,62 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
         var columns = string.Join(", ", insertableProps.Select(p => p.Name));
         var values = string.Join(", ", insertableProps.Select(p => $"@{p.Name}"));
 
-        // Buat DynamicParameters dan handle null values
         var parameters = new DynamicParameters();
         foreach (var prop in insertableProps)
         {
             var value = prop.GetValue(entity);
-            // Gunakan null, bukan DBNull.Value untuk Dapper
             parameters.Add($"@{prop.Name}", value);
         }
 
-        // Untuk tabel yang memiliki trigger, kita tidak bisa menggunakan OUTPUT INSERTED
-        // Alternatif: Insert dulu, lalu ambil ID terakhir dari sequence
-        var insertQuery = $"INSERT INTO {_tableName} ({columns}) VALUES ({values});";
-
-        // Execute insert
-        await _context.Connection.ExecuteAsync(insertQuery, parameters, transaction);
-
-        // Ambil ID terakhir yang di-insert (untuk SEQUENCE, gunakan query terpisah)
-        var getLastIdQuery = $"SELECT CAST(current_value AS INT) FROM sys.sequences WHERE name = 'Seq_{_tableName}Id'";
-        var newId = await _context.Connection.ExecuteScalarAsync<object>(getLastIdQuery, transaction: transaction);
-
-        var idProperty = typeof(T).GetProperty(_primaryKeyName);
-        if (idProperty != null && newId != null && newId != DBNull.Value)
+        try
         {
-            idProperty.SetValue(entity, Convert.ChangeType(newId, idProperty.PropertyType));
+            // Try OUTPUT INSERTED first (works for tables without triggers or with simple triggers)
+            var insertQuery = $@"
+                INSERT INTO {_tableName} ({columns}) 
+                OUTPUT INSERTED.{_primaryKeyName}
+                VALUES ({values});";
+
+            var newId = await _context.Connection.ExecuteScalarAsync<object>(insertQuery, parameters, transaction);
+
+            var idProperty = typeof(T).GetProperty(_primaryKeyName);
+            if (idProperty != null && newId != null && newId != DBNull.Value)
+            {
+                idProperty.SetValue(entity, Convert.ChangeType(newId, idProperty.PropertyType));
+            }
+
+            if (newId == null || newId == DBNull.Value)
+                throw new InvalidOperationException($"Insert failed - no ID returned from {_tableName} table");
+
+            return newId;
         }
+        catch (Exception ex) when (ex.Message.Contains("OUTPUT") || ex.Message.Contains("trigger"))
+        {
+            // Fallback: Table has triggers that prevent OUTPUT clause
+            // Use INSERT + SELECT SCOPE_IDENTITY() as two-step operation
+            _logger.LogWarning("OUTPUT clause failed for {TableName}, using fallback INSERT + IDENTITY/SCOPE_IDENTITY", _tableName);
 
-        if (newId == null || newId == DBNull.Value)
-            throw new InvalidOperationException($"Insert failed - no ID returned from {_tableName} table");
+            var insertQuery = $"INSERT INTO {_tableName} ({columns}) VALUES ({values});";
+            await _context.Connection.ExecuteAsync(insertQuery, parameters, transaction);
 
-        return newId;
+            // Get the last inserted ID using the sequence directly
+            var getLastIdQuery = $@"
+                SELECT CAST(current_value AS INT) 
+                FROM sys.sequences 
+                WHERE name = 'Seq_{_tableName}Id'";
+
+            var newId = await _context.Connection.ExecuteScalarAsync<object>(getLastIdQuery, transaction: transaction);
+
+            var idProperty = typeof(T).GetProperty(_primaryKeyName);
+            if (idProperty != null && newId != null && newId != DBNull.Value)
+            {
+                idProperty.SetValue(entity, Convert.ChangeType(newId, idProperty.PropertyType));
+            }
+
+            if (newId == null || newId == DBNull.Value)
+                throw new InvalidOperationException($"Insert failed - no ID returned from {_tableName} table");
+
+            return newId;
+        }
     }
 
     public async Task<int> UpdateAsync(T entity, IDbTransaction? transaction = null)

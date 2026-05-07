@@ -20,4 +20,7 @@ public interface IAssetService
     Task<ServiceResult<IEnumerable<AssetListViewModel>>> GetExpiredWarrantyAsync();
     Task<ServiceResult<IEnumerable<AssetListViewModel>>> GetUpcomingMaintenanceAsync(int daysAhead = 30);
     Task<ServiceResult<DashboardStatsViewModel>> GetDashboardStatsAsync();
+
+    // NEW: Asset tracking
+    Task<ServiceResult<AssetTrackingViewModel>> GetAssetTrackingAsync(int assetId);
 }

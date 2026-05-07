@@ -119,7 +119,10 @@ public class AssetTransactionReps : IAssetTransactionReps
             LEFT JOIN Asset a ON t.AssetId = a.AssetId
             LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
             LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
-            WHERE t.AssetId = @AssetId AND t.TransactionStatus = 'Approved' AND t.ActualReturnDate IS NULL
+            WHERE t.AssetId = @AssetId 
+              AND t.TransactionStatus = 'Approved' 
+              AND t.PairedTransactionId IS NULL
+              AND t.TransactionType IN ('HANDOVER', 'TRANSFER', 'LOAN', 'MAINTENANCE')
             ORDER BY t.TransactionDate DESC";
 
         return await _context.QueryFirstOrDefaultAsync<AssetTransactionEntity>(sql, new { AssetId = assetId });
@@ -129,6 +132,102 @@ public class AssetTransactionReps : IAssetTransactionReps
     {
         const string sql = "SELECT COUNT(*) FROM AssetTransaction WHERE AssetId = @AssetId";
         return await _context.ExecuteScalarAsync<int>(sql, new { AssetId = assetId });
+    }
+
+    // NEW: Get paired transaction
+    public async Task<AssetTransactionEntity?> GetPairedTransactionAsync(int transactionId)
+    {
+        const string sql = @"
+            SELECT t.*, a.AssetCode, a.AssetName, fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName
+            FROM AssetTransaction t
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            WHERE t.PairedTransactionId = @TransactionId";
+
+        return await _context.QueryFirstOrDefaultAsync<AssetTransactionEntity>(sql, new { TransactionId = transactionId });
+    }
+
+    // NEW: Check if asset has open paired transaction (no return yet)
+    public async Task<bool> HasOpenPairedTransactionAsync(int assetId, string transactionType)
+    {
+        var pairingTypes = new[] { "LOAN", "MAINTENANCE" };
+        if (!pairingTypes.Contains(transactionType))
+            return false;
+
+        const string sql = @"
+            SELECT COUNT(1) FROM AssetTransaction
+            WHERE AssetId = @AssetId
+              AND TransactionType = @TransactionType
+              AND TransactionStatus = 'Approved'
+              AND PairedTransactionId IS NULL";
+
+        return await _context.ExecuteScalarAsync<int>(sql, new { AssetId = assetId, TransactionType = transactionType }) > 0;
+    }
+
+    // NEW: Get all active loans
+    public async Task<IEnumerable<AssetTransactionEntity>> GetActiveLoansWithRelationsAsync()
+    {
+        const string sql = @"
+            SELECT t.*, a.AssetCode, a.AssetName, fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName
+            FROM AssetTransaction t
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            WHERE t.TransactionType = 'LOAN'
+              AND t.TransactionStatus = 'Approved'
+              AND t.PairedTransactionId IS NULL
+            ORDER BY t.ExpectedReturnDate";
+
+        return await _context.QueryAsync<AssetTransactionEntity>(sql);
+    }
+
+    // NEW: Get overdue loans
+    public async Task<IEnumerable<AssetTransactionEntity>> GetOverdueLoansWithRelationsAsync()
+    {
+        const string sql = @"
+            SELECT t.*, a.AssetCode, a.AssetName, fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName
+            FROM AssetTransaction t
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            WHERE t.TransactionType = 'LOAN'
+              AND t.TransactionStatus = 'Approved'
+              AND t.PairedTransactionId IS NULL
+              AND t.ExpectedReturnDate < GETDATE()
+            ORDER BY t.ExpectedReturnDate";
+
+        return await _context.QueryAsync<AssetTransactionEntity>(sql);
+    }
+
+    // NEW: Full asset transaction history
+    public async Task<IEnumerable<AssetTransactionEntity>> GetAssetTransactionHistoryAsync(int assetId)
+    {
+        const string sql = @"
+            SELECT t.*, a.AssetCode, a.AssetName, fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName
+            FROM AssetTransaction t
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            WHERE t.AssetId = @AssetId
+            ORDER BY t.TransactionDate DESC";
+
+        return await _context.QueryAsync<AssetTransactionEntity>(sql, new { AssetId = assetId });
+    }
+
+    // NEW: Employee transaction history
+    public async Task<IEnumerable<AssetTransactionEntity>> GetEmployeeTransactionHistoryAsync(int employeeId)
+    {
+        const string sql = @"
+            SELECT t.*, a.AssetCode, a.AssetName, fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName
+            FROM AssetTransaction t
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            WHERE t.FromEmployeeId = @EmployeeId OR t.ToEmployeeId = @EmployeeId
+            ORDER BY t.TransactionDate DESC";
+
+        return await _context.QueryAsync<AssetTransactionEntity>(sql, new { EmployeeId = employeeId });
     }
 
     public async Task<PaginatedResult<AssetTransactionEntity>> GetPagedWithRelationsAsync(int page, int pageSize, string? search = null, string? status = null, int? assetId = null)

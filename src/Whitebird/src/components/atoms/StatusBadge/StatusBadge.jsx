@@ -1,24 +1,15 @@
 import React from 'react';
+import { STATUS_COLORS } from '../../../core/constants/statusColors';
 import './StatusBadge.scss';
 
-const STATUS_COLORS = {
-  // Asset Status
-  'Available': 'success',
-  'Assigned': 'primary',
-  'Under Repair': 'warning',
-  'Maintenance': 'warning',
-  'Retired': 'secondary',
-  'Disposed': 'secondary',
-  // Transaction Status
-  'Pending': 'warning',
-  'Approved': 'success',
-  'Rejected': 'error',
-  'Completed': 'success',
-  'Cancelled': 'secondary',
-  // Employee Status
-  'Active': 'success',
-  'Resigned': 'secondary',
-  'On Leave': 'warning',
+const STATUS_VARIANT_MAP = {
+  'success': 'success',
+  'primary': 'primary',
+  'purple': 'purple',
+  'warning': 'warning',
+  'error': 'error',
+  'secondary': 'secondary',
+  'info': 'info',
 };
 
 /**
@@ -32,7 +23,8 @@ const StatusBadge = ({ status, className = '' }) => {
     return <span className={`status-badge status-badge--secondary ${className}`}>-</span>;
   }
 
-  const variant = STATUS_COLORS[status] || 'secondary';
+  const colorConfig = STATUS_COLORS[status] || STATUS_COLORS.default;
+  const variant = STATUS_VARIANT_MAP[colorConfig.label] || 'secondary';
 
   return (
     <span className={`status-badge status-badge--${variant} ${className}`}>

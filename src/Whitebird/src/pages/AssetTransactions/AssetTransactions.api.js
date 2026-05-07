@@ -9,6 +9,8 @@ class AssetTransactionsApi {
   async getByEmployeeId(employeeId) { return (await apiService.get(`/AssetTransaction/employee/${employeeId}`)).data; }
   async getByStatus(status) { return (await apiService.get(`/AssetTransaction/status/${status}`)).data; }
   async getPendingApprovals() { return (await apiService.get('/AssetTransaction/pending-approvals')).data; }
+  async getActiveLoans() { return (await apiService.get('/AssetTransaction/active-loans')).data; }
+  async getOverdueLoans() { return (await apiService.get('/AssetTransaction/overdue-loans')).data; }
   async create(data) { return (await apiService.post('/AssetTransaction', data)).data; }
   async update(id, data) { return (await apiService.put(`/AssetTransaction/${id}`, data)).data; }
   async approve(id, data) { return (await apiService.post(`/AssetTransaction/${id}/approve`, data)).data; }

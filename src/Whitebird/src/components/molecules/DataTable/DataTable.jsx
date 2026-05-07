@@ -24,61 +24,41 @@ const DataTable = memo(({
   const theme = useUIStore((s) => s.theme);
   const isDark = theme === 'dark';
 
-  // Safe rows — selalu array
   const safeRows = useMemo(() => {
     if (!rows) return [];
     if (Array.isArray(rows)) return rows;
     return [];
   }, [rows]);
 
-  // Safe columns — selalu array
   const safeColumns = useMemo(() => {
     if (!columns || !Array.isArray(columns)) return [];
     return columns;
   }, [columns]);
 
-  /**
-   * CRITICAL: getRowId yang robust.
-   * 
-   * Prioritas:
-   * 1. Gunakan fungsi getRowId dari props jika mengembalikan nilai valid (bukan undefined/null/NaN)
-   * 2. Coba field-field ID umum secara otomatis
-   * 3. Fallback terakhir: gunakan indeks array (stabil untuk sesi render yang sama)
-   * 
-   * PASTIKAN tidak pernah mengembalikan undefined/null.
-   */
   const safeGetRowId = useMemo(() => {
     return (row) => {
-      // Jika props menyediakan getRowId, coba gunakan
       if (typeof getRowId === 'function') {
         const customId = getRowId(row);
         if (customId !== undefined && customId !== null && customId !== '' && !Number.isNaN(customId)) {
           return customId;
         }
       }
-
-      // Coba field ID umum
-      if (row?.id !== undefined && row?.id !== null) return row.id;
-      if (row?.assetId !== undefined && row?.assetId !== null) return row.assetId;
-      if (row?.categoryId !== undefined && row?.categoryId !== null) return row.categoryId;
-      if (row?.supplierId !== undefined && row?.supplierId !== null) return row.supplierId;
-      if (row?.locationId !== undefined && row?.locationId !== null) return row.locationId;
-      if (row?.employeeId !== undefined && row?.employeeId !== null) return row.employeeId;
-      if (row?.assetTransactionId !== undefined && row?.assetTransactionId !== null) return row.assetTransactionId;
-
-      // Fallback: gunakan kombinasi field untuk unique key
-      const fallback = row?.assetCode || row?.categoryName || row?.supplierName || 
-                       row?.locationName || row?.fullName || row?.employeeCode || '';
+      if (row?.id != null) return row.id;
+      if (row?.assetId != null) return row.assetId;
+      if (row?.categoryId != null) return row.categoryId;
+      if (row?.supplierId != null) return row.supplierId;
+      if (row?.locationId != null) return row.locationId;
+      if (row?.employeeId != null) return row.employeeId;
+      if (row?.assetTransactionId != null) return row.assetTransactionId;
+      const fallback = row?.assetCode || row?.categoryName || row?.supplierName ||
+        row?.locationName || row?.fullName || row?.employeeCode || '';
       if (fallback) return fallback;
-
-      // Last resort: JSON stringify (tidak ideal tapi mencegah error)
-      return JSON.stringify(row);
+      return `row-${Math.random().toString(36).substr(2, 9)}`;
     };
   }, [getRowId]);
 
   const effectiveAutoHeight = autoHeight || hideFooter;
 
-  // MUI Theme untuk DataGrid — full dark/light support
   const muiTheme = useMemo(() => createTheme({
     palette: {
       mode: isDark ? 'dark' : 'light',
@@ -105,8 +85,7 @@ const DataTable = memo(({
             backgroundColor: 'transparent',
             width: '100%',
             minWidth: '100%',
-            '& .MuiDataGrid-main': { width: '100%' },
-            '& .MuiDataGrid-virtualScroller': { width: '100%' },
+            '& .MuiDataGrid-main': { width: '100%', minWidth: '100%' },
             '& .MuiDataGrid-columnHeaders': {
               backgroundColor: isDark ? '#374151' : '#f9fafb',
               color: isDark ? '#f9fafb' : '#374151',
@@ -139,8 +118,30 @@ const DataTable = memo(({
               backgroundColor: isDark ? 'rgba(17, 24, 39, 0.7)' : 'rgba(255, 255, 255, 0.7)',
               color: isDark ? '#9ca3af' : '#6b7280',
             },
-            '& .MuiDataGrid-columnSeparator, & .MuiDataGrid-menuIcon': {
-              display: 'none',
+            '& .MuiDataGrid-columnSeparator': {
+              display: 'flex !important',
+              visibility: 'visible !important',
+              color: isDark ? '#4b5563' : '#e5e7eb',
+            },
+            '& .MuiDataGrid-menuIcon': {
+              display: 'flex !important',
+              visibility: 'visible !important',
+              width: 'auto !important',
+              minWidth: '32px !important',
+            },
+            '& .MuiDataGrid-menuIconButton': {
+              color: isDark ? '#9ca3af' : '#6b7280',
+              opacity: 0.5,
+              transition: 'opacity 0.2s',
+              '&:hover': { opacity: 1 },
+            },
+            '& .MuiDataGrid-columnHeader:hover .MuiDataGrid-menuIconButton': {
+              opacity: 1,
+            },
+            '& .MuiDataGrid-iconSeparator': {
+              color: isDark ? '#4b5563' : '#e5e7eb',
+              cursor: 'col-resize',
+              '&:hover': { color: '#dc2626' },
             },
           },
         },
@@ -153,6 +154,15 @@ const DataTable = memo(({
           },
         },
       },
+      MuiPaper: {
+        styleOverrides: {
+          root: {
+            '&::-webkit-scrollbar': { width: '6px', height: '6px' },
+            '&::-webkit-scrollbar-track': { background: isDark ? '#1f2937' : '#f3f4f6' },
+            '&::-webkit-scrollbar-thumb': { background: isDark ? '#4b5563' : '#d1d5db', borderRadius: '3px' },
+          },
+        },
+      },
     },
   }), [isDark, hideFooter]);
 
@@ -162,7 +172,7 @@ const DataTable = memo(({
       role="region"
       aria-label={ariaLabel}
       aria-busy={loading}
-      style={{ width: '100%', minWidth: '100%' }}
+      style={{ width: '100%', minWidth: '100%', maxWidth: '100%', display: 'flex', flexDirection: 'column' }}
     >
       <ThemeProvider theme={muiTheme}>
         <DataGrid
@@ -180,9 +190,15 @@ const DataTable = memo(({
           getRowId={safeGetRowId}
           disableRowSelectionOnClick
           hideFooter={hideFooter}
+          disableColumnMenu={false}
+          disableColumnFilter={false}
+          disableColumnSelector={false}
+          disableColumnResize={false}
           sx={{
             width: '100%',
             minWidth: '100%',
+            maxWidth: '100%',
+            flex: 1,
             minHeight: effectiveAutoHeight ? undefined : 400,
           }}
         />

@@ -51,10 +51,34 @@ public static class MapsterServiceRegistration
             .Ignore(dest => dest.CreatedDate)
             .Ignore(dest => dest.CreatedBy);
 
+        // Asset List Mappings
+        TypeAdapterConfig<AssetEntity, AssetListViewModel>.NewConfig()
+            .Map(dest => dest.CategoryName, src => src.CategoryName ?? "Unknown")
+            .Map(dest => dest.CurrentHolderName, src => src.CurrentHolderName ?? "Unknown");
+
         // AssetTransaction Mappings
+        TypeAdapterConfig<AssetTransactionEntity, AssetTransactionDetailViewModel>.NewConfig()
+            .Map(dest => dest.AssetCode, src => src.AssetCode ?? "Unknown")
+            .Map(dest => dest.AssetName, src => src.AssetName ?? "Unknown")
+            .Map(dest => dest.FromEmployeeName, src => src.FromEmployeeName ?? "Unknown")
+            .Map(dest => dest.ToEmployeeName, src => src.ToEmployeeName ?? "Unknown")
+            .Map(dest => dest.FromLocationName, src => src.FromLocationName ?? "Unknown")
+            .Map(dest => dest.ToLocationName, src => src.ToLocationName ?? "Unknown")
+            .Map(dest => dest.ApprovedByName, src => src.ApprovedByName ?? "Unknown");
+
+        TypeAdapterConfig<AssetTransactionEntity, AssetTransactionListViewModel>.NewConfig()
+            .Map(dest => dest.AssetCode, src => src.AssetCode ?? "Unknown")
+            .Map(dest => dest.AssetName, src => src.AssetName ?? "Unknown")
+            .Map(dest => dest.FromEmployeeName, src => src.FromEmployeeName ?? "Unknown")
+            .Map(dest => dest.ToEmployeeName, src => src.ToEmployeeName ?? "Unknown")
+            .Map(dest => dest.FromLocationName, src => src.FromLocationName ?? "Unknown")
+            .Map(dest => dest.ToLocationName, src => src.ToLocationName ?? "Unknown");
+
         TypeAdapterConfig<AssetTransactionCreateViewModel, AssetTransactionEntity>.NewConfig()
             .Ignore(dest => dest.AssetTransactionId)
             .Ignore(dest => dest.ActualReturnDate)
+            .Ignore(dest => dest.ConditionAfter)
+            .Ignore(dest => dest.DamageReason)
             .Ignore(dest => dest.IsActive)
             .Ignore(dest => dest.CreatedDate)
             .Ignore(dest => dest.CreatedBy)
@@ -68,6 +92,12 @@ public static class MapsterServiceRegistration
             .Ignore(dest => dest.CreatedBy);
 
         // Category Mappings
+        TypeAdapterConfig<CategoryEntity, CategoryDetailViewModel>.NewConfig()
+            .Map(dest => dest.ParentCategoryName, src => src.ParentCategoryName ?? "Unknown");
+
+        TypeAdapterConfig<CategoryEntity, CategoryListViewModel>.NewConfig()
+            .Map(dest => dest.ParentCategoryName, src => src.ParentCategoryName ?? "Unknown");
+
         TypeAdapterConfig<CategoryCreateViewModel, CategoryEntity>.NewConfig()
             .Ignore(dest => dest.CategoryId)
             .Ignore(dest => dest.IsActive)
@@ -82,6 +112,9 @@ public static class MapsterServiceRegistration
             .Ignore(dest => dest.CreatedBy);
 
         // Employee Mappings
+        TypeAdapterConfig<EmployeeEntity, EmployeeDetailViewModel>.NewConfig()
+            .Ignore(dest => dest.ActiveAssetsCount);
+
         TypeAdapterConfig<EmployeeCreateViewModel, EmployeeEntity>.NewConfig()
             .Ignore(dest => dest.EmployeeId)
             .Ignore(dest => dest.EmployeeCode)
@@ -98,6 +131,12 @@ public static class MapsterServiceRegistration
             .Ignore(dest => dest.CreatedBy);
 
         // Location Mappings
+        TypeAdapterConfig<LocationEntity, LocationDetailViewModel>.NewConfig()
+            .Map(dest => dest.ParentLocationName, src => src.ParentLocationName ?? "Unknown");
+
+        TypeAdapterConfig<LocationEntity, LocationListViewModel>.NewConfig()
+            .Map(dest => dest.ParentLocationName, src => src.ParentLocationName ?? "Unknown");
+
         TypeAdapterConfig<LocationCreateViewModel, LocationEntity>.NewConfig()
             .Ignore(dest => dest.LocationId)
             .Ignore(dest => dest.LocationCode)
@@ -114,6 +153,12 @@ public static class MapsterServiceRegistration
             .Ignore(dest => dest.CreatedBy);
 
         // Supplier Mappings
+        TypeAdapterConfig<SupplierEntity, SupplierDetailViewModel>.NewConfig()
+            .Ignore(dest => dest.AssetCount);
+
+        TypeAdapterConfig<SupplierEntity, SupplierListViewModel>.NewConfig()
+            .Ignore(dest => dest.AssetCount);
+
         TypeAdapterConfig<SupplierCreateViewModel, SupplierEntity>.NewConfig()
             .Ignore(dest => dest.SupplierId)
             .Ignore(dest => dest.IsActive)

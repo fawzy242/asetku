@@ -19,8 +19,8 @@ namespace Whitebird.Migrations.Features.AssetTransaction
                         FromLocationId INT NULL,
                         ToLocationId INT NULL,
                         TransactionDate DATETIME NOT NULL,
-                        ExpectedReturnDate DATETIME NULL,
-                        ActualReturnDate DATETIME NULL,
+                        ExpectedReturnDate DATE NULL,
+                        ActualReturnDate DATE NULL,
                         Notes NVARCHAR(500) NULL,
                         ConditionBefore NVARCHAR(20) NULL,
                         ConditionAfter NVARCHAR(20) NULL,
@@ -50,22 +50,6 @@ namespace Whitebird.Migrations.Features.AssetTransaction
                 
                 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_AssetTransaction_TransactionDate' AND object_id = OBJECT_ID('AssetTransaction'))
                     CREATE INDEX IX_AssetTransaction_TransactionDate ON AssetTransaction(TransactionDate DESC);
-                GO
-                
-                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_AssetTransaction_TransactionType' AND object_id = OBJECT_ID('AssetTransaction'))
-                    CREATE INDEX IX_AssetTransaction_TransactionType ON AssetTransaction(TransactionType);
-                GO
-                
-                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_AssetTransaction_TransactionStatus' AND object_id = OBJECT_ID('AssetTransaction'))
-                    CREATE INDEX IX_AssetTransaction_TransactionStatus ON AssetTransaction(TransactionStatus);
-                GO
-                
-                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_AssetTransaction_FromEmployeeId' AND object_id = OBJECT_ID('AssetTransaction'))
-                    CREATE INDEX IX_AssetTransaction_FromEmployeeId ON AssetTransaction(FromEmployeeId);
-                GO
-                
-                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_AssetTransaction_ToEmployeeId' AND object_id = OBJECT_ID('AssetTransaction'))
-                    CREATE INDEX IX_AssetTransaction_ToEmployeeId ON AssetTransaction(ToEmployeeId);
                 GO
             ");
         }

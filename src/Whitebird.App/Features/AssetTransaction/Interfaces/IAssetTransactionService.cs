@@ -18,4 +18,8 @@ public interface IAssetTransactionService
     Task<ServiceResult> ReturnAssetAsync(AssetReturnViewModel model);
     Task<ServiceResult> CancelAsync(int id);
     Task<ServiceResult<PaginatedResult<AssetTransactionListViewModel>>> GetGridDataAsync(int page, int pageSize, string? search = null, string? status = null, int? assetId = null);
+
+    // NEW: Active loans & overdue
+    Task<ServiceResult<IEnumerable<AssetTransactionListViewModel>>> GetActiveLoansAsync();
+    Task<ServiceResult<IEnumerable<AssetTransactionListViewModel>>> GetOverdueLoansAsync();
 }

@@ -31,10 +31,6 @@ namespace Whitebird.Migrations.Features.ActivityLog
                     CREATE INDEX IX_ActivityLogs_ReferenceTable_ReferenceId ON ActivityLogs(ReferenceTable, ReferenceId);
                 GO
                 
-                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_ActivityLogs_ActivityType' AND object_id = OBJECT_ID('ActivityLogs'))
-                    CREATE INDEX IX_ActivityLogs_ActivityType ON ActivityLogs(ActivityType);
-                GO
-                
                 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_ActivityLogs_CreatedDate' AND object_id = OBJECT_ID('ActivityLogs'))
                     CREATE INDEX IX_ActivityLogs_CreatedDate ON ActivityLogs(CreatedDate DESC);
                 GO

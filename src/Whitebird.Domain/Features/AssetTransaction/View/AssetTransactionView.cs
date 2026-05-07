@@ -16,6 +16,10 @@ public class AssetTransactionListViewModel
     public DateTime TransactionDate { get; set; }
     public string TransactionStatus { get; set; } = default!;
     public DateTime? ExpectedReturnDate { get; set; }
+
+    // NEW
+    public int? PairedTransactionId { get; set; }
+    public bool IsOverdue { get; set; }
 }
 
 public class AssetTransactionDetailViewModel
@@ -50,6 +54,10 @@ public class AssetTransactionDetailViewModel
     public string CreatedBy { get; set; } = default!;
     public DateTime? ModifiedDate { get; set; }
     public string? ModifiedBy { get; set; }
+
+    // NEW
+    public int? PairedTransactionId { get; set; }
+    public string? DamageReason { get; set; }
 }
 
 public class AssetTransactionCreateViewModel
@@ -98,6 +106,9 @@ public class AssetTransactionCreateViewModel
 
     [StringLength(100, ErrorMessage = "VendorName cannot exceed 100 characters")]
     public string? VendorName { get; set; }
+
+    // NEW: Optional paired transaction reference
+    public int? PairedTransactionId { get; set; }
 }
 
 public class AssetTransactionUpdateViewModel
@@ -174,4 +185,8 @@ public class AssetReturnViewModel
 
     [StringLength(500, ErrorMessage = "Notes cannot exceed 500 characters")]
     public string? Notes { get; set; }
+
+    // NEW
+    [StringLength(100, ErrorMessage = "DamageReason cannot exceed 100 characters")]
+    public string? DamageReason { get; set; }
 }

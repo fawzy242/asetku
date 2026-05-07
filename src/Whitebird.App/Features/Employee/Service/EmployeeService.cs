@@ -4,8 +4,13 @@ using Whitebird.App.Features.Employee.Interfaces;
 using Whitebird.App.Features.Common.Service;
 using Whitebird.Domain.Features.Employee.Entities;
 using Whitebird.Domain.Features.Employee.View;
+using Whitebird.Domain.Features.AssetTransaction.Enums;
 using Whitebird.Infra.Features.Employee;
+using Whitebird.Infra.Features.Asset;
+using Whitebird.Infra.Features.AssetTransaction;
 using Whitebird.Infra.Features.Common;
+using System.Linq.Expressions;
+using System.Reflection;
 
 namespace Whitebird.App.Features.Employee.Service;
 
@@ -13,18 +18,24 @@ public class EmployeeService : BaseService, IEmployeeService
 {
     private readonly IGenericRepository<EmployeeEntity> _repository;
     private readonly IEmployeeReps _employeeReps;
+    private readonly IAssetReps _assetReps;
+    private readonly IAssetTransactionReps _transactionReps;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
 
     public EmployeeService(
         IGenericRepository<EmployeeEntity> repository,
         IEmployeeReps employeeReps,
+        IAssetReps assetReps,
+        IAssetTransactionReps transactionReps,
         ICurrentUserService currentUserService,
         IActivityLogService activityLogService,
         ILogger<EmployeeService> logger) : base(logger)
     {
         _repository = repository;
         _employeeReps = employeeReps;
+        _assetReps = assetReps;
+        _transactionReps = transactionReps;
         _currentUserService = currentUserService;
         _activityLogService = activityLogService;
     }
@@ -129,7 +140,7 @@ public class EmployeeService : BaseService, IEmployeeService
             await _activityLogService.LogUpdateAsync(
                 "Employee",
                 id,
-                $"Employee updated: Code '{oldCode}' -> '{existing.EmployeeCode}', Name '{oldName}' -> '{existing.FullName}', Status '{oldStatus}' -> '{existing.EmploymentStatus}'",
+                $"Employee updated: Code '{oldCode}', Name '{oldName}' -> '{model.FullName}', Status '{oldStatus}' -> '{model.EmploymentStatus}'",
                 _currentUserService.GetDisplayName());
 
             return ServiceResult<EmployeeDetailViewModel>.Success(updated!.Adapt<EmployeeDetailViewModel>(), "Employee updated successfully");
@@ -212,11 +223,23 @@ public class EmployeeService : BaseService, IEmployeeService
             if (!string.IsNullOrWhiteSpace(search))
             {
                 query = query.Where(e =>
-                    e.EmployeeCode.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                    e.FullName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (e.EmployeeCode != null && e.EmployeeCode.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                    (e.FullName != null && e.FullName.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
                     (e.Email != null && e.Email.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
                     (e.Department != null && e.Department.Contains(search, StringComparison.OrdinalIgnoreCase))
                 );
+            }
+
+            // Apply sorting using reflection (LINQ-to-Objects compatible)
+            if (!string.IsNullOrWhiteSpace(sortBy))
+            {
+                var propertyInfo = typeof(EmployeeEntity).GetProperty(sortBy, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
+                if (propertyInfo != null)
+                {
+                    query = sortDescending
+                        ? query.OrderByDescending(e => propertyInfo.GetValue(e, null))
+                        : query.OrderBy(e => propertyInfo.GetValue(e, null));
+                }
             }
 
             var totalCount = query.Count();
@@ -232,5 +255,77 @@ public class EmployeeService : BaseService, IEmployeeService
                 TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
             });
         }, "get employee grid data");
+    }
+
+    // NEW: Employee asset summary
+    public async Task<ServiceResult<EmployeeAssetSummaryViewModel>> GetAssetSummaryAsync(int employeeId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var employee = await _employeeReps.GetByIdAsync(employeeId);
+            if (employee == null)
+                return ServiceResult<EmployeeAssetSummaryViewModel>.NotFound($"Employee with id {employeeId} not found");
+
+            var currentAssets = await _assetReps.GetByHolderWithRelationsAsync(employeeId);
+            var allTransactions = await _transactionReps.GetEmployeeTransactionHistoryAsync(employeeId);
+
+            var summary = new EmployeeAssetSummaryViewModel
+            {
+                EmployeeId = employee.EmployeeId,
+                EmployeeCode = employee.EmployeeCode,
+                FullName = employee.FullName,
+                Department = employee.Department,
+                EmploymentStatus = employee.EmploymentStatus,
+                CurrentlyHeldAssets = currentAssets.Count(),
+                AssetsOnLoan = currentAssets.Count(a => a.Status == "On Loan"),
+                OverdueLoans = await _employeeReps.GetOverdueLoansCountAsync(employeeId),
+                TotalHistoricalAssets = await _employeeReps.GetTotalHistoricalAssetsAsync(employeeId),
+                ReturnedAssets = await _employeeReps.GetReturnedAssetsCountAsync(employeeId),
+                DamagedReturns = await _employeeReps.GetDamagedReturnsCountAsync(employeeId)
+            };
+
+            // Current assets detail
+            foreach (var asset in currentAssets)
+            {
+                var lastTxn = allTransactions
+                    .Where(t => t.AssetId == asset.AssetId)
+                    .OrderByDescending(t => t.TransactionDate)
+                    .FirstOrDefault();
+
+                summary.CurrentAssets.Add(new EmployeeAssetDetail
+                {
+                    AssetId = asset.AssetId,
+                    AssetCode = asset.AssetCode,
+                    AssetName = asset.AssetName,
+                    CategoryName = asset.CategoryName ?? "Unknown",
+                    Status = asset.Status,
+                    AssociationType = asset.Status == "On Loan" ? "On Loan" : "Assigned",
+                    SinceDate = lastTxn?.TransactionDate ?? asset.CreatedDate,
+                    ExpectedReturnDate = lastTxn?.ExpectedReturnDate,
+                    IsOverdue = lastTxn?.ExpectedReturnDate.HasValue == true && lastTxn.ExpectedReturnDate.Value < DateTime.Now,
+                    Condition = asset.Condition
+                });
+            }
+
+            // Asset history
+            foreach (var txn in allTransactions.OrderByDescending(t => t.TransactionDate))
+            {
+                summary.AssetHistory.Add(new EmployeeAssetHistory
+                {
+                    AssetTransactionId = txn.AssetTransactionId,
+                    AssetId = txn.AssetId,
+                    AssetCode = txn.AssetCode ?? "Unknown",
+                    AssetName = txn.AssetName ?? "Unknown",
+                    TransactionType = txn.TransactionType,
+                    TransactionDate = txn.TransactionDate,
+                    FromEmployeeName = txn.FromEmployeeName,
+                    ToEmployeeName = txn.ToEmployeeName,
+                    ConditionAfter = txn.ConditionAfter,
+                    Notes = txn.Notes
+                });
+            }
+
+            return ServiceResult<EmployeeAssetSummaryViewModel>.Success(summary);
+        }, "get employee asset summary");
     }
 }

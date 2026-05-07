@@ -15,4 +15,7 @@ public interface IEmployeeService
     Task<ServiceResult> DeleteAsync(int id);
     Task<ServiceResult> SoftDeleteAsync(int id);
     Task<ServiceResult<PaginatedResult<EmployeeListViewModel>>> GetGridDataAsync(int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false);
+
+    // NEW: Employee asset summary
+    Task<ServiceResult<EmployeeAssetSummaryViewModel>> GetAssetSummaryAsync(int employeeId);
 }

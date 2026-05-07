@@ -24,6 +24,12 @@ public class AssetTransactionEntity : AuditableEntity
     public decimal? MaintenanceCost { get; set; }
     public string? VendorName { get; set; }
 
+    // NEW: Paired transaction reference
+    public int? PairedTransactionId { get; set; }
+
+    // NEW: Damage reason on return
+    public string? DamageReason { get; set; }
+
     // Navigation properties - marked as NotMapped
     [NotMapped]
     public string? AssetCode { get; set; }

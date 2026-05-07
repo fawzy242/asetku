@@ -5,6 +5,7 @@ using Whitebird.App.Features.Common.Service;
 using Whitebird.Domain.Features.AssetTransaction.Entities;
 using Whitebird.Domain.Features.AssetTransaction.View;
 using Whitebird.Domain.Features.Asset.Entities;
+using Whitebird.Domain.Features.AssetTransaction.Enums;
 using Whitebird.Infra.Features.AssetTransaction;
 using Whitebird.Infra.Features.Common;
 using Whitebird.Infra.Features.Asset;
@@ -58,7 +59,9 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         return await ExecuteSafelyAsync(async () =>
         {
             var transactions = await _transactionReps.GetAllWithRelationsAsync();
-            return ServiceResult<IEnumerable<AssetTransactionListViewModel>>.Success(transactions.Adapt<IEnumerable<AssetTransactionListViewModel>>());
+            var viewModels = transactions.Adapt<List<AssetTransactionListViewModel>>();
+            MarkOverdueStatus(viewModels);
+            return ServiceResult<IEnumerable<AssetTransactionListViewModel>>.Success(viewModels);
         }, "get all transactions");
     }
 
@@ -67,7 +70,9 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         return await ExecuteSafelyAsync(async () =>
         {
             var transactions = await _transactionReps.GetByAssetIdWithRelationsAsync(assetId);
-            return ServiceResult<IEnumerable<AssetTransactionListViewModel>>.Success(transactions.Adapt<IEnumerable<AssetTransactionListViewModel>>());
+            var viewModels = transactions.Adapt<List<AssetTransactionListViewModel>>();
+            MarkOverdueStatus(viewModels);
+            return ServiceResult<IEnumerable<AssetTransactionListViewModel>>.Success(viewModels);
         }, "get transactions by asset");
     }
 
@@ -76,7 +81,9 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         return await ExecuteSafelyAsync(async () =>
         {
             var transactions = await _transactionReps.GetByEmployeeIdWithRelationsAsync(employeeId);
-            return ServiceResult<IEnumerable<AssetTransactionListViewModel>>.Success(transactions.Adapt<IEnumerable<AssetTransactionListViewModel>>());
+            var viewModels = transactions.Adapt<List<AssetTransactionListViewModel>>();
+            MarkOverdueStatus(viewModels);
+            return ServiceResult<IEnumerable<AssetTransactionListViewModel>>.Success(viewModels);
         }, "get transactions by employee");
     }
 
@@ -85,7 +92,9 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         return await ExecuteSafelyAsync(async () =>
         {
             var transactions = await _transactionReps.GetByStatusWithRelationsAsync(status);
-            return ServiceResult<IEnumerable<AssetTransactionListViewModel>>.Success(transactions.Adapt<IEnumerable<AssetTransactionListViewModel>>());
+            var viewModels = transactions.Adapt<List<AssetTransactionListViewModel>>();
+            MarkOverdueStatus(viewModels);
+            return ServiceResult<IEnumerable<AssetTransactionListViewModel>>.Success(viewModels);
         }, "get transactions by status");
     }
 
@@ -94,30 +103,94 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         return await ExecuteSafelyAsync(async () =>
         {
             var transactions = await _transactionReps.GetPendingApprovalsWithRelationsAsync();
-            return ServiceResult<IEnumerable<AssetTransactionListViewModel>>.Success(transactions.Adapt<IEnumerable<AssetTransactionListViewModel>>());
+            var viewModels = transactions.Adapt<List<AssetTransactionListViewModel>>();
+            MarkOverdueStatus(viewModels);
+            return ServiceResult<IEnumerable<AssetTransactionListViewModel>>.Success(viewModels);
         }, "get pending approvals");
+    }
+
+    public async Task<ServiceResult<IEnumerable<AssetTransactionListViewModel>>> GetActiveLoansAsync()
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var transactions = await _transactionReps.GetActiveLoansWithRelationsAsync();
+            var viewModels = transactions.Adapt<List<AssetTransactionListViewModel>>();
+            MarkOverdueStatus(viewModels);
+            return ServiceResult<IEnumerable<AssetTransactionListViewModel>>.Success(viewModels);
+        }, "get active loans");
+    }
+
+    public async Task<ServiceResult<IEnumerable<AssetTransactionListViewModel>>> GetOverdueLoansAsync()
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var transactions = await _transactionReps.GetOverdueLoansWithRelationsAsync();
+            var viewModels = transactions.Adapt<List<AssetTransactionListViewModel>>();
+            MarkOverdueStatus(viewModels);
+            return ServiceResult<IEnumerable<AssetTransactionListViewModel>>.Success(viewModels);
+        }, "get overdue loans");
     }
 
     public async Task<ServiceResult<AssetTransactionDetailViewModel>> CreateAsync(AssetTransactionCreateViewModel model)
     {
+        // Validate transaction type
+        if (!TransactionTypeConstants.All.Contains(model.TransactionType))
+            return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Invalid transaction type: {model.TransactionType}");
+
+        // Validate asset exists and is active
         var asset = await _assetReps.GetByIdRawAsync(model.AssetId);
         if (asset == null)
             return ServiceResult<AssetTransactionDetailViewModel>.NotFound($"Asset with id {model.AssetId} not found");
-        if (model.TransactionType == "Assignment" && asset.Status != "Available")
-            return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Asset '{asset.AssetCode}' is not available for assignment");
-        if (model.ToEmployeeId.HasValue && await _employeeReps.GetByIdAsync(model.ToEmployeeId.Value) == null)
-            return ServiceResult<AssetTransactionDetailViewModel>.NotFound($"Employee with id {model.ToEmployeeId} not found");
+
+        // Validate pairing if required
+        if (TransactionTypeConstants.RequiresPairing.Contains(model.TransactionType))
+        {
+            if (!model.PairedTransactionId.HasValue)
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Transaction type '{model.TransactionType}' requires a PairedTransactionId");
+
+            var pairedTransaction = await _transactionReps.GetByIdRawAsync(model.PairedTransactionId.Value);
+            if (pairedTransaction == null)
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Paired transaction with id {model.PairedTransactionId} not found");
+            if (pairedTransaction.AssetId != model.AssetId)
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("Paired transaction must be for the same asset");
+            if (pairedTransaction.PairedTransactionId != null)
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("Paired transaction is already closed");
+
+            // Validate pairing types
+            bool isValidPair = (model.TransactionType == TransactionTypeConstants.LoanReturn && pairedTransaction.TransactionType == TransactionTypeConstants.Loan) ||
+                               (model.TransactionType == TransactionTypeConstants.PostMaintenance && pairedTransaction.TransactionType == TransactionTypeConstants.Maintenance);
+            if (!isValidPair)
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Invalid pairing: {model.TransactionType} cannot pair with {pairedTransaction.TransactionType}");
+        }
+
+        // Validate business rules per transaction type
+        var validationResult = await ValidateTransactionRulesAsync(model, asset);
+        if (validationResult != null)
+            return validationResult;
 
         return await ExecuteWithTransactionAsync(async () =>
         {
             var entity = model.Adapt<AssetTransactionEntity>();
-            entity.TransactionDate = DateTime.Now;
             entity.TransactionStatus = "Pending";
             entity.IsActive = true;
             entity.CreatedDate = DateTime.Now;
             entity.CreatedBy = _currentUserService.GetDisplayName();
 
             var id = await _repository.InsertAsync(entity);
+
+            // If this is a pairing transaction, update the paired transaction's PairedTransactionId
+            if (entity.PairedTransactionId.HasValue)
+            {
+                var pairedTxn = await _transactionReps.GetByIdRawAsync(entity.PairedTransactionId.Value);
+                if (pairedTxn != null)
+                {
+                    pairedTxn.PairedTransactionId = Convert.ToInt32(id);
+                    pairedTxn.ModifiedDate = DateTime.Now;
+                    pairedTxn.ModifiedBy = _currentUserService.GetDisplayName();
+                    await _repository.UpdateAsync(pairedTxn);
+                }
+            }
+
             var created = await _transactionReps.GetByIdWithRelationsAsync(Convert.ToInt32(id));
 
             if (created != null)
@@ -185,29 +258,41 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult.BadRequest("Transaction is not pending approval");
 
             var asset = await _assetReps.GetByIdRawAsync(existing.AssetId);
-            var assetCode = asset?.AssetCode ?? "Unknown";
+            if (asset == null)
+                return ServiceResult.NotFound($"Asset with id {existing.AssetId} not found");
+
+            var assetCode = asset.AssetCode;
 
             if (model.IsApproved)
             {
                 existing.TransactionStatus = "Approved";
                 existing.ApprovedBy = _currentUserService.UserId;
 
-                if (existing.TransactionType == "Assignment" && existing.ToEmployeeId.HasValue)
+                // Update asset status & holder based on transaction type
+                string newStatus = DeriveAssetStatus(existing.TransactionType);
+                asset.Status = newStatus;
+
+                if (TransactionTypeConstants.ChangesHolder.Contains(existing.TransactionType))
                 {
-                    if (asset != null)
+                    if (existing.TransactionType == TransactionTypeConstants.Return ||
+                        existing.TransactionType == TransactionTypeConstants.LoanReturn)
                     {
-                        asset.Status = "Assigned";
+                        asset.CurrentHolderId = null;
+                    }
+                    else
+                    {
                         asset.CurrentHolderId = existing.ToEmployeeId;
-                        asset.ModifiedDate = DateTime.Now;
-                        asset.ModifiedBy = _currentUserService.GetDisplayName();
-                        await _assetRepository.UpdateAsync(asset);
                     }
                 }
+
+                asset.ModifiedDate = DateTime.Now;
+                asset.ModifiedBy = _currentUserService.GetDisplayName();
+                await _assetRepository.UpdateAsync(asset);
 
                 await _activityLogService.LogUpdateAsync(
                     "AssetTransaction",
                     id,
-                    $"Transaction approved: Type '{existing.TransactionType}' for Asset '{assetCode}'",
+                    $"Transaction approved: Type '{existing.TransactionType}' for Asset '{assetCode}'. Asset status updated to '{newStatus}'",
                     _currentUserService.GetDisplayName());
             }
             else
@@ -245,10 +330,13 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult.BadRequest("Cannot return asset from unapproved transaction");
             if (transaction.ActualReturnDate.HasValue)
                 return ServiceResult.BadRequest("Asset already returned");
+            if (transaction.PairedTransactionId != null)
+                return ServiceResult.BadRequest("Transaction is already paired/closed");
 
             transaction.ActualReturnDate = model.ActualReturnDate;
             transaction.ConditionAfter = model.ConditionAfter;
-            transaction.Notes = model.Notes;
+            transaction.DamageReason = model.DamageReason;
+            transaction.Notes = model.Notes ?? transaction.Notes;
             transaction.ModifiedDate = DateTime.Now;
             transaction.ModifiedBy = _currentUserService.GetDisplayName();
 
@@ -258,17 +346,22 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             var asset = await _assetReps.GetByIdRawAsync(transaction.AssetId);
             if (asset != null)
             {
-                asset.Status = "Available";
+                asset.Status = !string.IsNullOrEmpty(model.DamageReason) ? "Damaged" : "Available";
                 asset.CurrentHolderId = null;
+                asset.Condition = model.ConditionAfter ?? asset.Condition;
                 asset.ModifiedDate = DateTime.Now;
                 asset.ModifiedBy = _currentUserService.GetDisplayName();
                 await _assetRepository.UpdateAsync(asset);
             }
 
+            var logDesc = $"Asset returned: Asset '{asset?.AssetCode}' returned on {model.ActualReturnDate:yyyy-MM-dd}";
+            if (!string.IsNullOrEmpty(model.DamageReason))
+                logDesc += $" (Damaged: {model.DamageReason})";
+
             await _activityLogService.LogUpdateAsync(
                 "AssetTransaction",
                 model.AssetTransactionId,
-                $"Asset returned: Asset '{asset?.AssetCode}' returned on {model.ActualReturnDate:yyyy-MM-dd}",
+                logDesc,
                 _currentUserService.GetDisplayName());
 
             return ServiceResult.Success("Asset returned successfully");
@@ -318,6 +411,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         {
             var result = await _transactionReps.GetPagedWithRelationsAsync(page, pageSize, search, status, assetId);
             var viewModels = result.Data.Adapt<List<AssetTransactionListViewModel>>();
+            MarkOverdueStatus(viewModels);
 
             return ServiceResult<PaginatedResult<AssetTransactionListViewModel>>.Success(new PaginatedResult<AssetTransactionListViewModel>
             {
@@ -329,4 +423,117 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             });
         }, "get transaction grid data");
     }
+
+    #region Private Helpers
+
+    private async Task<ServiceResult<AssetTransactionDetailViewModel>?> ValidateTransactionRulesAsync(AssetTransactionCreateViewModel model, AssetEntity asset)
+    {
+        var type = model.TransactionType;
+
+        // HANDOVER: Company → Employee (ToEmployeeId required)
+        if (type == TransactionTypeConstants.Handover)
+        {
+            if (!model.ToEmployeeId.HasValue)
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("HANDOVER requires ToEmployeeId");
+            if (asset.Status != "Available")
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Asset '{asset.AssetCode}' is not available (current status: {asset.Status})");
+        }
+
+        // TRANSFER: Employee A → Employee B (both required)
+        if (type == TransactionTypeConstants.Transfer)
+        {
+            if (!model.FromEmployeeId.HasValue || !model.ToEmployeeId.HasValue)
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("TRANSFER requires both FromEmployeeId and ToEmployeeId");
+            if (asset.Status != "Assigned" && asset.Status != "On Loan")
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Asset '{asset.AssetCode}' is not assigned to any employee (current status: {asset.Status})");
+            if (asset.CurrentHolderId != model.FromEmployeeId)
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Asset '{asset.AssetCode}' is not held by employee {model.FromEmployeeId}");
+        }
+
+        // LOAN: Company → Employee (ToEmployeeId required)
+        if (type == TransactionTypeConstants.Loan)
+        {
+            if (!model.ToEmployeeId.HasValue)
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("LOAN requires ToEmployeeId");
+            if (asset.Status != "Available")
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Asset '{asset.AssetCode}' is not available for loan (current status: {asset.Status})");
+        }
+
+        // RETURN: Employee → Company (FromEmployeeId required)
+        if (type == TransactionTypeConstants.Return)
+        {
+            if (!model.FromEmployeeId.HasValue)
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("RETURN requires FromEmployeeId");
+            if (asset.Status != "Assigned" && asset.Status != "On Loan")
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Asset '{asset.AssetCode}' is not assigned (current status: {asset.Status})");
+        }
+
+        // LOAN_RETURN: Return from loan (PairedTransactionId required, validated above)
+        if (type == TransactionTypeConstants.LoanReturn)
+        {
+            if (asset.Status != "On Loan")
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Asset '{asset.AssetCode}' is not on loan (current status: {asset.Status})");
+        }
+
+        // MAINTENANCE: Asset to maintenance
+        if (type == TransactionTypeConstants.Maintenance)
+        {
+            if (asset.Status == "In Maintenance" || asset.Status == "Under Repair")
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Asset '{asset.AssetCode}' is already in maintenance");
+        }
+
+        // POST_MAINTENANCE: Return from maintenance (PairedTransactionId required, validated above)
+        if (type == TransactionTypeConstants.PostMaintenance)
+        {
+            if (asset.Status != "In Maintenance")
+                return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Asset '{asset.AssetCode}' is not in maintenance (current status: {asset.Status})");
+        }
+
+        // Validate employee exists if provided
+        if (model.ToEmployeeId.HasValue)
+        {
+            var employee = await _employeeReps.GetByIdAsync(model.ToEmployeeId.Value);
+            if (employee == null)
+                return ServiceResult<AssetTransactionDetailViewModel>.NotFound($"Employee with id {model.ToEmployeeId} not found");
+        }
+        if (model.FromEmployeeId.HasValue)
+        {
+            var employee = await _employeeReps.GetByIdAsync(model.FromEmployeeId.Value);
+            if (employee == null)
+                return ServiceResult<AssetTransactionDetailViewModel>.NotFound($"Employee with id {model.FromEmployeeId} not found");
+        }
+
+        return null;
+    }
+
+    private string DeriveAssetStatus(string transactionType)
+    {
+        return transactionType switch
+        {
+            TransactionTypeConstants.Handover => "Assigned",
+            TransactionTypeConstants.Transfer => "Assigned",
+            TransactionTypeConstants.Loan => "On Loan",
+            TransactionTypeConstants.Return => "Available",
+            TransactionTypeConstants.LoanReturn => "Available",
+            TransactionTypeConstants.Maintenance => "In Maintenance",
+            TransactionTypeConstants.PostMaintenance => "Available",
+            TransactionTypeConstants.Disposal => "Disposed",
+            _ => "Available"
+        };
+    }
+
+    private void MarkOverdueStatus(List<AssetTransactionListViewModel> transactions)
+    {
+        var now = DateTime.Now;
+        foreach (var t in transactions)
+        {
+            t.IsOverdue = t.TransactionType == TransactionTypeConstants.Loan
+                && t.TransactionStatus == "Approved"
+                && t.PairedTransactionId == null
+                && t.ExpectedReturnDate.HasValue
+                && t.ExpectedReturnDate.Value < now;
+        }
+    }
+
+    #endregion
 }

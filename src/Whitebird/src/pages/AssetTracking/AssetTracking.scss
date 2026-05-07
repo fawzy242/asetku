@@ -5,25 +5,12 @@
 .asset-tracking {
     color: var(--text-primary);
 
-    .chrono-card {
-        border-radius: $radius-lg !important;
-        border: 1px solid var(--border) !important;
-        box-shadow: $shadow-sm !important;
-        background-color: var(--card-bg) !important;
-    }
-
-    .chrono-card-title {
-        font-weight: 600 !important;
-        font-size: 14px !important;
-        color: var(--text-primary) !important;
-    }
-
-    .chrono-card-subtitle {
-        color: var(--text-secondary) !important;
-    }
-
-    .chrono-title {
-        color: var(--text-secondary) !important;
-        font-size: 12px !important;
+    .summary-stat-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: $spacing-sm;
+        padding: $spacing-lg;
     }
 }
