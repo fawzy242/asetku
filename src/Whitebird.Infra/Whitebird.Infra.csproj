@@ -8,12 +8,17 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Whitebird.Domain\Whitebird.Domain.csproj" />
+    <ProjectReference Include="..\Whitebird.Migrations\Whitebird.Migrations.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Database & ORM -->
     <PackageReference Include="Dapper" />
     <PackageReference Include="Microsoft.Data.SqlClient" />
+
+    <PackageReference Include="FluentMigrator" />
+    <PackageReference Include="FluentMigrator.Runner" />
+    <PackageReference Include="FluentMigrator.Runner.SqlServer" />
     
     <!-- Configuration -->
     <PackageReference Include="Microsoft.Extensions.Configuration" />
