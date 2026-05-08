@@ -14,6 +14,9 @@
         "pattern": "Local:\\s+(http://localhost:\\d+)",
         "uriFormat": "%s"
       },
+      "env": {
+        "VITE_API_BASE_URL": "https://localhost:5001"
+      },
       "presentation": {
         "reveal": "always",
         "panel": "dedicated"
@@ -54,7 +57,7 @@
         "uriFormat": "%s"
       },
       "env": {
-        "VITE_BACKEND_URL": "https://localhost:5001"
+        "VITE_API_BASE_URL": "https://localhost:5001"
       },
       "presentation": {
         "reveal": "always",
