@@ -1,3 +1,4 @@
+using FluentMigrator.Runner;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Whitebird.Infra.Database;
@@ -12,6 +13,7 @@ using Whitebird.Infra.Features.Location;
 using Whitebird.Infra.Features.Supplier;
 using Whitebird.Infra.Features.Reports;
 using Whitebird.Infra.Features.ActivityLog;
+using Whitebird.Migrations.Features.ActivityLog;
 
 namespace Whitebird.Infra.DependencyInjection;
 
@@ -19,8 +21,21 @@ public static class InfrastructureServiceRegistration
 {
     public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
     {
+        // ========== DATABASE ==========
         services.AddDatabaseServices(configuration);
+
+        // ========== FLUENT MIGRATOR ==========
+        services
+            .AddFluentMigratorCore()
+            .ConfigureRunner(rb => rb
+                .AddSqlServer2016()
+                .WithGlobalConnectionString(configuration.GetConnectionString("DefaultConnection"))
+                .ScanIn(typeof(CreateActivityLogTable).Assembly).For.Migrations())
+            .AddLogging(lb => lb.AddFluentMigratorConsole());
+
+        // ========== REPOSITORIES ==========
         services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+
         services.AddScoped<IAssetReps, AssetReps>();
         services.AddScoped<IAssetTransactionReps, AssetTransactionReps>();
         services.AddScoped<IAuthReps, AuthReps>();
@@ -30,6 +45,7 @@ public static class InfrastructureServiceRegistration
         services.AddScoped<ISupplierReps, SupplierReps>();
         services.AddScoped<IReportsReps, ReportsReps>();
         services.AddScoped<IActivityLogReps, ActivityLogReps>();
+
         return services;
     }
 }
