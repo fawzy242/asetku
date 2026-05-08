@@ -6,38 +6,44 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
   const isDev = mode === "development";
 
+  const backendUrl = env.VITE_API_BASE_URL || "http://localhost:5001";
+
   return {
     plugins: [react()],
     root: process.cwd(),
     publicDir: "public",
+    base: "/",
+
     server: {
       port: 3000,
       strictPort: true,
       open: isDev,
       proxy: {
         "/api": {
-          target: env.VITE_BACKEND_URL || "https://localhost:5001",
+          target: backendUrl,
           changeOrigin: true,
           secure: false,
         },
         "/health": {
-          target: env.VITE_BACKEND_URL || "https://localhost:5001",
+          target: backendUrl,
           changeOrigin: true,
           secure: false,
         },
         "/swagger": {
-          target: env.VITE_BACKEND_URL || "https://localhost:5001",
+          target: backendUrl,
           changeOrigin: true,
           secure: false,
         },
       },
     },
+
     build: {
-      outDir: "wwwroot",
+      outDir: "dist",
       emptyOutDir: true,
       sourcemap: isDev,
       minify: !isDev,
       chunkSizeWarningLimit: 1000,
+
       rollupOptions: {
         input: {
           main: resolve(process.cwd(), "index.html"),
@@ -51,10 +57,12 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+
     preview: {
       port: 4173,
       strictPort: true,
     },
+
     define: {
       __APP_VERSION__: JSON.stringify(env.VITE_APP_VERSION || "1.0.0"),
     },

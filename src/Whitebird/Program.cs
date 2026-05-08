@@ -1,6 +1,7 @@
 ﻿using Microsoft.OpenApi.Models;
 using Whitebird.Infra.DependencyInjection;
 using Whitebird.App.DependencyInjection;
+using FluentMigrator.Runner;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -58,7 +59,7 @@ builder.Services.AddSwaggerGen(c =>
 
 // ========== CORS ==========
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? new[] { "http://localhost:3000" };
+    ?? new[] { "http://localhost" };
 
 builder.Services.AddCors(options =>
 {
@@ -99,17 +100,47 @@ builder.Logging.AddDebug();
 
 var app = builder.Build();
 
-// ========== MIDDLEWARE ==========
-if (app.Environment.IsDevelopment())
+// ========== AUTO DATABASE MIGRATION ==========
+using (var scope = app.Services.CreateScope())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
+    Console.WriteLine("=== MIGRATION BLOCK EXECUTED ===");
+
+    var logger = scope.ServiceProvider
+        .GetRequiredService<ILoggerFactory>()
+        .CreateLogger("FluentMigrator");
+
+    try
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Whitebird API V1");
-        c.RoutePrefix = "swagger";
-    });
+        var runner = scope.ServiceProvider.GetRequiredService<IMigrationRunner>();
+
+        if (runner.HasMigrationsToApplyUp())
+        {
+            logger.LogInformation("Applying pending migrations...");
+            runner.MigrateUp();
+            logger.LogInformation("Database migration completed successfully.");
+        }
+        else
+        {
+            logger.LogInformation("No pending migrations.");
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Migration failed during startup.");
+        throw;
+    }
 }
-else
+
+// ========== SWAGGER ==========
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Whitebird API V1");
+    c.RoutePrefix = "swagger";
+});
+
+// ========== PRODUCTION SECURITY ==========
+if (!app.Environment.IsDevelopment())
 {
     app.UseHsts();
 }
@@ -125,20 +156,17 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseHttpsRedirection();
+// TEMPORARY DISABLE FOR IIS HTTP SETUP
+// app.UseHttpsRedirection();
+
 app.UseResponseCompression();
 app.UseRateLimiter();
 app.UseCors("AllowFrontend");
+
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapControllers();
 
-// ========== SPA FALLBACK (Serve React in Production) ==========
-if (!app.Environment.IsDevelopment())
-{
-    app.UseStaticFiles();
-    app.MapFallbackToFile("index.html");
-}
+app.MapControllers();
 
 // ========== HEALTH CHECK ==========
 app.MapGet("/health", () => Results.Ok(new
