@@ -1,1 +1,0 @@
-import{j as s,B as t}from"./mui-D3Xa-p6O.js";import"./vendor-Ci_Lcj-T.js";const p=({children:e,visible:a=!1,columns:r=3})=>a?s.jsx(t,{className:"filter-panel",sx:{display:"grid",gridTemplateColumns:{xs:"1fr",sm:`repeat(${Math.min(r,2)}, 1fr)`,md:`repeat(${r}, 1fr)`},gap:2,mb:3,p:2,bgcolor:"var(--surface)",borderRadius:2},children:e}):null;export{p as F};
