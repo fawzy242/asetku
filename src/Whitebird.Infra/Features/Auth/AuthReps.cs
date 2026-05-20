@@ -1,6 +1,5 @@
-using Dapper;
 using Whitebird.Infra.Database;
-using Whitebird.Domain.Features.Users.Entities;
+using Whitebird.Domain.Features.Users;
 
 namespace Whitebird.Infra.Features.Auth;
 

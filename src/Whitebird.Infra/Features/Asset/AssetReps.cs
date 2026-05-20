@@ -1,6 +1,6 @@
 using Dapper;
 using Whitebird.Infra.Database;
-using Whitebird.Domain.Features.Asset.Entities;
+using Whitebird.Domain.Features.Asset;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.Asset;
@@ -25,16 +25,17 @@ public class AssetReps : IAssetReps
         const string sql = @"
             SELECT a.*, 
                    c.CategoryName, 
-                   e.FullName as CurrentHolderName, 
-                   s.SupplierName, 
-                   r.FullName as ResponsiblePartyName
+                   s.SupplierName,
+                   o.OfficeName,
+                   md1.MasterDataName as AssetConditionName,
+                   md2.MasterDataName as AssetConditionPurchaseName
             FROM Asset a
-            LEFT JOIN Category c ON a.CategoryId = c.CategoryId
-            LEFT JOIN Employee e ON a.CurrentHolderId = e.EmployeeId
-            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId
-            LEFT JOIN Employee r ON a.ResponsiblePartyId = r.EmployeeId
+            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
+            LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN MasterData md1 ON a.AssetCondition = md1.ReferenceCode AND md1.ReferenceName = 'AssetCondition' AND md1.IsActive = 1
+            LEFT JOIN MasterData md2 ON a.AssetConditionPurchase = md2.ReferenceCode AND md2.ReferenceName = 'AssetConditionPurchase' AND md2.IsActive = 1
             WHERE a.AssetId = @AssetId AND a.IsActive = 1";
-
         return await _context.QueryFirstOrDefaultAsync<AssetEntity>(sql, new { AssetId = assetId });
     }
 
@@ -43,85 +44,108 @@ public class AssetReps : IAssetReps
         const string sql = @"
             SELECT a.*, 
                    c.CategoryName, 
-                   e.FullName as CurrentHolderName, 
-                   s.SupplierName
+                   s.SupplierName,
+                   o.OfficeName,
+                   md1.MasterDataName as AssetConditionName,
+                   md2.MasterDataName as AssetConditionPurchaseName
             FROM Asset a
-            LEFT JOIN Category c ON a.CategoryId = c.CategoryId
-            LEFT JOIN Employee e ON a.CurrentHolderId = e.EmployeeId
-            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId
+            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
+            LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN MasterData md1 ON a.AssetCondition = md1.ReferenceCode AND md1.ReferenceName = 'AssetCondition' AND md1.IsActive = 1
+            LEFT JOIN MasterData md2 ON a.AssetConditionPurchase = md2.ReferenceCode AND md2.ReferenceName = 'AssetConditionPurchase' AND md2.IsActive = 1
             WHERE a.IsActive = 1
             ORDER BY a.AssetCode";
-
         return await _context.QueryAsync<AssetEntity>(sql);
     }
 
     public async Task<IEnumerable<AssetEntity>> GetByCategoryWithRelationsAsync(int categoryId)
     {
         const string sql = @"
-            SELECT a.*, c.CategoryName, e.FullName as CurrentHolderName, s.SupplierName
+            SELECT a.*, c.CategoryName, s.SupplierName, o.OfficeName,
+                   md1.MasterDataName as AssetConditionName,
+                   md2.MasterDataName as AssetConditionPurchaseName
             FROM Asset a
-            LEFT JOIN Category c ON a.CategoryId = c.CategoryId
-            LEFT JOIN Employee e ON a.CurrentHolderId = e.EmployeeId
-            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId
+            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
+            LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN MasterData md1 ON a.AssetCondition = md1.ReferenceCode AND md1.ReferenceName = 'AssetCondition' AND md1.IsActive = 1
+            LEFT JOIN MasterData md2 ON a.AssetConditionPurchase = md2.ReferenceCode AND md2.ReferenceName = 'AssetConditionPurchase' AND md2.IsActive = 1
             WHERE a.CategoryId = @CategoryId AND a.IsActive = 1
             ORDER BY a.AssetCode";
-
         return await _context.QueryAsync<AssetEntity>(sql, new { CategoryId = categoryId });
     }
 
-    public async Task<IEnumerable<AssetEntity>> GetByStatusWithRelationsAsync(string status)
+    public async Task<IEnumerable<AssetEntity>> GetByOfficeWithRelationsAsync(int officeId)
     {
         const string sql = @"
-            SELECT a.*, c.CategoryName, e.FullName as CurrentHolderName, s.SupplierName
+            SELECT a.*, c.CategoryName, s.SupplierName, o.OfficeName,
+                   md1.MasterDataName as AssetConditionName,
+                   md2.MasterDataName as AssetConditionPurchaseName
             FROM Asset a
-            LEFT JOIN Category c ON a.CategoryId = c.CategoryId
-            LEFT JOIN Employee e ON a.CurrentHolderId = e.EmployeeId
-            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId
-            WHERE a.Status = @Status AND a.IsActive = 1
+            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
+            LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN MasterData md1 ON a.AssetCondition = md1.ReferenceCode AND md1.ReferenceName = 'AssetCondition' AND md1.IsActive = 1
+            LEFT JOIN MasterData md2 ON a.AssetConditionPurchase = md2.ReferenceCode AND md2.ReferenceName = 'AssetConditionPurchase' AND md2.IsActive = 1
+            WHERE a.OfficeId = @OfficeId AND a.IsActive = 1
             ORDER BY a.AssetCode";
-
-        return await _context.QueryAsync<AssetEntity>(sql, new { Status = status });
+        return await _context.QueryAsync<AssetEntity>(sql, new { OfficeId = officeId });
     }
 
     public async Task<IEnumerable<AssetEntity>> GetByHolderWithRelationsAsync(int employeeId)
     {
         const string sql = @"
-            SELECT a.*, c.CategoryName, e.FullName as CurrentHolderName, s.SupplierName
+            SELECT DISTINCT a.*, c.CategoryName, s.SupplierName, o.OfficeName,
+                   md1.MasterDataName as AssetConditionName,
+                   md2.MasterDataName as AssetConditionPurchaseName
             FROM Asset a
-            LEFT JOIN Category c ON a.CategoryId = c.CategoryId
-            LEFT JOIN Employee e ON a.CurrentHolderId = e.EmployeeId
-            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId
-            WHERE a.CurrentHolderId = @EmployeeId AND a.IsActive = 1
+            INNER JOIN AssetTransaction at ON a.AssetId = at.AssetId
+            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
+            LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN MasterData md1 ON a.AssetCondition = md1.ReferenceCode AND md1.ReferenceName = 'AssetCondition' AND md1.IsActive = 1
+            LEFT JOIN MasterData md2 ON a.AssetConditionPurchase = md2.ReferenceCode AND md2.ReferenceName = 'AssetConditionPurchase' AND md2.IsActive = 1
+            WHERE at.ToEmployeeId = @EmployeeId
+              AND at.Approved = 1
+              AND at.FromAssetTransactionId IS NULL
+              AND at.TransactionType IN (1, 2, 3)
+              AND a.IsActive = 1
             ORDER BY a.AssetCode";
-
         return await _context.QueryAsync<AssetEntity>(sql, new { EmployeeId = employeeId });
     }
 
     public async Task<IEnumerable<AssetEntity>> GetExpiredWarrantyWithRelationsAsync()
     {
         const string sql = @"
-            SELECT a.*, c.CategoryName, e.FullName as CurrentHolderName, s.SupplierName
+            SELECT a.*, c.CategoryName, s.SupplierName, o.OfficeName,
+                   md1.MasterDataName as AssetConditionName,
+                   md2.MasterDataName as AssetConditionPurchaseName
             FROM Asset a
-            LEFT JOIN Category c ON a.CategoryId = c.CategoryId
-            LEFT JOIN Employee e ON a.CurrentHolderId = e.EmployeeId
-            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId
+            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
+            LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN MasterData md1 ON a.AssetCondition = md1.ReferenceCode AND md1.ReferenceName = 'AssetCondition' AND md1.IsActive = 1
+            LEFT JOIN MasterData md2 ON a.AssetConditionPurchase = md2.ReferenceCode AND md2.ReferenceName = 'AssetConditionPurchase' AND md2.IsActive = 1
             WHERE a.WarrantyExpiryDate < GETDATE() AND a.WarrantyExpiryDate IS NOT NULL AND a.IsActive = 1
             ORDER BY a.WarrantyExpiryDate";
-
         return await _context.QueryAsync<AssetEntity>(sql);
     }
 
     public async Task<IEnumerable<AssetEntity>> GetUpcomingMaintenanceWithRelationsAsync(int daysAhead = 30)
     {
         const string sql = @"
-            SELECT a.*, c.CategoryName, e.FullName as CurrentHolderName, s.SupplierName
+            SELECT a.*, c.CategoryName, s.SupplierName, o.OfficeName,
+                   md1.MasterDataName as AssetConditionName,
+                   md2.MasterDataName as AssetConditionPurchaseName
             FROM Asset a
-            LEFT JOIN Category c ON a.CategoryId = c.CategoryId
-            LEFT JOIN Employee e ON a.CurrentHolderId = e.EmployeeId
-            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId
+            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
+            LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN MasterData md1 ON a.AssetCondition = md1.ReferenceCode AND md1.ReferenceName = 'AssetCondition' AND md1.IsActive = 1
+            LEFT JOIN MasterData md2 ON a.AssetConditionPurchase = md2.ReferenceCode AND md2.ReferenceName = 'AssetConditionPurchase' AND md2.IsActive = 1
             WHERE a.NextMaintenanceDate BETWEEN GETDATE() AND DATEADD(DAY, @DaysAhead, GETDATE()) AND a.IsActive = 1
             ORDER BY a.NextMaintenanceDate";
-
         return await _context.QueryAsync<AssetEntity>(sql, new { DaysAhead = daysAhead });
     }
 
@@ -140,57 +164,9 @@ public class AssetReps : IAssetReps
         return await _context.ExecuteScalarAsync<int>(sql, parameters) > 0;
     }
 
-    public async Task<int> GetNextAssetNumberAsync()
-    {
-        const string sql = @"SELECT ISNULL(MAX(CAST(SUBSTRING(AssetCode, 5, LEN(AssetCode)) AS INT)), 0) + 1 
-                             FROM Asset WHERE AssetCode LIKE 'AST-%'";
-        return await _context.ExecuteScalarAsync<int>(sql);
-    }
-
-    // NEW: Get status counts for dashboard
-    public async Task<Dictionary<string, int>> GetStatusCountsAsync()
-    {
-        const string sql = @"
-            SELECT Status, COUNT(*) as Count
-            FROM Asset
-            WHERE IsActive = 1
-            GROUP BY Status";
-
-        var results = await _context.QueryAsync<(string Status, int Count)>(sql);
-        return results.ToDictionary(r => r.Status, r => r.Count);
-    }
-
-    // NEW: Get expired warranty count
-    public async Task<int> GetExpiredWarrantyCountAsync()
-    {
-        const string sql = @"
-            SELECT COUNT(*) FROM Asset 
-            WHERE WarrantyExpiryDate < GETDATE() 
-              AND WarrantyExpiryDate IS NOT NULL 
-              AND IsActive = 1";
-
-        return await _context.ExecuteScalarAsync<int>(sql);
-    }
-
-    // NEW: Get upcoming maintenance count
-    public async Task<int> GetUpcomingMaintenanceCountAsync(int daysAhead = 30)
-    {
-        const string sql = @"
-            SELECT COUNT(*) FROM Asset 
-            WHERE NextMaintenanceDate BETWEEN GETDATE() AND DATEADD(DAY, @DaysAhead, GETDATE()) 
-              AND IsActive = 1";
-
-        return await _context.ExecuteScalarAsync<int>(sql, new { DaysAhead = daysAhead });
-    }
-
-    // NEW: Get total asset value
-    public async Task<decimal> GetTotalAssetValueAsync()
-    {
-        const string sql = "SELECT ISNULL(SUM(PurchasePrice), 0) FROM Asset WHERE IsActive = 1";
-        return await _context.ExecuteScalarAsync<decimal>(sql);
-    }
-
-    public async Task<PaginatedResult<AssetEntity>> GetPagedWithRelationsAsync(int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false, Dictionary<string, object>? filters = null)
+    public async Task<PaginatedResult<AssetEntity>> GetPagedWithRelationsAsync(
+        int page, int pageSize, string? search = null, string? sortBy = null,
+        bool sortDescending = false, Dictionary<string, object>? filters = null)
     {
         var conditions = new List<string> { "a.IsActive = 1" };
         var parameters = new DynamicParameters();
@@ -219,11 +195,15 @@ public class AssetReps : IAssetReps
 
         var offset = (page - 1) * pageSize;
         var dataSql = $@"
-            SELECT a.*, c.CategoryName, e.FullName as CurrentHolderName, s.SupplierName
+            SELECT a.*, c.CategoryName, s.SupplierName, o.OfficeName,
+                   md1.MasterDataName as AssetConditionName,
+                   md2.MasterDataName as AssetConditionPurchaseName
             FROM Asset a
-            LEFT JOIN Category c ON a.CategoryId = c.CategoryId
-            LEFT JOIN Employee e ON a.CurrentHolderId = e.EmployeeId
-            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId
+            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
+            LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN MasterData md1 ON a.AssetCondition = md1.ReferenceCode AND md1.ReferenceName = 'AssetCondition' AND md1.IsActive = 1
+            LEFT JOIN MasterData md2 ON a.AssetConditionPurchase = md2.ReferenceCode AND md2.ReferenceName = 'AssetConditionPurchase' AND md2.IsActive = 1
             WHERE {whereClause}
             ORDER BY {orderBy}
             OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
@@ -241,5 +221,81 @@ public class AssetReps : IAssetReps
             PageSize = pageSize,
             TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
         };
+    }
+
+    public async Task<int> GetTotalAssetsCountAsync()
+    {
+        const string sql = "SELECT COUNT(*) FROM Asset WHERE IsActive = 1";
+        return await _context.ExecuteScalarAsync<int>(sql);
+    }
+
+    public async Task<int> GetAvailableAssetsCountAsync()
+    {
+        const string sql = @"
+            SELECT COUNT(*) FROM Asset a WHERE a.IsActive = 1 
+            AND NOT EXISTS (SELECT 1 FROM AssetTransaction at 
+                            WHERE at.AssetId = a.AssetId 
+                              AND at.Approved = 1 
+                              AND at.FromAssetTransactionId IS NULL 
+                              AND at.IsActive = 1)";
+        return await _context.ExecuteScalarAsync<int>(sql);
+    }
+
+    public async Task<int> GetAssignedAssetsCountAsync()
+    {
+        const string sql = @"
+            SELECT COUNT(DISTINCT at.AssetId) 
+            FROM AssetTransaction at
+            WHERE at.TransactionType IN (1, 2) 
+              AND at.Approved = 1 
+              AND at.FromAssetTransactionId IS NULL 
+              AND at.IsActive = 1";
+        return await _context.ExecuteScalarAsync<int>(sql);
+    }
+
+    public async Task<int> GetAssetsOnLoanCountAsync()
+    {
+        const string sql = @"
+            SELECT COUNT(DISTINCT at.AssetId) 
+            FROM AssetTransaction at
+            WHERE at.TransactionType = 3 
+              AND at.Approved = 1 
+              AND at.FromAssetTransactionId IS NULL 
+              AND at.IsActive = 1";
+        return await _context.ExecuteScalarAsync<int>(sql);
+    }
+
+    public async Task<int> GetAssetsInMaintenanceCountAsync()
+    {
+        const string sql = @"
+            SELECT COUNT(DISTINCT at.AssetId) 
+            FROM AssetTransaction at
+            WHERE at.TransactionType = 6 
+              AND at.Approved = 1 
+              AND at.FromAssetTransactionId IS NULL 
+              AND at.IsActive = 1";
+        return await _context.ExecuteScalarAsync<int>(sql);
+    }
+
+    public async Task<int> GetExpiredWarrantyCountAsync()
+    {
+        const string sql = @"
+            SELECT COUNT(*) FROM Asset 
+            WHERE WarrantyExpiryDate < GETDATE() AND WarrantyExpiryDate IS NOT NULL AND IsActive = 1";
+        return await _context.ExecuteScalarAsync<int>(sql);
+    }
+
+    public async Task<int> GetUpcomingMaintenanceCountAsync(int daysAhead = 30)
+    {
+        const string sql = @"
+            SELECT COUNT(*) FROM Asset 
+            WHERE NextMaintenanceDate BETWEEN GETDATE() AND DATEADD(DAY, @DaysAhead, GETDATE()) AND IsActive = 1";
+        return await _context.ExecuteScalarAsync<int>(sql, new { DaysAhead = daysAhead });
+    }
+
+    public async Task<decimal> GetTotalAssetValueAsync()
+    {
+        const string sql = "SELECT ISNULL(SUM(PurchasePrice), 0) FROM Asset WHERE IsActive = 1";
+        return await _context.ExecuteScalarAsync<decimal>(sql);
     }
 }

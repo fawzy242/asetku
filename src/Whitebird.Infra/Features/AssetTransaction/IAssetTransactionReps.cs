@@ -1,28 +1,30 @@
-using Whitebird.Domain.Features.AssetTransaction.Entities;
+using Whitebird.Domain.Features.AssetTransaction;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.AssetTransaction;
 
 public interface IAssetTransactionReps
 {
-    // Raw entity untuk CRUD operations
+    // Raw entity
     Task<AssetTransactionEntity?> GetByIdRawAsync(int transactionId);
 
-    // Methods with relations (navigation properties populated via JOIN)
+    // With relations
     Task<AssetTransactionEntity?> GetByIdWithRelationsAsync(int transactionId);
     Task<IEnumerable<AssetTransactionEntity>> GetAllWithRelationsAsync();
     Task<IEnumerable<AssetTransactionEntity>> GetByAssetIdWithRelationsAsync(int assetId);
     Task<IEnumerable<AssetTransactionEntity>> GetByEmployeeIdWithRelationsAsync(int employeeId);
-    Task<IEnumerable<AssetTransactionEntity>> GetByStatusWithRelationsAsync(string status);
+    Task<IEnumerable<AssetTransactionEntity>> GetByApprovalStatusAsync(bool? approved);
     Task<IEnumerable<AssetTransactionEntity>> GetPendingApprovalsWithRelationsAsync();
     Task<IEnumerable<AssetTransactionEntity>> GetByDateRangeWithRelationsAsync(DateTime startDate, DateTime endDate);
-    Task<AssetTransactionEntity?> GetActiveTransactionByAssetIdWithRelationsAsync(int assetId);
+    Task<AssetTransactionEntity?> GetActiveTransactionByAssetIdAsync(int assetId);
     Task<int> GetTransactionCountByAssetAsync(int assetId);
-    Task<PaginatedResult<AssetTransactionEntity>> GetPagedWithRelationsAsync(int page, int pageSize, string? search = null, string? status = null, int? assetId = null);
 
-    // NEW: Pairing & tracking queries
+    // Pagination
+    Task<PaginatedResult<AssetTransactionEntity>> GetPagedWithRelationsAsync(int page, int pageSize, string? search = null, bool? approved = null, int? assetId = null);
+
+    // Pairing queries
     Task<AssetTransactionEntity?> GetPairedTransactionAsync(int transactionId);
-    Task<bool> HasOpenPairedTransactionAsync(int assetId, string transactionType);
+    Task<bool> HasOpenPairedTransactionAsync(int assetId, int transactionType);
     Task<IEnumerable<AssetTransactionEntity>> GetActiveLoansWithRelationsAsync();
     Task<IEnumerable<AssetTransactionEntity>> GetOverdueLoansWithRelationsAsync();
     Task<IEnumerable<AssetTransactionEntity>> GetAssetTransactionHistoryAsync(int assetId);

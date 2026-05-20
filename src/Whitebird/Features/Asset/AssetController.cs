@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Whitebird.App.Features.Asset.Interfaces;
-using Whitebird.Domain.Features.Asset.View;
+using Whitebird.App.Features.Asset.Import;
+using Whitebird.Domain.Features.Asset;
 using Whitebird.App.Features.Common;
 
 namespace Whitebird.App.Features.Asset.Controllers;
@@ -11,42 +12,61 @@ namespace Whitebird.App.Features.Asset.Controllers;
 public class AssetController : ControllerBase
 {
     private readonly IAssetService _assetService;
+    private readonly AssetImportService _assetImportService;
 
-    public AssetController(IAssetService assetService) => _assetService = assetService;
+    public AssetController(IAssetService assetService, AssetImportService assetImportService)
+    {
+        _assetService = assetService;
+        _assetImportService = assetImportService;
+    }
 
     [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetById(int id) => this.HandleResult(await _assetService.GetByIdAsync(id));
+    public async Task<IActionResult> GetById(int id)
+        => this.HandleResult(await _assetService.GetByIdAsync(id));
 
     [HttpGet]
-    public async Task<IActionResult> GetAll() => this.HandleResult(await _assetService.GetAllAsync());
+    public async Task<IActionResult> GetAll()
+        => this.HandleResult(await _assetService.GetAllAsync());
 
     [HttpGet("category/{categoryId:int}")]
-    public async Task<IActionResult> GetByCategory(int categoryId) => this.HandleResult(await _assetService.GetByCategoryAsync(categoryId));
+    public async Task<IActionResult> GetByCategory(int categoryId)
+        => this.HandleResult(await _assetService.GetByCategoryAsync(categoryId));
 
-    [HttpGet("status/{status}")]
-    public async Task<IActionResult> GetByStatus(string status) => this.HandleResult(await _assetService.GetByStatusAsync(status));
-
-    [HttpGet("holder/{employeeId:int}")]
-    public async Task<IActionResult> GetByHolder(int employeeId) => this.HandleResult(await _assetService.GetByHolderAsync(employeeId));
+    [HttpGet("office/{officeId:int}")]
+    public async Task<IActionResult> GetByOffice(int officeId)
+        => this.HandleResult(await _assetService.GetByOfficeAsync(officeId));
 
     [HttpGet("tracking/{assetId:int}")]
-    public async Task<IActionResult> GetAssetTracking(int assetId) => this.HandleResult(await _assetService.GetAssetTrackingAsync(assetId));
+    public async Task<IActionResult> GetAssetTracking(int assetId)
+        => this.HandleResult(await _assetService.GetAssetTrackingAsync(assetId));
+
+    [HttpGet("status/{assetId:int}")]
+    public async Task<IActionResult> GetCurrentStatus(int assetId)
+        => this.HandleResult(await _assetService.GetCurrentStatusAsync(assetId));
+
+    [HttpGet("history/{assetId:int}")]
+    public async Task<IActionResult> GetTransactionHistory(int assetId)
+        => this.HandleResult(await _assetService.GetAssetTransactionHistoryAsync(assetId));
 
     [HttpGet("grid")]
     public async Task<IActionResult> GetGridData([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string? search = null, [FromQuery] string? sortBy = null, [FromQuery] bool sortDescending = false)
         => this.HandleResult(await _assetService.GetGridDataAsync(page, pageSize, search, sortBy, sortDescending));
 
     [HttpGet("search")]
-    public async Task<IActionResult> Search([FromQuery] string keyword) => this.HandleResult(await _assetService.SearchAsync(keyword));
+    public async Task<IActionResult> Search([FromQuery] string keyword)
+        => this.HandleResult(await _assetService.SearchAsync(keyword));
 
     [HttpGet("expired-warranty")]
-    public async Task<IActionResult> GetExpiredWarranty() => this.HandleResult(await _assetService.GetExpiredWarrantyAsync());
+    public async Task<IActionResult> GetExpiredWarranty()
+        => this.HandleResult(await _assetService.GetExpiredWarrantyAsync());
 
     [HttpGet("upcoming-maintenance")]
-    public async Task<IActionResult> GetUpcomingMaintenance([FromQuery] int daysAhead = 30) => this.HandleResult(await _assetService.GetUpcomingMaintenanceAsync(daysAhead));
+    public async Task<IActionResult> GetUpcomingMaintenance([FromQuery] int daysAhead = 30)
+        => this.HandleResult(await _assetService.GetUpcomingMaintenanceAsync(daysAhead));
 
     [HttpGet("dashboard-stats")]
-    public async Task<IActionResult> GetDashboardStats() => this.HandleResult(await _assetService.GetDashboardStatsAsync());
+    public async Task<IActionResult> GetDashboardStats()
+        => this.HandleResult(await _assetService.GetDashboardStatsAsync());
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] AssetCreateViewModel model)
@@ -65,8 +85,39 @@ public class AssetController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete(int id) => this.HandleResult(await _assetService.DeleteAsync(id));
+    public async Task<IActionResult> Delete(int id)
+        => this.HandleResult(await _assetService.DeleteAsync(id));
 
     [HttpDelete("{id:int}/soft")]
-    public async Task<IActionResult> SoftDelete(int id) => this.HandleResult(await _assetService.SoftDeleteAsync(id));
+    public async Task<IActionResult> SoftDelete(int id)
+        => this.HandleResult(await _assetService.SoftDeleteAsync(id));
+
+    [HttpPost("activate")]
+    public async Task<IActionResult> BulkActivate([FromBody] BulkActivateRequest request)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _assetService.BulkActivateAsync(request));
+    }
+
+    [HttpPost("import")]
+    public async Task<IActionResult> Import(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("No file provided");
+
+        using var stream = file.OpenReadStream();
+        var result = await _assetImportService.ImportFromExcelAsync(stream);
+        return this.HandleResult(result);
+    }
+
+    [HttpGet("import/template")]
+    public async Task<IActionResult> DownloadImportTemplate()
+    {
+        var result = await _assetImportService.GenerateTemplateAsync();
+        if (!result.IsSuccess || result.Data == null)
+            return this.HandleResult(result);
+
+        return File(result.Data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Asset_Import_Template.xlsx");
+    }
 }

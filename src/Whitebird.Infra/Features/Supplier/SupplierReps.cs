@@ -1,6 +1,6 @@
 using Dapper;
 using Whitebird.Infra.Database;
-using Whitebird.Domain.Features.Supplier.Entities;
+using Whitebird.Domain.Features.Supplier;
 
 namespace Whitebird.Infra.Features.Supplier;
 

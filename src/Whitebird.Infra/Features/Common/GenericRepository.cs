@@ -4,7 +4,7 @@ using System.Text;
 using Dapper;
 using Microsoft.Extensions.Logging;
 using Whitebird.Infra.Database;
-using Whitebird.Domain.Features.Common.Attributes;
+using Whitebird.Domain.Features.Common;
 
 namespace Whitebird.Infra.Features.Common;
 

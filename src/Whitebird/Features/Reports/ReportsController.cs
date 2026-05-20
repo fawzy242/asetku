@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Whitebird.App.Features.Reports.Interfaces;
 using Whitebird.App.Features.Common;
+using Whitebird.App.Features.Reports.Interfaces;
 
 namespace Whitebird.App.Features.Reports.Controllers;
 
@@ -11,10 +11,14 @@ public class ReportsController : ControllerBase
 {
     private readonly IReportsService _reportService;
 
-    public ReportsController(IReportsService reportService) => _reportService = reportService;
+    public ReportsController(IReportsService reportService)
+    {
+        _reportService = reportService;
+    }
 
     [HttpGet("dashboard/stats")]
-    public async Task<IActionResult> GetDashboardStats() => this.HandleResult(await _reportService.GetDashboardStatsAsync());
+    public async Task<IActionResult> GetDashboardStats()
+        => this.HandleResult(await _reportService.GetDashboardStatsAsync());
 
     [HttpGet("asset-transaction/data")]
     public async Task<IActionResult> GetAssetTransactionData([FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null, [FromQuery] string? transactionType = null)

@@ -1,27 +1,29 @@
-using Whitebird.Domain.Features.Asset.Entities;
+using Whitebird.Domain.Features.Asset;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.Asset;
 
 public interface IAssetReps
 {
-    // Raw entity untuk CRUD operations
     Task<AssetEntity?> GetByIdRawAsync(int assetId);
 
-    // Methods with relations (navigation properties populated via JOIN)
     Task<AssetEntity?> GetByIdWithRelationsAsync(int assetId);
     Task<IEnumerable<AssetEntity>> GetAllWithRelationsAsync();
     Task<IEnumerable<AssetEntity>> GetByCategoryWithRelationsAsync(int categoryId);
-    Task<IEnumerable<AssetEntity>> GetByStatusWithRelationsAsync(string status);
+    Task<IEnumerable<AssetEntity>> GetByOfficeWithRelationsAsync(int officeId);
     Task<IEnumerable<AssetEntity>> GetByHolderWithRelationsAsync(int employeeId);
     Task<IEnumerable<AssetEntity>> GetExpiredWarrantyWithRelationsAsync();
     Task<IEnumerable<AssetEntity>> GetUpcomingMaintenanceWithRelationsAsync(int daysAhead = 30);
+
     Task<bool> IsAssetCodeExistsAsync(string assetCode, int? excludeAssetId = null);
-    Task<int> GetNextAssetNumberAsync();
+
     Task<PaginatedResult<AssetEntity>> GetPagedWithRelationsAsync(int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false, Dictionary<string, object>? filters = null);
 
-    // NEW: Dashboard stats
-    Task<Dictionary<string, int>> GetStatusCountsAsync();
+    Task<int> GetTotalAssetsCountAsync();
+    Task<int> GetAvailableAssetsCountAsync();
+    Task<int> GetAssignedAssetsCountAsync();
+    Task<int> GetAssetsOnLoanCountAsync();
+    Task<int> GetAssetsInMaintenanceCountAsync();
     Task<int> GetExpiredWarrantyCountAsync();
     Task<int> GetUpcomingMaintenanceCountAsync(int daysAhead = 30);
     Task<decimal> GetTotalAssetValueAsync();

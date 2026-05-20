@@ -1,4 +1,4 @@
-using Whitebird.Domain.Features.Users.Entities;
+using Whitebird.Domain.Features.Users;
 
 namespace Whitebird.Infra.Features.Auth;
 

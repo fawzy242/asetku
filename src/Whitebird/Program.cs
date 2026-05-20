@@ -20,15 +20,29 @@ builder.Services.AddMapsterConfiguration();
 // ========== SWAGGER ==========
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
+    c.SwaggerDoc("v2", new OpenApiInfo
     {
-        Title = "Whitebird Asset Management API",
-        Version = "v1",
-        Description = "API for managing assets, tracking transactions, employees, and inventory",
+        Title = "Asetku - Asset Management System API",
+        Version = "v2.0.0",
+        Description = @"
+Complete API for managing assets, tracking transactions, employees, offices, departments, and file attachments.
+
+## Key Features:
+- **Asset Management**: CRUD, tracking, warranty, maintenance
+- **Transaction Management**: HANDOVER, TRANSFER, LOAN, RETURN, LOAN_RETURN, MAINTENANCE, POST_MAINTENANCE, DISPOSAL
+- **Employee Management**: CRUD, asset summary, import
+- **Master Data**: Centralized lookup for positions, statuses, types
+- **File Attachments**: Single/multiple upload, preview for images
+- **Reports**: 5 report types with Excel export
+- **Import**: Bulk import for Assets and Employees (Excel)
+
+## Authentication:
+Use session token from /api/Auth/login
+",
         Contact = new OpenApiContact
         {
-            Name = "Whitebird Support",
-            Email = "support@whitebird.local"
+            Name = "Asetku Support",
+            Email = "support@asetku.local"
         }
     });
 
@@ -38,7 +52,7 @@ builder.Services.AddSwaggerGen(c =>
         Type = SecuritySchemeType.ApiKey,
         Scheme = "ApiKey",
         In = ParameterLocation.Header,
-        Description = "Session token for authentication"
+        Description = "Session token for authentication (get from /api/Auth/login)"
     });
 
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -55,11 +69,19 @@ builder.Services.AddSwaggerGen(c =>
             Array.Empty<string>()
         }
     });
+
+    // Include XML comments
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        c.IncludeXmlComments(xmlPath);
+    }
 });
 
 // ========== CORS ==========
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? new[] { "http://localhost" };
+    ?? new[] { "http://localhost:3000", "http://localhost:4200", "http://localhost:8080" };
 
 builder.Services.AddCors(options =>
 {
@@ -103,8 +125,6 @@ var app = builder.Build();
 // ========== AUTO DATABASE MIGRATION ==========
 using (var scope = app.Services.CreateScope())
 {
-    Console.WriteLine("=== MIGRATION BLOCK EXECUTED ===");
-
     var logger = scope.ServiceProvider
         .GetRequiredService<ILoggerFactory>()
         .CreateLogger("FluentMigrator");
@@ -135,8 +155,9 @@ using (var scope = app.Services.CreateScope())
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Whitebird API V1");
+    c.SwaggerEndpoint("/swagger/v2/swagger.json", "Asetku API V2");
     c.RoutePrefix = "swagger";
+    c.DocumentTitle = "Asetku Asset Management API";
 });
 
 // ========== PRODUCTION SECURITY ==========
@@ -156,9 +177,6 @@ app.Use(async (context, next) =>
     await next();
 });
 
-// TEMPORARY DISABLE FOR IIS HTTP SETUP
-// app.UseHttpsRedirection();
-
 app.UseResponseCompression();
 app.UseRateLimiter();
 app.UseCors("AllowFrontend");
@@ -174,7 +192,12 @@ app.MapGet("/health", () => Results.Ok(new
     status = "Healthy",
     timestamp = DateTime.UtcNow,
     environment = app.Environment.EnvironmentName,
-    version = "1.0.0"
+    version = "2.0.0",
+    modules = new[]
+    {
+        "Asset", "AssetTransaction", "Auth", "Category", "Department",
+        "Employee", "FileAttachment", "MasterData", "Office", "Reports", "Supplier"
+    }
 }));
 
 app.Run();

@@ -1,6 +1,6 @@
 using Dapper;
 using Whitebird.Infra.Database;
-using Whitebird.Domain.Features.Employee.Entities;
+using Whitebird.Domain.Features.Employee;
 
 namespace Whitebird.Infra.Features.Employee;
 
@@ -19,21 +19,62 @@ public class EmployeeReps : IEmployeeReps
         return await _context.QueryFirstOrDefaultAsync<EmployeeEntity>(sql, new { EmployeeId = employeeId });
     }
 
+    public async Task<EmployeeEntity?> GetByIdWithRelationsAsync(int employeeId)
+    {
+        const string sql = @"
+            SELECT e.*, 
+                   d.DepartmentName, 
+                   o.OfficeName,
+                   md1.MasterDataName as PositionName,
+                   md2.MasterDataName as EmploymentStatusName
+            FROM Employee e
+            LEFT JOIN Department d ON e.DepartmentId = d.DepartmentId AND d.IsActive = 1
+            LEFT JOIN Office o ON e.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN MasterData md1 ON e.Position = md1.ReferenceCode AND md1.ReferenceName = 'Position' AND md1.IsActive = 1
+            LEFT JOIN MasterData md2 ON e.EmploymentStatus = md2.ReferenceCode AND md2.ReferenceName = 'EmployeeStatus' AND md2.IsActive = 1
+            WHERE e.EmployeeId = @EmployeeId AND e.IsActive = 1";
+        return await _context.QueryFirstOrDefaultAsync<EmployeeEntity>(sql, new { EmployeeId = employeeId });
+    }
+
     public async Task<IEnumerable<EmployeeEntity>> GetAllAsync()
     {
-        const string sql = "SELECT * FROM Employee WHERE IsActive = 1 ORDER BY FullName";
+        const string sql = @"
+            SELECT e.*, 
+                   d.DepartmentName, 
+                   o.OfficeName,
+                   md1.MasterDataName as PositionName,
+                   md2.MasterDataName as EmploymentStatusName
+            FROM Employee e
+            LEFT JOIN Department d ON e.DepartmentId = d.DepartmentId AND d.IsActive = 1
+            LEFT JOIN Office o ON e.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN MasterData md1 ON e.Position = md1.ReferenceCode AND md1.ReferenceName = 'Position' AND md1.IsActive = 1
+            LEFT JOIN MasterData md2 ON e.EmploymentStatus = md2.ReferenceCode AND md2.ReferenceName = 'EmployeeStatus' AND md2.IsActive = 1
+            WHERE e.IsActive = 1
+            ORDER BY e.FullName";
         return await _context.QueryAsync<EmployeeEntity>(sql);
     }
 
-    public async Task<IEnumerable<EmployeeEntity>> GetByDepartmentAsync(string department)
+    public async Task<IEnumerable<EmployeeEntity>> GetByDepartmentIdAsync(int departmentId)
     {
-        const string sql = "SELECT * FROM Employee WHERE Department = @Department AND IsActive = 1 ORDER BY FullName";
-        return await _context.QueryAsync<EmployeeEntity>(sql, new { Department = department });
+        const string sql = @"
+            SELECT e.*, d.DepartmentName, o.OfficeName
+            FROM Employee e
+            LEFT JOIN Department d ON e.DepartmentId = d.DepartmentId AND d.IsActive = 1
+            LEFT JOIN Office o ON e.OfficeId = o.OfficeId AND o.IsActive = 1
+            WHERE e.DepartmentId = @DepartmentId AND e.IsActive = 1
+            ORDER BY e.FullName";
+        return await _context.QueryAsync<EmployeeEntity>(sql, new { DepartmentId = departmentId });
     }
 
-    public async Task<IEnumerable<EmployeeEntity>> GetByStatusAsync(string employmentStatus)
+    public async Task<IEnumerable<EmployeeEntity>> GetByEmploymentStatusAsync(int employmentStatus)
     {
-        const string sql = "SELECT * FROM Employee WHERE EmploymentStatus = @EmploymentStatus AND IsActive = 1 ORDER BY FullName";
+        const string sql = @"
+            SELECT e.*, d.DepartmentName, o.OfficeName
+            FROM Employee e
+            LEFT JOIN Department d ON e.DepartmentId = d.DepartmentId AND d.IsActive = 1
+            LEFT JOIN Office o ON e.OfficeId = o.OfficeId AND o.IsActive = 1
+            WHERE e.EmploymentStatus = @EmploymentStatus AND e.IsActive = 1
+            ORDER BY e.FullName";
         return await _context.QueryAsync<EmployeeEntity>(sql, new { EmploymentStatus = employmentStatus });
     }
 
@@ -52,84 +93,78 @@ public class EmployeeReps : IEmployeeReps
         return await _context.ExecuteScalarAsync<int>(sql, parameters) > 0;
     }
 
-    public async Task<string> GenerateEmployeeCodeAsync()
-    {
-        const string sql = @"
-            SELECT ISNULL(MAX(CAST(SUBSTRING(EmployeeCode, 5, LEN(EmployeeCode)) AS INT)), 0) + 1 
-            FROM Employee WHERE EmployeeCode LIKE 'EMP-%'";
-        var nextNumber = await _context.ExecuteScalarAsync<int>(sql);
-        return $"EMP-{nextNumber:D6}";
-    }
-
     public async Task<int> GetActiveAssetsCountAsync(int employeeId)
     {
-        const string sql = "SELECT COUNT(*) FROM Asset WHERE CurrentHolderId = @EmployeeId AND Status IN ('Assigned', 'On Loan') AND IsActive = 1";
+        const string sql = @"
+            SELECT COUNT(DISTINCT t.AssetId) 
+            FROM AssetTransaction t
+            WHERE t.ToEmployeeId = @EmployeeId
+              AND t.Approved = 1
+              AND t.FromAssetTransactionId IS NULL
+              AND t.TransactionType IN (1, 2, 3)
+              AND t.IsActive = 1";
         return await _context.ExecuteScalarAsync<int>(sql, new { EmployeeId = employeeId });
     }
 
-    // NEW
     public async Task<int> GetAssetsOnLoanCountAsync(int employeeId)
     {
         const string sql = @"
-            SELECT COUNT(*) FROM Asset a
-            INNER JOIN AssetTransaction t ON a.AssetId = t.AssetId
-            WHERE a.CurrentHolderId = @EmployeeId 
-              AND a.Status = 'On Loan' 
-              AND a.IsActive = 1
-              AND t.TransactionType = 'LOAN'
-              AND t.TransactionStatus = 'Approved'
-              AND t.PairedTransactionId IS NULL";
-
+            SELECT COUNT(DISTINCT t.AssetId) 
+            FROM AssetTransaction t
+            WHERE t.ToEmployeeId = @EmployeeId 
+              AND t.TransactionType = 3
+              AND t.Approved = 1
+              AND t.FromAssetTransactionId IS NULL
+              AND t.IsActive = 1";
         return await _context.ExecuteScalarAsync<int>(sql, new { EmployeeId = employeeId });
     }
 
-    // NEW
     public async Task<int> GetOverdueLoansCountAsync(int employeeId)
     {
         const string sql = @"
-            SELECT COUNT(*) FROM AssetTransaction t
-            INNER JOIN Asset a ON t.AssetId = a.AssetId
+            SELECT COUNT(*) 
+            FROM AssetTransaction t
             WHERE t.ToEmployeeId = @EmployeeId
-              AND t.TransactionType = 'LOAN'
-              AND t.TransactionStatus = 'Approved'
-              AND t.PairedTransactionId IS NULL
+              AND t.TransactionType = 3
+              AND t.Approved = 1
+              AND t.FromAssetTransactionId IS NULL
               AND t.ExpectedReturnDate < GETDATE()
-              AND a.IsActive = 1";
-
+              AND t.IsActive = 1";
         return await _context.ExecuteScalarAsync<int>(sql, new { EmployeeId = employeeId });
     }
 
-    // NEW
     public async Task<int> GetTotalHistoricalAssetsAsync(int employeeId)
     {
         const string sql = @"
-            SELECT COUNT(DISTINCT AssetId) FROM AssetTransaction
-            WHERE FromEmployeeId = @EmployeeId OR ToEmployeeId = @EmployeeId";
-
+            SELECT COUNT(DISTINCT AssetId) 
+            FROM AssetTransaction
+            WHERE (FromEmployeeId = @EmployeeId OR ToEmployeeId = @EmployeeId)
+              AND IsActive = 1";
         return await _context.ExecuteScalarAsync<int>(sql, new { EmployeeId = employeeId });
     }
 
-    // NEW
     public async Task<int> GetReturnedAssetsCountAsync(int employeeId)
     {
         const string sql = @"
-            SELECT COUNT(*) FROM AssetTransaction
+            SELECT COUNT(*) 
+            FROM AssetTransaction
             WHERE FromEmployeeId = @EmployeeId
-              AND TransactionType IN ('RETURN', 'LOAN_RETURN')
-              AND TransactionStatus = 'Approved'";
-
+              AND TransactionType IN (4, 5)
+              AND Approved = 1
+              AND IsActive = 1";
         return await _context.ExecuteScalarAsync<int>(sql, new { EmployeeId = employeeId });
     }
 
-    // NEW
     public async Task<int> GetDamagedReturnsCountAsync(int employeeId)
     {
         const string sql = @"
-            SELECT COUNT(*) FROM AssetTransaction
+            SELECT COUNT(*) 
+            FROM AssetTransaction
             WHERE FromEmployeeId = @EmployeeId
-              AND TransactionType IN ('RETURN', 'LOAN_RETURN')
-              AND DamageReason IS NOT NULL";
-
+              AND TransactionType IN (4, 5)
+              AND ConditionAfter = 3
+              AND Approved = 1
+              AND IsActive = 1";
         return await _context.ExecuteScalarAsync<int>(sql, new { EmployeeId = employeeId });
     }
 }

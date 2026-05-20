@@ -1,6 +1,6 @@
 using Dapper;
 using Whitebird.Infra.Database;
-using Whitebird.Domain.Features.ActivityLog.View;
+using Whitebird.Domain.Features.ActivityLog;
 
 namespace Whitebird.Infra.Features.ActivityLog;
 
