@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Whitebird.App.Features.Common;
-using Whitebird.App.Features.MasterData.Interfaces;
+using Whitebird.App.Features.MasterData;
+using Whitebird.Features.Common;
 
-namespace Whitebird.App.Features.MasterData.Controllers;
+namespace Whitebird.Features.MasterData.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]

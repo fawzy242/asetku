@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.Common;
 
@@ -14,4 +15,7 @@ public interface IAuthService
     Task<ServiceResult<UserDto>> GetUserBySessionTokenAsync(string sessionToken);
     Task<ServiceResult> ChangePasswordAsync(int userId, ChangePasswordRequest request);
     Task<ServiceResult> ValidateSessionAsync(string sessionToken);
+    Task<ServiceResult<string>> UploadProfilePhotoAsync(int userId, IFormFile file);
+    Task<ServiceResult<byte[]>> GetProfilePhotoAsync(int userId);
+    Task<ServiceResult> DeleteProfilePhotoAsync(int userId);
 }

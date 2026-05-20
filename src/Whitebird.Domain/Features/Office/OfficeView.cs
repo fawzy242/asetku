@@ -7,6 +7,7 @@ public class OfficeListViewModel
     public int OfficeId { get; set; }
     public string? OfficeCode { get; set; }
     public string OfficeName { get; set; } = default!;
+    public int? OfficeType { get; set; }           // ← TAMBAHKAN
     public string? OfficeTypeName { get; set; }
     public string? City { get; set; }
     public int? ParentOfficeId { get; set; }

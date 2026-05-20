@@ -1,3 +1,4 @@
+using Dapper;
 using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.Users;
 
@@ -98,5 +99,20 @@ public class AuthReps : IAuthReps
     {
         const string sql = "SELECT COUNT(1) FROM Users WHERE SessionToken = @SessionToken AND SessionExpiry > GETDATE() AND IsActive = 1";
         return await _context.ExecuteScalarAsync<int>(sql, new { SessionToken = sessionToken }) > 0;
+    }
+
+    public async Task<int> UpdateUserAsync(UsersEntity user)
+    {
+        const string sql = @"
+            UPDATE Users SET 
+                FullName = @FullName,
+                PhoneNumber = @PhoneNumber,
+                ProfilePhotoPath = @ProfilePhotoPath,
+                ProfilePhotoFileName = @ProfilePhotoFileName,
+                ModifiedDate = @ModifiedDate,
+                ModifiedBy = @ModifiedBy
+            WHERE UserId = @UserId AND IsActive = 1";
+        
+        return await _context.ExecuteAsync(sql, user);
     }
 }

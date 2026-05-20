@@ -1,10 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
-using Whitebird.App.Features.Asset.Interfaces;
-using Whitebird.App.Features.Asset.Import;
-using Whitebird.Domain.Features.Asset;
+using Whitebird.App.Features.Asset;
 using Whitebird.App.Features.Common;
+using Whitebird.App.Features.Common.Import;
+using Whitebird.Domain.Features.Asset;
+using Whitebird.Features.Common;
 
-namespace Whitebird.App.Features.Asset.Controllers;
+namespace Whitebird.Features.Asset.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -100,16 +101,32 @@ public class AssetController : ControllerBase
         return this.HandleResult(await _assetService.BulkActivateAsync(request));
     }
 
-    [HttpPost("import")]
-    public async Task<IActionResult> Import(IFormFile file)
+[HttpPost("import")]
+public async Task<IActionResult> Import(IFormFile file)
+{
+    if (file == null || file.Length == 0)
+        return BadRequest("No file provided");
+    
+    var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+    
+    using var stream = file.OpenReadStream();
+    ServiceResult<ImportResult> result;
+    
+    if (extension == ".txt" || extension == ".csv")
     {
-        if (file == null || file.Length == 0)
-            return BadRequest("No file provided");
-
-        using var stream = file.OpenReadStream();
-        var result = await _assetImportService.ImportFromExcelAsync(stream);
-        return this.HandleResult(result);
+        result = await _assetImportService.ImportFromTxtAsync(stream);
     }
+    else if (extension == ".xlsx" || extension == ".xls")
+    {
+        result = await _assetImportService.ImportFromExcelAsync(stream);
+    }
+    else
+    {
+        return BadRequest($"Unsupported file format: {extension}. Supported: .xlsx, .xls, .csv, .txt");
+    }
+    
+    return this.HandleResult(result);
+}
 
     [HttpGet("import/template")]
     public async Task<IActionResult> DownloadImportTemplate()

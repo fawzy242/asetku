@@ -17,4 +17,5 @@ public interface IAuthReps
     Task<bool> ClearSessionAsync(int userId);
     Task<bool> ClearSessionByTokenAsync(string sessionToken);
     Task<bool> ValidateSessionAsync(string sessionToken);
+    Task<int> UpdateUserAsync(UsersEntity user);
 }

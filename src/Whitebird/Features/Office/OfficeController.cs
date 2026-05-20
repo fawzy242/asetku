@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Whitebird.App.Features.Common;
-using Whitebird.App.Features.Office.Interfaces;
+using Whitebird.App.Features.Office;
 using Whitebird.Domain.Features.Office;
+using Whitebird.Features.Common;
 
-namespace Whitebird.App.Features.Office.Controllers;
+namespace Whitebird.Features.Office.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]

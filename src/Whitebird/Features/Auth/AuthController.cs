@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Whitebird.App.Features.Auth.Interfaces;
-using Whitebird.Domain.Features.Common.Auth;
-using Whitebird.App.Features.Common;
+using Whitebird.Domain.Features.Common;
+using Whitebird.Features.Common;
 
 namespace Whitebird.App.Features.Auth.Controllers;
 
@@ -12,7 +11,10 @@ public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
 
-    public AuthController(IAuthService authService) => _authService = authService;
+    public AuthController(IAuthService authService)
+    {
+        _authService = authService;
+    }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
@@ -23,7 +25,10 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("logout")]
-    public async Task<IActionResult> Logout([FromBody] LogoutRequest request) => this.HandleResult(await _authService.LogoutAsync(request.SessionToken));
+    public async Task<IActionResult> Logout([FromBody] LogoutRequest request)
+    {
+        return this.HandleResult(await _authService.LogoutAsync(request.SessionToken));
+    }
 
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
@@ -88,5 +93,51 @@ public class AuthController : ControllerBase
         return Ok(new { isValid = result.IsSuccess });
     }
 
-    private string? GetSessionToken() => Request.Headers["X-Session-Token"].ToString();
+    [HttpPost("profile-photo")]
+    public async Task<IActionResult> UploadProfilePhoto(IFormFile file)
+    {
+        var sessionToken = GetSessionToken();
+        if (string.IsNullOrEmpty(sessionToken))
+            return Unauthorized();
+
+        var user = await _authService.GetUserBySessionTokenAsync(sessionToken);
+        if (!user.IsSuccess || user.Data == null)
+            return Unauthorized();
+
+        if (file == null || file.Length == 0)
+            return BadRequest("No file provided");
+
+        var result = await _authService.UploadProfilePhotoAsync(user.Data.UserId, file);
+        return this.HandleResult(result);
+    }
+
+    [HttpGet("profile-photo/{userId:int}")]
+    public async Task<IActionResult> GetProfilePhoto(int userId)
+    {
+        var result = await _authService.GetProfilePhotoAsync(userId);
+        if (!result.IsSuccess || result.Data == null)
+            return this.HandleResult(result);
+
+        return File(result.Data, "image/jpeg");
+    }
+
+    [HttpDelete("profile-photo")]
+    public async Task<IActionResult> DeleteProfilePhoto()
+    {
+        var sessionToken = GetSessionToken();
+        if (string.IsNullOrEmpty(sessionToken))
+            return Unauthorized();
+
+        var user = await _authService.GetUserBySessionTokenAsync(sessionToken);
+        if (!user.IsSuccess || user.Data == null)
+            return Unauthorized();
+
+        var result = await _authService.DeleteProfilePhotoAsync(user.Data.UserId);
+        return this.HandleResult(result);
+    }
+
+    private string? GetSessionToken()
+    {
+        return Request.Headers["X-Session-Token"].ToString();
+    }
 }

@@ -2,7 +2,6 @@ using Mapster;
 using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.MasterData;
-using Whitebird.App.Features.Office;
 using Whitebird.Domain.Features.Office;
 using Whitebird.Infra.Features.Common;
 using Whitebird.Infra.Features.Office;
@@ -42,7 +41,7 @@ public class OfficeService : BaseService, IOfficeService
 
             var viewModel = office.Adapt<OfficeDetailViewModel>();
             viewModel.ChildCount = await _officeReps.GetChildCountAsync(id);
-
+            
             if (viewModel.OfficeType.HasValue)
             {
                 var typeResult = await _masterDataService.GetValueAsync("OfficeType", viewModel.OfficeType.Value);
@@ -60,9 +59,9 @@ public class OfficeService : BaseService, IOfficeService
         {
             var offices = await _officeReps.GetAllAsync();
             var viewModels = offices.Adapt<List<OfficeListViewModel>>();
-
+            
             var officeTypes = await _masterDataService.GetOfficeTypesAsync();
-            var typeDict = officeTypes.IsSuccess
+            var typeDict = officeTypes.IsSuccess && officeTypes.Data != null
                 ? officeTypes.Data.ToDictionary(t => t.Code, t => t.Name)
                 : new Dictionary<int, string>();
 
@@ -82,9 +81,9 @@ public class OfficeService : BaseService, IOfficeService
         {
             var offices = await _officeReps.GetActiveOnlyAsync();
             var viewModels = offices.Adapt<List<OfficeListViewModel>>();
-
+            
             var officeTypes = await _masterDataService.GetOfficeTypesAsync();
-            var typeDict = officeTypes.IsSuccess
+            var typeDict = officeTypes.IsSuccess && officeTypes.Data != null
                 ? officeTypes.Data.ToDictionary(t => t.Code, t => t.Name)
                 : new Dictionary<int, string>();
 
@@ -116,7 +115,7 @@ public class OfficeService : BaseService, IOfficeService
         if (await _officeReps.IsOfficeNameExistsAsync(model.OfficeName))
             return ServiceResult<OfficeDetailViewModel>.Conflict($"Office '{model.OfficeName}' already exists");
 
-        if (!string.IsNullOrWhiteSpace(model.OfficeCode) &&
+        if (!string.IsNullOrWhiteSpace(model.OfficeCode) && 
             await _officeReps.IsOfficeCodeExistsAsync(model.OfficeCode))
             return ServiceResult<OfficeDetailViewModel>.Conflict($"Office code '{model.OfficeCode}' already exists");
 
@@ -176,7 +175,7 @@ public class OfficeService : BaseService, IOfficeService
         if (await _officeReps.IsOfficeNameExistsAsync(model.OfficeName, id))
             return ServiceResult<OfficeDetailViewModel>.Conflict($"Office '{model.OfficeName}' already exists");
 
-        if (!string.IsNullOrWhiteSpace(model.OfficeCode) &&
+        if (!string.IsNullOrWhiteSpace(model.OfficeCode) && 
             await _officeReps.IsOfficeCodeExistsAsync(model.OfficeCode, id))
             return ServiceResult<OfficeDetailViewModel>.Conflict($"Office code '{model.OfficeCode}' already exists");
 
@@ -319,7 +318,7 @@ public class OfficeService : BaseService, IOfficeService
             var viewModels = pagedData.Adapt<List<OfficeListViewModel>>();
 
             var officeTypes = await _masterDataService.GetOfficeTypesAsync();
-            var typeDict = officeTypes.IsSuccess
+            var typeDict = officeTypes.IsSuccess && officeTypes.Data != null
                 ? officeTypes.Data.ToDictionary(t => t.Code, t => t.Name)
                 : new Dictionary<int, string>();
 

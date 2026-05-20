@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using Whitebird.App.Features.Common.Service;
+using Whitebird.App.Features.Common;
 using Whitebird.Infra.Features.Common;
 
-namespace Whitebird.App.Features.Common;
+namespace Whitebird.Features.Common;
 
 public static class ControllerHelper
 {

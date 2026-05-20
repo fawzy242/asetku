@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Whitebird.App.Features.Common;
-using Whitebird.App.Features.FileAttachment.Interfaces;
-using Whitebird.Domain.Features.FileAttachment;
+using Whitebird.App.Features.FileAttachment;
+using Whitebird.Features.Common;
 
-namespace Whitebird.App.Features.FileAttachment.Controllers;
+namespace Whitebird.Features.FileAttachment.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]

@@ -17,4 +17,6 @@ public class UsersEntity : AuditableEntity
     public string? ResetToken { get; set; }
     public DateTime? ResetTokenExpiry { get; set; }
     public DateTime? LastLoginDate { get; set; }
+    public string? ProfilePhotoPath { get; set; }
+    public string? ProfilePhotoFileName { get; set; }
 }

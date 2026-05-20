@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
-using Whitebird.App.Features.AssetTransaction.Interfaces;
+using Whitebird.App.Features.AssetTransaction;
 using Whitebird.Domain.Features.AssetTransaction;
-using Whitebird.App.Features.Common;
+using Whitebird.Features.Common;
 
-namespace Whitebird.App.Features.AssetTransaction.Controllers;
+namespace Whitebird.Features.AssetTransaction.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -11,10 +11,14 @@ namespace Whitebird.App.Features.AssetTransaction.Controllers;
 public class AssetTransactionController : ControllerBase
 {
     private readonly IAssetTransactionService _transactionService;
+    private readonly TransactionImportService _transactionImportService;
 
-    public AssetTransactionController(IAssetTransactionService transactionService)
+    public AssetTransactionController(
+        IAssetTransactionService transactionService,
+        TransactionImportService transactionImportService)
     {
         _transactionService = transactionService;
+        _transactionImportService = transactionImportService;
     }
 
     [HttpGet("{id:int}")]
@@ -88,4 +92,25 @@ public class AssetTransactionController : ControllerBase
     [HttpPost("{id:int}/cancel")]
     public async Task<IActionResult> Cancel(int id)
         => this.HandleResult(await _transactionService.CancelAsync(id));
+
+    [HttpPost("import")]
+    public async Task<IActionResult> Import(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("No file provided");
+        
+        using var stream = file.OpenReadStream();
+        var result = await _transactionImportService.ImportFromExcelAsync(stream);
+        return this.HandleResult(result);
+    }
+
+    [HttpGet("import/template")]
+    public async Task<IActionResult> DownloadImportTemplate()
+    {
+        var result = await _transactionImportService.GenerateTemplateAsync();
+        if (!result.IsSuccess || result.Data == null)
+            return this.HandleResult(result);
+        
+        return File(result.Data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Transaction_Import_Template.xlsx");
+    }
 }

@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Logging;
-using Whitebird.App.Features.Auth;
 using Whitebird.App.Features.Common;
+using Whitebird.App.Features.FileAttachment;
 using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Auth;
-using BCrypt.Net;
+using Microsoft.AspNetCore.Http;
 
 namespace Whitebird.App.Features.Auth;
 
@@ -12,16 +12,22 @@ public class AuthService : BaseService, IAuthService
     private readonly IAuthReps _authRepository;
     private readonly IEmailService _emailService;
     private readonly IActivityLogService _activityLogService;
+    private readonly IStorageService _storageService;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public AuthService(
         IAuthReps authRepository,
         IEmailService emailService,
         IActivityLogService activityLogService,
+        IStorageService storageService,
+        IHttpContextAccessor httpContextAccessor,
         ILogger<AuthService> logger) : base(logger)
     {
         _authRepository = authRepository;
         _emailService = emailService;
         _activityLogService = activityLogService;
+        _storageService = storageService;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<ServiceResult<LoginResponse>> LoginAsync(LoginRequest request)
@@ -49,6 +55,11 @@ public class AuthService : BaseService, IAuthService
 
             await _activityLogService.LogAsync("User", user.UserId, "LOGIN", $"User '{user.Username}' logged in successfully", user.Username);
 
+            var requestContext = _httpContextAccessor.HttpContext?.Request;
+            var profilePhotoUrl = !string.IsNullOrEmpty(user.ProfilePhotoPath) && requestContext != null
+                ? $"{requestContext.Scheme}://{requestContext.Host}/api/Auth/profile-photo/{user.UserId}"
+                : null;
+
             var response = new LoginResponse
             {
                 SessionToken = sessionToken,
@@ -59,7 +70,8 @@ public class AuthService : BaseService, IAuthService
                     Email = user.Email,
                     FullName = user.FullName,
                     RoleId = user.RoleId,
-                    Username = user.Username
+                    Username = user.Username,
+                    ProfilePhotoUrl = profilePhotoUrl
                 }
             };
 
@@ -162,13 +174,19 @@ public class AuthService : BaseService, IAuthService
             if (user == null || !user.IsActive)
                 return ServiceResult<UserDto>.NotFound("User not found");
 
+            var request = _httpContextAccessor.HttpContext?.Request;
+            var profilePhotoUrl = !string.IsNullOrEmpty(user.ProfilePhotoPath) && request != null
+                ? $"{request.Scheme}://{request.Host}/api/Auth/profile-photo/{userId}"
+                : null;
+
             return ServiceResult<UserDto>.Success(new UserDto
             {
                 UserId = user.UserId,
                 Email = user.Email,
                 FullName = user.FullName,
                 RoleId = user.RoleId,
-                Username = user.Username
+                Username = user.Username,
+                ProfilePhotoUrl = profilePhotoUrl
             });
         }, "get user by id");
     }
@@ -181,13 +199,19 @@ public class AuthService : BaseService, IAuthService
             if (user == null)
                 return ServiceResult<UserDto>.NotFound("Invalid or expired session");
 
+            var request = _httpContextAccessor.HttpContext?.Request;
+            var profilePhotoUrl = !string.IsNullOrEmpty(user.ProfilePhotoPath) && request != null
+                ? $"{request.Scheme}://{request.Host}/api/Auth/profile-photo/{user.UserId}"
+                : null;
+
             return ServiceResult<UserDto>.Success(new UserDto
             {
                 UserId = user.UserId,
                 Email = user.Email,
                 FullName = user.FullName,
                 RoleId = user.RoleId,
-                Username = user.Username
+                Username = user.Username,
+                ProfilePhotoUrl = profilePhotoUrl
             });
         }, "get user by session token");
     }
@@ -225,5 +249,100 @@ public class AuthService : BaseService, IAuthService
                 ? ServiceResult.Failure("Invalid or expired session")
                 : ServiceResult.Success("Session valid");
         }, "validate session");
+    }
+
+    public async Task<ServiceResult<string>> UploadProfilePhotoAsync(int userId, IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return ServiceResult<string>.BadRequest("No file provided");
+
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+        
+        if (!allowedExtensions.Contains(extension))
+            return ServiceResult<string>.BadRequest($"File type '{extension}' is not allowed. Allowed: {string.Join(", ", allowedExtensions)}");
+
+        var maxSize = 5 * 1024 * 1024;
+        if (file.Length > maxSize)
+            return ServiceResult<string>.BadRequest($"File size exceeds 5MB limit");
+
+        var user = await _authRepository.GetUserByIdAsync(userId);
+        if (user == null)
+            return ServiceResult<string>.NotFound("User not found");
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            if (!string.IsNullOrEmpty(user.ProfilePhotoPath))
+            {
+                await _storageService.DeleteFileAsync(user.ProfilePhotoPath);
+            }
+
+            var subDirectory = Path.Combine("Users", userId.ToString(), "Profile");
+            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
+            
+            user.ProfilePhotoPath = savedPath;
+            user.ProfilePhotoFileName = file.FileName;
+            user.ModifiedDate = DateTime.Now;
+            user.ModifiedBy = user.Username;
+
+            await _authRepository.UpdateUserAsync(user);
+
+            var request = _httpContextAccessor.HttpContext?.Request;
+            var photoUrl = request != null ? $"{request.Scheme}://{request.Host}/api/Auth/profile-photo/{userId}" : null;
+
+            await _activityLogService.LogUpdateAsync(
+                "User",
+                userId,
+                $"Profile photo uploaded for user '{user.Username}'",
+                user.Username);
+
+            return ServiceResult<string>.Success(photoUrl ?? string.Empty, "Profile photo uploaded successfully");
+        }, "upload profile photo");
+    }
+
+    public async Task<ServiceResult<byte[]>> GetProfilePhotoAsync(int userId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var user = await _authRepository.GetUserByIdAsync(userId);
+            if (user == null)
+                return ServiceResult<byte[]>.NotFound("User not found");
+
+            if (string.IsNullOrEmpty(user.ProfilePhotoPath))
+                return ServiceResult<byte[]>.NotFound("Profile photo not found");
+
+            var fileBytes = await _storageService.ReadFileAsync(user.ProfilePhotoPath);
+            return ServiceResult<byte[]>.Success(fileBytes);
+        }, "get profile photo");
+    }
+
+    public async Task<ServiceResult> DeleteProfilePhotoAsync(int userId)
+    {
+        var user = await _authRepository.GetUserByIdAsync(userId);
+        if (user == null)
+            return ServiceResult.NotFound("User not found");
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            if (string.IsNullOrEmpty(user.ProfilePhotoPath))
+                return ServiceResult.Success("No profile photo to delete");
+
+            await _storageService.DeleteFileAsync(user.ProfilePhotoPath);
+            
+            user.ProfilePhotoPath = null;
+            user.ProfilePhotoFileName = null;
+            user.ModifiedDate = DateTime.Now;
+            user.ModifiedBy = user.Username;
+
+            await _authRepository.UpdateUserAsync(user);
+
+            await _activityLogService.LogUpdateAsync(
+                "User",
+                userId,
+                $"Profile photo deleted for user '{user.Username}'",
+                user.Username);
+
+            return ServiceResult.Success("Profile photo deleted successfully");
+        }, "delete profile photo");
     }
 }

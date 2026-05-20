@@ -181,7 +181,7 @@ public static class MapsterServiceRegistration
             .Ignore(dest => dest.CreatedDate)
             .Ignore(dest => dest.CreatedBy);
 
-        // ========== OFFICE MAPPINGS ==========
+        // ========== OFFICE MAPPINGS (DIPERBAIKI) ==========
         TypeAdapterConfig<OfficeEntity, OfficeDetailViewModel>.NewConfig()
             .Map(dest => dest.ParentOfficeName, src => src.ParentOfficeName ?? "Unknown")
             .Ignore(dest => dest.OfficeTypeName)
