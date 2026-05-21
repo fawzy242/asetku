@@ -14,12 +14,22 @@ import PageHeader from "../../components/molecules/PageHeader/PageHeader";
 import SearchToolbar from "../../components/molecules/SearchToolbar/SearchToolbar";
 import Tabs from "../../components/molecules/Tabs/Tabs";
 import IconButton from "../../components/atoms/IconButton/IconButton";
+import ModalActions from "../../components/molecules/ModalActions/ModalActions";
 import { useGridData } from "../../hooks/useGridData";
 import { useReferenceData } from "../../hooks/useReferenceData";
 import { useCrudForm } from "../../hooks/useCrudForm";
+import { cleanNullableStrings, cleanIdFields } from "../../core/utils/formHelpers";
+import { STATUS_TABS } from "../../core/constants/tabs";
 import "./Offices.scss";
 
 const officesData = new OfficesData();
+
+// OFFICE TYPE OPTIONS - hardcoded, bisa pindah ke constants jika perlu
+const OFFICE_TYPE_OPTIONS = [
+  { value: "", label: "Select Type" },
+  { value: "1", label: "Head Office" },
+  { value: "2", label: "Branch Office" },
+];
 
 const INITIAL_FORM_DATA = {
   officeName: "",
@@ -28,40 +38,38 @@ const INITIAL_FORM_DATA = {
   city: "",
   address: "",
   phone: "",
-  parentOfficeId: "",
+  parentOfficeId: null,  // IMPORTANT: gunakan null, BUKAN string kosong
 };
 
-const OFFICE_TYPE_OPTIONS = [
-  { value: "", label: "Select Type" },
-  { value: "1", label: "Head Office" },
-  { value: "2", label: "Branch Office" },
-];
-
-const TABS = [
-  { id: "all", label: "All" },
-  { id: "active", label: "Active" },
-  { id: "inactive", label: "Inactive" },
-];
-
+/**
+ * Transform form data untuk dikirim ke API
+ * Pastikan parentOfficeId dikirim sebagai null (bukan string kosong)
+ */
 const transformOfficeFormData = (data) => {
-  const result = { ...data };
-  if (result.officeCode === '' || result.officeCode === undefined) result.officeCode = null;
-  if (result.officeType === '' || result.officeType === undefined) result.officeType = null;
-  else if (typeof result.officeType === 'string') result.officeType = parseInt(result.officeType, 10);
-  if (result.city === '' || result.city === undefined) result.city = null;
-  if (result.address === '' || result.address === undefined) result.address = null;
-  if (result.phone === '' || result.phone === undefined) result.phone = null;
-  if (result.parentOfficeId === '' || result.parentOfficeId === undefined || result.parentOfficeId === null) {
-    result.parentOfficeId = null;
-  } else if (typeof result.parentOfficeId === 'string') {
-    result.parentOfficeId = parseInt(result.parentOfficeId, 10);
+  // Step 1: Clean nullable string fields (empty string -> null)
+  let result = cleanNullableStrings(data, ['officeCode', 'city', 'address', 'phone']);
+  
+  // Step 2: Clean ID fields (string -> int or null)
+  // Pastikan parentOfficeId yang kosong jadi null, BUKAN string kosong ""
+  result = cleanIdFields(result, ['officeType', 'parentOfficeId']);
+  
+  // Step 3: Pastikan officeName tidak kosong
+  if (!result.officeName || result.officeName.trim() === '') {
+    result.officeName = null;
   }
+  
+  // Step 4: VERIFIKASI - parentOfficeId HARUS null atau number, BUKAN string
+  if (result.parentOfficeId === '' || result.parentOfficeId === undefined) {
+    result.parentOfficeId = null;
+  }
+  
   return result;
 };
 
+officesData.transformFormData = transformOfficeFormData;
+
 const CRUD_OPTIONS = { 
-  idField: 'officeId', 
-  transformFormData: transformOfficeFormData 
+  idField: 'officeId',
 };
 
 const OfficesMenu = () => {
@@ -129,23 +137,37 @@ const OfficesMenu = () => {
 
   const onSubmit = useCallback(async (e) => {
     e.preventDefault();
-    if (!formData.officeName.trim()) return;
+    if (!formData.officeName?.trim()) return;
     if (isSubmitting) return;
     
+    // Prepare data with isActive flag
     const data = { 
       ...formData, 
       isActive: editingOffice ? editingOffice.isActive : true 
     };
     
+    // Pastikan parentOfficeId tidak pernah string kosong
+    if (data.parentOfficeId === '' || data.parentOfficeId === undefined) {
+      data.parentOfficeId = null;
+    }
+    
     const r = editingOffice
       ? await officesData.update(editingOffice.officeId, data)
       : await officesData.create(data);
+      
     if (r.success) {
       queryClient.invalidateQueries({ queryKey: ['reference', 'offices'] });
       handleClose();
       reload();
     }
   }, [formData, isSubmitting, editingOffice, handleClose, reload, queryClient]);
+
+  // Handler untuk perubahan parentOfficeId di form
+  const handleParentOfficeChange = useCallback((value) => {
+    // Jika value adalah string kosong, set ke null
+    const newValue = (value === '' || value === undefined || value === null) ? null : value;
+    setFormData(prev => ({ ...prev, parentOfficeId: newValue }));
+  }, [setFormData]);
 
   const parentOfficeOptions = useMemo(() => [
     { value: "", label: "None (Top Level)" },
@@ -205,6 +227,9 @@ const OfficesMenu = () => {
 
   if (loading && !offices.length) return <div className="page-loading"><Spinner size="lg" /></div>;
 
+  // Nilai parentOfficeId untuk form - pastikan null menjadi "" untuk display di Select
+  const parentOfficeValue = formData.parentOfficeId === null ? "" : (formData.parentOfficeId || "");
+
   return (
     <div className="offices-menu">
       <div className="page-header">
@@ -217,7 +242,7 @@ const OfficesMenu = () => {
         />
       </div>
 
-      <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+      <Tabs tabs={STATUS_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar onSearch={handleSearch} placeholder="Search by name, code, city..." />
       
       <div className="offices-menu__table">
@@ -246,7 +271,7 @@ const OfficesMenu = () => {
             <Grid item xs={12} sm={6}>
               <Input 
                 label="Office Name" 
-                value={formData.officeName} 
+                value={formData.officeName || ""} 
                 onChange={e => setFormData({ ...formData, officeName: e.target.value })} 
                 required 
               />
@@ -270,8 +295,8 @@ const OfficesMenu = () => {
             <Grid item xs={12} sm={6}>
               <Select 
                 label="Parent Office" 
-                value={formData.parentOfficeId || ""} 
-                onChange={e => setFormData({ ...formData, parentOfficeId: e.target.value === "" ? null : e.target.value })} 
+                value={parentOfficeValue}
+                onChange={e => handleParentOfficeChange(e.target.value)} 
                 options={parentOfficeOptions} 
               />
             </Grid>
@@ -299,12 +324,11 @@ const OfficesMenu = () => {
               />
             </Grid>
           </Grid>
-          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 3 }}>
-            <Button variant="outline" onClick={handleClose} type="button">Cancel</Button>
-            <Button type="submit" variant="primary" loading={isSubmitting}>
-              {editingOffice ? "Update" : "Create"}
-            </Button>
-          </Box>
+          <ModalActions 
+            onCancel={handleClose} 
+            isSubmitting={isSubmitting}
+            submitText={editingOffice ? "Update" : "Create"}
+          />
         </form>
       </Modal>
     </div>

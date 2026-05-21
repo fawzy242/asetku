@@ -18,7 +18,6 @@ export const cleanNullableStrings = (data, fields = []) => {
   });
   return result;
 };
-
 /**
  * Clean nullable ID fields (convert empty string to null, parse string to int)
  * @param {Object} data - Form data object
@@ -28,16 +27,26 @@ export const cleanNullableStrings = (data, fields = []) => {
 export const cleanIdFields = (data, fields = []) => {
   const result = { ...data };
   fields.forEach(field => {
-    if (result[field] === '' || result[field] === null || result[field] === undefined) {
+    // Jika value adalah string kosong, undefined, atau null -> set ke null
+    if (result[field] === '' || result[field] === undefined || result[field] === null) {
       result[field] = null;
-    } else if (typeof result[field] === 'string') {
+    } 
+    // Jika value adalah string angka -> parse ke integer
+    else if (typeof result[field] === 'string') {
       const parsed = parseInt(result[field], 10);
       result[field] = isNaN(parsed) ? null : parsed;
+    }
+    // Jika value sudah number, biarkan
+    else if (typeof result[field] === 'number') {
+      // sudah benar
+    }
+    // Selain itu (boolean, object, dll) -> null
+    else {
+      result[field] = null;
     }
   });
   return result;
 };
-
 /**
  * Clean nullable number fields (convert empty string to null, parse string to float)
  * @param {Object} data - Form data object
