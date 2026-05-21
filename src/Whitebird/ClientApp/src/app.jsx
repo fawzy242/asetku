@@ -37,6 +37,7 @@ const PageLoader = () => (
   </div>
 );
 
+// Wrapper with ErrorBoundary per page
 const LazyPage = ({ children }) => (
   <ErrorBoundary>
     <Suspense fallback={<PageLoader />}>

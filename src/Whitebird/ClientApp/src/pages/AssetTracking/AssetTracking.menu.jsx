@@ -10,6 +10,26 @@ import { getStatusChipStyles } from "../../core/constants/statusColors";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./AssetTracking.scss";
 
+/**
+ * ============================================================
+ * FUTURE BACKEND ENDPOINTS NEEDED FOR ASSET TRACKING
+ * ============================================================
+ * 
+ * 1. GET /api/Asset/{id}/timeline
+ *    Returns complete timeline/history for a single asset.
+ *    Query: ?startDate=&endDate=&transactionType=
+ *    Response: Array of timeline events with date, activityType, description,
+ *              previousHolder, newHolder, previousStatus, newStatus, notes
+ * 
+ * 2. GET /api/Asset/tracking-list
+ *    Returns lightweight tracking list for asset selector.
+ *    Query: ?search=&status=&categoryId=&holderId=&page=&pageSize=
+ *    Response: Paginated list with assetId, assetCode, assetName, currentStatus
+ * 
+ * Currently using fallback: /api/Asset/tracking/{id} + /api/AssetTransaction/asset/{id}
+ * ============================================================
+ */
+
 const trackingData = new AssetTrackingData();
 
 const AssetTrackingMenu = () => {
@@ -37,7 +57,7 @@ const AssetTrackingMenu = () => {
     setSelectedAsset(assetId);
     setLoadingData(true);
     
-    // Use the dedicated tracking endpoint
+    // Try dedicated tracking endpoint first
     const trackingRes = await trackingData.fetchAssetTracking(assetId);
     if (trackingRes.success) {
       setTrackingData_(trackingRes.data);

@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { FiUser, FiMail, FiShield, FiLock, FiSave, FiX, FiBriefcase, FiCalendar, FiEdit2, FiCheck } from "react-icons/fi";
-import { Grid, Box, Avatar, Typography } from "@mui/material";
+import React, { useState, useEffect, useCallback } from "react";
+import { FiUser, FiMail, FiShield, FiLock, FiSave, FiX, FiBriefcase, FiCalendar, FiEdit2, FiCheck, FiCamera, FiTrash2, FiUpload } from "react-icons/fi";
+import { Grid, Box, Avatar, Typography, IconButton, CircularProgress } from "@mui/material";
 import ProfileData from "./Profile.data";
 import Card from "../../components/atoms/Card/Card";
 import Button from "../../components/atoms/Button/Button";
 import Input from "../../components/atoms/Input/Input";
 import Spinner from "../../components/atoms/Spinner/Spinner";
 import ConfirmDialog from "../../components/molecules/ConfirmDialog/ConfirmDialog";
+import apiService from "../../core/services/api.service";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./Profile.scss";
 
@@ -18,11 +19,15 @@ const ProfileMenu = () => {
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState(null);
   const [passwordData, setPasswordData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const [formData, setFormData] = useState({ fullName: '', email: '', phoneNumber: '', username: '' });
   const [errors, setErrors] = useState({});
 
-  useEffect(() => { loadProfile(); }, []);
+  useEffect(() => { 
+    loadProfile(); 
+  }, []);
 
   const loadProfile = async () => {
     setLoading(true);
@@ -35,8 +40,84 @@ const ProfileMenu = () => {
         phoneNumber: r.data.phoneNumber || '',
         username: r.data.username || '',
       });
+      // Load profile photo
+      loadProfilePhoto(r.data.userId);
     }
     setLoading(false);
+  };
+
+  const loadProfilePhoto = async (userId) => {
+    if (!userId) return;
+    try {
+      const response = await apiService.get(`/Auth/profile-photo/${userId}`, { responseType: 'blob' });
+      if (response.data && response.data.size > 0) {
+        const url = URL.createObjectURL(response.data);
+        setProfilePhotoUrl(url);
+      }
+    } catch (error) {
+      // No photo or error - ignore
+      setProfilePhotoUrl(null);
+    }
+  };
+
+  const handlePhotoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      ConfirmDialog.toast.error('Please select an image file (JPEG, PNG, GIF, WEBP)');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      ConfirmDialog.toast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await apiService.post('/Auth/profile-photo', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (response.data?.isSuccess) {
+        ConfirmDialog.toast.success('Profile photo updated');
+        // Reload photo
+        loadProfilePhoto(profile?.userId);
+      } else {
+        ConfirmDialog.toast.error(response.data?.message || 'Failed to upload photo');
+      }
+    } catch (error) {
+      ConfirmDialog.toast.error('Failed to upload photo');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleDeletePhoto = async () => {
+    const confirmed = await ConfirmDialog.show({
+      title: 'Delete Profile Photo',
+      text: 'Are you sure you want to delete your profile photo?',
+      icon: 'warning',
+      confirmButtonText: 'Delete',
+    });
+    if (!confirmed) return;
+
+    try {
+      const response = await apiService.delete('/Auth/profile-photo');
+      if (response.data?.isSuccess) {
+        ConfirmDialog.toast.success('Profile photo deleted');
+        setProfilePhotoUrl(null);
+      } else {
+        ConfirmDialog.toast.error(response.data?.message || 'Failed to delete photo');
+      }
+    } catch (error) {
+      ConfirmDialog.toast.error('Failed to delete photo');
+    }
   };
 
   const validatePassword = () => {
@@ -121,7 +202,39 @@ const ProfileMenu = () => {
         <Grid item xs={12} md={7}>
           <Card>
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 3, mb: 3, pb: 3, borderBottom: '1px solid var(--border)' }}>
-              <Avatar sx={{ width: 80, height: 80, bgcolor: 'var(--primary)', fontSize: 32, fontWeight: 600 }}>{userInitial}</Avatar>
+              {/* Profile Photo Section */}
+              <Box sx={{ position: 'relative' }}>
+                <Avatar 
+                  src={profilePhotoUrl || undefined} 
+                  sx={{ width: 100, height: 100, bgcolor: 'var(--primary)', fontSize: 40, fontWeight: 600 }}
+                >
+                  {!profilePhotoUrl && userInitial}
+                </Avatar>
+                {uploadingPhoto && (
+                  <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', bgcolor: 'rgba(0,0,0,0.5)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <CircularProgress size={30} sx={{ color: 'white' }} />
+                  </Box>
+                )}
+                <Box sx={{ position: 'absolute', bottom: -8, right: -8, display: 'flex', gap: 1 }}>
+                  <IconButton
+                    size="small"
+                    component="label"
+                    sx={{ bgcolor: 'var(--primary)', color: 'white', '&:hover': { bgcolor: 'var(--primary-hover)' } }}
+                  >
+                    <FiCamera size={16} />
+                    <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden onChange={handlePhotoUpload} />
+                  </IconButton>
+                  {profilePhotoUrl && (
+                    <IconButton
+                      size="small"
+                      onClick={handleDeletePhoto}
+                      sx={{ bgcolor: 'var(--error)', color: 'white', '&:hover': { bgcolor: 'var(--error-dark)', opacity: 0.9 } }}
+                    >
+                      <FiTrash2 size={14} />
+                    </IconButton>
+                  )}
+                </Box>
+              </Box>
               <Box sx={{ flex: 1 }}>
                 <Typography variant="h6" fontWeight={600}>{profile?.fullName}</Typography>
                 <Typography variant="body2" color="text.secondary">{profile?.roleId || 'User'}</Typography>

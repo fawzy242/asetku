@@ -6,8 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:analyze": "vite build --mode analyze",
     "preview": "vite preview",
-    "clean": "del-cli ../wwwroot"
+    "clean": "del-cli ../wwwroot",
+    "lint": "eslint src --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "preview:build": "npm run build && npm run preview"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

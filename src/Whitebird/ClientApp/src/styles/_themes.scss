@@ -23,6 +23,13 @@
     --sidebar-text: #{$sidebar-text-light};
     --sidebar-text-active: #{$sidebar-text-active-light};
     --sidebar-hover: #{$sidebar-hover-light};
+    
+    // Additional colors
+    --table-header-bg: #f9fafb;
+    --table-row-hover: #f3f4f6;
+    --disabled-bg: #f3f4f6;
+    --disabled-text: #9ca3af;
+    --placeholder: #9ca3af;
 }
 
 [data-theme='dark'] {
@@ -48,4 +55,11 @@
     --sidebar-text: #{$sidebar-text-dark};
     --sidebar-text-active: #{$sidebar-text-active-dark};
     --sidebar-hover: #{$sidebar-hover-dark};
+    
+    // Additional colors for dark mode
+    --table-header-bg: #374151;
+    --table-row-hover: #2d3748;
+    --disabled-bg: #374151;
+    --disabled-text: #6b7280;
+    --placeholder: #6b7280;
 }

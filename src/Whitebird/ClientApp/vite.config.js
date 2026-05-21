@@ -5,8 +5,8 @@ import { resolve } from "path";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
   const isDev = mode === "development";
+  const isProd = mode === "production";
 
-  // Backend URL untuk proxy (development mode)
   const backendUrl = env.VITE_API_BASE_URL || "https://localhost:5001";
 
   return {
@@ -39,23 +39,26 @@ export default defineConfig(({ mode }) => {
     },
 
     build: {
-      // CRITICAL: Build output ke wwwroot (bukan dist)
       outDir: "../wwwroot",
       emptyOutDir: true,
       sourcemap: isDev,
-      minify: !isDev,
+      minify: isProd ? "esbuild" : false,
       chunkSizeWarningLimit: 1000,
-
+      target: "es2020",
       rollupOptions: {
         input: {
           main: resolve(process.cwd(), "index.html"),
         },
         output: {
           manualChunks: {
-            vendor: ["react", "react-dom", "react-router-dom"],
-            mui: ["@mui/material", "@mui/x-data-grid"],
-            charts: ["chart.js", "react-chartjs-2"],
+            "react-vendor": ["react", "react-dom", "react-router-dom"],
+            "mui-vendor": ["@mui/material", "@mui/x-data-grid", "@mui/x-date-pickers"],
+            "chart-vendor": ["chart.js", "react-chartjs-2"],
+            "utils-vendor": ["axios", "dayjs", "zustand", "@tanstack/react-query"],
           },
+          chunkFileNames: isProd ? "assets/[name].[hash].js" : "assets/[name].js",
+          entryFileNames: isProd ? "assets/[name].[hash].js" : "assets/[name].js",
+          assetFileNames: isProd ? "assets/[name].[hash].[ext]" : "assets/[name].[ext]",
         },
       },
     },
@@ -67,6 +70,15 @@ export default defineConfig(({ mode }) => {
 
     define: {
       __APP_VERSION__: JSON.stringify(env.VITE_APP_VERSION || "1.0.0"),
+    },
+
+    optimizeDeps: {
+      include: ["react", "react-dom", "react-router-dom", "@mui/material", "axios", "dayjs"],
+    },
+
+    esbuild: {
+      logOverride: { "this-is-undefined-in-esm": "silent" },
+      drop: isProd ? ["console", "debugger"] : [],
     },
   };
 });

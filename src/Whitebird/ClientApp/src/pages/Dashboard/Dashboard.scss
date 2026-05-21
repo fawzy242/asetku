@@ -29,6 +29,9 @@
         align-items: center;
         gap: $spacing-md;
         padding: $spacing-lg;
+        background-color: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: $radius-lg;
 
         svg {
             font-size: 28px;
@@ -48,6 +51,16 @@
             font-weight: 700;
             color: var(--text-primary);
         }
+
+        &--clickable {
+            cursor: pointer;
+            transition: transform $transition-fast, box-shadow $transition-fast;
+            
+            &:hover {
+                transform: translateY(-4px);
+                box-shadow: $shadow-lg;
+            }
+        }
     }
 
     &__charts {
@@ -63,6 +76,7 @@
 
     &__chart-card {
         min-height: 400px;
+        background-color: var(--card-bg);
     }
 
     &__chart-container {
@@ -72,6 +86,12 @@
         align-items: center;
         justify-content: center;
         padding: $spacing-md;
+        background-color: var(--card-bg);
+        
+        @include respond-to('sm') {
+            height: 250px;
+            padding: $spacing-sm;
+        }
     }
 
     &__summary-list {
@@ -101,24 +121,6 @@
         color: var(--text-primary);
     }
 
-    &__chart-empty {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        color: var(--text-secondary);
-        gap: $spacing-md;
-
-        svg {
-            color: var(--text-secondary);
-        }
-
-        p {
-            font-size: $font-size-sm;
-        }
-    }
-
     &__alerts {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -127,6 +129,10 @@
 
         @include respond-to('md') {
             grid-template-columns: 1fr;
+        }
+
+        .card {
+            background-color: var(--card-bg);
         }
 
         ul {

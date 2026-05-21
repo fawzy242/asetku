@@ -7,6 +7,7 @@ import DashboardData from "./Dashboard.data";
 import Card from "../../components/atoms/Card/Card";
 import DataTable from "../../components/molecules/DataTable/DataTable";
 import Spinner from "../../components/atoms/Spinner/Spinner";
+import DrilldownModal from "../../components/molecules/DrilldownModal/DrilldownModal";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
 import { ASSET_STATUS_CHART_COLORS } from "../../core/constants/assetStatuses";
 import { useUIStore } from "../../stores/uiStore";
@@ -14,6 +15,27 @@ import utilsHelper from "../../core/utils/utils.helper";
 import "./Dashboard.scss";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement);
+
+/**
+ * ============================================================
+ * FUTURE BACKEND ENDPOINTS NEEDED FOR DASHBOARD
+ * ============================================================
+ * 
+ * 1. GET /api/Reports/dashboard/monthly-stats
+ *    Returns monthly transaction counts for the dashboard chart.
+ *    
+ *    Response:
+ *    {
+ *      "isSuccess": true,
+ *      "data": {
+ *        "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+ *        "counts": [65, 59, 80, 81, 56, 55, 40, 45, 60, 70, 75, 80]
+ *      }
+ *    }
+ * 
+ * Currently using /api/Reports/asset-transaction/data?groupBy=month as fallback
+ * ============================================================
+ */
 
 const dashboardData = new DashboardData();
 
@@ -23,6 +45,13 @@ const DashboardMenu = () => {
   const [expiredWarranty, setExpiredWarranty] = useState([]);
   const [upcomingMaintenance, setUpcomingMaintenance] = useState([]);
   const [recentTransactions, setRecentTransactions] = useState({ data: [] });
+  const [drilldown, setDrilldown] = useState({
+    isOpen: false,
+    title: '',
+    endpoint: '',
+    params: {},
+    columns: null,
+  });
 
   const theme = useUIStore((s) => s.theme);
   const isDark = theme === 'dark';
@@ -90,19 +119,31 @@ const DashboardMenu = () => {
     },
   ];
 
-  if (loading) return <div className="page-loading"><Spinner size="lg" /></div>;
-
-  const statCards = [
-    { icon: FiPackage, label: 'Total Assets', value: stats.totalAssets || 0 },
-    { icon: FiCheckCircle, label: 'Available', value: stats.availableAssets || 0 },
-    { icon: FiUser, label: 'Assigned', value: stats.assignedAssets || 0 },
-    { icon: FiLayers, label: 'On Loan', value: stats.assetsOnLoan || 0 },
-    { icon: FiTool, label: 'In Maintenance', value: stats.assetsInMaintenance || 0 },
-    { icon: FiShield, label: 'Damaged', value: stats.damagedAssets || 0 },
-    { icon: FiClock, label: 'Pending Txns', value: stats.pendingTransactions || 0 },
-    { icon: FiAlertTriangle, label: 'Overdue Loans', value: stats.overdueLoanCount || 0 },
-    { icon: FiDollarSign, label: 'Total Value', value: utilsHelper.formatCurrency(stats.totalAssetValue) },
+  const statCardsConfig = [
+    { icon: FiPackage, label: 'Total Assets', value: stats.totalAssets || 0, endpoint: '/Asset/grid', params: {} },
+    { icon: FiCheckCircle, label: 'Available', value: stats.availableAssets || 0, endpoint: '/Asset/grid', params: { status: 'Available' } },
+    { icon: FiUser, label: 'Assigned', value: stats.assignedAssets || 0, endpoint: '/Asset/grid', params: { status: 'Assigned' } },
+    { icon: FiLayers, label: 'On Loan', value: stats.assetsOnLoan || 0, endpoint: '/Asset/grid', params: { status: 'On Loan' } },
+    { icon: FiTool, label: 'In Maintenance', value: stats.assetsInMaintenance || 0, endpoint: '/Asset/grid', params: { status: 'In Maintenance' } },
+    { icon: FiShield, label: 'Damaged', value: stats.damagedAssets || 0, endpoint: '/Asset/grid', params: { status: 'Damaged' } },
+    { icon: FiClock, label: 'Pending Txns', value: stats.pendingTransactions || 0, endpoint: '/AssetTransaction/grid', params: { approved: null } },
+    { icon: FiAlertTriangle, label: 'Overdue Loans', value: stats.overdueLoanCount || 0, endpoint: '/AssetTransaction/overdue-loans', params: {} },
+    { icon: FiDollarSign, label: 'Total Value', value: utilsHelper.formatCurrency(stats.totalAssetValue), noDrilldown: true },
   ];
+
+  const handleCardClick = (card) => {
+    if (card.noDrilldown) return;
+    
+    setDrilldown({
+      isOpen: true,
+      title: `${card.label} Details`,
+      endpoint: card.endpoint,
+      params: card.params,
+      columns: card.label.includes('Transaction') || card.label.includes('Txn') ? transactionColumns : null,
+    });
+  };
+
+  if (loading) return <div className="page-loading"><Spinner size="lg" /></div>;
 
   return (
     <div className="dashboard fade-transition">
@@ -111,10 +152,17 @@ const DashboardMenu = () => {
       </div>
 
       <div className="dashboard__stats">
-        {statCards.map(({ icon: Icon, label, value }) => (
-          <Card key={label} className="dashboard__stat-card">
-            <Icon aria-hidden="true" />
-            <div><h3>{label}</h3><p>{value}</p></div>
+        {statCardsConfig.map((card) => (
+          <Card 
+            key={card.label} 
+            className={`dashboard__stat-card ${!card.noDrilldown ? 'dashboard__stat-card--clickable' : ''}`}
+            onClick={() => handleCardClick(card)}
+          >
+            <card.icon aria-hidden="true" />
+            <div>
+              <h3>{card.label}</h3>
+              <p>{card.value}</p>
+            </div>
           </Card>
         ))}
       </div>
@@ -205,6 +253,16 @@ const DashboardMenu = () => {
           ariaLabel="Recent transactions table"
         />
       </Card>
+
+      {/* Drilldown Modal */}
+      <DrilldownModal
+        isOpen={drilldown.isOpen}
+        onClose={() => setDrilldown(prev => ({ ...prev, isOpen: false }))}
+        title={drilldown.title}
+        endpoint={drilldown.endpoint}
+        params={drilldown.params}
+        columns={drilldown.columns}
+      />
     </div>
   );
 };

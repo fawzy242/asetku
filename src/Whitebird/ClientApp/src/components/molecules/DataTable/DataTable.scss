@@ -7,7 +7,7 @@
     max-width: 100% !important;
     background-color: transparent;
     border-radius: $radius-lg;
-    overflow: hidden;
+    overflow-x: auto; // ADDED: horizontal scroll
     display: flex;
     flex-direction: column;
     position: relative;
@@ -17,6 +17,10 @@
         min-width: 100% !important;
         max-width: 100% !important;
         flex: 1;
+        // ADDED: responsive font
+        @include respond-to('sm') {
+            font-size: 12px;
+        }
     }
 
     .MuiDataGrid-main {
@@ -24,7 +28,6 @@
         min-width: 100% !important;
     }
 
-    // FIX: Scrollbar horizontal & vertical ikut tema
     .MuiDataGrid-virtualScroller {
         width: 100% !important;
 
@@ -54,6 +57,21 @@
 
     .MuiDataGrid-columnHeaders {
         width: 100% !important;
+        
+        @include respond-to('sm') {
+            .MuiDataGrid-columnHeaderTitle {
+                font-size: 11px;
+                white-space: normal;
+                word-break: break-word;
+            }
+        }
+    }
+
+    .MuiDataGrid-cell {
+        @include respond-to('sm') {
+            font-size: 11px;
+            padding: 4px 8px;
+        }
     }
 
     .MuiDataGrid-columnSeparator {

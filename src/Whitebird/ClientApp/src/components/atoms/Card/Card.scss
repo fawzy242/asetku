@@ -24,6 +24,7 @@
         @include flex-between;
         padding: $spacing-lg;
         border-bottom: 1px solid var(--border);
+        background-color: var(--card-bg);
     }
 
     &__header-content {
@@ -50,5 +51,6 @@
     &__body {
         padding: $spacing-lg;
         color: var(--text-primary);
+        background-color: var(--card-bg);
     }
 }

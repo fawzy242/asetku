@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { FiEdit2, FiTrash2, FiPlus, FiUpload, FiCheckSquare } from "react-icons/fi";
 import { Grid, Box, Chip } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
@@ -18,62 +18,27 @@ import FilterPanel from "../../components/molecules/FilterPanel/FilterPanel";
 import IconButton from "../../components/atoms/IconButton/IconButton";
 import ImportModal from "../../components/molecules/ImportModal/ImportModal";
 import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
+import FileUploader from "../../components/molecules/FileUploader/FileUploader";
+import ModalActions from "../../components/molecules/ModalActions/ModalActions";
 import { useGridData } from "../../hooks/useGridData";
 import { useReferenceData } from "../../hooks/useReferenceData";
 import { useCrudForm } from "../../hooks/useCrudForm";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
+import { cleanEmployeeFormData } from "../../core/utils/formHelpers";
+import { STATUS_TABS } from "../../core/constants/tabs";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./Employees.scss";
 
 const employeesData = new EmployeesData();
+employeesData.transformFormData = cleanEmployeeFormData;
 
-// UPDATED: Removed obsolete fields, added new fields
 const INITIAL_FORM_DATA = {
-  employeeCode: "",
-  fullName: "",
-  address: "",
-  departmentId: "",
-  position: "",
-  employmentStatus: "",
-  phoneNumber: "",
-  email: "",
-  officeId: "",
-  joinDate: "",
-  resignDate: "",
+  employeeCode: "", fullName: "", address: "", departmentId: "",
+  position: "", employmentStatus: "", phoneNumber: "", email: "",
+  officeId: "", joinDate: "", resignDate: "",
 };
-
-const NULLABLE_STRING_FIELDS = ['address', 'phoneNumber', 'email'];
-const NULLABLE_INT_FIELDS = ['departmentId', 'position', 'employmentStatus', 'officeId'];
-
-const transformEmployeeFormData = (data) => {
-  const result = { ...data };
-  NULLABLE_STRING_FIELDS.forEach(f => {
-    if (result[f] === '' || result[f] === undefined) result[f] = null;
-  });
-  NULLABLE_INT_FIELDS.forEach(f => {
-    if (result[f] === '' || result[f] === null || result[f] === undefined) result[f] = null;
-    else if (typeof result[f] === 'string') result[f] = parseInt(result[f], 10);
-  });
-  if (result.joinDate === '' || result.joinDate === undefined) result.joinDate = null;
-  if (result.resignDate === '' || result.resignDate === undefined) result.resignDate = null;
-  return result;
-};
-
-employeesData.transformFormData = transformEmployeeFormData;
 
 const CRUD_OPTIONS = { idField: 'employeeId' };
-
-const TABS = [
-  { id: "all", label: "All" },
-  { id: "active", label: "Active" },
-  { id: "inactive", label: "Inactive" },
-];
-
-const STATUS_OPTIONS = [
-  { value: "", label: "All Status" },
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
-];
 
 const EmployeesMenu = () => {
   const [activeTab, setActiveTab] = useState("all");
@@ -97,15 +62,11 @@ const EmployeesMenu = () => {
 
   const fetchGridData = useCallback(async (params) => {
     const filters = { ...params };
-    
     if (activeTab === "active") filters.isActive = true;
     else if (activeTab === "inactive") filters.isActive = false;
-    
     if (statusFilter === "active") filters.isActive = true;
     else if (statusFilter === "inactive") filters.isActive = false;
-    
     if (departmentFilter) filters.departmentId = departmentFilter;
-    
     return employeesData.fetchGridData(filters);
   }, [activeTab, statusFilter, departmentFilter]);
 
@@ -221,9 +182,7 @@ const EmployeesMenu = () => {
       <div className="page-header">
         <h1 className="page-title">Employee</h1>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <Button variant="outline" onClick={() => setShowImportModal(true)} startIcon={<FiUpload />}>
-            Import
-          </Button>
+          <Button variant="outline" onClick={() => setShowImportModal(true)} startIcon={<FiUpload />}>Import</Button>
           {selectedRows.length > 0 && (
             <Button variant="primary" onClick={() => setShowBulkActivateModal(true)} startIcon={<FiCheckSquare />}>
               Activate ({selectedRows.length})
@@ -233,7 +192,7 @@ const EmployeesMenu = () => {
         </div>
       </div>
      
-      <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+      <Tabs tabs={STATUS_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar 
         onSearch={handleSearch} 
         onFilterToggle={() => setShowFilters(!showFilters)} 
@@ -245,7 +204,7 @@ const EmployeesMenu = () => {
           label="Status" 
           value={statusFilter} 
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} 
-          options={STATUS_OPTIONS} 
+          options={[{ value: "", label: "All Status" }, { value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} 
         />
         <Select 
           label="Department" 
@@ -282,96 +241,51 @@ const EmployeesMenu = () => {
         <form onSubmit={onSubmit}>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <Input 
-                label="Employee Code" 
-                value={formData.employeeCode || ""} 
-                onChange={e => setFormData({ ...formData, employeeCode: e.target.value })} 
-                required 
-              />
+              <Input label="Employee Code" value={formData.employeeCode || ""} onChange={e => setFormData({ ...formData, employeeCode: e.target.value })} required />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Input 
-                label="Full Name" 
-                value={formData.fullName || ""} 
-                onChange={e => setFormData({ ...formData, fullName: e.target.value })} 
-                required 
-              />
+              <Input label="Full Name" value={formData.fullName || ""} onChange={e => setFormData({ ...formData, fullName: e.target.value })} required />
             </Grid>
             <Grid item xs={12}>
-              <Input 
-                label="Address" 
-                value={formData.address || ""} 
-                onChange={e => setFormData({ ...formData, address: e.target.value })} 
-                multiline 
-                rows={2} 
-              />
+              <Input label="Address" value={formData.address || ""} onChange={e => setFormData({ ...formData, address: e.target.value })} multiline rows={2} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Select 
-                label="Department" 
-                value={formData.departmentId || ""} 
-                onChange={e => setFormData({ ...formData, departmentId: e.target.value })} 
-                options={departmentOptions} 
-              />
+              <Select label="Department" value={formData.departmentId || ""} onChange={e => setFormData({ ...formData, departmentId: e.target.value })} options={departmentOptions} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Select 
-                label="Position" 
-                value={formData.position || ""} 
-                onChange={e => setFormData({ ...formData, position: e.target.value })} 
-                options={positionOptions} 
-              />
+              <Select label="Position" value={formData.position || ""} onChange={e => setFormData({ ...formData, position: e.target.value })} options={positionOptions} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Select 
-                label="Employment Status" 
-                value={formData.employmentStatus || ""} 
-                onChange={e => setFormData({ ...formData, employmentStatus: e.target.value })} 
-                options={statusOptions} 
-              />
+              <Select label="Employment Status" value={formData.employmentStatus || ""} onChange={e => setFormData({ ...formData, employmentStatus: e.target.value })} options={statusOptions} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Select 
-                label="Office" 
-                value={formData.officeId || ""} 
-                onChange={e => setFormData({ ...formData, officeId: e.target.value })} 
-                options={officeOptions} 
-              />
+              <Select label="Office" value={formData.officeId || ""} onChange={e => setFormData({ ...formData, officeId: e.target.value })} options={officeOptions} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Input 
-                label="Phone Number" 
-                value={formData.phoneNumber || ""} 
-                onChange={e => setFormData({ ...formData, phoneNumber: e.target.value })} 
-              />
+              <Input label="Phone Number" value={formData.phoneNumber || ""} onChange={e => setFormData({ ...formData, phoneNumber: e.target.value })} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Input 
-                label="Email" 
-                type="email" 
-                value={formData.email || ""} 
-                onChange={e => setFormData({ ...formData, email: e.target.value })} 
-              />
+              <Input label="Email" type="email" value={formData.email || ""} onChange={e => setFormData({ ...formData, email: e.target.value })} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <DatePickerInput 
-                label="Join Date" 
-                value={formData.joinDate || ""} 
-                onChange={e => setFormData({ ...formData, joinDate: e.target.value })} 
-              />
+              <DatePickerInput label="Join Date" value={formData.joinDate || ""} onChange={e => setFormData({ ...formData, joinDate: e.target.value })} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <DatePickerInput 
-                label="Resign Date" 
-                value={formData.resignDate || ""} 
-                onChange={e => setFormData({ ...formData, resignDate: e.target.value })} 
+              <DatePickerInput label="Resign Date" value={formData.resignDate || ""} onChange={e => setFormData({ ...formData, resignDate: e.target.value })} />
+            </Grid>
+            <Grid item xs={12}>
+              <FileUploader 
+                referenceTable="Employee"
+                referenceId={editingEmployee?.employeeId}
+                onUploadComplete={reload}
               />
             </Grid>
           </Grid>
-          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 3 }}>
-            <Button variant="outline" onClick={handleClose} type="button">Cancel</Button>
-            <Button type="submit" variant="primary" loading={isSubmitting}>{editingEmployee ? "Update" : "Create"}</Button>
-          </Box>
+          <ModalActions 
+            onCancel={handleClose} 
+            isSubmitting={isSubmitting}
+            submitText={editingEmployee ? "Update" : "Create"}
+          />
         </form>
       </Modal>
 

@@ -9,6 +9,13 @@ class MasterDataService {
     return (await apiService.get(`/MasterData/${referenceName}`)).data;
   }
 
+  // NEW: Batch endpoint untuk multiple reference data
+  async getBatch(referenceNames) {
+    const params = new URLSearchParams();
+    referenceNames.forEach(name => params.append('names', name));
+    return (await apiService.get(`/MasterData/batch?${params.toString()}`)).data;
+  }
+
   async getTransactionTypes() {
     return (await apiService.get('/MasterData/transaction-types')).data;
   }

@@ -75,6 +75,54 @@ img {
     border: 0;
 }
 
+// Responsive utility classes
+.hide-on-mobile {
+    @include respond-to('sm') {
+        display: none !important;
+    }
+}
+
+.hide-on-tablet {
+    @include respond-to('md') {
+        display: none !important;
+    }
+}
+
+.show-on-mobile {
+    display: none !important;
+    @include respond-to('sm') {
+        display: block !important;
+    }
+}
+
+.show-on-mobile-flex {
+    display: none !important;
+    @include respond-to('sm') {
+        display: flex !important;
+    }
+}
+
+// Spacing utilities
+.p-responsive {
+    padding: $spacing-lg;
+    @include respond-to('md') {
+        padding: $spacing-md;
+    }
+    @include respond-to('sm') {
+        padding: $spacing-sm;
+    }
+}
+
+.gap-responsive {
+    gap: $spacing-lg;
+    @include respond-to('md') {
+        gap: $spacing-md;
+    }
+    @include respond-to('sm') {
+        gap: $spacing-sm;
+    }
+}
+
 // ============================================================
 // GLOBAL ANIMATIONS
 // ============================================================
@@ -91,7 +139,6 @@ img {
     from {
         opacity: 0;
     }
-
     to {
         opacity: 1;
     }
@@ -102,7 +149,6 @@ img {
         opacity: 0;
         transform: translateY(8px);
     }
-
     to {
         opacity: 1;
         transform: translateY(0);
@@ -171,10 +217,64 @@ img {
 // ============================================================
 // RESPONSIVE UTILITIES
 // ============================================================
-@include respond-to('md') {
-    .page-header {
+
+// Container responsive
+.container {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 $spacing-lg;
+    
+    @include respond-to('md') {
+        padding: 0 $spacing-md;
+    }
+    
+    @include respond-to('sm') {
+        padding: 0 $spacing-sm;
+    }
+}
+
+// Grid responsive
+.responsive-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: $spacing-lg;
+    
+    @include respond-to('lg') {
+        grid-template-columns: repeat(3, 1fr);
+    }
+    
+    @include respond-to('md') {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    @include respond-to('sm') {
+        grid-template-columns: 1fr;
+        gap: $spacing-md;
+    }
+}
+
+// Page header responsive
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $spacing-lg;
+    flex-wrap: wrap;
+    gap: $spacing-md;
+
+    @include respond-to('sm') {
         flex-direction: column;
         align-items: flex-start;
-        gap: $spacing-md;
+    }
+}
+
+.page-title {
+    font-size: $font-size-2xl;
+    font-weight: 700;
+    color: var(--text-primary);
+    
+    @include respond-to('sm') {
+        font-size: $font-size-xl;
     }
 }

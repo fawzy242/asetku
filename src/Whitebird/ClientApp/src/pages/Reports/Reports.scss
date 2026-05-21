@@ -5,45 +5,124 @@
 .reports-menu {
     color: var(--text-primary);
 
-    &__stats {
+    &__report-types {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: $spacing-lg;
-        margin-bottom: $spacing-xl;
-
-        @include respond-to('lg') {
-            grid-template-columns: repeat(2, 1fr);
-        }
-
-        @include respond-to('sm') {
-            grid-template-columns: 1fr;
-        }
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: $spacing-md;
     }
 
-    &__stat-card {
+    &__report-card {
         display: flex;
         align-items: center;
         gap: $spacing-md;
         padding: $spacing-lg;
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: $radius-lg;
+        cursor: pointer;
+        transition: all $transition-fast;
+        text-align: left;
+        width: 100%;
 
-        svg {
-            font-size: 32px;
-            color: var(--primary);
+        &:hover {
+            border-color: var(--primary);
+            background-color: rgba(220, 38, 38, 0.02);
         }
 
-        h3 {
-            font-size: $font-size-sm;
-            color: var(--text-secondary);
-        }
-
-        p {
-            font-size: $font-size-xl;
-            font-weight: 700;
-            color: var(--text-primary);
+        &--active {
+            border-color: var(--primary);
+            background-color: rgba(220, 38, 38, 0.05);
         }
     }
 
-    &__table {
-        min-height: 400px;
+    &__report-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 48px;
+        height: 48px;
+        background: rgba(220, 38, 38, 0.1);
+        border-radius: $radius-md;
+        color: var(--primary);
+        font-size: 24px;
+        flex-shrink: 0;
+
+        svg {
+            width: 24px;
+            height: 24px;
+        }
+    }
+
+    &__report-info {
+        flex: 1;
+    }
+
+    &__report-label {
+        font-size: $font-size-base;
+        font-weight: 600;
+        margin: 0 0 $spacing-xs 0;
+        color: var(--text-primary);
+    }
+
+    &__report-description {
+        font-size: $font-size-sm;
+        color: var(--text-secondary);
+        margin: 0;
+    }
+
+    &__filters {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: $spacing-md;
+        align-items: end;
+    }
+
+    &__filter-actions {
+        display: flex;
+        gap: $spacing-sm;
+        align-items: flex-end;
+        padding-bottom: 8px;
+    }
+
+    &__export-card {
+        background: linear-gradient(135deg, rgba(220, 38, 38, 0.05) 0%, rgba(220, 38, 38, 0.02) 100%);
+    }
+
+    &__export-content {
+        display: flex;
+        align-items: center;
+        gap: $spacing-xl;
+        flex-wrap: wrap;
+        justify-content: space-between;
+    }
+
+    &__export-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 64px;
+        height: 64px;
+        background: rgba(220, 38, 38, 0.15);
+        border-radius: $radius-xl;
+        color: var(--primary);
+    }
+
+    &__export-info {
+        flex: 1;
+    }
+
+    @include respond-to('md') {
+        &__report-types {
+            grid-template-columns: 1fr;
+        }
+
+        &__export-content {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        &__filters {
+            grid-template-columns: 1fr;
+        }
     }
 }

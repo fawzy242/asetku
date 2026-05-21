@@ -7,7 +7,6 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.scss';
 
-// UPDATED: Added Departments and MasterData, renamed Locations to Offices
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: FiHome, path: '/dashboard' },
   { id: 'assets', label: 'Assets', icon: FiBox, path: '/assets' },
@@ -34,9 +33,24 @@ const menuItems = [
 const Sidebar = ({ collapsed = false, onToggle }) => {
   const [expandedItems, setExpandedItems] = useState(new Set());
   const [logoError, setLogoError] = useState(false);
+  const [showMobileOverlay, setShowMobileOverlay] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const activePath = location.pathname;
+
+  // Check for mobile on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+      if (window.innerWidth >= 640) {
+        setShowMobileOverlay(false);
+      }
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     menuItems.forEach(item => {
@@ -52,6 +66,24 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
     return next; 
   });
 
+  const handleToggle = () => {
+    if (isMobile) {
+      setShowMobileOverlay(!showMobileOverlay);
+    }
+    if (onToggle) {
+      onToggle();
+    }
+  };
+
+  const handleNavigate = (path) => {
+    if (path) {
+      navigate(path);
+      if (isMobile) {
+        setShowMobileOverlay(false);
+      }
+    }
+  };
+
   const renderItem = (item, level = 0) => {
     const hasChildren = item.children?.length > 0;
     const isExpanded = expandedItems.has(item.id);
@@ -65,7 +97,11 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
           className={`sidebar__link ${isActive ? 'sidebar__link--active' : ''} ${level > 0 ? 'sidebar__link--child' : ''}`}
           onClick={e => {
             e.preventDefault();
-            hasChildren ? toggleExpand(item.id) : item.path && navigate(item.path);
+            if (hasChildren) {
+              toggleExpand(item.id);
+            } else if (item.path) {
+              handleNavigate(item.path);
+            }
           }}
           aria-current={isActive ? 'page' : undefined}
         >
@@ -92,50 +128,55 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
     );
   };
 
-  const handleLogoClick = () => navigate('/dashboard');
+  const handleLogoClick = () => handleNavigate('/dashboard');
   const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0';
 
   return (
-    <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`} role="navigation" aria-label="Main navigation">
-      <div className="sidebar__header">
-        {!collapsed ? (
-          <>
-            <div className="sidebar__logo" onClick={handleLogoClick} style={{ cursor: 'pointer' }} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handleLogoClick()} aria-label="Go to dashboard">
-              {logoError ? (
-                <div className="sidebar__logo-fallback" aria-hidden="true">W</div>
-              ) : (
-                <img
-                  src="/logo.png"
-                  alt="Whitebird Asset Management System Logo"
-                  className="sidebar__logo-img"
-                  onError={() => setLogoError(true)}
-                />
-              )}
-              <span className="sidebar__logo-text">Whitebird</span>
-            </div>
-            <button className="sidebar__toggle-btn" onClick={onToggle} aria-label="Collapse sidebar">
-              <FiChevronLeft size={20} />
+    <>
+      <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''} ${isMobile && showMobileOverlay ? 'sidebar--mobile-open' : ''}`} role="navigation" aria-label="Main navigation">
+        <div className="sidebar__header">
+          {!collapsed ? (
+            <>
+              <div className="sidebar__logo" onClick={handleLogoClick} style={{ cursor: 'pointer' }} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handleLogoClick()} aria-label="Go to dashboard">
+                {logoError ? (
+                  <div className="sidebar__logo-fallback" aria-hidden="true">W</div>
+                ) : (
+                  <img
+                    src="/logo.png"
+                    alt="Whitebird Asset Management System Logo"
+                    className="sidebar__logo-img"
+                    onError={() => setLogoError(true)}
+                  />
+                )}
+                <span className="sidebar__logo-text">Whitebird</span>
+              </div>
+              <button className="sidebar__toggle-btn" onClick={handleToggle} aria-label="Collapse sidebar">
+                <FiChevronLeft size={20} />
+              </button>
+            </>
+          ) : (
+            <button className="sidebar__toggle-btn sidebar__toggle-btn--expand" onClick={handleToggle} aria-label="Expand sidebar">
+              <FiMenu size={22} />
             </button>
-          </>
-        ) : (
-          <button className="sidebar__toggle-btn sidebar__toggle-btn--expand" onClick={onToggle} aria-label="Expand sidebar">
-            <FiMenu size={22} />
-          </button>
-        )}
-      </div>
-      <nav className="sidebar__nav">
-        <ul className="sidebar__menu">
-          {menuItems.map(item => renderItem(item))}
-        </ul>
-      </nav>
-      <div className="sidebar__footer">
-        {!collapsed && (
-          <div className="sidebar__version">
-            <span>v{appVersion}</span>
-          </div>
-        )}
-      </div>
-    </aside>
+          )}
+        </div>
+        <nav className="sidebar__nav">
+          <ul className="sidebar__menu">
+            {menuItems.map(item => renderItem(item))}
+          </ul>
+        </nav>
+        <div className="sidebar__footer">
+          {!collapsed && (
+            <div className="sidebar__version">
+              <span>v{appVersion}</span>
+            </div>
+          )}
+        </div>
+      </aside>
+      {isMobile && showMobileOverlay && (
+        <div className="sidebar-overlay sidebar-overlay--visible" onClick={handleToggle} />
+      )}
+    </>
   );
 };
 

@@ -299,3 +299,52 @@
         margin: $spacing-sm 0;
     }
 }
+
+// Responsive styles
+@include respond-to('md') {
+    .topbar {
+        padding: 0 $spacing-md;
+        
+        &__center {
+            margin: 0 $spacing-md;
+        }
+        
+        &__search {
+            max-width: 300px;
+        }
+        
+        &__user-name {
+            display: none;
+        }
+    }
+}
+
+@include respond-to('sm') {
+    .topbar {
+        padding: 0 $spacing-sm;
+        
+        &__center {
+            margin: 0 $spacing-sm;
+        }
+        
+        &__search {
+            max-width: 200px;
+        }
+        
+        &__search-input {
+            padding-left: 36px;
+            font-size: $font-size-xs;
+        }
+        
+        &__theme-toggle {
+            width: 34px;
+            height: 34px;
+        }
+        
+        &__user-avatar {
+            width: 32px;
+            height: 32px;
+            font-size: $font-size-sm;
+        }
+    }
+}

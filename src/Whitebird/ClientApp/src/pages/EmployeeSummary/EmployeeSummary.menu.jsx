@@ -10,6 +10,46 @@ import { getStatusChipStyles } from "../../core/constants/statusColors";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./EmployeeSummary.scss";
 
+/**
+ * ============================================================
+ * FUTURE BACKEND ENDPOINTS NEEDED FOR EMPLOYEE SUMMARY
+ * ============================================================
+ * 
+ * 1. GET /api/Employee/{id}/summary
+ *    Returns complete aggregated summary for a single employee.
+ *    
+ *    Response:
+ *    {
+ *      "isSuccess": true,
+ *      "data": {
+ *        "employeeId": 1,
+ *        "employeeCode": "EMP-001",
+ *        "fullName": "John Doe",
+ *        "department": "IT",
+ *        "position": "Developer",
+ *        "email": "john@example.com",
+ *        "phoneNumber": "+62...",
+ *        "employmentStatus": "Active",
+ *        "joinDate": "2023-01-15T00:00:00",
+ *        "totalAssets": 5,
+ *        "totalAssetValue": 15000000,
+ *        "totalTransactions": 25,
+ *        "lastTransactionDate": "2024-01-20T10:30:00",
+ *        "pendingReturns": 1,
+ *        "recentAssets": [...],
+ *        "recentTransactions": [...],
+ *        "assetsByStatus": { "available": 2, "assigned": 3, "underRepair": 0, "retired": 0 }
+ *      }
+ *    }
+ * 
+ * 2. GET /api/Employee/summary-list
+ *    Returns lightweight summary for all employees (for selector/dropdown).
+ *    Query: ?search=&status=&department=&page=&pageSize=
+ * 
+ * Currently using: /api/Employee/{id} + /api/Employee/{id}/asset-summary
+ * ============================================================
+ */
+
 const summaryData = new EmployeeSummaryData();
 
 const EmployeeSummaryMenu = () => {
@@ -39,7 +79,6 @@ const EmployeeSummaryMenu = () => {
     setSelectedEmployee(employeeId);
     setLoadingData(true);
     
-    // Use the new asset summary endpoint
     const [detailRes, summaryRes] = await Promise.all([
       summaryData.fetchEmployeeDetail(employeeId),
       summaryData.fetchAssetSummary(employeeId)
@@ -72,13 +111,11 @@ const EmployeeSummaryMenu = () => {
     />
   );
 
-  // Calculate total asset value from current assets
   const totalAssetValue = (assetSummary?.currentAssets || []).reduce(
     (sum, a) => sum + (a.purchasePrice || 0), 
     0
   );
 
-  // Asset columns for current assets table
   const assetColumns = [
     { field: "assetCode", headerName: "Asset Code", width: 130 },
     { field: "assetName", headerName: "Asset Name", flex: 1, minWidth: 180 },
@@ -101,7 +138,6 @@ const EmployeeSummaryMenu = () => {
     { field: "conditionName", headerName: "Condition", width: 100 },
   ];
 
-  // History columns for asset history table
   const historyColumns = [
     { field: "transactionDate", headerName: "Date", width: 160, valueFormatter: (p) => p?.value ? utilsHelper.formatDateTime(p.value) : '-' },
     { field: "transactionTypeName", headerName: "Type", width: 150 },
@@ -118,7 +154,6 @@ const EmployeeSummaryMenu = () => {
   const currentAssets = assetSummary?.currentAssets || [];
   const assetHistory = assetSummary?.assetHistory || [];
 
-  // Format employee options for select dropdown
   const employeeOptions = employees.map(e => ({ 
     value: e.employeeId, 
     label: `${e.employeeCode} - ${e.fullName}` 

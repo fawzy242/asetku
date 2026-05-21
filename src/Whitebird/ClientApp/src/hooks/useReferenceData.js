@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiService from '../core/services/api.service';
 import masterDataService from '../core/services/masterData.service';
 
@@ -52,7 +52,27 @@ const fetchAssets = async () => {
 
 const fetchMasterDataTypes = async (referenceName) => {
   const r = await masterDataService.getByReferenceName(referenceName);
-  return (r.data || []).map(m => ({ code: m.code, name: m.name }));
+  return (r.data || []).map(m => ({ code: m.code, name: m.name, value: m.code, label: m.name }));
+};
+
+// ============================================================
+// BATCH FETCHER (OPTIMIZED)
+// ============================================================
+
+const fetchBatchMasterData = async (names) => {
+  try {
+    const r = await masterDataService.getBatch(names);
+    if (r.isSuccess && r.data) {
+      const result = {};
+      names.forEach(name => {
+        result[name] = (r.data[name] || []).map(m => ({ code: m.code, name: m.name, value: m.code, label: m.name }));
+      });
+      return result;
+    }
+    return {};
+  } catch {
+    return {};
+  }
 };
 
 // ============================================================
@@ -75,7 +95,7 @@ const CACHE_KEYS = {
   ASSET_CONDITION_PURCHASES: ['reference', 'assetConditionPurchases'],
 };
 
-const CACHE_STALE_TIME = 30 * 60 * 1000; // 30 minutes
+const CACHE_STALE_TIME = 5 * 60 * 1000; // 5 minutes
 const MASTER_DATA_STALE_TIME = 24 * 60 * 60 * 1000; // 24 hours
 
 // ============================================================
@@ -85,102 +105,33 @@ const MASTER_DATA_STALE_TIME = 24 * 60 * 60 * 1000; // 24 hours
 export const useReferenceData = () => {
   const queryClient = useQueryClient();
 
-  // Basic Reference Data
-  const categories = useQuery({
-    queryKey: CACHE_KEYS.CATEGORIES,
-    queryFn: fetchCategories,
-    staleTime: CACHE_STALE_TIME,
+  // Use useQueries untuk parallel fetching yang efisien
+  const results = useQueries({
+    queries: [
+      { queryKey: CACHE_KEYS.CATEGORIES, queryFn: fetchCategories, staleTime: CACHE_STALE_TIME },
+      { queryKey: CACHE_KEYS.SUPPLIERS, queryFn: fetchSuppliers, staleTime: CACHE_STALE_TIME },
+      { queryKey: CACHE_KEYS.EMPLOYEES, queryFn: fetchEmployees, staleTime: CACHE_STALE_TIME },
+      { queryKey: CACHE_KEYS.DEPARTMENTS, queryFn: fetchDepartments, staleTime: CACHE_STALE_TIME },
+      { queryKey: CACHE_KEYS.OFFICES, queryFn: fetchOffices, staleTime: CACHE_STALE_TIME },
+      { queryKey: CACHE_KEYS.ASSETS, queryFn: fetchAssets, staleTime: CACHE_STALE_TIME },
+      { queryKey: CACHE_KEYS.TRANSACTION_TYPES, queryFn: () => fetchMasterDataTypes('TransactionType'), staleTime: MASTER_DATA_STALE_TIME },
+      { queryKey: CACHE_KEYS.ASSET_CONDITIONS, queryFn: () => fetchMasterDataTypes('AssetCondition'), staleTime: MASTER_DATA_STALE_TIME },
+      { queryKey: CACHE_KEYS.EMPLOYEE_POSITIONS, queryFn: () => fetchMasterDataTypes('Position'), staleTime: MASTER_DATA_STALE_TIME },
+      { queryKey: CACHE_KEYS.EMPLOYEE_STATUSES, queryFn: () => fetchMasterDataTypes('EmployeeStatus'), staleTime: MASTER_DATA_STALE_TIME },
+      { queryKey: CACHE_KEYS.OFFICE_TYPES, queryFn: () => fetchMasterDataTypes('OfficeType'), staleTime: MASTER_DATA_STALE_TIME },
+      { queryKey: CACHE_KEYS.MAINTENANCE_TYPES, queryFn: () => fetchMasterDataTypes('MaintenanceType'), staleTime: MASTER_DATA_STALE_TIME },
+      { queryKey: CACHE_KEYS.ASSET_CONDITION_PURCHASES, queryFn: () => fetchMasterDataTypes('AssetConditionPurchase'), staleTime: MASTER_DATA_STALE_TIME },
+    ],
   });
 
-  const suppliers = useQuery({
-    queryKey: CACHE_KEYS.SUPPLIERS,
-    queryFn: fetchSuppliers,
-    staleTime: CACHE_STALE_TIME,
-  });
+  const [
+    categories, suppliers, employees, departments, offices, assets,
+    transactionTypes, assetConditions, employeePositions,
+    employeeStatuses, officeTypes, maintenanceTypes, assetConditionPurchases,
+  ] = results;
 
-  const employees = useQuery({
-    queryKey: CACHE_KEYS.EMPLOYEES,
-    queryFn: fetchEmployees,
-    staleTime: CACHE_STALE_TIME,
-  });
-
-  const departments = useQuery({
-    queryKey: CACHE_KEYS.DEPARTMENTS,
-    queryFn: fetchDepartments,
-    staleTime: CACHE_STALE_TIME,
-  });
-
-  const offices = useQuery({
-    queryKey: CACHE_KEYS.OFFICES,
-    queryFn: fetchOffices,
-    staleTime: CACHE_STALE_TIME,
-  });
-
-  const assets = useQuery({
-    queryKey: CACHE_KEYS.ASSETS,
-    queryFn: fetchAssets,
-    staleTime: CACHE_STALE_TIME,
-  });
-
-  // Master Data (from MasterData API)
-  const transactionTypes = useQuery({
-    queryKey: CACHE_KEYS.TRANSACTION_TYPES,
-    queryFn: () => fetchMasterDataTypes('TransactionType'),
-    staleTime: MASTER_DATA_STALE_TIME,
-  });
-
-  const assetConditions = useQuery({
-    queryKey: CACHE_KEYS.ASSET_CONDITIONS,
-    queryFn: () => fetchMasterDataTypes('AssetCondition'),
-    staleTime: MASTER_DATA_STALE_TIME,
-  });
-
-  const employeePositions = useQuery({
-    queryKey: CACHE_KEYS.EMPLOYEE_POSITIONS,
-    queryFn: () => fetchMasterDataTypes('Position'),
-    staleTime: MASTER_DATA_STALE_TIME,
-  });
-
-  const employeeStatuses = useQuery({
-    queryKey: CACHE_KEYS.EMPLOYEE_STATUSES,
-    queryFn: () => fetchMasterDataTypes('EmployeeStatus'),
-    staleTime: MASTER_DATA_STALE_TIME,
-  });
-
-  const officeTypes = useQuery({
-    queryKey: CACHE_KEYS.OFFICE_TYPES,
-    queryFn: () => fetchMasterDataTypes('OfficeType'),
-    staleTime: MASTER_DATA_STALE_TIME,
-  });
-
-  const maintenanceTypes = useQuery({
-    queryKey: CACHE_KEYS.MAINTENANCE_TYPES,
-    queryFn: () => fetchMasterDataTypes('MaintenanceType'),
-    staleTime: MASTER_DATA_STALE_TIME,
-  });
-
-  const assetConditionPurchases = useQuery({
-    queryKey: CACHE_KEYS.ASSET_CONDITION_PURCHASES,
-    queryFn: () => fetchMasterDataTypes('AssetConditionPurchase'),
-    staleTime: MASTER_DATA_STALE_TIME,
-  });
-
-  // Loading & Error States
-  const isLoading = 
-    categories.isLoading || suppliers.isLoading || employees.isLoading ||
-    departments.isLoading || offices.isLoading || assets.isLoading ||
-    transactionTypes.isLoading || assetConditions.isLoading ||
-    employeePositions.isLoading || employeeStatuses.isLoading ||
-    officeTypes.isLoading || maintenanceTypes.isLoading ||
-    assetConditionPurchases.isLoading;
-
-  const isError = 
-    categories.isError || suppliers.isError || employees.isError ||
-    departments.isError || offices.isError || assets.isError ||
-    transactionTypes.isError || assetConditions.isError ||
-    employeePositions.isError || employeeStatuses.isError ||
-    officeTypes.isError || maintenanceTypes.isError ||
-    assetConditionPurchases.isError;
+  const isLoading = results.some(r => r.isLoading);
+  const isError = results.some(r => r.isError);
 
   // Invalidation Helpers
   const invalidateAll = () => {

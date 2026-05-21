@@ -1,240 +1,333 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { FiPackage, FiDollarSign, FiUsers, FiClock, FiDownload, FiRefreshCw, FiBox, FiTool, FiTrendingUp, FiSearch } from "react-icons/fi";
+import React, { useState, useCallback } from "react";
+import { FiDownload, FiFileText, FiCalendar, FiBox, FiUsers, FiTool, FiTrendingUp } from "react-icons/fi";
+import { Grid, Box, Typography, Chip } from "@mui/material";
 import ReportsData from "./Reports.data";
-import DataTable from "../../components/molecules/DataTable/DataTable";
-import Pagination from "../../components/molecules/Pagination/Pagination";
-import Button from "../../components/atoms/Button/Button";
 import Card from "../../components/atoms/Card/Card";
+import Button from "../../components/atoms/Button/Button";
 import Select from "../../components/atoms/Select/Select";
+import DatePickerInput from "../../components/atoms/Input/DatePickerInput";
 import Spinner from "../../components/atoms/Spinner/Spinner";
-import Tabs from "../../components/molecules/Tabs/Tabs";
-import utilsHelper from "../../core/utils/utils.helper";
+import ConfirmDialog from "../../components/molecules/ConfirmDialog/ConfirmDialog";
 import "./Reports.scss";
 
 const reportsData = new ReportsData();
 
-const TABS = [
-  { id: "transactions", label: "Transactions", icon: <FiRefreshCw /> },
-  { id: "inventory", label: "Inventory", icon: <FiBox /> },
-  { id: "employee", label: "Employee Assets", icon: <FiUsers /> },
-  { id: "maintenance", label: "Maintenance", icon: <FiTool /> },
-  { id: "financial", label: "Financial", icon: <FiTrendingUp /> },
-];
-
-const EXPORT_REPORT_OPTIONS = [
-  { value: "transactions", label: "Transaction Report" },
-  { value: "inventory", label: "Inventory Report" },
-  { value: "employee", label: "Employee Asset Report" },
-  { value: "maintenance", label: "Maintenance Report" },
-  { value: "financial", label: "Financial Report" },
+// Report type definitions
+const REPORT_TYPES = [
+  { 
+    id: "transactions", 
+    label: "Transaction Report", 
+    icon: <FiFileText />,
+    description: "Export asset transaction history",
+    hasDateRange: true,
+    hasTypeFilter: true,
+  },
+  { 
+    id: "inventory", 
+    label: "Inventory Report", 
+    icon: <FiBox />,
+    description: "Export current asset inventory",
+    hasStatusFilter: true,
+    hasCategoryFilter: true,
+  },
+  { 
+    id: "employee", 
+    label: "Employee Asset Report", 
+    icon: <FiUsers />,
+    description: "Export assets assigned to employees",
+    hasEmployeeFilter: true,
+    hasDepartmentFilter: true,
+  },
+  { 
+    id: "maintenance", 
+    label: "Maintenance Report", 
+    icon: <FiTool />,
+    description: "Export maintenance history",
+    hasDateRange: true,
+  },
+  { 
+    id: "financial", 
+    label: "Financial Report", 
+    icon: <FiTrendingUp />,
+    description: "Export asset financial summary",
+    hasDateRange: true,
+  },
 ];
 
 const ReportsMenu = () => {
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("transactions");
-  const [stats, setStats] = useState({});
-  const [reportData, setReportData] = useState([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [exportReportType, setExportReportType] = useState("");
+  const [selectedReport, setSelectedReport] = useState("transactions");
   const [isExporting, setIsExporting] = useState(false);
+  const [dateRange, setDateRange] = useState({ startDate: "", endDate: "" });
+  const [statusFilter, setStatusFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [employeeFilter, setEmployeeFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
+  
+  // Reference data for filters
+  const [categories, setCategories] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  
+  const [loadingFilters, setLoadingFilters] = useState(true);
 
-  useEffect(() => {
-    loadStats();
+  // Load filter options on mount
+  React.useEffect(() => {
+    const loadFilters = async () => {
+      setLoadingFilters(true);
+      try {
+        const [catsRes, empsRes] = await Promise.all([
+          reportsData.api.getCategories(),
+          reportsData.api.getEmployees()
+        ]);
+        if (catsRes?.data) setCategories(catsRes.data);
+        if (empsRes?.data) {
+          setEmployees(empsRes.data);
+          const depts = [...new Set(empsRes.data.map(e => e.department).filter(Boolean))];
+          setDepartments(depts);
+        }
+      } catch (error) {
+        console.error("Failed to load filters:", error);
+      }
+      setLoadingFilters(false);
+    };
+    loadFilters();
   }, []);
 
-  useEffect(() => {
-    loadReportData();
-  }, [activeTab, page, pageSize]);
+  const currentReport = REPORT_TYPES.find(r => r.id === selectedReport) || REPORT_TYPES[0];
 
-  const loadStats = async () => {
-    const r = await reportsData.fetchDashboardStats();
-    if (r.success) setStats(r.data);
-  };
-
-  const loadReportData = async () => {
-    setLoading(true);
-    let r;
-    switch (activeTab) {
-      case "transactions": r = await reportsData.fetchTransactionData({ page, pageSize }); break;
-      case "inventory": r = await reportsData.fetchInventoryData({ page, pageSize }); break;
-      case "employee": r = await reportsData.fetchEmployeeAssetData({ page, pageSize }); break;
-      case "maintenance": r = await reportsData.fetchMaintenanceData({ page, pageSize }); break;
-      default: r = await reportsData.fetchFinancialData({ page, pageSize }); break;
+  const buildParams = useCallback(() => {
+    const params = {};
+    if (currentReport.hasDateRange) {
+      if (dateRange.startDate) params.startDate = dateRange.startDate;
+      if (dateRange.endDate) params.endDate = dateRange.endDate;
     }
-    if (r.success) { setReportData(r.data); setTotalCount(r.data.length); }
-    setLoading(false);
-  };
+    if (currentReport.hasStatusFilter && statusFilter) params.status = statusFilter;
+    if (currentReport.hasCategoryFilter && categoryFilter) params.categoryId = categoryFilter;
+    if (currentReport.hasTypeFilter && typeFilter) params.transactionType = typeFilter;
+    if (currentReport.hasEmployeeFilter && employeeFilter) params.employeeId = employeeFilter;
+    if (currentReport.hasDepartmentFilter && departmentFilter) params.department = departmentFilter;
+    return params;
+  }, [currentReport, dateRange, statusFilter, categoryFilter, typeFilter, employeeFilter, departmentFilter]);
 
   const handleExport = async () => {
-    if (!exportReportType) return;
-
     setIsExporting(true);
-    let dataToExport = reportData;
-
-    // Fetch data untuk report yang dipilih jika berbeda dengan tab aktif
-    if (exportReportType !== activeTab) {
-      let r;
-      switch (exportReportType) {
-        case "transactions": r = await reportsData.fetchTransactionData({}); break;
-        case "inventory": r = await reportsData.fetchInventoryData({}); break;
-        case "employee": r = await reportsData.fetchEmployeeAssetData({}); break;
-        case "maintenance": r = await reportsData.fetchMaintenanceData({}); break;
-        default: r = await reportsData.fetchFinancialData({}); break;
-      }
-      if (r.success) dataToExport = r.data;
+    
+    const params = buildParams();
+    let result = { success: false };
+    
+    switch (selectedReport) {
+      case "transactions":
+        result = await reportsData.exportTransaction(params, []);
+        break;
+      case "inventory":
+        result = await reportsData.exportInventory(params, []);
+        break;
+      case "employee":
+        result = await reportsData.exportEmployee(params, []);
+        break;
+      case "maintenance":
+        result = await reportsData.exportMaintenance(params, []);
+        break;
+      case "financial":
+        result = await reportsData.exportFinancial(params, []);
+        break;
+      default:
+        break;
     }
-
-    const reportNames = {
-      transactions: 'Transaction_Report',
-      inventory: 'Inventory_Report',
-      employee: 'Employee_Asset_Report',
-      maintenance: 'Maintenance_Report',
-      financial: 'Financial_Report',
-    };
-
-    const params = {};
-    let serverResult = { success: false };
-
-    switch (exportReportType) {
-      case "transactions": serverResult = await reportsData.exportTransaction(params, dataToExport); break;
-      case "inventory": serverResult = await reportsData.exportInventory(params, dataToExport); break;
-      case "employee": serverResult = await reportsData.exportEmployee(params, dataToExport); break;
-      case "maintenance": serverResult = await reportsData.exportMaintenance(params, dataToExport); break;
-      default: serverResult = await reportsData.exportFinancial(params, dataToExport); break;
-    }
-
-    if (!serverResult.success && dataToExport && dataToExport.length > 0) {
-      await reportsData.exportToExcel(dataToExport, reportNames[exportReportType] || 'Report');
-    }
-
+    
     setIsExporting(false);
+    
+    if (!result.success) {
+      ConfirmDialog.toast.error("Failed to generate report. Please try again.");
+    }
   };
 
-  const handleTabChange = useCallback((tab) => {
-    setActiveTab(tab);
-    setPage(1);
-  }, []);
+  const resetFilters = () => {
+    setDateRange({ startDate: "", endDate: "" });
+    setStatusFilter("");
+    setCategoryFilter("");
+    setTypeFilter("");
+    setEmployeeFilter("");
+    setDepartmentFilter("");
+  };
 
-  const getColumns = useMemo(() => {
-    switch (activeTab) {
-      case "transactions":
-        return [
-          { field: "assetCode", headerName: "Code", width: 120 },
-          { field: "assetName", headerName: "Name", flex: 1, minWidth: 160 },
-          { field: "fullName", headerName: "Employee", width: 160 },
-          { field: "transactionType", headerName: "Type", width: 150 },
-          { field: "transactionStatus", headerName: "Status", width: 110 },
-          { field: "transactionDate", headerName: "Date", width: 160, valueFormatter: (p) => (p?.value && p.value !== '') ? utilsHelper.formatDateTime(p.value) : '-' },
-        ];
-      case "inventory":
-        return [
-          { field: "assetCode", headerName: "Code", width: 120 },
-          { field: "assetName", headerName: "Name", flex: 1, minWidth: 180 },
-          { field: "categoryName", headerName: "Category", width: 150 },
-          { field: "status", headerName: "Status", width: 140 },
-          { field: "currentHolderName", headerName: "Holder", width: 150 },
-        ];
-      case "employee":
-        return [
-          { field: "employeeCode", headerName: "Emp Code", width: 110 },
-          { field: "fullName", headerName: "Employee", flex: 1, minWidth: 160 },
-          { field: "department", headerName: "Dept", width: 140 },
-          { field: "assetCode", headerName: "Asset", width: 120 },
-          { field: "assetName", headerName: "Name", flex: 1, minWidth: 160 },
-        ];
-      case "maintenance":
-        return [
-          { field: "assetCode", headerName: "Code", width: 120 },
-          { field: "assetName", headerName: "Name", flex: 1, minWidth: 180 },
-          { field: "maintenanceCount", headerName: "Count", width: 90 },
-          { field: "lastMaintenanceDate", headerName: "Last", width: 120, valueFormatter: (p) => (p?.value && p.value !== '') ? utilsHelper.formatDate(p.value) : '-' },
-          { field: "nextMaintenanceDate", headerName: "Next", width: 120, valueFormatter: (p) => (p?.value && p.value !== '') ? utilsHelper.formatDate(p.value) : '-' },
-        ];
-      default:
-        return [
-          { field: "assetCode", headerName: "Code", width: 120 },
-          { field: "assetName", headerName: "Name", flex: 1, minWidth: 180 },
-          { field: "categoryName", headerName: "Category", width: 150 },
-          { field: "purchasePrice", headerName: "Price", width: 130, valueFormatter: (p) => (p?.value != null) ? utilsHelper.formatCurrency(p.value) : '-' },
-          { field: "totalMaintenanceCost", headerName: "Maint. Cost", width: 130, valueFormatter: (p) => (p?.value != null) ? utilsHelper.formatCurrency(p.value) : '-' },
-        ];
-    }
-  }, [activeTab]);
+  const categoryOptions = [
+    { value: "", label: "All Categories" },
+    ...(categories || []).map(c => ({ value: c.categoryId, label: c.categoryName }))
+  ];
+  
+  const employeeOptions = [
+    { value: "", label: "All Employees" },
+    ...(employees || []).map(e => ({ value: e.employeeId, label: `${e.employeeCode} - ${e.fullName}` }))
+  ];
+  
+  const departmentOptions = [
+    { value: "", label: "All Departments" },
+    ...departments.map(d => ({ value: d, label: d }))
+  ];
+  
+  const statusOptions = [
+    { value: "", label: "All Statuses" },
+    { value: "Active", label: "Active" },
+    { value: "Inactive", label: "Inactive" },
+  ];
+  
+  const transactionTypeOptions = [
+    { value: "", label: "All Types" },
+    { value: "1", label: "HANDOVER" },
+    { value: "2", label: "TRANSFER" },
+    { value: "3", label: "LOAN" },
+    { value: "4", label: "RETURN" },
+    { value: "5", label: "LOAN_RETURN" },
+    { value: "6", label: "MAINTENANCE" },
+    { value: "7", label: "POST_MAINTENANCE" },
+    { value: "8", label: "DISPOSAL" },
+  ];
+
+  if (loadingFilters) {
+    return (
+      <div className="reports-menu">
+        <div className="page-header">
+          <h1 className="page-title">Reports & Analytics</h1>
+        </div>
+        <div className="page-loading"><Spinner size="lg" /></div>
+      </div>
+    );
+  }
 
   return (
     <div className="reports-menu fade-transition">
       <div className="page-header">
         <h1 className="page-title">Reports & Analytics</h1>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div style={{ minWidth: '240px' }}>
-            <Select
-              label="Select Report to Download"
-              value={exportReportType}
-              onChange={e => setExportReportType(e.target.value)}
-              options={EXPORT_REPORT_OPTIONS}
-              size="small"
-            />
-          </div>
-          <Button
-            variant="primary"
-            onClick={handleExport}
-            startIcon={<FiDownload />}
-            loading={isExporting}
-            disabled={!exportReportType}
-          >
-            Export
-          </Button>
-        </div>
       </div>
+      
+      <Grid container spacing={3}>
+        {/* Report Type Selection */}
+        <Grid item xs={12}>
+          <Card title="Select Report Type">
+            <div className="reports-menu__report-types">
+              {REPORT_TYPES.map(report => (
+                <button
+                  key={report.id}
+                  className={`reports-menu__report-card ${selectedReport === report.id ? 'reports-menu__report-card--active' : ''}`}
+                  onClick={() => setSelectedReport(report.id)}
+                >
+                  <div className="reports-menu__report-icon">{report.icon}</div>
+                  <div className="reports-menu__report-info">
+                    <h3 className="reports-menu__report-label">{report.label}</h3>
+                    <p className="reports-menu__report-description">{report.description}</p>
+                  </div>
+                  {selectedReport === report.id && (
+                    <Chip label="Selected" size="small" color="primary" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </Card>
+        </Grid>
 
-      <div className="reports-menu__stats">
-        <Card className="reports-menu__stat-card">
-          <FiPackage />
-          <div><h3>Total Assets</h3><p>{stats.totalAssets || 0}</p></div>
-        </Card>
-        <Card className="reports-menu__stat-card">
-          <FiDollarSign />
-          <div><h3>Total Value</h3><p>{utilsHelper.formatCurrency(stats.totalAssetValue)}</p></div>
-        </Card>
-        <Card className="reports-menu__stat-card">
-          <FiUsers />
-          <div><h3>Employees</h3><p>{stats.totalEmployees || 0}</p></div>
-        </Card>
-        <Card className="reports-menu__stat-card">
-          <FiClock />
-          <div><h3>Pending Txns</h3><p>{stats.pendingTransactions || 0}</p></div>
-        </Card>
-      </div>
+        {/* Filter Panel */}
+        <Grid item xs={12}>
+          <Card title="Filter Options">
+            <div className="reports-menu__filters">
+              {currentReport.hasDateRange && (
+                <>
+                  <DatePickerInput
+                    label="Start Date"
+                    value={dateRange.startDate}
+                    onChange={e => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                  />
+                  <DatePickerInput
+                    label="End Date"
+                    value={dateRange.endDate}
+                    onChange={e => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                  />
+                </>
+              )}
+              
+              {currentReport.hasStatusFilter && (
+                <Select
+                  label="Status"
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value)}
+                  options={statusOptions}
+                />
+              )}
+              
+              {currentReport.hasCategoryFilter && (
+                <Select
+                  label="Category"
+                  value={categoryFilter}
+                  onChange={e => setCategoryFilter(e.target.value)}
+                  options={categoryOptions}
+                />
+              )}
+              
+              {currentReport.hasTypeFilter && (
+                <Select
+                  label="Transaction Type"
+                  value={typeFilter}
+                  onChange={e => setTypeFilter(e.target.value)}
+                  options={transactionTypeOptions}
+                />
+              )}
+              
+              {currentReport.hasEmployeeFilter && (
+                <Select
+                  label="Employee"
+                  value={employeeFilter}
+                  onChange={e => setEmployeeFilter(e.target.value)}
+                  options={employeeOptions}
+                />
+              )}
+              
+              {currentReport.hasDepartmentFilter && (
+                <Select
+                  label="Department"
+                  value={departmentFilter}
+                  onChange={e => setDepartmentFilter(e.target.value)}
+                  options={departmentOptions}
+                />
+              )}
+              
+              <div className="reports-menu__filter-actions">
+                <Button variant="outline" onClick={resetFilters}>
+                  Reset Filters
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </Grid>
 
-      <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
-
-      <Card className="reports-menu__table">
-        {loading ? (
-          <div className="page-loading"><Spinner size="lg" /></div>
-        ) : (
-          <>
-            <DataTable
-              rows={reportData}
-              columns={getColumns}
-              loading={loading}
-              pageSize={pageSize}
-              hideFooter={true}
-              getRowId={(_, i) => `report-row-${i}`}
-              ariaLabel="Reports data table"
-            />
-            <Pagination
-              currentPage={page}
-              totalPages={Math.ceil(totalCount / pageSize) || 1}
-              pageSize={pageSize}
-              totalItems={totalCount}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-            />
-          </>
-        )}
-      </Card>
+        {/* Export Action */}
+        <Grid item xs={12}>
+          <Card className="reports-menu__export-card">
+            <div className="reports-menu__export-content">
+              <div className="reports-menu__export-icon">
+                <FiDownload size={32} />
+              </div>
+              <div className="reports-menu__export-info">
+                <Typography variant="h6" fontWeight={600}>
+                  Download {currentReport.label}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {currentReport.description} will be exported as Excel file (.xlsx)
+                </Typography>
+              </div>
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={handleExport}
+                loading={isExporting}
+                startIcon={<FiDownload />}
+              >
+                Generate Report
+              </Button>
+            </div>
+          </Card>
+        </Grid>
+      </Grid>
     </div>
   );
 };

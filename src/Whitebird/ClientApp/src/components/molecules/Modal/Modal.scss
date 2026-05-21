@@ -14,6 +14,7 @@
     justify-content: center;
     z-index: $z-index-modal;
     animation: fadeIn 0.2s ease-out;
+    padding: $spacing-md;
 }
 
 .modal {
@@ -43,14 +44,20 @@
     }
 
     @include respond-to('sm') {
-        margin: $spacing-md;
+        width: 95%;
         max-height: 95vh;
+        margin: $spacing-sm;
+        
+        &--sm, &--md, &--lg, &--xl {
+            max-width: 95%;
+        }
     }
 
     &__header {
         @include flex-between;
         padding: $spacing-lg;
         border-bottom: 1px solid;
+        flex-shrink: 0;
     }
 
     &__title {
@@ -85,6 +92,7 @@
         gap: $spacing-md;
         padding: $spacing-lg;
         border-top: 1px solid;
+        flex-shrink: 0;
     }
 }
 
@@ -92,7 +100,6 @@
     from {
         opacity: 0;
     }
-
     to {
         opacity: 1;
     }
@@ -103,7 +110,6 @@
         opacity: 0;
         transform: translateY(-15px);
     }
-
     to {
         opacity: 1;
         transform: translateY(0);

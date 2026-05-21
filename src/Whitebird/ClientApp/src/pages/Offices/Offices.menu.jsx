@@ -271,7 +271,7 @@ const OfficesMenu = () => {
               <Select 
                 label="Parent Office" 
                 value={formData.parentOfficeId || ""} 
-                onChange={e => setFormData({ ...formData, parentOfficeId: e.target.value })} 
+                onChange={e => setFormData({ ...formData, parentOfficeId: e.target.value === "" ? null : e.target.value })} 
                 options={parentOfficeOptions} 
               />
             </Grid>

@@ -17,20 +17,22 @@ import Tabs from "../../components/molecules/Tabs/Tabs";
 import FilterPanel from "../../components/molecules/FilterPanel/FilterPanel";
 import IconButton from "../../components/atoms/IconButton/IconButton";
 import ImportModal from "../../components/molecules/ImportModal/ImportModal";
+import FileUploader from "../../components/molecules/FileUploader/FileUploader";
+import ModalActions from "../../components/molecules/ModalActions/ModalActions";
 import { useGridData } from "../../hooks/useGridData";
 import { useReferenceData } from "../../hooks/useReferenceData";
 import { useCrudForm } from "../../hooks/useCrudForm";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
 import { TRANSACTION_TYPE_OPTIONS, TRANSACTION_TYPE_FILTER_OPTIONS, TRANSACTION_TYPES_REQUIRING_PAIR, TRANSACTION_TYPES_REQUIRING_TO_EMPLOYEE, TRANSACTION_TYPES_REQUIRING_FROM_EMPLOYEE, TRANSACTION_TYPES, getTransactionTypeName } from "../../core/constants/transactionTypes";
-import { CONDITION_OPTIONS } from "../../core/constants/assetStatuses";
+import { cleanTransactionFormData } from "../../core/utils/formHelpers";
+import { TRANSACTION_STATUS_TABS } from "../../core/constants/tabs";
 import { getTransactionTypeCode } from "../../core/utils/mappingHelpers";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./AssetTransactions.scss";
 
 const transactionsData = new AssetTransactionsData();
+transactionsData.transformFormData = cleanTransactionFormData;
 
-// UPDATED: Removed obsolete fields (fromLocationId, vendorName)
-// Updated: fromAssetTransactionId instead of pairedTransactionId
 const INITIAL_FORM_DATA = {
   assetId: "",
   transactionType: "",
@@ -43,50 +45,8 @@ const INITIAL_FORM_DATA = {
   maintenanceType: "",
   maintenanceCost: "",
   fromAssetTransactionId: "",
+  transactionDate: new Date().toISOString(),
 };
-
-// TABS for transactions (based on approval status and special views)
-const TRANSACTION_TABS = [
-  { id: "all", label: "All" },
-  { id: "pending", label: "Pending" },
-  { id: "approved", label: "Approved" },
-  { id: "rejected", label: "Rejected" },
-  { id: "active-loans", label: "Active Loans" },
-  { id: "overdue-loans", label: "Overdue Loans" },
-];
-
-const NULLABLE_STRING_FIELDS = ['expectedReturnDate', 'notes', 'conditionBefore', 'maintenanceType'];
-const NULLABLE_INT_FIELDS = ['fromEmployeeId', 'toEmployeeId', 'toLocationId', 'fromAssetTransactionId'];
-
-const transformTransactionFormData = (data) => {
-  const result = { ...data };
-  NULLABLE_STRING_FIELDS.forEach(f => {
-    if (result[f] === '' || result[f] === undefined) result[f] = null;
-  });
-  NULLABLE_INT_FIELDS.forEach(f => {
-    if (result[f] === '' || result[f] === null || result[f] === undefined) result[f] = null;
-    else if (typeof result[f] === 'string') result[f] = parseInt(result[f], 10);
-  });
-  
-  if (result.transactionType && typeof result.transactionType === 'string') {
-    result.transactionType = getTransactionTypeCode(result.transactionType);
-  }
-  if (result.assetId === '' || result.assetId === null || result.assetId === undefined) result.assetId = 0;
-  else if (typeof result.assetId === 'string') result.assetId = parseInt(result.assetId, 10);
-  
-  if (result.maintenanceCost === '' || result.maintenanceCost === null || result.maintenanceCost === undefined) result.maintenanceCost = null;
-  else if (typeof result.maintenanceCost === 'string') result.maintenanceCost = parseFloat(result.maintenanceCost);
-  
-  if (!result.transactionDate) result.transactionDate = new Date().toISOString();
-  
-  // Remove obsolete fields
-  delete result.vendorName;
-  delete result.fromLocationId;
-  
-  return result;
-};
-
-transactionsData.transformFormData = transformTransactionFormData;
 
 const CRUD_OPTIONS = { idField: 'assetTransactionId' };
 
@@ -120,7 +80,6 @@ const AssetTransactionsMenu = () => {
   const fetchGridData = useCallback(async (params) => {
     const filters = { ...params };
     
-    // Handle tab-based filtering
     if (activeTab === 'pending') {
       return transactionsData.fetchGridData({ ...filters, approved: null });
     } else if (activeTab === 'approved') {
@@ -134,7 +93,7 @@ const AssetTransactionsMenu = () => {
           const loans = result.data?.data || result.data || [];
           return { success: true, data: { data: loans, totalCount: loans.length } };
         }
-      } catch { /* fallback to grid */ }
+      } catch { }
     } else if (activeTab === 'overdue-loans') {
       try {
         const result = await transactionsData.api.getOverdueLoans();
@@ -142,7 +101,7 @@ const AssetTransactionsMenu = () => {
           const loans = result.data?.data || result.data || [];
           return { success: true, data: { data: loans, totalCount: loans.length } };
         }
-      } catch { /* fallback to grid */ }
+      } catch { }
     }
     
     if (approvalFilter === 'pending') filters.approved = null;
@@ -159,15 +118,15 @@ const AssetTransactionsMenu = () => {
     pageSize, setPageSize, updateFilters, reload 
   } = useGridData(['transactions', activeTab, approvalFilter, typeFilter], fetchGridData);
 
-  // Load paired transaction options for pairing transactions
   useEffect(() => {
-    if (formData.transactionType && TRANSACTION_TYPES_REQUIRING_PAIR.includes(formData.transactionType) && formData.assetId) {
+    if (formData.transactionType && TRANSACTION_TYPES_REQUIRING_PAIR.includes(parseInt(formData.transactionType)) && formData.assetId) {
       setLoadingPairedOptions(true);
       (async () => {
         try {
           const result = await transactionsData.api.getByAssetId(formData.assetId);
           const allTxns = result?.data?.data || result?.data || [];
-          const pairSourceType = formData.transactionType === TRANSACTION_TYPES.LOAN_RETURN ? TRANSACTION_TYPES.LOAN : TRANSACTION_TYPES.MAINTENANCE;
+          const transactionTypeNum = parseInt(formData.transactionType);
+          const pairSourceType = transactionTypeNum === TRANSACTION_TYPES.LOAN_RETURN ? TRANSACTION_TYPES.LOAN : TRANSACTION_TYPES.MAINTENANCE;
           const validPairs = allTxns.filter(t => 
             t.transactionType === pairSourceType && 
             t.approved === true && 
@@ -184,11 +143,11 @@ const AssetTransactionsMenu = () => {
       })();
     } else {
       setPairedTransactionOptions([]);
-      if (!TRANSACTION_TYPES_REQUIRING_PAIR.includes(formData.transactionType)) {
+      if (!TRANSACTION_TYPES_REQUIRING_PAIR.includes(parseInt(formData.transactionType))) {
         setFormData(prev => ({ ...prev, fromAssetTransactionId: "" }));
       }
     }
-  }, [formData.transactionType, formData.assetId]);
+  }, [formData.transactionType, formData.assetId, setFormData, transactionsData.api]);
 
   const handleSearch = useCallback((search) => updateFilters({ search }), [updateFilters]);
   
@@ -253,7 +212,6 @@ const AssetTransactionsMenu = () => {
     await transactionsData.downloadTemplate();
   }, []);
 
-  // Helper to get display status from approved flag
   const getDisplayStatus = (row) => {
     if (row.approved === true) return 'Approved';
     if (row.approved === false) return 'Rejected';
@@ -321,12 +279,11 @@ const AssetTransactionsMenu = () => {
     setPage(1); 
   }, [setPage]);
   
-  const showFromEmployee = TRANSACTION_TYPES_REQUIRING_FROM_EMPLOYEE.includes(formData.transactionType);
-  const showToEmployee = TRANSACTION_TYPES_REQUIRING_TO_EMPLOYEE.includes(formData.transactionType);
-  const showPairedTransaction = TRANSACTION_TYPES_REQUIRING_PAIR.includes(formData.transactionType);
-  const showMaintenanceFields = formData.transactionType === TRANSACTION_TYPES.MAINTENANCE || formData.transactionType === TRANSACTION_TYPES.POST_MAINTENANCE;
+  const showFromEmployee = TRANSACTION_TYPES_REQUIRING_FROM_EMPLOYEE.includes(parseInt(formData.transactionType));
+  const showToEmployee = TRANSACTION_TYPES_REQUIRING_TO_EMPLOYEE.includes(parseInt(formData.transactionType));
+  const showPairedTransaction = TRANSACTION_TYPES_REQUIRING_PAIR.includes(parseInt(formData.transactionType));
+  const showMaintenanceFields = parseInt(formData.transactionType) === TRANSACTION_TYPES.MAINTENANCE || parseInt(formData.transactionType) === TRANSACTION_TYPES.POST_MAINTENANCE;
   
-  // Condition options from MasterData
   const conditionOptions = useMemo(() => [
     { value: "", label: "Select Condition" },
     ...(assetConditions || []).map(c => ({ value: c.value, label: c.label }))
@@ -346,7 +303,7 @@ const AssetTransactionsMenu = () => {
         </div>
       </div>
       
-      <Tabs tabs={TRANSACTION_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+      <Tabs tabs={TRANSACTION_STATUS_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar onSearch={handleSearch} onFilterToggle={() => setShowFilters(!showFilters)} showFilters={showFilters} placeholder="Search by asset, employee..." />
       <FilterPanel visible={showFilters}>
         <Select label="Approval Status" value={approvalFilter} onChange={(e) => { setApprovalFilter(e.target.value); setPage(1); }} options={[{ value: "", label: "All" }, { value: "pending", label: "Pending" }, { value: "approved", label: "Approved" }, { value: "rejected", label: "Rejected" }]} />
@@ -482,11 +439,19 @@ const AssetTransactionsMenu = () => {
                 rows={2} 
               />
             </Grid>
+            <Grid item xs={12}>
+              <FileUploader 
+                referenceTable="AssetTransaction"
+                referenceId={editingTransaction?.assetTransactionId}
+                onUploadComplete={reload}
+              />
+            </Grid>
           </Grid>
-          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 3 }}>
-            <Button variant="outline" onClick={handleClose} type="button">Cancel</Button>
-            <Button type="submit" variant="primary" loading={isSubmitting}>{editingTransaction ? "Update" : "Create"}</Button>
-          </Box>
+          <ModalActions 
+            onCancel={handleClose} 
+            isSubmitting={isSubmitting}
+            submitText={editingTransaction ? "Update" : "Create"}
+          />
         </form>
       </Modal>
 

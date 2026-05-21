@@ -48,27 +48,30 @@
     }
 }
 
+// Responsive breakpoints - konsisten di seluruh aplikasi
+$breakpoint-sm: 640px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 1024px;
+$breakpoint-xl: 1280px;
+
 @mixin respond-to($breakpoint) {
-    @if $breakpoint =='sm' {
-        @media (max-width: 640px) {
+    @if $breakpoint == 'sm' {
+        @media (max-width: $breakpoint-sm) {
             @content;
         }
     }
-
-    @else if $breakpoint =='md' {
-        @media (max-width: 768px) {
+    @else if $breakpoint == 'md' {
+        @media (max-width: $breakpoint-md) {
             @content;
         }
     }
-
-    @else if $breakpoint =='lg' {
-        @media (max-width: 1024px) {
+    @else if $breakpoint == 'lg' {
+        @media (max-width: $breakpoint-lg) {
             @content;
         }
     }
-
-    @else if $breakpoint =='xl' {
-        @media (max-width: 1280px) {
+    @else if $breakpoint == 'xl' {
+        @media (max-width: $breakpoint-xl) {
             @content;
         }
     }

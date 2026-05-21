@@ -1,37 +1,9 @@
-import React, { forwardRef } from "react";
+import React, { forwardRef, memo } from "react";
 import { NumericFormat } from "react-number-format";
 import { TextField } from "@mui/material";
 import "./Input.scss";
 
-/**
- * MUI Number Input wrapper menggunakan react-number-format.
- * Menggantikan <input type="number"> dengan number formatting yang proper.
- * 
- * Props:
- * - label: string
- * - value: string | number
- * - onChange: function (e) => setFormData({ ...formData, field: e.target.value })
- * - prefix: string (default: '') — contoh: 'Rp ' untuk currency
- * - suffix: string (default: '') — contoh: ' months', ' years'
- * - thousandSeparator: boolean (default: true)
- * - decimalScale: number (default: 0) — jumlah digit desimal
- * - allowNegative: boolean (default: false)
- * - min: number (default: undefined)
- * - max: number (default: undefined)
- * - placeholder: string
- * - required: boolean
- * - disabled: boolean
- * - error: string | boolean
- * - helperText: string
- * - name: string
- * - autoFocus: boolean
- * - fullWidth: boolean (default: true)
- * - size: string (default: 'small')
- * - variant: string (default: 'outlined')
- * - register: function (optional) — react-hook-form register
- * - registerOptions: object (optional)
- */
-const NumberInput = forwardRef(({
+const NumberInput = memo(forwardRef(({
   label,
   value,
   onChange,
@@ -59,12 +31,10 @@ const NumberInput = forwardRef(({
   const finalError = !!(error || helperText);
   const finalHelperText = error || helperText;
 
-  // Handle register jika ada
   const registerProps = register ? register(name, registerOptions) : {};
 
   const handleValueChange = (values) => {
     if (onChange) {
-      // Kirim value asli (float) ke parent
       onChange({ target: { value: values.floatValue ?? '', name: name } });
     }
   };
@@ -111,7 +81,7 @@ const NumberInput = forwardRef(({
       />
     </div>
   );
-});
+}));
 
 NumberInput.displayName = "NumberInput";
 export default NumberInput;

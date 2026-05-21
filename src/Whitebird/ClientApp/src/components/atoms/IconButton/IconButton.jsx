@@ -1,19 +1,7 @@
-import React from 'react';
+import React, { memo } from 'react';
 import './IconButton.scss';
 
-/**
- * Reusable icon button untuk table actions dan toolbar
- * @param {Object} props
- * @param {React.ReactNode} props.children - Icon element
- * @param {Function} props.onClick - Click handler
- * @param {string} [props.variant] - 'default' | 'danger' | 'success' | 'warning'
- * @param {string} [props.size] - 'sm' | 'md' | 'lg'
- * @param {string} [props.title] - Tooltip text (also used as aria-label)
- * @param {string} [props.className] - Additional CSS class
- * @param {boolean} [props.disabled] - Disabled state
- * @param {string} [props.type] - Button type
- */
-const IconButton = ({
+const IconButton = memo(({
   children,
   onClick,
   variant = 'default',
@@ -39,6 +27,7 @@ const IconButton = ({
       {children}
     </button>
   );
-};
+});
 
+IconButton.displayName = 'IconButton';
 export default IconButton;

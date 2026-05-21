@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { STATUS_COLORS } from '../../../core/constants/statusColors';
 import './StatusBadge.scss';
 
@@ -12,13 +12,7 @@ const STATUS_VARIANT_MAP = {
   'info': 'info',
 };
 
-/**
- * Reusable status badge component
- * @param {Object} props
- * @param {string} props.status - Status text to display
- * @param {string} [props.className] - Additional CSS class
- */
-const StatusBadge = ({ status, className = '' }) => {
+const StatusBadge = memo(({ status, className = '' }) => {
   if (!status && status !== 0) {
     return <span className={`status-badge status-badge--secondary ${className}`}>-</span>;
   }
@@ -31,6 +25,7 @@ const StatusBadge = ({ status, className = '' }) => {
       {status}
     </span>
   );
-};
+});
 
+StatusBadge.displayName = 'StatusBadge';
 export default StatusBadge;

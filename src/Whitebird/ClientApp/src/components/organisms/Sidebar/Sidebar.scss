@@ -203,3 +203,39 @@
         }
     }
 }
+
+// Add responsive styles at the end of Sidebar.scss
+@include respond-to('sm') {
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform $transition-base;
+        z-index: $z-index-modal;
+        
+        &--collapsed {
+            transform: translateX(0);
+            width: $sidebar-collapsed-width;
+        }
+        
+        // When not collapsed on mobile, hide it
+        &:not(.sidebar--collapsed) {
+            transform: translateX(0);
+            width: $sidebar-width;
+        }
+    }
+    
+    // Overlay when sidebar is open on mobile
+    .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: $z-index-modal-backdrop;
+        display: none;
+        
+        &.sidebar-overlay--visible {
+            display: block;
+        }
+    }
+}
