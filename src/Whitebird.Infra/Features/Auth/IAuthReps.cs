@@ -5,6 +5,7 @@ namespace Whitebird.Infra.Features.Auth;
 public interface IAuthReps
 {
     Task<UsersEntity?> GetUserByEmailAsync(string email);
+    Task<UsersEntity?> GetUserByUsernameAsync(string username);  // NEW for login
     Task<UsersEntity?> GetUserBySessionTokenAsync(string sessionToken);
     Task<UsersEntity?> GetUserByResetTokenAsync(string email, string resetToken);
     Task<UsersEntity?> GetUserByIdAsync(int userId);

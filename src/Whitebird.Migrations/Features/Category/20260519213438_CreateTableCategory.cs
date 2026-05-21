@@ -8,7 +8,10 @@ namespace Whitebird.Migrations.Features.Category
         public override void Up()
         {
             Execute.Sql(@"
-        IF NOT EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'Category' AND [xtype] = 'U')
+        -- ============================================================
+        -- CREATE TABLE
+        -- ============================================================
+        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Category')
         BEGIN
             CREATE TABLE [dbo].[Category] (
                 [CategoryId] INT IDENTITY(1,1) NOT NULL,
@@ -25,21 +28,24 @@ namespace Whitebird.Migrations.Features.Category
                 CONSTRAINT [FK_Category_ParentCategory]
                     FOREIGN KEY ([ParentCategoryId]) REFERENCES [dbo].[Category]([CategoryId])
             );
-        END;
+        END
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Category_CategoryName')
+        -- ============================================================
+        -- CREATE INDEXES (menggunakan OBJECT_ID yang lebih aman)
+        -- ============================================================
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Category_CategoryName' AND object_id = OBJECT_ID('Category'))
             CREATE INDEX [IX_Category_CategoryName]
             ON [dbo].[Category]([CategoryName]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Category_CategoryCode')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Category_CategoryCode' AND object_id = OBJECT_ID('Category'))
             CREATE INDEX [IX_Category_CategoryCode]
             ON [dbo].[Category]([CategoryCode]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Category_ParentCategoryId')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Category_ParentCategoryId' AND object_id = OBJECT_ID('Category'))
             CREATE INDEX [IX_Category_ParentCategoryId]
             ON [dbo].[Category]([ParentCategoryId]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Category_IsActive')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Category_IsActive' AND object_id = OBJECT_ID('Category'))
             CREATE INDEX [IX_Category_IsActive]
             ON [dbo].[Category]([IsActive])
             WHERE [IsActive] = 1;
@@ -49,23 +55,31 @@ namespace Whitebird.Migrations.Features.Category
         public override void Down()
         {
             Execute.Sql(@"
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Category_IsActive')
+        -- ============================================================
+        -- DROP INDEXES
+        -- ============================================================
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Category_IsActive' AND object_id = OBJECT_ID('Category'))
             DROP INDEX [IX_Category_IsActive] ON [dbo].[Category];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Category_ParentCategoryId')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Category_ParentCategoryId' AND object_id = OBJECT_ID('Category'))
             DROP INDEX [IX_Category_ParentCategoryId] ON [dbo].[Category];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Category_CategoryCode')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Category_CategoryCode' AND object_id = OBJECT_ID('Category'))
             DROP INDEX [IX_Category_CategoryCode] ON [dbo].[Category];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Category_CategoryName')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Category_CategoryName' AND object_id = OBJECT_ID('Category'))
             DROP INDEX [IX_Category_CategoryName] ON [dbo].[Category];
 
-        IF EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'Category' AND [xtype] = 'U')
+        -- ============================================================
+        -- DROP FOREIGN KEY & TABLE
+        -- ============================================================
+        IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Category')
         BEGIN
-            ALTER TABLE [dbo].[Category] DROP CONSTRAINT [FK_Category_ParentCategory];
+            IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('Category') AND name = 'FK_Category_ParentCategory')
+                ALTER TABLE [dbo].[Category] DROP CONSTRAINT [FK_Category_ParentCategory];
+            
             DROP TABLE [dbo].[Category];
-        END;
+        END
     ");
         }
     }

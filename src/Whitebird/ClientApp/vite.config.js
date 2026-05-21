@@ -6,7 +6,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
   const isDev = mode === "development";
 
-  const backendUrl = env.VITE_API_BASE_URL || "http://localhost:5001";
+  // Backend URL untuk proxy (development mode)
+  const backendUrl = env.VITE_API_BASE_URL || "https://localhost:5001";
 
   return {
     plugins: [react()],
@@ -38,7 +39,8 @@ export default defineConfig(({ mode }) => {
     },
 
     build: {
-      outDir: "dist",
+      // CRITICAL: Build output ke wwwroot (bukan dist)
+      outDir: "../wwwroot",
       emptyOutDir: true,
       sourcemap: isDev,
       minify: !isDev,

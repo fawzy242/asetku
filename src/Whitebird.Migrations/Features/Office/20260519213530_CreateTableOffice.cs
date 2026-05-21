@@ -8,7 +8,10 @@ namespace Whitebird.Migrations.Features.Office
         public override void Up()
         {
             Execute.Sql(@"
-        IF NOT EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'Office' AND [xtype] = 'U')
+        -- ============================================================
+        -- CREATE TABLE
+        -- ============================================================
+        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Office')
         BEGIN
             CREATE TABLE [dbo].[Office] (
                 [OfficeId] INT IDENTITY(1,1) NOT NULL,
@@ -29,25 +32,28 @@ namespace Whitebird.Migrations.Features.Office
                 CONSTRAINT [FK_Office_ParentOffice]
                     FOREIGN KEY ([ParentOfficeId]) REFERENCES [dbo].[Office]([OfficeId])
             );
-        END;
+        END
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Office_OfficeName')
+        -- ============================================================
+        -- CREATE INDEXES (menggunakan OBJECT_ID yang lebih aman)
+        -- ============================================================
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Office_OfficeName' AND object_id = OBJECT_ID('Office'))
             CREATE INDEX [IX_Office_OfficeName]
             ON [dbo].[Office]([OfficeName]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Office_OfficeType')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Office_OfficeType' AND object_id = OBJECT_ID('Office'))
             CREATE INDEX [IX_Office_OfficeType]
             ON [dbo].[Office]([OfficeType]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Office_City')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Office_City' AND object_id = OBJECT_ID('Office'))
             CREATE INDEX [IX_Office_City]
             ON [dbo].[Office]([City]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Office_ParentOfficeId')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Office_ParentOfficeId' AND object_id = OBJECT_ID('Office'))
             CREATE INDEX [IX_Office_ParentOfficeId]
             ON [dbo].[Office]([ParentOfficeId]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Office_IsActive')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Office_IsActive' AND object_id = OBJECT_ID('Office'))
             CREATE INDEX [IX_Office_IsActive]
             ON [dbo].[Office]([IsActive])
             WHERE [IsActive] = 1;
@@ -57,26 +63,34 @@ namespace Whitebird.Migrations.Features.Office
         public override void Down()
         {
             Execute.Sql(@"
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Office_IsActive')
+        -- ============================================================
+        -- DROP INDEXES
+        -- ============================================================
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Office_IsActive' AND object_id = OBJECT_ID('Office'))
             DROP INDEX [IX_Office_IsActive] ON [dbo].[Office];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Office_ParentOfficeId')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Office_ParentOfficeId' AND object_id = OBJECT_ID('Office'))
             DROP INDEX [IX_Office_ParentOfficeId] ON [dbo].[Office];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Office_City')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Office_City' AND object_id = OBJECT_ID('Office'))
             DROP INDEX [IX_Office_City] ON [dbo].[Office];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Office_OfficeType')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Office_OfficeType' AND object_id = OBJECT_ID('Office'))
             DROP INDEX [IX_Office_OfficeType] ON [dbo].[Office];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Office_OfficeName')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Office_OfficeName' AND object_id = OBJECT_ID('Office'))
             DROP INDEX [IX_Office_OfficeName] ON [dbo].[Office];
 
-        IF EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'Office' AND [xtype] = 'U')
+        -- ============================================================
+        -- DROP FOREIGN KEY & TABLE
+        -- ============================================================
+        IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Office')
         BEGIN
-            ALTER TABLE [dbo].[Office] DROP CONSTRAINT [FK_Office_ParentOffice];
+            IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('Office') AND name = 'FK_Office_ParentOffice')
+                ALTER TABLE [dbo].[Office] DROP CONSTRAINT [FK_Office_ParentOffice];
+            
             DROP TABLE [dbo].[Office];
-        END;
+        END
     ");
         }
     }

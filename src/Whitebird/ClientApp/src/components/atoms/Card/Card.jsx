@@ -1,7 +1,7 @@
-import React from "react";
+import React, { memo } from "react";
 import "./Card.scss";
 
-const Card = ({
+const Card = memo(({
   children,
   title = null,
   subtitle = null,
@@ -33,6 +33,7 @@ const Card = ({
       <div className="card__body">{children}</div>
     </div>
   );
-};
+});
 
+Card.displayName = "Card";
 export default Card;

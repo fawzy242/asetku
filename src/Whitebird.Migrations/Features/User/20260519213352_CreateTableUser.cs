@@ -8,7 +8,10 @@ namespace Whitebird.Migrations.Features.User
         public override void Up()
         {
             Execute.Sql(@"
-        IF NOT EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'Users' AND [xtype] = 'U')
+        -- ============================================================
+        -- CREATE TABLE
+        -- ============================================================
+        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Users')
         BEGIN
             CREATE TABLE [dbo].[Users] (
                 [UserId] INT IDENTITY(1,1) NOT NULL,
@@ -28,32 +31,37 @@ namespace Whitebird.Migrations.Features.User
                 [ResetToken] NVARCHAR(255) NULL,
                 [ResetTokenExpiry] DATETIME NULL,
                 [LastLoginDate] DATETIME NULL,
+                [ProfilePhotoPath] NVARCHAR(1000) NULL,
+                [ProfilePhotoFileName] NVARCHAR(255) NULL,
                 CONSTRAINT [PK_Users] PRIMARY KEY ([UserId]),
                 CONSTRAINT [UQ_Users_Username] UNIQUE ([Username]),
                 CONSTRAINT [UQ_Users_Email] UNIQUE ([Email])
             );
-        END;
+        END
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Users_IsActive')
+        -- ============================================================
+        -- CREATE INDEXES (menggunakan OBJECT_ID yang lebih aman)
+        -- ============================================================
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Users_IsActive' AND object_id = OBJECT_ID('Users'))
             CREATE INDEX [IX_Users_IsActive]
             ON [dbo].[Users]([IsActive])
             WHERE [IsActive] = 1;
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Users_Email')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Users_Email' AND object_id = OBJECT_ID('Users'))
             CREATE INDEX [IX_Users_Email]
             ON [dbo].[Users]([Email]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Users_SessionToken')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Users_SessionToken' AND object_id = OBJECT_ID('Users'))
             CREATE INDEX [IX_Users_SessionToken]
             ON [dbo].[Users]([SessionToken])
             WHERE [SessionToken] IS NOT NULL;
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Users_ResetToken')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Users_ResetToken' AND object_id = OBJECT_ID('Users'))
             CREATE INDEX [IX_Users_ResetToken]
             ON [dbo].[Users]([ResetToken])
             WHERE [ResetToken] IS NOT NULL;
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Users_LastLoginDate')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Users_LastLoginDate' AND object_id = OBJECT_ID('Users'))
             CREATE INDEX [IX_Users_LastLoginDate]
             ON [dbo].[Users]([LastLoginDate] DESC);
     ");
@@ -62,22 +70,28 @@ namespace Whitebird.Migrations.Features.User
         public override void Down()
         {
             Execute.Sql(@"
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Users_LastLoginDate')
+        -- ============================================================
+        -- DROP INDEXES
+        -- ============================================================
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Users_LastLoginDate' AND object_id = OBJECT_ID('Users'))
             DROP INDEX [IX_Users_LastLoginDate] ON [dbo].[Users];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Users_ResetToken')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Users_ResetToken' AND object_id = OBJECT_ID('Users'))
             DROP INDEX [IX_Users_ResetToken] ON [dbo].[Users];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Users_SessionToken')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Users_SessionToken' AND object_id = OBJECT_ID('Users'))
             DROP INDEX [IX_Users_SessionToken] ON [dbo].[Users];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Users_Email')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Users_Email' AND object_id = OBJECT_ID('Users'))
             DROP INDEX [IX_Users_Email] ON [dbo].[Users];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Users_IsActive')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Users_IsActive' AND object_id = OBJECT_ID('Users'))
             DROP INDEX [IX_Users_IsActive] ON [dbo].[Users];
 
-        IF EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'Users' AND [xtype] = 'U')
+        -- ============================================================
+        -- DROP TABLE
+        -- ============================================================
+        IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Users')
             DROP TABLE [dbo].[Users];
     ");
         }

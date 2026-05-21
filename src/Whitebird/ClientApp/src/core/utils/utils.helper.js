@@ -1,9 +1,14 @@
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { API_CONFIG, UPLOAD_CONFIG } from '../constants/appConstants';
 
 dayjs.extend(relativeTime);
 
 class UtilsHelper {
+  // ============================================================
+  // DATE FORMATTING
+  // ============================================================
+  
   formatDate(date, format = 'YYYY-MM-DD') {
     if (!date) return '-';
     return dayjs(date).format(format);
@@ -14,6 +19,15 @@ class UtilsHelper {
     return dayjs(dateTime).format(format);
   }
 
+  formatRelativeTime(date) {
+    if (!date) return '-';
+    return dayjs(date).fromNow();
+  }
+
+  // ============================================================
+  // NUMBER FORMATTING
+  // ============================================================
+  
   formatCurrency(amount, currency = 'IDR') {
     if (amount === null || amount === undefined) return '-';
     
@@ -34,64 +48,24 @@ class UtilsHelper {
     }).format(number);
   }
 
-  formatRelativeTime(date) {
-    if (!date) return '-';
-    return dayjs(date).fromNow();
-  }
-
-  debounce(func, wait = 300) {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
-      clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
-    };
-  }
-
-  throttle(func, limit = 300) {
-    let inThrottle;
-    return function(...args) {
-      if (!inThrottle) {
-        func.apply(this, args);
-        inThrottle = true;
-        setTimeout(() => inThrottle = false, limit);
-      }
-    };
+  // ============================================================
+  // STRING UTILITIES
+  // ============================================================
+  
+  truncateText(text, maxLength = 50) {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
   }
 
   generateId(prefix = '') {
     return `${prefix}${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  getStatusColor(status) {
-    const colors = {
-      // Asset Status
-      'Available': 'success',
-      'Assigned': 'primary',
-      'Under Repair': 'warning',
-      'Maintenance': 'warning',
-      'Retired': 'secondary',
-      'Disposed': 'secondary',
-      
-      // Transaction Status
-      'Pending': 'warning',
-      'Approved': 'success',
-      'Rejected': 'error',
-      'Completed': 'success',
-      'Cancelled': 'secondary',
-      
-      // Employee Status
-      'Active': 'success',
-      'Resigned': 'secondary',
-      'On Leave': 'warning'
-    };
-    
-    return colors[status] || 'secondary';
-  }
-
+  // ============================================================
+  // VALIDATION
+  // ============================================================
+  
   validateEmail(email) {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return re.test(email);
@@ -106,16 +80,10 @@ class UtilsHelper {
     return value !== null && value !== undefined && value.toString().trim() !== '';
   }
 
-  getErrorMessage(error) {
-    if (error.response?.data?.errors?.length > 0) {
-      return error.response.data.errors.join('\n');
-    }
-    if (error.response?.data?.message) {
-      return error.response.data.message;
-    }
-    return error.message || 'An unexpected error occurred';
-  }
-
+  // ============================================================
+  // LOCAL STORAGE
+  // ============================================================
+  
   setLocalStorage(key, value) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
@@ -146,6 +114,10 @@ class UtilsHelper {
     }
   }
 
+  // ============================================================
+  // QUERY STRING
+  // ============================================================
+  
   buildQueryString(params) {
     const query = Object.entries(params)
       .filter(([_, value]) => value !== null && value !== undefined && value !== '')
@@ -166,12 +138,24 @@ class UtilsHelper {
     return result;
   }
 
-  truncateText(text, maxLength = 50) {
-    if (!text) return '';
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
+  // ============================================================
+  // ERROR HANDLING
+  // ============================================================
+  
+  getErrorMessage(error) {
+    if (error.response?.data?.errors?.length > 0) {
+      return error.response.data.errors.join('\n');
+    }
+    if (error.response?.data?.message) {
+      return error.response.data.message;
+    }
+    return error.message || 'An unexpected error occurred';
   }
 
+  // ============================================================
+  // FILE HANDLING
+  // ============================================================
+  
   downloadFile(blob, fileName) {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -181,6 +165,45 @@ class UtilsHelper {
     link.click();
     link.remove();
     window.URL.revokeObjectURL(url);
+  }
+
+  formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  isImageFile(fileName) {
+    const extension = fileName?.split('.').pop()?.toLowerCase();
+    return UPLOAD_CONFIG.ALLOWED_IMAGE_EXTENSIONS.includes(`.${extension}`);
+  }
+
+  // ============================================================
+  // DEPRECATED — Use mappingHelpers.js instead
+  // ============================================================
+  
+  /**
+   * @deprecated Use getStatusChipStyles from statusColors.js instead
+   */
+  getStatusColor(status) {
+    console.warn('getStatusColor is deprecated. Use getStatusChipStyles from statusColors.js');
+    const colors = {
+      'Available': 'success',
+      'Assigned': 'primary',
+      'On Loan': 'purple',
+      'In Maintenance': 'warning',
+      'Under Repair': 'warning',
+      'Damaged': 'error',
+      'Retired': 'secondary',
+      'Pending': 'warning',
+      'Approved': 'success',
+      'Rejected': 'error',
+      'Active': 'success',
+      'Resigned': 'secondary',
+    };
+    return colors[status] || 'secondary';
   }
 }
 

@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
   const performLogout = useCallback(async () => {
     const token = localStorage.getItem("whitebird_session_token");
     if (token) { 
-      try { await apiService.post("/auth/logout", { sessionToken: token }); } catch {} 
+      try { await apiService.post("/Auth/logout", { sessionToken: token }); } catch {} 
     }
     localStorage.removeItem("whitebird_session_token");
     utilsHelper.removeLocalStorage("user");
@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }) => {
     
     if (token && savedUser) {
       try {
-        const response = await apiService.get("/auth/validate-session");
+        const response = await apiService.get("/Auth/validate-session");
         const isValid = response.data?.data?.isValid || response.data?.isValid;
         if (!mountedRef.current) return;
         if (isValid) { 
@@ -70,9 +70,10 @@ export const AuthProvider = ({ children }) => {
     };
   }, [checkAuth]);
 
-  const login = useCallback(async (email, password) => {
+  // UPDATED: Login now uses username instead of email
+  const login = useCallback(async (username, password) => {
     try {
-      const response = await apiService.post("/auth/login", { email, password });
+      const response = await apiService.post("/Auth/login", { username, password });
       if (response.data?.isSuccess) {
         const { sessionToken, user: userData } = response.data.data;
         localStorage.setItem("whitebird_session_token", sessionToken);
@@ -81,13 +82,13 @@ export const AuthProvider = ({ children }) => {
           setUser(userData);
           setIsAuthenticated(true);
         }
-        ConfirmDialog.toast.success(`Welcome back, ${userData.fullName}!`);
+        ConfirmDialog.toast.success(`Welcome back, ${userData.fullName || userData.username}!`);
         return { success: true };
       }
       ConfirmDialog.toast.error(response.data?.message || "Login failed");
       return { success: false, error: response.data?.message || "Login failed" };
     } catch (error) {
-      const message = error.response?.data?.message || "Invalid email or password";
+      const message = error.response?.data?.message || "Invalid username or password";
       ConfirmDialog.toast.error(message);
       return { success: false, error: message };
     }

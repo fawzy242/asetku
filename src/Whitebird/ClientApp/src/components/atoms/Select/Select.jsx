@@ -1,9 +1,9 @@
-import React, { forwardRef } from "react";
+import React, { forwardRef, memo } from "react";
 import { FormControl, InputLabel, Select as MuiSelect, MenuItem, FormHelperText } from "@mui/material";
 import { useUIStore } from "../../../stores/uiStore";
 import "./Select.scss";
 
-const Select = forwardRef(({
+const Select = memo(forwardRef(({
   label,
   options = [],
   value,
@@ -80,7 +80,6 @@ const Select = forwardRef(({
                 maxHeight: '300px',
                 backgroundColor: isDark ? '#1f2937' : '#ffffff',
                 color: isDark ? '#f9fafb' : '#111827',
-                // FIX: Scrollbar styling
                 '&::-webkit-scrollbar': {
                   width: '6px',
                 },
@@ -127,7 +126,7 @@ const Select = forwardRef(({
       </FormControl>
     </div>
   );
-});
+}));
 
 Select.displayName = "Select";
 export default Select;

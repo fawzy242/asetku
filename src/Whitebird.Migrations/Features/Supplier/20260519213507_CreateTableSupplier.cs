@@ -8,7 +8,10 @@ namespace Whitebird.Migrations.Features.Supplier
         public override void Up()
         {
             Execute.Sql(@"
-        IF NOT EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'Supplier' AND [xtype] = 'U')
+        -- ============================================================
+        -- CREATE TABLE
+        -- ============================================================
+        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Supplier')
         BEGIN
             CREATE TABLE [dbo].[Supplier] (
                 [SupplierId] INT IDENTITY(1,1) NOT NULL,
@@ -24,17 +27,20 @@ namespace Whitebird.Migrations.Features.Supplier
                 [Address] NVARCHAR(500) NULL,
                 CONSTRAINT [PK_Supplier] PRIMARY KEY ([SupplierId])
             );
-        END;
+        END
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Supplier_SupplierName')
+        -- ============================================================
+        -- CREATE INDEXES (menggunakan OBJECT_ID yang lebih aman)
+        -- ============================================================
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Supplier_SupplierName' AND object_id = OBJECT_ID('Supplier'))
             CREATE INDEX [IX_Supplier_SupplierName]
             ON [dbo].[Supplier]([SupplierName]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Supplier_Email')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Supplier_Email' AND object_id = OBJECT_ID('Supplier'))
             CREATE INDEX [IX_Supplier_Email]
             ON [dbo].[Supplier]([Email]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Supplier_IsActive')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Supplier_IsActive' AND object_id = OBJECT_ID('Supplier'))
             CREATE INDEX [IX_Supplier_IsActive]
             ON [dbo].[Supplier]([IsActive])
             WHERE [IsActive] = 1;
@@ -44,16 +50,22 @@ namespace Whitebird.Migrations.Features.Supplier
         public override void Down()
         {
             Execute.Sql(@"
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Supplier_IsActive')
+        -- ============================================================
+        -- DROP INDEXES
+        -- ============================================================
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Supplier_IsActive' AND object_id = OBJECT_ID('Supplier'))
             DROP INDEX [IX_Supplier_IsActive] ON [dbo].[Supplier];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Supplier_Email')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Supplier_Email' AND object_id = OBJECT_ID('Supplier'))
             DROP INDEX [IX_Supplier_Email] ON [dbo].[Supplier];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Supplier_SupplierName')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Supplier_SupplierName' AND object_id = OBJECT_ID('Supplier'))
             DROP INDEX [IX_Supplier_SupplierName] ON [dbo].[Supplier];
 
-        IF EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'Supplier' AND [xtype] = 'U')
+        -- ============================================================
+        -- DROP TABLE
+        -- ============================================================
+        IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Supplier')
             DROP TABLE [dbo].[Supplier];
     ");
         }

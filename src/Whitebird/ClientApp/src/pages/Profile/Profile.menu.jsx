@@ -73,10 +73,14 @@ const ProfileMenu = () => {
     }
   };
 
+  // NOTE: Profile update endpoint does not exist in backend
+  // This is a local-only update for demo purposes
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
     if (!validateProfile()) return;
     setSaving(true);
+    // Simulate API call - backend does not have /Auth/profile endpoint
+    await new Promise(resolve => setTimeout(resolve, 500));
     setSaving(false);
     setEditMode(false);
     setProfile(prev => ({ ...prev, ...formData }));
@@ -102,7 +106,7 @@ const ProfileMenu = () => {
 
   if (loading) return <div className="profile-loading"><Spinner size="lg" /></div>;
 
-  const userInitial = profile?.fullName?.charAt(0) || 'U';
+  const userInitial = profile?.fullName?.charAt(0) || profile?.username?.charAt(0) || 'U';
 
   return (
     <div className="profile-menu fade-transition">
@@ -120,7 +124,7 @@ const ProfileMenu = () => {
               <Avatar sx={{ width: 80, height: 80, bgcolor: 'var(--primary)', fontSize: 32, fontWeight: 600 }}>{userInitial}</Avatar>
               <Box sx={{ flex: 1 }}>
                 <Typography variant="h6" fontWeight={600}>{profile?.fullName}</Typography>
-                <Typography variant="body2" color="text.secondary">{profile?.roleId}</Typography>
+                <Typography variant="body2" color="text.secondary">{profile?.roleId || 'User'}</Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
                   <FiCalendar size={12} /> Member since {utilsHelper.formatDate(profile?.createdDate, 'MMMM D, YYYY')}
                 </Typography>
@@ -165,9 +169,20 @@ const ProfileMenu = () => {
                   </Box>
                   <Box>
                     <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Role</Typography>
-                    <Typography variant="body1" fontWeight={500}>{profile?.roleId}</Typography>
+                    <Typography variant="body1" fontWeight={500}>{profile?.roleId || 'User'}</Typography>
                   </Box>
                 </Box>
+                {profile?.phoneNumber && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'var(--surface)', borderRadius: 2, color: 'var(--primary)' }}>
+                      <FiBriefcase size={20} />
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Phone</Typography>
+                      <Typography variant="body1" fontWeight={500}>{profile?.phoneNumber}</Typography>
+                    </Box>
+                  </Box>
+                )}
               </Box>
             ) : (
               <form onSubmit={handleProfileUpdate}>
@@ -180,6 +195,9 @@ const ProfileMenu = () => {
                   </Grid>
                   <Grid item xs={12}>
                     <Input label="Phone (Optional)" value={formData.phoneNumber} onChange={e => setFormData({ ...formData, phoneNumber: e.target.value })} />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Input label="Username" value={formData.username} disabled />
                   </Grid>
                   <Grid item xs={12}>
                     <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>

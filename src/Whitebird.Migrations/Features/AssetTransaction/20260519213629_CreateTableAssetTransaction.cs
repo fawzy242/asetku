@@ -8,7 +8,10 @@ namespace Whitebird.Migrations.Features.AssetTransaction
         public override void Up()
         {
             Execute.Sql(@"
-        IF NOT EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'AssetTransaction' AND [xtype] = 'U')
+        -- ============================================================
+        -- CREATE TABLE
+        -- ============================================================
+        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'AssetTransaction')
         BEGIN
             CREATE TABLE [dbo].[AssetTransaction] (
                 [AssetTransactionId] INT IDENTITY(1,1) NOT NULL,
@@ -45,53 +48,56 @@ namespace Whitebird.Migrations.Features.AssetTransaction
                 CONSTRAINT [FK_AssetTransaction_ToOffice]
                     FOREIGN KEY ([ToLocationId]) REFERENCES [dbo].[Office]([OfficeId])
             );
-        END;
+        END
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_AssetId')
+        -- ============================================================
+        -- CREATE INDEXES (menggunakan OBJECT_ID yang lebih aman)
+        -- ============================================================
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_AssetId' AND object_id = OBJECT_ID('AssetTransaction'))
             CREATE INDEX [IX_AssetTransaction_AssetId]
             ON [dbo].[AssetTransaction]([AssetId]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_TransactionDate')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_TransactionDate' AND object_id = OBJECT_ID('AssetTransaction'))
             CREATE INDEX [IX_AssetTransaction_TransactionDate]
             ON [dbo].[AssetTransaction]([TransactionDate] DESC);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_TransactionType')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_TransactionType' AND object_id = OBJECT_ID('AssetTransaction'))
             CREATE INDEX [IX_AssetTransaction_TransactionType]
             ON [dbo].[AssetTransaction]([TransactionType]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_FromEmployeeId')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_FromEmployeeId' AND object_id = OBJECT_ID('AssetTransaction'))
             CREATE INDEX [IX_AssetTransaction_FromEmployeeId]
             ON [dbo].[AssetTransaction]([FromEmployeeId]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_ToEmployeeId')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_ToEmployeeId' AND object_id = OBJECT_ID('AssetTransaction'))
             CREATE INDEX [IX_AssetTransaction_ToEmployeeId]
             ON [dbo].[AssetTransaction]([ToEmployeeId]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_ToLocationId')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_ToLocationId' AND object_id = OBJECT_ID('AssetTransaction'))
             CREATE INDEX [IX_AssetTransaction_ToLocationId]
             ON [dbo].[AssetTransaction]([ToLocationId]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_Approved')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_Approved' AND object_id = OBJECT_ID('AssetTransaction'))
             CREATE INDEX [IX_AssetTransaction_Approved]
             ON [dbo].[AssetTransaction]([Approved])
             WHERE [Approved] IS NOT NULL;
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_ExpectedReturnDate')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_ExpectedReturnDate' AND object_id = OBJECT_ID('AssetTransaction'))
             CREATE INDEX [IX_AssetTransaction_ExpectedReturnDate]
             ON [dbo].[AssetTransaction]([ExpectedReturnDate])
             WHERE [ExpectedReturnDate] IS NOT NULL;
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_FromAssetTransactionId')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_FromAssetTransactionId' AND object_id = OBJECT_ID('AssetTransaction'))
             CREATE INDEX [IX_AssetTransaction_FromAssetTransactionId]
             ON [dbo].[AssetTransaction]([FromAssetTransactionId])
             WHERE [FromAssetTransactionId] IS NOT NULL;
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_IsActive')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_IsActive' AND object_id = OBJECT_ID('AssetTransaction'))
             CREATE INDEX [IX_AssetTransaction_IsActive]
             ON [dbo].[AssetTransaction]([IsActive])
             WHERE [IsActive] = 1;
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_AssetId_TransactionDate')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_AssetId_TransactionDate' AND object_id = OBJECT_ID('AssetTransaction'))
             CREATE INDEX [IX_AssetTransaction_AssetId_TransactionDate]
             ON [dbo].[AssetTransaction]([AssetId], [TransactionDate] DESC);
     ");
@@ -100,48 +106,64 @@ namespace Whitebird.Migrations.Features.AssetTransaction
         public override void Down()
         {
             Execute.Sql(@"
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_AssetId_TransactionDate')
+        -- ============================================================
+        -- DROP INDEXES
+        -- ============================================================
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_AssetId_TransactionDate' AND object_id = OBJECT_ID('AssetTransaction'))
             DROP INDEX [IX_AssetTransaction_AssetId_TransactionDate] ON [dbo].[AssetTransaction];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_IsActive')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_IsActive' AND object_id = OBJECT_ID('AssetTransaction'))
             DROP INDEX [IX_AssetTransaction_IsActive] ON [dbo].[AssetTransaction];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_FromAssetTransactionId')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_FromAssetTransactionId' AND object_id = OBJECT_ID('AssetTransaction'))
             DROP INDEX [IX_AssetTransaction_FromAssetTransactionId] ON [dbo].[AssetTransaction];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_ExpectedReturnDate')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_ExpectedReturnDate' AND object_id = OBJECT_ID('AssetTransaction'))
             DROP INDEX [IX_AssetTransaction_ExpectedReturnDate] ON [dbo].[AssetTransaction];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_Approved')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_Approved' AND object_id = OBJECT_ID('AssetTransaction'))
             DROP INDEX [IX_AssetTransaction_Approved] ON [dbo].[AssetTransaction];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_ToLocationId')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_ToLocationId' AND object_id = OBJECT_ID('AssetTransaction'))
             DROP INDEX [IX_AssetTransaction_ToLocationId] ON [dbo].[AssetTransaction];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_ToEmployeeId')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_ToEmployeeId' AND object_id = OBJECT_ID('AssetTransaction'))
             DROP INDEX [IX_AssetTransaction_ToEmployeeId] ON [dbo].[AssetTransaction];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_FromEmployeeId')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_FromEmployeeId' AND object_id = OBJECT_ID('AssetTransaction'))
             DROP INDEX [IX_AssetTransaction_FromEmployeeId] ON [dbo].[AssetTransaction];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_TransactionType')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_TransactionType' AND object_id = OBJECT_ID('AssetTransaction'))
             DROP INDEX [IX_AssetTransaction_TransactionType] ON [dbo].[AssetTransaction];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_TransactionDate')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_TransactionDate' AND object_id = OBJECT_ID('AssetTransaction'))
             DROP INDEX [IX_AssetTransaction_TransactionDate] ON [dbo].[AssetTransaction];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_AssetTransaction_AssetId')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AssetTransaction_AssetId' AND object_id = OBJECT_ID('AssetTransaction'))
             DROP INDEX [IX_AssetTransaction_AssetId] ON [dbo].[AssetTransaction];
 
-        IF EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'AssetTransaction' AND [xtype] = 'U')
+        -- ============================================================
+        -- DROP FOREIGN KEYS & TABLE
+        -- ============================================================
+        IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'AssetTransaction')
         BEGIN
-            ALTER TABLE [dbo].[AssetTransaction] DROP CONSTRAINT [FK_AssetTransaction_ToOffice];
-            ALTER TABLE [dbo].[AssetTransaction] DROP CONSTRAINT [FK_AssetTransaction_ToEmployee];
-            ALTER TABLE [dbo].[AssetTransaction] DROP CONSTRAINT [FK_AssetTransaction_FromEmployee];
-            ALTER TABLE [dbo].[AssetTransaction] DROP CONSTRAINT [FK_AssetTransaction_PreviousTransaction];
-            ALTER TABLE [dbo].[AssetTransaction] DROP CONSTRAINT [FK_AssetTransaction_Asset];
+            IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('AssetTransaction') AND name = 'FK_AssetTransaction_ToOffice')
+                ALTER TABLE [dbo].[AssetTransaction] DROP CONSTRAINT [FK_AssetTransaction_ToOffice];
+            
+            IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('AssetTransaction') AND name = 'FK_AssetTransaction_ToEmployee')
+                ALTER TABLE [dbo].[AssetTransaction] DROP CONSTRAINT [FK_AssetTransaction_ToEmployee];
+            
+            IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('AssetTransaction') AND name = 'FK_AssetTransaction_FromEmployee')
+                ALTER TABLE [dbo].[AssetTransaction] DROP CONSTRAINT [FK_AssetTransaction_FromEmployee];
+            
+            IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('AssetTransaction') AND name = 'FK_AssetTransaction_PreviousTransaction')
+                ALTER TABLE [dbo].[AssetTransaction] DROP CONSTRAINT [FK_AssetTransaction_PreviousTransaction];
+            
+            IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('AssetTransaction') AND name = 'FK_AssetTransaction_Asset')
+                ALTER TABLE [dbo].[AssetTransaction] DROP CONSTRAINT [FK_AssetTransaction_Asset];
+            
             DROP TABLE [dbo].[AssetTransaction];
-        END;
+        END
     ");
         }
     }

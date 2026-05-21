@@ -4,30 +4,86 @@ import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialo
 import utilsHelper from '../../core/utils/utils.helper';
 
 class ReportsData {
-  constructor() { this.api = ReportsApi; }
+  constructor() {
+    this.api = ReportsApi;
+  }
 
   async fetchDashboardStats() {
-    try { const r = await this.api.getDashboardStats(); return { success: true, data: r.data || {} }; }
-    catch { return { success: false, error: 'Failed to load stats' }; }
+    try {
+      const r = await this.api.getDashboardStats();
+      return { success: true, data: r.data || {} };
+    } catch {
+      return { success: false, error: 'Failed to load stats' };
+    }
   }
 
   async fetchFilterOptions() {
     try {
       const [categories, suppliers, employees] = await Promise.all([
-        this.api.getCategories(), this.api.getSuppliers(), this.api.getEmployees()
+        this.api.getCategories(),
+        this.api.getSuppliers(),
+        this.api.getEmployees()
       ]);
       const departments = [...new Set((employees.data || []).map(e => e.department).filter(Boolean))];
-      return { success: true, data: { categories: categories.data || [], suppliers: suppliers.data || [], employees: employees.data || [], departments } };
-    } catch { return { success: false, error: 'Failed to load filter options' }; }
+      return {
+        success: true,
+        data: {
+          categories: categories.data || [],
+          suppliers: suppliers.data || [],
+          employees: employees.data || [],
+          departments
+        }
+      };
+    } catch {
+      return { success: false, error: 'Failed to load filter options' };
+    }
   }
 
-  async fetchTransactionData(params) { try { const r = await this.api.getAssetTransactionData(params); return { success: true, data: r.data || [] }; } catch { return { success: false, data: [] }; } }
-  async fetchInventoryData(params) { try { const r = await this.api.getAssetInventoryData(params); return { success: true, data: r.data || [] }; } catch { return { success: false, data: [] }; } }
-  async fetchEmployeeAssetData(params) { try { const r = await this.api.getEmployeeAssetData(params); return { success: true, data: r.data || [] }; } catch { return { success: false, data: [] }; } }
-  async fetchMaintenanceData(params) { try { const r = await this.api.getMaintenanceData(params); return { success: true, data: r.data || [] }; } catch { return { success: false, data: [] }; } }
-  async fetchFinancialData(params) { try { const r = await this.api.getFinancialData(params); return { success: true, data: r.data || [] }; } catch { return { success: false, data: [] }; } }
+  async fetchTransactionData(params) {
+    try {
+      const r = await this.api.getAssetTransactionData(params);
+      return { success: true, data: r.data || [] };
+    } catch {
+      return { success: false, data: [] };
+    }
+  }
 
-  // Client-side export using XLSX
+  async fetchInventoryData(params) {
+    try {
+      const r = await this.api.getAssetInventoryData(params);
+      return { success: true, data: r.data || [] };
+    } catch {
+      return { success: false, data: [] };
+    }
+  }
+
+  async fetchEmployeeAssetData(params) {
+    try {
+      const r = await this.api.getEmployeeAssetData(params);
+      return { success: true, data: r.data || [] };
+    } catch {
+      return { success: false, data: [] };
+    }
+  }
+
+  async fetchMaintenanceData(params) {
+    try {
+      const r = await this.api.getMaintenanceData(params);
+      return { success: true, data: r.data || [] };
+    } catch {
+      return { success: false, data: [] };
+    }
+  }
+
+  async fetchFinancialData(params) {
+    try {
+      const r = await this.api.getFinancialData(params);
+      return { success: true, data: r.data || [] };
+    } catch {
+      return { success: false, data: [] };
+    }
+  }
+
   async exportToExcel(data, filename, sheetName = 'Report') {
     try {
       if (!data || data.length === 0) {
@@ -46,7 +102,6 @@ class ReportsData {
     }
   }
 
-  // Server-side export using backend EPPlus endpoints
   async exportFromServer(endpointFn, params, filename) {
     try {
       const blob = await endpointFn(params);
@@ -54,7 +109,6 @@ class ReportsData {
       ConfirmDialog.toast.success('Report exported successfully');
       return { success: true };
     } catch {
-      // Fallback to client-side export
       ConfirmDialog.toast.info('Server export unavailable. Using client-side export.');
       return { success: false };
     }

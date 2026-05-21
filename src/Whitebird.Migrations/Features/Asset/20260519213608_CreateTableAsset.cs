@@ -8,7 +8,10 @@ namespace Whitebird.Migrations.Features.Asset
         public override void Up()
         {
             Execute.Sql(@"
-        IF NOT EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'Asset' AND [xtype] = 'U')
+        -- ============================================================
+        -- CREATE TABLE
+        -- ============================================================
+        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Asset')
         BEGIN
             CREATE TABLE [dbo].[Asset] (
                 [AssetId] INT IDENTITY(1,1) NOT NULL,
@@ -52,51 +55,54 @@ namespace Whitebird.Migrations.Features.Asset
                 CONSTRAINT [FK_Asset_Office]
                     FOREIGN KEY ([OfficeId]) REFERENCES [dbo].[Office]([OfficeId])
             );
-        END;
+        END
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_AssetName')
+        -- ============================================================
+        -- CREATE INDEXES (menggunakan OBJECT_ID yang lebih aman)
+        -- ============================================================
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_AssetName' AND object_id = OBJECT_ID('Asset'))
             CREATE INDEX [IX_Asset_AssetName]
             ON [dbo].[Asset]([AssetName]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_CategoryId')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_CategoryId' AND object_id = OBJECT_ID('Asset'))
             CREATE INDEX [IX_Asset_CategoryId]
             ON [dbo].[Asset]([CategoryId]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_SupplierId')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_SupplierId' AND object_id = OBJECT_ID('Asset'))
             CREATE INDEX [IX_Asset_SupplierId]
             ON [dbo].[Asset]([SupplierId]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_OfficeId')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_OfficeId' AND object_id = OBJECT_ID('Asset'))
             CREATE INDEX [IX_Asset_OfficeId]
             ON [dbo].[Asset]([OfficeId]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_SerialNumber')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_SerialNumber' AND object_id = OBJECT_ID('Asset'))
             CREATE INDEX [IX_Asset_SerialNumber]
             ON [dbo].[Asset]([SerialNumber])
             WHERE [SerialNumber] IS NOT NULL;
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_AssetCondition')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_AssetCondition' AND object_id = OBJECT_ID('Asset'))
             CREATE INDEX [IX_Asset_AssetCondition]
             ON [dbo].[Asset]([AssetCondition]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_PurchaseDate')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_PurchaseDate' AND object_id = OBJECT_ID('Asset'))
             CREATE INDEX [IX_Asset_PurchaseDate]
             ON [dbo].[Asset]([PurchaseDate] DESC);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_WarrantyExpiryDate')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_WarrantyExpiryDate' AND object_id = OBJECT_ID('Asset'))
             CREATE INDEX [IX_Asset_WarrantyExpiryDate]
             ON [dbo].[Asset]([WarrantyExpiryDate]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_NextMaintenanceDate')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_NextMaintenanceDate' AND object_id = OBJECT_ID('Asset'))
             CREATE INDEX [IX_Asset_NextMaintenanceDate]
             ON [dbo].[Asset]([NextMaintenanceDate]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_IsActive')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_IsActive' AND object_id = OBJECT_ID('Asset'))
             CREATE INDEX [IX_Asset_IsActive]
             ON [dbo].[Asset]([IsActive])
             WHERE [IsActive] = 1;
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_OperasionalOffice')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_OperasionalOffice' AND object_id = OBJECT_ID('Asset'))
             CREATE INDEX [IX_Asset_OperasionalOffice]
             ON [dbo].[Asset]([OperasionalOffice], [IsActive])
             WHERE [OperasionalOffice] = 1 AND [IsActive] = 1;
@@ -106,46 +112,58 @@ namespace Whitebird.Migrations.Features.Asset
         public override void Down()
         {
             Execute.Sql(@"
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_OperasionalOffice')
+        -- ============================================================
+        -- DROP INDEXES
+        -- ============================================================
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_OperasionalOffice' AND object_id = OBJECT_ID('Asset'))
             DROP INDEX [IX_Asset_OperasionalOffice] ON [dbo].[Asset];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_IsActive')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_IsActive' AND object_id = OBJECT_ID('Asset'))
             DROP INDEX [IX_Asset_IsActive] ON [dbo].[Asset];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_NextMaintenanceDate')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_NextMaintenanceDate' AND object_id = OBJECT_ID('Asset'))
             DROP INDEX [IX_Asset_NextMaintenanceDate] ON [dbo].[Asset];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_WarrantyExpiryDate')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_WarrantyExpiryDate' AND object_id = OBJECT_ID('Asset'))
             DROP INDEX [IX_Asset_WarrantyExpiryDate] ON [dbo].[Asset];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_PurchaseDate')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_PurchaseDate' AND object_id = OBJECT_ID('Asset'))
             DROP INDEX [IX_Asset_PurchaseDate] ON [dbo].[Asset];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_AssetCondition')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_AssetCondition' AND object_id = OBJECT_ID('Asset'))
             DROP INDEX [IX_Asset_AssetCondition] ON [dbo].[Asset];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_SerialNumber')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_SerialNumber' AND object_id = OBJECT_ID('Asset'))
             DROP INDEX [IX_Asset_SerialNumber] ON [dbo].[Asset];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_OfficeId')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_OfficeId' AND object_id = OBJECT_ID('Asset'))
             DROP INDEX [IX_Asset_OfficeId] ON [dbo].[Asset];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_SupplierId')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_SupplierId' AND object_id = OBJECT_ID('Asset'))
             DROP INDEX [IX_Asset_SupplierId] ON [dbo].[Asset];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_CategoryId')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_CategoryId' AND object_id = OBJECT_ID('Asset'))
             DROP INDEX [IX_Asset_CategoryId] ON [dbo].[Asset];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Asset_AssetName')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Asset_AssetName' AND object_id = OBJECT_ID('Asset'))
             DROP INDEX [IX_Asset_AssetName] ON [dbo].[Asset];
 
-        IF EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'Asset' AND [xtype] = 'U')
+        -- ============================================================
+        -- DROP FOREIGN KEYS & TABLE
+        -- ============================================================
+        IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Asset')
         BEGIN
-            ALTER TABLE [dbo].[Asset] DROP CONSTRAINT [FK_Asset_Office];
-            ALTER TABLE [dbo].[Asset] DROP CONSTRAINT [FK_Asset_Supplier];
-            ALTER TABLE [dbo].[Asset] DROP CONSTRAINT [FK_Asset_Category];
+            IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('Asset') AND name = 'FK_Asset_Office')
+                ALTER TABLE [dbo].[Asset] DROP CONSTRAINT [FK_Asset_Office];
+            
+            IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('Asset') AND name = 'FK_Asset_Supplier')
+                ALTER TABLE [dbo].[Asset] DROP CONSTRAINT [FK_Asset_Supplier];
+            
+            IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('Asset') AND name = 'FK_Asset_Category')
+                ALTER TABLE [dbo].[Asset] DROP CONSTRAINT [FK_Asset_Category];
+            
             DROP TABLE [dbo].[Asset];
-        END;
+        END
     ");
         }
     }

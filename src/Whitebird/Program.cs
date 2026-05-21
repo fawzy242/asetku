@@ -24,8 +24,7 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "Asetku - Asset Management System API",
         Version = "v2.0.0",
-        Description = @"
-Complete API for managing assets, tracking transactions, employees, offices, departments, and file attachments.
+        Description = @"Complete API for managing assets, tracking transactions, employees, offices, departments, and file attachments.
 
 ## Key Features:
 - **Asset Management**: CRUD, tracking, warranty, maintenance
@@ -70,7 +69,6 @@ Use session token from /api/Auth/login
         }
     });
 
-    // Include XML comments
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
@@ -152,13 +150,24 @@ using (var scope = app.Services.CreateScope())
 }
 
 // ========== SWAGGER ==========
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+if (app.Environment.IsDevelopment())
 {
-    c.SwaggerEndpoint("/swagger/v2/swagger.json", "Asetku API V2");
-    c.RoutePrefix = "swagger";
-    c.DocumentTitle = "Asetku Asset Management API";
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v2/swagger.json", "Asetku API V2");
+        c.RoutePrefix = "swagger";
+        c.DocumentTitle = "Asetku Asset Management API";
+    });
+}
+
+// ========== SERVE STATIC FILES (Frontend) ==========
+// Ini kunci untuk IIS deployment: serve frontend dari wwwroot
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
+// Fallback: Untuk SPA routing, semua request non-API diarahkan ke index.html
+app.MapFallbackToFile("/index.html");
 
 // ========== PRODUCTION SECURITY ==========
 if (!app.Environment.IsDevelopment())

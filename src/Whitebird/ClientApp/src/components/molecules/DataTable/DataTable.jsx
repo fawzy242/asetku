@@ -24,17 +24,20 @@ const DataTable = memo(({
   const theme = useUIStore((s) => s.theme);
   const isDark = theme === 'dark';
 
+  // Memoized rows to prevent unnecessary re-renders
   const safeRows = useMemo(() => {
     if (!rows) return [];
     if (Array.isArray(rows)) return rows;
     return [];
   }, [rows]);
 
+  // Memoized columns to prevent unnecessary re-renders
   const safeColumns = useMemo(() => {
     if (!columns || !Array.isArray(columns)) return [];
     return columns;
   }, [columns]);
 
+  // Memoized getRowId function
   const safeGetRowId = useMemo(() => {
     return (row) => {
       if (typeof getRowId === 'function') {
@@ -47,11 +50,11 @@ const DataTable = memo(({
       if (row?.assetId != null) return row.assetId;
       if (row?.categoryId != null) return row.categoryId;
       if (row?.supplierId != null) return row.supplierId;
-      if (row?.locationId != null) return row.locationId;
+      if (row?.officeId != null) return row.officeId;
       if (row?.employeeId != null) return row.employeeId;
       if (row?.assetTransactionId != null) return row.assetTransactionId;
       const fallback = row?.assetCode || row?.categoryName || row?.supplierName ||
-        row?.locationName || row?.fullName || row?.employeeCode || '';
+        row?.officeName || row?.fullName || row?.employeeCode || '';
       if (fallback) return fallback;
       return `row-${Math.random().toString(36).substr(2, 9)}`;
     };
@@ -59,6 +62,7 @@ const DataTable = memo(({
 
   const effectiveAutoHeight = autoHeight || hideFooter;
 
+  // Memoized MUI theme to prevent recreation
   const muiTheme = useMemo(() => createTheme({
     palette: {
       mode: isDark ? 'dark' : 'light',

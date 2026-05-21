@@ -6,9 +6,9 @@
       "type": "node",
       "request": "launch",
       "preLaunchTask": "start-fullstack",
-      "program": "${workspaceFolder}/src/Whitebird/node_modules/vite/bin/vite.js",
+      "program": "${workspaceFolder}/src/Whitebird/ClientApp/node_modules/vite/bin/vite.js",
       "args": ["--host"],
-      "cwd": "${workspaceFolder}/src/Whitebird",
+      "cwd": "${workspaceFolder}/src/Whitebird/ClientApp",
       "serverReadyAction": {
         "action": "openExternally",
         "pattern": "Local:\\s+(http://localhost:\\d+)",
@@ -48,9 +48,9 @@
       "name": "🎨 Frontend Only",
       "type": "node",
       "request": "launch",
-      "program": "${workspaceFolder}/src/Whitebird/node_modules/vite/bin/vite.js",
+      "program": "${workspaceFolder}/src/Whitebird/ClientApp/node_modules/vite/bin/vite.js",
       "args": ["--host"],
-      "cwd": "${workspaceFolder}/src/Whitebird",
+      "cwd": "${workspaceFolder}/src/Whitebird/ClientApp",
       "serverReadyAction": {
         "action": "openExternally",
         "pattern": "Local:\\s+(http://localhost:\\d+)",

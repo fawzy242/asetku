@@ -8,7 +8,10 @@ namespace Whitebird.Migrations.Features.Department
         public override void Up()
         {
             Execute.Sql(@"
-        IF NOT EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'Department' AND [xtype] = 'U')
+        -- ============================================================
+        -- CREATE TABLE
+        -- ============================================================
+        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Department')
         BEGIN
             CREATE TABLE [dbo].[Department] (
                 [DepartmentId] INT IDENTITY(1,1) NOT NULL,
@@ -22,17 +25,20 @@ namespace Whitebird.Migrations.Features.Department
                 [Description] NVARCHAR(500) NULL,
                 CONSTRAINT [PK_Department] PRIMARY KEY ([DepartmentId])
             );
-        END;
+        END
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Department_DepartmentName')
+        -- ============================================================
+        -- CREATE INDEXES (menggunakan OBJECT_ID yang lebih aman)
+        -- ============================================================
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Department_DepartmentName' AND object_id = OBJECT_ID('Department'))
             CREATE INDEX [IX_Department_DepartmentName]
             ON [dbo].[Department]([DepartmentName]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Department_DepartmentCode')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Department_DepartmentCode' AND object_id = OBJECT_ID('Department'))
             CREATE INDEX [IX_Department_DepartmentCode]
             ON [dbo].[Department]([DepartmentCode]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Department_IsActive')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Department_IsActive' AND object_id = OBJECT_ID('Department'))
             CREATE INDEX [IX_Department_IsActive]
             ON [dbo].[Department]([IsActive])
             WHERE [IsActive] = 1;
@@ -42,16 +48,22 @@ namespace Whitebird.Migrations.Features.Department
         public override void Down()
         {
             Execute.Sql(@"
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Department_IsActive')
+        -- ============================================================
+        -- DROP INDEXES
+        -- ============================================================
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Department_IsActive' AND object_id = OBJECT_ID('Department'))
             DROP INDEX [IX_Department_IsActive] ON [dbo].[Department];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Department_DepartmentCode')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Department_DepartmentCode' AND object_id = OBJECT_ID('Department'))
             DROP INDEX [IX_Department_DepartmentCode] ON [dbo].[Department];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Department_DepartmentName')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Department_DepartmentName' AND object_id = OBJECT_ID('Department'))
             DROP INDEX [IX_Department_DepartmentName] ON [dbo].[Department];
 
-        IF EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'Department' AND [xtype] = 'U')
+        -- ============================================================
+        -- DROP TABLE
+        -- ============================================================
+        IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Department')
             DROP TABLE [dbo].[Department];
     ");
         }

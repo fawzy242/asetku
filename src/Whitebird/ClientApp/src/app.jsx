@@ -24,7 +24,9 @@ const Employees = lazy(() => import('./pages/Employees/Employees'));
 const EmployeeSummary = lazy(() => import('./pages/EmployeeSummary/EmployeeSummary'));
 const Categories = lazy(() => import('./pages/Categories/Categories'));
 const Suppliers = lazy(() => import('./pages/Suppliers/Suppliers'));
-const Locations = lazy(() => import('./pages/Locations/Locations'));
+const Departments = lazy(() => import('./pages/Departments/Departments'));
+const Offices = lazy(() => import('./pages/Offices/Offices'));
+const MasterData = lazy(() => import('./pages/MasterData/MasterData'));
 const Reports = lazy(() => import('./pages/Reports/Reports'));
 const Profile = lazy(() => import('./pages/Profile/Profile'));
 const NotFound = lazy(() => import('./pages/NotFound/NotFound'));
@@ -81,7 +83,9 @@ const AppRoutes = () => (
       <Route path="employee-summary" element={<LazyPage><EmployeeSummary /></LazyPage>} />
       <Route path="categories" element={<LazyPage><Categories /></LazyPage>} />
       <Route path="suppliers" element={<LazyPage><Suppliers /></LazyPage>} />
-      <Route path="locations" element={<LazyPage><Locations /></LazyPage>} />
+      <Route path="departments" element={<LazyPage><Departments /></LazyPage>} />
+      <Route path="offices" element={<LazyPage><Offices /></LazyPage>} />
+      <Route path="master-data" element={<LazyPage><MasterData /></LazyPage>} />
       <Route path="reports" element={<LazyPage><Reports /></LazyPage>} />
       <Route path="profile" element={<LazyPage><Profile /></LazyPage>} />
     </Route>

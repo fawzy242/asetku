@@ -1,41 +1,13 @@
 @use '../../../styles/variables' as *;
 @use '../../../styles/mixins' as *;
 
+// ============================================================
+// IconButton styles
+// NOTE: Base styles are in _shared.scss
+// This file only contains component-specific overrides
+// ============================================================
+
 .icon-btn {
-    @include flex-center;
-    width: 36px;
-    height: 36px;
-    color: var(--text-secondary);
-    background: transparent;
-    border-radius: $radius-md;
-    transition: all $transition-fast;
-    cursor: pointer;
-    border: none;
-
-    &:hover {
-        background: var(--surface);
-        color: var(--primary);
-    }
-
-    &--danger:hover {
-        color: var(--error);
-    }
-
-    &--success:hover {
-        color: var(--success);
-    }
-
-    &--warning:hover {
-        color: var(--warning);
-    }
-
-    &--lg {
-        width: 40px;
-        height: 40px;
-    }
-
-    &--sm {
-        width: 28px;
-        height: 28px;
-    }
+    // No duplicate styles here — use _shared.scss as source of truth
+    // Component-specific overrides can be added below if needed
 }

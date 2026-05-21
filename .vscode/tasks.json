@@ -55,7 +55,7 @@
       "command": "npm",
       "args": ["install"],
       "options": {
-        "cwd": "${workspaceFolder}/src/Whitebird"
+        "cwd": "${workspaceFolder}/src/Whitebird/ClientApp"
       },
       "presentation": {
         "reveal": "silent"
@@ -67,7 +67,7 @@
       "command": "npm",
       "args": ["run", "dev", "--", "--host"],
       "options": {
-        "cwd": "${workspaceFolder}/src/Whitebird"
+        "cwd": "${workspaceFolder}/src/Whitebird/ClientApp"
       },
       "isBackground": true,
       "problemMatcher": {
@@ -98,7 +98,7 @@
       "command": "npm",
       "args": ["run", "build"],
       "options": {
-        "cwd": "${workspaceFolder}/src/Whitebird"
+        "cwd": "${workspaceFolder}/src/Whitebird/ClientApp"
       },
       "presentation": {
         "reveal": "always"
@@ -110,7 +110,7 @@
       "command": "npm",
       "args": ["run", "preview"],
       "options": {
-        "cwd": "${workspaceFolder}/src/Whitebird"
+        "cwd": "${workspaceFolder}/src/Whitebird/ClientApp"
       },
       "isBackground": true,
       "presentation": {

@@ -8,7 +8,10 @@ namespace Whitebird.Migrations.Features.Employee
         public override void Up()
         {
             Execute.Sql(@"
-        IF NOT EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'Employee' AND [xtype] = 'U')
+        -- ============================================================
+        -- CREATE TABLE
+        -- ============================================================
+        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Employee')
         BEGIN
             CREATE TABLE [dbo].[Employee] (
                 [EmployeeId] INT IDENTITY(1,1) NOT NULL,
@@ -33,37 +36,40 @@ namespace Whitebird.Migrations.Features.Employee
                 CONSTRAINT [FK_Employee_Department]
                     FOREIGN KEY ([DepartmentId]) REFERENCES [dbo].[Department]([DepartmentId])
             );
-        END;
+        END
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Employee_FullName')
+        -- ============================================================
+        -- CREATE INDEXES (menggunakan OBJECT_ID yang lebih aman)
+        -- ============================================================
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_FullName' AND object_id = OBJECT_ID('Employee'))
             CREATE INDEX [IX_Employee_FullName]
             ON [dbo].[Employee]([FullName]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Employee_DepartmentId')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_DepartmentId' AND object_id = OBJECT_ID('Employee'))
             CREATE INDEX [IX_Employee_DepartmentId]
             ON [dbo].[Employee]([DepartmentId]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Employee_OfficeId')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_OfficeId' AND object_id = OBJECT_ID('Employee'))
             CREATE INDEX [IX_Employee_OfficeId]
             ON [dbo].[Employee]([OfficeId]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Employee_Position')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_Position' AND object_id = OBJECT_ID('Employee'))
             CREATE INDEX [IX_Employee_Position]
             ON [dbo].[Employee]([Position]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Employee_EmploymentStatus')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_EmploymentStatus' AND object_id = OBJECT_ID('Employee'))
             CREATE INDEX [IX_Employee_EmploymentStatus]
             ON [dbo].[Employee]([EmploymentStatus]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Employee_Email')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_Email' AND object_id = OBJECT_ID('Employee'))
             CREATE INDEX [IX_Employee_Email]
             ON [dbo].[Employee]([Email]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Employee_JoinDate')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_JoinDate' AND object_id = OBJECT_ID('Employee'))
             CREATE INDEX [IX_Employee_JoinDate]
             ON [dbo].[Employee]([JoinDate] DESC);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Employee_IsActive')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_IsActive' AND object_id = OBJECT_ID('Employee'))
             CREATE INDEX [IX_Employee_IsActive]
             ON [dbo].[Employee]([IsActive])
             WHERE [IsActive] = 1;
@@ -73,35 +79,43 @@ namespace Whitebird.Migrations.Features.Employee
         public override void Down()
         {
             Execute.Sql(@"
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Employee_IsActive')
+        -- ============================================================
+        -- DROP INDEXES
+        -- ============================================================
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_IsActive' AND object_id = OBJECT_ID('Employee'))
             DROP INDEX [IX_Employee_IsActive] ON [dbo].[Employee];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Employee_JoinDate')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_JoinDate' AND object_id = OBJECT_ID('Employee'))
             DROP INDEX [IX_Employee_JoinDate] ON [dbo].[Employee];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Employee_Email')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_Email' AND object_id = OBJECT_ID('Employee'))
             DROP INDEX [IX_Employee_Email] ON [dbo].[Employee];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Employee_EmploymentStatus')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_EmploymentStatus' AND object_id = OBJECT_ID('Employee'))
             DROP INDEX [IX_Employee_EmploymentStatus] ON [dbo].[Employee];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Employee_Position')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_Position' AND object_id = OBJECT_ID('Employee'))
             DROP INDEX [IX_Employee_Position] ON [dbo].[Employee];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Employee_OfficeId')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_OfficeId' AND object_id = OBJECT_ID('Employee'))
             DROP INDEX [IX_Employee_OfficeId] ON [dbo].[Employee];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Employee_DepartmentId')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_DepartmentId' AND object_id = OBJECT_ID('Employee'))
             DROP INDEX [IX_Employee_DepartmentId] ON [dbo].[Employee];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_Employee_FullName')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employee_FullName' AND object_id = OBJECT_ID('Employee'))
             DROP INDEX [IX_Employee_FullName] ON [dbo].[Employee];
 
-        IF EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'Employee' AND [xtype] = 'U')
+        -- ============================================================
+        -- DROP FOREIGN KEY & TABLE
+        -- ============================================================
+        IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Employee')
         BEGIN
-            ALTER TABLE [dbo].[Employee] DROP CONSTRAINT [FK_Employee_Department];
+            IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('Employee') AND name = 'FK_Employee_Department')
+                ALTER TABLE [dbo].[Employee] DROP CONSTRAINT [FK_Employee_Department];
+            
             DROP TABLE [dbo].[Employee];
-        END;
+        END
     ");
         }
     }

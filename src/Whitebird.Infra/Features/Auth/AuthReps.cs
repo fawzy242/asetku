@@ -19,6 +19,12 @@ public class AuthReps : IAuthReps
         return await _context.QueryFirstOrDefaultAsync<UsersEntity>(sql, new { Email = email });
     }
 
+    public async Task<UsersEntity?> GetUserByUsernameAsync(string username)
+    {
+        const string sql = "SELECT * FROM Users WHERE Username = @Username AND IsActive = 1";
+        return await _context.QueryFirstOrDefaultAsync<UsersEntity>(sql, new { Username = username });
+    }
+
     public async Task<UsersEntity?> GetUserBySessionTokenAsync(string sessionToken)
     {
         const string sql = @"
@@ -112,7 +118,7 @@ public class AuthReps : IAuthReps
                 ModifiedDate = @ModifiedDate,
                 ModifiedBy = @ModifiedBy
             WHERE UserId = @UserId AND IsActive = 1";
-        
+
         return await _context.ExecuteAsync(sql, user);
     }
 }

@@ -8,7 +8,10 @@ namespace Whitebird.Migrations.Features.ActivityLog
         public override void Up()
         {
             Execute.Sql(@"
-        IF NOT EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'ActivityLogs' AND [xtype] = 'U')
+        -- ============================================================
+        -- CREATE TABLE
+        -- ============================================================
+        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'ActivityLogs')
         BEGIN
             CREATE TABLE [dbo].[ActivityLogs] (
                 [LogId] INT IDENTITY(1,1) NOT NULL,
@@ -25,19 +28,22 @@ namespace Whitebird.Migrations.Features.ActivityLog
             );
         END;
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_ActivityLogs_ReferenceTable_ReferenceId')
+        -- ============================================================
+        -- CREATE INDEXES (menggunakan sys.indexes dengan EXISTS check yang aman)
+        -- ============================================================
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ActivityLogs_ReferenceTable_ReferenceId' AND object_id = OBJECT_ID('ActivityLogs'))
             CREATE INDEX [IX_ActivityLogs_ReferenceTable_ReferenceId]
             ON [dbo].[ActivityLogs]([ReferenceTable], [ReferenceId]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_ActivityLogs_CreatedDate')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ActivityLogs_CreatedDate' AND object_id = OBJECT_ID('ActivityLogs'))
             CREATE INDEX [IX_ActivityLogs_CreatedDate]
             ON [dbo].[ActivityLogs]([CreatedDate] DESC);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_ActivityLogs_ActivityType')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ActivityLogs_ActivityType' AND object_id = OBJECT_ID('ActivityLogs'))
             CREATE INDEX [IX_ActivityLogs_ActivityType]
             ON [dbo].[ActivityLogs]([ActivityType]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_ActivityLogs_IsActive')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ActivityLogs_IsActive' AND object_id = OBJECT_ID('ActivityLogs'))
             CREATE INDEX [IX_ActivityLogs_IsActive]
             ON [dbo].[ActivityLogs]([IsActive])
             WHERE [IsActive] = 1;
@@ -47,19 +53,25 @@ namespace Whitebird.Migrations.Features.ActivityLog
         public override void Down()
         {
             Execute.Sql(@"
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_ActivityLogs_IsActive')
+        -- ============================================================
+        -- DROP INDEXES
+        -- ============================================================
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ActivityLogs_IsActive' AND object_id = OBJECT_ID('ActivityLogs'))
             DROP INDEX [IX_ActivityLogs_IsActive] ON [dbo].[ActivityLogs];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_ActivityLogs_ActivityType')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ActivityLogs_ActivityType' AND object_id = OBJECT_ID('ActivityLogs'))
             DROP INDEX [IX_ActivityLogs_ActivityType] ON [dbo].[ActivityLogs];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_ActivityLogs_CreatedDate')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ActivityLogs_CreatedDate' AND object_id = OBJECT_ID('ActivityLogs'))
             DROP INDEX [IX_ActivityLogs_CreatedDate] ON [dbo].[ActivityLogs];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_ActivityLogs_ReferenceTable_ReferenceId')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ActivityLogs_ReferenceTable_ReferenceId' AND object_id = OBJECT_ID('ActivityLogs'))
             DROP INDEX [IX_ActivityLogs_ReferenceTable_ReferenceId] ON [dbo].[ActivityLogs];
 
-        IF EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'ActivityLogs' AND [xtype] = 'U')
+        -- ============================================================
+        -- DROP TABLE
+        -- ============================================================
+        IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'ActivityLogs')
             DROP TABLE [dbo].[ActivityLogs];
     ");
         }

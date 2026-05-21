@@ -1,9 +1,9 @@
-import React, { forwardRef, useState, useRef, useCallback } from "react";
+import React, { forwardRef, useState, useRef, useCallback, memo } from "react";
 import { TextField, InputAdornment, IconButton } from "@mui/material";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import "./Input.scss";
 
-const Input = forwardRef(({
+const Input = memo(forwardRef(({
   label,
   type = "text",
   placeholder = "",
@@ -117,7 +117,7 @@ const Input = forwardRef(({
       />
     </div>
   );
-});
+}));
 
 Input.displayName = "Input";
 export default Input;

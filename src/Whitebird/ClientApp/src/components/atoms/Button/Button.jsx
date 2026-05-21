@@ -1,8 +1,8 @@
-import React from "react";
+import React, { memo } from "react";
 import { FiLoader } from "react-icons/fi";
 import "./Button.scss";
 
-const Button = ({
+const Button = memo(({
   children,
   variant = "primary",
   size = "md",
@@ -43,6 +43,7 @@ const Button = ({
       {!loading && endIcon && <span className="btn__icon btn__icon--end">{endIcon}</span>}
     </button>
   );
-};
+});
 
+Button.displayName = "Button";
 export default Button;

@@ -1,64 +1,64 @@
 import { z } from 'zod';
 
+// Base schema with common validations
+const stringField = (max = 100, required = false) => {
+  let schema = z.string().max(max, `Maximum ${max} characters`);
+  if (!required) schema = schema.optional().or(z.literal('')).or(z.null());
+  else schema = schema.min(1, 'This field is required');
+  return schema;
+};
+
+const numberField = (required = false, min = 0, max = undefined) => {
+  let schema = z.coerce.number().min(min, `Minimum value is ${min}`);
+  if (max !== undefined) schema = schema.max(max, `Maximum value is ${max}`);
+  if (!required) schema = schema.optional().or(z.null());
+  return schema;
+};
+
+const dateField = (required = false) => {
+  let schema = z.string().or(z.null()).optional();
+  if (required) schema = z.string().min(1, 'Date is required');
+  return schema;
+};
+
 export const assetSchema = z.object({
-  assetName: z.string().min(1, 'Asset name is required').max(100),
-  categoryId: z.string().min(1, 'Category is required'),
-  subCategory: z.string().optional(),
-  assetType: z.string().optional(),
-  brand: z.string().max(50).optional(),
-  model: z.string().max(50).optional(),
-  serialNumber: z.string().max(50).optional(),
-  imei: z.string().max(50).optional(),
-  macAddress: z.string().max(50).optional(),
-  purchaseDate: z.string().optional(),
-  purchasePrice: z.string().optional(),
-  invoiceNumber: z.string().max(50).optional(),
-  warrantyPeriod: z.string().optional(),
-  warrantyExpiryDate: z.string().optional(),
-  condition: z.string().optional(),
-  status: z.string().optional(),
-  location: z.string().max(100).optional(),
-  currentHolderId: z.string().optional(),
-  responsiblePartyId: z.string().optional(),
-  supplierId: z.string().optional(),
-  residualValue: z.string().optional(),
-  usefulLife: z.string().optional(),
-  depreciationStartDate: z.string().optional(),
-  notes: z.string().max(500).optional(),
+  // Required fields
+  assetCode: stringField(50, true),
+  assetName: stringField(100, true),
+  categoryId: numberField(true, 1),
+  
+  // Optional fields
+  brand: stringField(50),
+  model: stringField(50),
+  serialNumber: stringField(50),
+  imei: stringField(50),
+  macAddress: stringField(50),
+  hostname: stringField(50),
+  ipAddress: stringField(50),
+  invoiceNumber: stringField(50),
+  notes: stringField(500),
+  
+  // Number fields
+  purchasePrice: numberField(false, 0),
+  residualValue: numberField(false, 0),
+  warrantyPeriod: numberField(false, 0),
+  usefulLife: numberField(false, 1),
+  
+  // ID fields (FK)
+  supplierId: numberField(false),
+  officeId: numberField(false),
+  assetCondition: numberField(false, 1, 3),
+  assetConditionPurchase: numberField(false, 1, 2),
+  
+  // Date fields
+  purchaseDate: dateField(),
+  warrantyExpiryDate: dateField(),
+  depreciationStartDate: dateField(),
+  
+  // Boolean field
+  operasionalOffice: z.boolean().optional().or(z.null()),
 });
 
-export const categorySchema = z.object({
-  categoryName: z.string().min(1, 'Category name is required').max(100),
-  description: z.string().max(500).optional(),
-  parentCategoryId: z.string().optional(),
-});
+export type AssetFormData = z.infer<typeof assetSchema>;
 
-export const supplierSchema = z.object({
-  supplierName: z.string().min(1, 'Supplier name is required').max(100),
-  contactPerson: z.string().max(100).optional(),
-  phoneNumber: z.string().max(20).optional(),
-  email: z.string().email('Invalid email').optional().or(z.literal('')),
-  address: z.string().max(500).optional(),
-});
-
-export const employeeSchema = z.object({
-  fullName: z.string().min(1, 'Full name is required').max(100),
-  department: z.string().max(50).optional(),
-  position: z.string().max(50).optional(),
-  division: z.string().max(50).optional(),
-  branch: z.string().max(50).optional(),
-  costCenter: z.string().max(50).optional(),
-  phoneNumber: z.string().max(20).optional(),
-  email: z.string().email('Invalid email').optional().or(z.literal('')),
-  officeLocation: z.string().max(100).optional(),
-  employmentStatus: z.string().optional(),
-  joinDate: z.string().optional(),
-});
-
-export const locationSchema = z.object({
-  locationName: z.string().min(1, 'Location name is required').max(100),
-  locationType: z.string().max(50).optional(),
-  address: z.string().max(500).optional(),
-  city: z.string().max(100).optional(),
-  parentLocationId: z.string().optional(),
-});
+export default assetSchema;

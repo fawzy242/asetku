@@ -2,15 +2,17 @@
 @use '../../styles/mixins' as *;
 @use '../../styles/shared';
 
+// ============================================================
+// AssetTracking styles
+// NOTE: .summary-stat-card is defined in _shared.scss
+// ============================================================
+
 .asset-tracking {
     color: var(--text-primary);
 
+    // HAPUS duplikasi .summary-stat-card — gunakan dari _shared.scss
+    // Jika perlu override, tambahkan di sini:
     .summary-stat-card {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        gap: $spacing-sm;
-        padding: $spacing-lg;
+        // Override specific to AssetTracking if needed
     }
 }

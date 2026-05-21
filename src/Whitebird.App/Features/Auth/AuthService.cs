@@ -1,9 +1,9 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.FileAttachment;
 using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Auth;
-using Microsoft.AspNetCore.Http;
 
 namespace Whitebird.App.Features.Auth;
 
@@ -34,12 +34,14 @@ public class AuthService : BaseService, IAuthService
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var user = await _authRepository.GetUserByEmailAsync(request.Email);
+            // CHANGED: Use GetUserByUsernameAsync instead of GetUserByEmailAsync
+            var user = await _authRepository.GetUserByUsernameAsync(request.Username);
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
-                await _activityLogService.LogAsync("User", 0, "LOGIN_FAILED", $"Failed login attempt for email: {request.Email}", "System");
-                return ServiceResult<LoginResponse>.Failure("Invalid email or password");
+                // CHANGED: Log username instead of email
+                await _activityLogService.LogAsync("User", 0, "LOGIN_FAILED", $"Failed login attempt for username: {request.Username}", "System");
+                return ServiceResult<LoginResponse>.Failure("Invalid username or password");
             }
 
             if (!user.IsActive)
@@ -258,7 +260,7 @@ public class AuthService : BaseService, IAuthService
 
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
-        
+
         if (!allowedExtensions.Contains(extension))
             return ServiceResult<string>.BadRequest($"File type '{extension}' is not allowed. Allowed: {string.Join(", ", allowedExtensions)}");
 
@@ -279,7 +281,7 @@ public class AuthService : BaseService, IAuthService
 
             var subDirectory = Path.Combine("Users", userId.ToString(), "Profile");
             var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
-            
+
             user.ProfilePhotoPath = savedPath;
             user.ProfilePhotoFileName = file.FileName;
             user.ModifiedDate = DateTime.Now;
@@ -328,7 +330,7 @@ public class AuthService : BaseService, IAuthService
                 return ServiceResult.Success("No profile photo to delete");
 
             await _storageService.DeleteFileAsync(user.ProfilePhotoPath);
-            
+
             user.ProfilePhotoPath = null;
             user.ProfilePhotoFileName = null;
             user.ModifiedDate = DateTime.Now;

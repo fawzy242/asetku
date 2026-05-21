@@ -1,11 +1,12 @@
 import apiService from '../../core/services/api.service';
 
 class ProfileApi {
-  async getCurrentUser() { return (await apiService.get('/Auth/me')).data; }
-  
-  async updateProfile(data) { 
-    return (await apiService.put('/Auth/profile', data)).data; 
+  async getCurrentUser() { 
+    return (await apiService.get('/Auth/me')).data; 
   }
+  
+  // NOTE: /Auth/profile endpoint does not exist in backend
+  // Profile update is handled locally only
   
   async changePassword(data) { 
     return (await apiService.post('/Auth/change-password', data)).data; 

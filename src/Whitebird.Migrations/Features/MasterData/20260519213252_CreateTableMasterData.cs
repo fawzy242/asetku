@@ -8,7 +8,10 @@ namespace Whitebird.Migrations.Features.MasterData
         public override void Up()
         {
             Execute.Sql(@"
-        IF NOT EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'MasterData' AND [xtype] = 'U')
+        -- ============================================================
+        -- CREATE TABLE
+        -- ============================================================
+        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'MasterData')
         BEGIN
             CREATE TABLE [dbo].[MasterData] (
                 [MasterDataId] INT IDENTITY(1,1) NOT NULL,
@@ -22,17 +25,20 @@ namespace Whitebird.Migrations.Features.MasterData
                 [MasterDataName] NVARCHAR(200) NULL,
                 CONSTRAINT [PK_MasterData] PRIMARY KEY ([MasterDataId])
             );
-        END;
+        END
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_MasterData_ReferenceCode_ReferenceName')
+        -- ============================================================
+        -- CREATE INDEXES (menggunakan OBJECT_ID yang lebih aman)
+        -- ============================================================
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_MasterData_ReferenceCode_ReferenceName' AND object_id = OBJECT_ID('MasterData'))
             CREATE INDEX [IX_MasterData_ReferenceCode_ReferenceName]
             ON [dbo].[MasterData]([ReferenceCode], [ReferenceName]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_MasterData_ReferenceName')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_MasterData_ReferenceName' AND object_id = OBJECT_ID('MasterData'))
             CREATE INDEX [IX_MasterData_ReferenceName]
             ON [dbo].[MasterData]([ReferenceName]);
 
-        IF NOT EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_MasterData_IsActive')
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_MasterData_IsActive' AND object_id = OBJECT_ID('MasterData'))
             CREATE INDEX [IX_MasterData_IsActive]
             ON [dbo].[MasterData]([IsActive])
             WHERE [IsActive] = 1;
@@ -42,16 +48,22 @@ namespace Whitebird.Migrations.Features.MasterData
         public override void Down()
         {
             Execute.Sql(@"
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_MasterData_IsActive')
+        -- ============================================================
+        -- DROP INDEXES
+        -- ============================================================
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_MasterData_IsActive' AND object_id = OBJECT_ID('MasterData'))
             DROP INDEX [IX_MasterData_IsActive] ON [dbo].[MasterData];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_MasterData_ReferenceName')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_MasterData_ReferenceName' AND object_id = OBJECT_ID('MasterData'))
             DROP INDEX [IX_MasterData_ReferenceName] ON [dbo].[MasterData];
 
-        IF EXISTS (SELECT * FROM [sys.indexes] WHERE [name] = 'IX_MasterData_ReferenceCode_ReferenceName')
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_MasterData_ReferenceCode_ReferenceName' AND object_id = OBJECT_ID('MasterData'))
             DROP INDEX [IX_MasterData_ReferenceCode_ReferenceName] ON [dbo].[MasterData];
 
-        IF EXISTS (SELECT * FROM [sysobjects] WHERE [name] = 'MasterData' AND [xtype] = 'U')
+        -- ============================================================
+        -- DROP TABLE
+        -- ============================================================
+        IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'MasterData')
             DROP TABLE [dbo].[MasterData];
     ");
         }

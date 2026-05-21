@@ -1,0 +1,64 @@
+@use '../../../styles/variables' as *;
+@use '../../../styles/mixins' as *;
+
+.bulk-activate-modal {
+    text-align: center;
+
+    &__icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 80px;
+        height: 80px;
+        margin: 0 auto $spacing-lg;
+        background-color: rgba(245, 158, 11, 0.1);
+        border-radius: $radius-full;
+        color: #f59e0b;
+    }
+
+    &__title {
+        font-weight: 600;
+        margin-bottom: $spacing-sm;
+        color: var(--text-primary);
+    }
+
+    &__description {
+        color: var(--text-secondary);
+        margin-bottom: $spacing-xl;
+    }
+
+    &__selected {
+        background-color: var(--surface);
+        border-radius: $radius-md;
+        padding: $spacing-md;
+        margin-bottom: $spacing-xl;
+        text-align: left;
+    }
+
+    &__selected-header {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        margin-bottom: $spacing-sm;
+        font-size: $font-size-sm;
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+
+    &__selected-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: $spacing-xs;
+    }
+
+    &__selected-chip {
+        background-color: var(--card-bg) !important;
+    }
+
+    &__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: $spacing-md;
+        margin-top: $spacing-lg;
+    }
+}

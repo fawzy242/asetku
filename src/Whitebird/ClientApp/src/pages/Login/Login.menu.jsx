@@ -8,16 +8,17 @@ import utilsHelper from '../../core/utils/utils.helper';
 
 const LoginMenu = ({ onLoginSuccess }) => {
   const { login } = useAuth();
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  // UPDATED: email field changed to username
+  const [formData, setFormData] = useState({ username: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
   const validateForm = useCallback(() => {
     const err = {};
-    if (!formData.email.trim()) {
-      err.email = 'Email is required';
-    } else if (!utilsHelper.validateEmail(formData.email)) {
-      err.email = 'Invalid email format';
+    if (!formData.username.trim()) {
+      err.username = 'Username is required';
+    } else if (formData.username.length < 3) {
+      err.username = 'Username must be at least 3 characters';
     }
     if (!formData.password) {
       err.password = 'Password is required';
@@ -32,7 +33,8 @@ const LoginMenu = ({ onLoginSuccess }) => {
     e.preventDefault();
     if (!validateForm()) return;
     setLoading(true);
-    const r = await login(formData.email, formData.password);
+    // UPDATED: pass username instead of email
+    const r = await login(formData.username, formData.password);
     setLoading(false);
     if (r.success) {
       onLoginSuccess?.();
@@ -55,13 +57,13 @@ const LoginMenu = ({ onLoginSuccess }) => {
       sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
     >
       <Input
-        label="Email Address"
-        type="email"
-        value={formData.email}
-        onChange={handleChange('email')}
-        error={errors.email}
-        helperText={errors.email}
-        autoComplete="email"
+        label="Username"
+        type="text"
+        value={formData.username}
+        onChange={handleChange('username')}
+        error={errors.username}
+        helperText={errors.username}
+        autoComplete="username"
         autoFocus
       />
       <Input

@@ -1,12 +1,16 @@
-import { useState, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { DEBOUNCE_CONFIG } from '../core/constants/appConstants';
+import { useDebounce } from './useDebounce';
+import apiService from '../core/services/api.service';
 
 /**
  * Custom hook untuk grid data dengan React Query caching.
  * 
- * PERBAIKAN KRITIS: queryKey sekarang bisa berupa array dengan identifier
- * yang berubah saat tab/filter berubah. fetchFn dipanggil ulang (refetch)
- * SETIAP KALI queryKey berubah.
+ * PERBAIKAN:
+ * - queryKey menggunakan array of values instead of JSON.stringify
+ * - debounce untuk filter changes
+ * - abort controller untuk cancel in-flight requests
  * 
  * @param {Array|string} queryKey - Unique query key (array dianjurkan)
  * @param {Function} fetchFn - Async function untuk fetch data
@@ -16,15 +20,43 @@ export const useGridData = (queryKey, fetchFn, options = {}) => {
   const [page, setPage] = useState(options.initialPage || 1);
   const [pageSize, setPageSize] = useState(options.initialPageSize || 10);
   const [filters, setFilters] = useState({});
+  const abortControllerRef = useRef(null);
+  
+  // Debounce filter changes to prevent excessive API calls
+  const debouncedFilters = useDebounce(filters, DEBOUNCE_CONFIG.SEARCH_DELAY);
 
-  // Query key: gabungan base key + page + pageSize + filters
+  // Build query key as array (more efficient than JSON.stringify)
   const fullQueryKey = Array.isArray(queryKey)
-    ? [...queryKey, page, pageSize, JSON.stringify(filters)]
-    : [queryKey, page, pageSize, JSON.stringify(filters)];
+    ? [...queryKey, page, pageSize, ...Object.entries(debouncedFilters).flat()]
+    : [queryKey, page, pageSize, ...Object.entries(debouncedFilters).flat()];
+
+  // Cancel previous request when query key changes
+  useEffect(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [fullQueryKey]);
 
   const queryResult = useQuery({
     queryKey: fullQueryKey,
-    queryFn: () => fetchFn({ page, pageSize, ...filters }),
+    queryFn: () => {
+      // Cancel previous request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+      
+      return fetchFn({ page, pageSize, ...debouncedFilters }, {
+        signal: abortControllerRef.current.signal
+      });
+    },
     staleTime: options.staleTime || 2 * 60 * 1000,
     placeholderData: (previousData) => previousData,
   });

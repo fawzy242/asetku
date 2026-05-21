@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { FiHome, FiBox, FiRefreshCw, FiUsers, FiFolder, FiBarChart2, FiChevronDown, FiChevronLeft, FiGrid, FiTruck, FiMapPin, FiMenu, FiCrosshair, FiUserCheck } from 'react-icons/fi';
+import { 
+  FiHome, FiBox, FiRefreshCw, FiUsers, FiFolder, FiBarChart2, 
+  FiChevronDown, FiChevronLeft, FiGrid, FiTruck, FiMapPin, 
+  FiMenu, FiCrosshair, FiUserCheck, FiDatabase, FiBriefcase 
+} from 'react-icons/fi';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.scss';
 
+// UPDATED: Added Departments and MasterData, renamed Locations to Offices
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: FiHome, path: '/dashboard' },
   { id: 'assets', label: 'Assets', icon: FiBox, path: '/assets' },
@@ -10,11 +15,19 @@ const menuItems = [
   { id: 'tracking', label: 'Asset Tracking', icon: FiCrosshair, path: '/tracking' },
   { id: 'employees', label: 'Employees', icon: FiUsers, path: '/employees' },
   { id: 'employee-summary', label: 'Employee Summary', icon: FiUserCheck, path: '/employee-summary' },
-  { id: 'master-data', label: 'Master Data', icon: FiFolder, path: null, children: [
-    { id: 'categories', label: 'Categories', icon: FiGrid, path: '/categories' },
-    { id: 'suppliers', label: 'Suppliers', icon: FiTruck, path: '/suppliers' },
-    { id: 'locations', label: 'Locations', icon: FiMapPin, path: '/locations' },
-  ]},
+  { 
+    id: 'master-data', 
+    label: 'Master Data', 
+    icon: FiFolder, 
+    path: null, 
+    children: [
+      { id: 'categories', label: 'Categories', icon: FiGrid, path: '/categories' },
+      { id: 'suppliers', label: 'Suppliers', icon: FiTruck, path: '/suppliers' },
+      { id: 'departments', label: 'Departments', icon: FiBriefcase, path: '/departments' },
+      { id: 'offices', label: 'Offices', icon: FiMapPin, path: '/offices' },
+      { id: 'master-data-view', label: 'Master Data', icon: FiDatabase, path: '/master-data' },
+    ]
+  },
   { id: 'reports', label: 'Reports', icon: FiBarChart2, path: '/reports' },
 ];
 

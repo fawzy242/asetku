@@ -2,6 +2,8 @@
  * CENTRALIZED ASSET STATUS CONSTANTS
  * Single source of truth untuk semua asset status options.
  * 
+ * NOTE: Status ini untuk DISPLAY SAJA. Backend mengirim currentStatus dari active transaction.
+ * 
  * Usage:
  *   import { ASSET_STATUS_OPTIONS, ASSET_STATUS_FILTER_OPTIONS } from '../../core/constants/assetStatuses';
  */
@@ -69,8 +71,9 @@ export const TRANSACTION_STATUS_FILTER_OPTIONS = [
  */
 export const TRANSACTION_TABS = [
   { id: 'all', label: 'All' },
-  { id: 'Pending', label: 'Pending' },
-  { id: 'Approved', label: 'Approved' },
+  { id: 'pending', label: 'Pending' },
+  { id: 'approved', label: 'Approved' },
+  { id: 'rejected', label: 'Rejected' },
   { id: 'active-loans', label: 'Active Loans' },
   { id: 'overdue-loans', label: 'Overdue Loans' },
 ];
@@ -90,12 +93,28 @@ export const ASSET_STATUS_CHART_COLORS = {
 };
 
 /**
- * Condition options untuk dropdown.
+ * Asset Condition Mapping (from MasterData)
+ * Untuk form create/edit asset
  */
-export const CONDITION_OPTIONS = [
-  { value: 'Good', label: 'Good' },
-  { value: 'Fair', label: 'Fair' },
-  { value: 'Poor', label: 'Poor' },
+export const ASSET_CONDITION_OPTIONS = [
+  { value: '', label: 'Select Condition' },
+  { value: '1', label: 'Good' },
+  { value: '2', label: 'Normal' },
+  { value: '3', label: 'Damaged' },
 ];
+
+/**
+ * Asset Condition Purchase Mapping
+ */
+export const ASSET_CONDITION_PURCHASE_OPTIONS = [
+  { value: '', label: 'Select' },
+  { value: '1', label: 'New' },
+  { value: '2', label: 'Second Hand' },
+];
+
+/**
+ * Condition options untuk dropdown (deprecated, use ASSET_CONDITION_OPTIONS)
+ */
+export const CONDITION_OPTIONS = ASSET_CONDITION_OPTIONS;
 
 export default ASSET_STATUSES;
