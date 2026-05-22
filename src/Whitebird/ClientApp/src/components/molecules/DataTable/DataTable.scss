@@ -7,17 +7,18 @@
     max-width: 100% !important;
     background-color: transparent;
     border-radius: $radius-lg;
-    overflow-x: auto; // ADDED: horizontal scroll
+    overflow-x: auto;
     display: flex;
     flex-direction: column;
     position: relative;
 
+    // FIX: Pastikan semua elemen DataGrid memiliki lebar penuh
     .MuiDataGrid-root {
         width: 100% !important;
         min-width: 100% !important;
         max-width: 100% !important;
         flex: 1;
-        // ADDED: responsive font
+
         @include respond-to('sm') {
             font-size: 12px;
         }
@@ -30,6 +31,7 @@
 
     .MuiDataGrid-virtualScroller {
         width: 100% !important;
+        min-width: 100% !important;
 
         &::-webkit-scrollbar {
             width: 6px;
@@ -57,7 +59,7 @@
 
     .MuiDataGrid-columnHeaders {
         width: 100% !important;
-        
+
         @include respond-to('sm') {
             .MuiDataGrid-columnHeaderTitle {
                 font-size: 11px;
@@ -92,4 +94,20 @@
             font-size: 0.75rem;
         }
     }
+}
+
+// FIX: Global fix untuk MUI DataGrid width issue
+.MuiDataGrid-root {
+    width: 100% !important;
+    min-width: 100% !important;
+}
+
+.MuiDataGrid-virtualScroller {
+    width: 100% !important;
+    min-width: 100% !important;
+}
+
+.MuiDataGrid-main {
+    width: 100% !important;
+    min-width: 100% !important;
 }

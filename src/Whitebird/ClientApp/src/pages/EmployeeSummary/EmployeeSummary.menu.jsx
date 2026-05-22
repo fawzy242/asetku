@@ -277,46 +277,52 @@ const EmployeeSummaryMenu = () => {
 
             {/* Current Assets Table */}
             <Grid item xs={12}>
-              <Card title={`Current Assets (${currentAssets.length})`}>
-                {loadingData ? (
-                  <div className="page-loading"><Spinner size="lg" /></div>
-                ) : currentAssets.length === 0 ? (
-                  <Box sx={{ textAlign: 'center', py: 4, color: 'var(--text-secondary)' }}>
-                    <FiBox size={40} />
-                    <Typography>No assets assigned</Typography>
-                  </Box>
-                ) : (
-                  <DataTable 
-                    rows={currentAssets} 
-                    columns={assetColumns} 
-                    pageSize={10} 
-                    getRowId={(row) => row.assetId || `asset-${Math.random()}`} 
-                    hideFooter={true} 
-                    ariaLabel="Employee current assets table" 
-                  />
-                )}
-              </Card>
+<Card title={`Current Assets (${currentAssets.length})`}>
+  {loadingData ? (
+    <div className="page-loading"><Spinner size="lg" /></div>
+  ) : currentAssets.length === 0 ? (
+    <Box sx={{ textAlign: 'center', py: 4, color: 'var(--text-secondary)' }}>
+      <FiBox size={40} />
+      <Typography>No assets assigned</Typography>
+    </Box>
+  ) : (
+    <div style={{ width: '100%', minWidth: 0 }}>
+      <DataTable 
+        rows={currentAssets} 
+        columns={assetColumns} 
+        pageSize={10} 
+        getRowId={(row) => row.assetId || `asset-${Math.random()}`} 
+        hideFooter={true} 
+        autoHeight={true}  // TAMBAHKAN INI
+        ariaLabel="Employee current assets table" 
+      />
+    </div>
+  )}
+</Card>
             </Grid>
 
             {/* Asset History Table */}
             <Grid item xs={12}>
-              <Card title={`Asset History (${assetHistory.length})`}>
-                {assetHistory.length === 0 ? (
-                  <Box sx={{ textAlign: 'center', py: 4, color: 'var(--text-secondary)' }}>
-                    <FiRefreshCw size={40} />
-                    <Typography>No transaction history</Typography>
-                  </Box>
-                ) : (
-                  <DataTable 
-                    rows={assetHistory.slice(0, 20)} 
-                    columns={historyColumns} 
-                    pageSize={10} 
-                    getRowId={(row) => row.assetTransactionId || `hist-${Math.random()}`} 
-                    hideFooter={true} 
-                    ariaLabel="Employee asset history table" 
-                  />
-                )}
-              </Card>
+<Card title={`Asset History (${assetHistory.length})`}>
+  {assetHistory.length === 0 ? (
+    <Box sx={{ textAlign: 'center', py: 4, color: 'var(--text-secondary)' }}>
+      <FiRefreshCw size={40} />
+      <Typography>No transaction history</Typography>
+    </Box>
+  ) : (
+    <div style={{ width: '100%', minWidth: 0 }}>
+      <DataTable 
+        rows={assetHistory.slice(0, 20)} 
+        columns={historyColumns} 
+        pageSize={10} 
+        getRowId={(row) => row.assetTransactionId || `hist-${Math.random()}`} 
+        hideFooter={true} 
+        autoHeight={true}  // TAMBAHKAN INI
+        ariaLabel="Employee asset history table" 
+      />
+    </div>
+  )}
+</Card>
             </Grid>
           </>
         )}

@@ -214,19 +214,20 @@ const EmployeesMenu = () => {
         />
       </FilterPanel>
       
-      <div className="employees-menu__table">
-        <DataTable 
-          rows={employees} 
-          columns={columns} 
-          loading={loading} 
-          pageSize={pageSize} 
-          getRowId={(row) => row.employeeId} 
-          hideFooter={true} 
-          checkboxSelection={true}
-          onSelectionChange={(newSelection) => setSelectedRows(newSelection)}
-          ariaLabel="Employees data table" 
-        />
-      </div>
+<div className="employees-menu__table" style={{ width: '100%', minWidth: 0 }}>
+  <DataTable 
+    rows={employees} 
+    columns={columns} 
+    loading={loading} 
+    pageSize={pageSize} 
+    getRowId={(row) => row.employeeId} 
+    hideFooter={true} 
+    autoHeight={true}  // TAMBAHKAN INI
+    checkboxSelection={true}
+    onSelectionChange={(newSelection) => setSelectedRows(newSelection)}
+    ariaLabel="Employees data table" 
+  />
+</div>
       <Pagination 
         currentPage={page} 
         totalPages={Math.ceil(totalCount / pageSize) || 1} 

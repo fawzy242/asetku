@@ -179,17 +179,18 @@ const CategoriesMenu = () => {
 
       <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar onSearch={handleSearch} placeholder="Search by name..." />
-      <div className="categories-menu__table">
-        <DataTable
-          rows={categories}
-          columns={columns}
-          loading={loading}
-          pageSize={pageSize}
-          getRowId={(row) => row.categoryId}
-          hideFooter={true}
-          ariaLabel="Categories data table"
-        />
-      </div>
+<div className="categories-menu__table" style={{ width: '100%', minWidth: 0 }}>
+  <DataTable
+    rows={categories}
+    columns={columns}
+    loading={loading}
+    pageSize={pageSize}
+    getRowId={(row) => row.categoryId}
+    hideFooter={true}
+    autoHeight={true}  // TAMBAHKAN INI
+    ariaLabel="Categories data table"
+  />
+</div>
       <Pagination
         currentPage={page}
         totalPages={Math.ceil(totalCount / pageSize) || 1}

@@ -245,17 +245,18 @@ const OfficesMenu = () => {
       <Tabs tabs={STATUS_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar onSearch={handleSearch} placeholder="Search by name, code, city..." />
       
-      <div className="offices-menu__table">
-        <DataTable
-          rows={offices}
-          columns={columns}
-          loading={loading}
-          pageSize={pageSize}
-          getRowId={(row) => row.officeId}
-          hideFooter={true}
-          ariaLabel="Offices data table"
-        />
-      </div>
+<div className="offices-menu__table" style={{ width: '100%', minWidth: 0 }}>
+  <DataTable
+    rows={offices}
+    columns={columns}
+    loading={loading}
+    pageSize={pageSize}
+    getRowId={(row) => row.officeId}
+    hideFooter={true}
+    autoHeight={true}  // TAMBAHKAN INI
+    ariaLabel="Offices data table"
+  />
+</div>
       <Pagination
         currentPage={page}
         totalPages={Math.ceil(totalCount / pageSize) || 1}

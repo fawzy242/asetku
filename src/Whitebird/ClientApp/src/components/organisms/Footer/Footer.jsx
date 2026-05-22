@@ -8,7 +8,7 @@ const Footer = () => {
     <footer className="footer" role="contentinfo">
       <div className="footer__content">
         <div className="footer__copyright">
-          &copy; {currentYear} Whitebird Asset Management System. All rights reserved.
+          &copy; {currentYear} AsetKu Asset Management System. All rights reserved.
         </div>
         <nav className="footer__links" aria-label="Footer navigation">
           <button className="footer__link" onClick={() => {}} aria-label="Privacy policy (coming soon)">Privacy</button>

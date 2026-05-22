@@ -15,7 +15,7 @@ const DataTable = memo(({
   onSelectionChange = null,
   rowHeight = 52,
   headerHeight = 56,
-  autoHeight = false,
+  autoHeight = true,  // UBAH: default ke true untuk mencegah error width 0
   getRowId = null,
   hideFooter = true,
   className = '',
@@ -24,20 +24,17 @@ const DataTable = memo(({
   const theme = useUIStore((s) => s.theme);
   const isDark = theme === 'dark';
 
-  // Memoized rows to prevent unnecessary re-renders
   const safeRows = useMemo(() => {
     if (!rows) return [];
     if (Array.isArray(rows)) return rows;
     return [];
   }, [rows]);
 
-  // Memoized columns to prevent unnecessary re-renders
   const safeColumns = useMemo(() => {
     if (!columns || !Array.isArray(columns)) return [];
     return columns;
   }, [columns]);
 
-  // Memoized getRowId function
   const safeGetRowId = useMemo(() => {
     return (row) => {
       if (typeof getRowId === 'function') {
@@ -62,7 +59,6 @@ const DataTable = memo(({
 
   const effectiveAutoHeight = autoHeight || hideFooter;
 
-  // Memoized MUI theme to prevent recreation
   const muiTheme = useMemo(() => createTheme({
     palette: {
       mode: isDark ? 'dark' : 'light',
@@ -202,7 +198,7 @@ const DataTable = memo(({
             width: '100%',
             minWidth: '100%',
             maxWidth: '100%',
-            flex: 1,
+            flex: effectiveAutoHeight ? 'none' : 1,
             minHeight: effectiveAutoHeight ? undefined : 400,
           }}
         />

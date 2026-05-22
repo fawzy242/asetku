@@ -129,17 +129,18 @@ const SuppliersMenu = () => {
       </div>
       <Tabs tabs={STATUS_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar onSearch={handleSearch} placeholder="Search by name, contact..." />
-      <div className="suppliers-menu__table">
-        <DataTable 
-          rows={suppliers} 
-          columns={columns} 
-          loading={loading} 
-          pageSize={pageSize} 
-          getRowId={(row) => row.supplierId} 
-          hideFooter={true} 
-          ariaLabel="Suppliers data table" 
-        />
-      </div>
+<div className="suppliers-menu__table" style={{ width: '100%', minWidth: 0 }}>
+  <DataTable 
+    rows={suppliers} 
+    columns={columns} 
+    loading={loading} 
+    pageSize={pageSize} 
+    getRowId={(row) => row.supplierId} 
+    hideFooter={true} 
+    autoHeight={true}  // TAMBAHKAN INI
+    ariaLabel="Suppliers data table" 
+  />
+</div>
       <Pagination 
         currentPage={page} 
         totalPages={Math.ceil(totalCount / pageSize) || 1} 

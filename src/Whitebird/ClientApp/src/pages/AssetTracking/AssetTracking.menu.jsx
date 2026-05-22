@@ -231,25 +231,28 @@ const AssetTrackingMenu = () => {
 
             {/* Timeline Table */}
             <Grid item xs={12}>
-              <Card title={`Transaction Timeline (${timeline.length})`}>
-                {loadingData ? (
-                  <div className="page-loading"><Spinner size="lg" /></div>
-                ) : timeline.length === 0 ? (
-                  <Box sx={{ textAlign: 'center', py: 4, color: 'var(--text-secondary)' }}>
-                    <FiRefreshCw size={40} style={{ marginBottom: 8 }} />
-                    <Typography>No transaction history found</Typography>
-                  </Box>
-                ) : (
-                  <DataTable 
-                    rows={timeline} 
-                    columns={timelineColumns} 
-                    pageSize={15} 
-                    getRowId={(_, i) => `timeline-${i}`} 
-                    hideFooter={true} 
-                    ariaLabel="Asset timeline table" 
-                  />
-                )}
-              </Card>
+<Card title={`Transaction Timeline (${timeline.length})`}>
+  {loadingData ? (
+    <div className="page-loading"><Spinner size="lg" /></div>
+  ) : timeline.length === 0 ? (
+    <Box sx={{ textAlign: 'center', py: 4, color: 'var(--text-secondary)' }}>
+      <FiRefreshCw size={40} style={{ marginBottom: 8 }} />
+      <Typography>No transaction history found</Typography>
+    </Box>
+  ) : (
+    <div style={{ width: '100%', minWidth: 0 }}>
+      <DataTable 
+        rows={timeline} 
+        columns={timelineColumns} 
+        pageSize={15} 
+        getRowId={(_, i) => `timeline-${i}`} 
+        hideFooter={true} 
+        autoHeight={true}  // TAMBAHKAN INI
+        ariaLabel="Asset timeline table" 
+      />
+    </div>
+  )}
+</Card>
             </Grid>
           </>
         )}

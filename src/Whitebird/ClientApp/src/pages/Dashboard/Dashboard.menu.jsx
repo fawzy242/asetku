@@ -243,16 +243,19 @@ const DashboardMenu = () => {
         )}
       </div>
 
-      <Card title="Recent Transactions">
-        <DataTable
-          rows={recentTransactions.data || []}
-          columns={transactionColumns}
-          pageSize={5}
-          getRowId={(row) => row?.assetTransactionId || `txn-${Math.random()}`}
-          hideFooter={true}
-          ariaLabel="Recent transactions table"
-        />
-      </Card>
+<Card title="Recent Transactions">
+  <div style={{ width: '100%', overflowX: 'auto' }}>
+    <DataTable
+      rows={recentTransactions.data || []}
+      columns={transactionColumns}
+      pageSize={5}
+      getRowId={(row) => row?.assetTransactionId || `txn-${Math.random()}`}
+      hideFooter={true}
+      autoHeight={true}  // TAMBAHKAN INI
+      ariaLabel="Recent transactions table"
+    />
+  </div>
+</Card>
 
       {/* Drilldown Modal */}
       <DrilldownModal

@@ -310,17 +310,18 @@ const AssetTransactionsMenu = () => {
         <Select label="Type" value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }} options={TRANSACTION_TYPE_FILTER_OPTIONS} />
       </FilterPanel>
       
-      <div className="transactions-menu__table">
-        <DataTable 
-          rows={transactions} 
-          columns={columns} 
-          loading={loading} 
-          pageSize={pageSize} 
-          getRowId={(row) => row.assetTransactionId} 
-          hideFooter={true} 
-          ariaLabel="Transactions data table" 
-        />
-      </div>
+<div className="transactions-menu__table" style={{ width: '100%', minWidth: 0 }}>
+  <DataTable 
+    rows={transactions} 
+    columns={columns} 
+    loading={loading} 
+    pageSize={pageSize} 
+    getRowId={(row) => row.assetTransactionId} 
+    hideFooter={true} 
+    autoHeight={true}  // TAMBAHKAN INI
+    ariaLabel="Transactions data table" 
+  />
+</div>
       <Pagination 
         currentPage={page} 
         totalPages={Math.ceil(totalCount / pageSize) || 1} 

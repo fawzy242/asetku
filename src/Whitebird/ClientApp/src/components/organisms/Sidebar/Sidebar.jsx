@@ -39,7 +39,6 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
   const location = useLocation();
   const activePath = location.pathname;
 
-  // Check for mobile on mount and resize
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 640);
@@ -139,16 +138,16 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
             <>
               <div className="sidebar__logo" onClick={handleLogoClick} style={{ cursor: 'pointer' }} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handleLogoClick()} aria-label="Go to dashboard">
                 {logoError ? (
-                  <div className="sidebar__logo-fallback" aria-hidden="true">W</div>
+                  <div className="sidebar__logo-fallback" aria-hidden="true">A</div>
                 ) : (
                   <img
                     src="/logo.png"
-                    alt="Whitebird Asset Management System Logo"
+                    alt="AsetKu Asset Management System Logo"
                     className="sidebar__logo-img"
                     onError={() => setLogoError(true)}
                   />
                 )}
-                <span className="sidebar__logo-text">Whitebird</span>
+                <span className="sidebar__logo-text">AsetKu</span>
               </div>
               <button className="sidebar__toggle-btn" onClick={handleToggle} aria-label="Collapse sidebar">
                 <FiChevronLeft size={20} />

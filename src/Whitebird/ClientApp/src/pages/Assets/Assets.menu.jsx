@@ -148,19 +148,20 @@ const AssetsMenu = () => {
         />
       </FilterPanel>
       
-      <div className="assets-menu__table">
-        <DataTable 
-          rows={assets} 
-          columns={columns} 
-          loading={loading} 
-          pageSize={pageSize} 
-          getRowId={(row) => row.assetId} 
-          hideFooter={true} 
-          checkboxSelection={true}
-          onSelectionChange={(newSelection) => setSelectedRows(newSelection)}
-          ariaLabel="Assets data table" 
-        />
-      </div>
+<div className="assets-menu__table" style={{ width: '100%', minWidth: 0 }}>
+  <DataTable 
+    rows={assets} 
+    columns={columns} 
+    loading={loading} 
+    pageSize={pageSize} 
+    getRowId={(row) => row.assetId} 
+    hideFooter={true} 
+    autoHeight={true}  // TAMBAHKAN INI
+    checkboxSelection={true}
+    onSelectionChange={(newSelection) => setSelectedRows(newSelection)}
+    ariaLabel="Assets data table" 
+  />
+</div>
       <Pagination 
         currentPage={page} 
         totalPages={Math.ceil(totalCount / pageSize) || 1} 

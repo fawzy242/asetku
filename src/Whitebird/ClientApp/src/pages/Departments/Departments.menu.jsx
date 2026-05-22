@@ -193,17 +193,18 @@ const DepartmentsMenu = () => {
       <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar onSearch={handleSearch} placeholder="Search by name, code..." />
       
-      <div className="departments-menu__table">
-        <DataTable
-          rows={departments}
-          columns={columns}
-          loading={loading}
-          pageSize={pageSize}
-          getRowId={(row) => row.departmentId}
-          hideFooter={true}
-          ariaLabel="Departments data table"
-        />
-      </div>
+<div className="departments-menu__table" style={{ width: '100%', minWidth: 0 }}>
+  <DataTable
+    rows={departments}
+    columns={columns}
+    loading={loading}
+    pageSize={pageSize}
+    getRowId={(row) => row.departmentId}
+    hideFooter={true}
+    autoHeight={true}  // TAMBAHKAN INI
+    ariaLabel="Departments data table"
+  />
+</div>
       <Pagination
         currentPage={page}
         totalPages={Math.ceil(totalCount / pageSize) || 1}

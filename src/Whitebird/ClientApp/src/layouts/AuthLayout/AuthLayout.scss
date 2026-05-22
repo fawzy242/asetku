@@ -70,9 +70,16 @@
         @include flex-center;
         flex-direction: column;
         margin-bottom: $spacing-xl;
+        gap: $spacing-md;
     }
 
-    &__logo-icon {
+    &__logo-img {
+        width: 64px;
+        height: 64px;
+        object-fit: contain;
+    }
+
+    &__logo-fallback {
         @include flex-center;
         width: 64px;
         height: 64px;
@@ -81,7 +88,6 @@
         font-size: 32px;
         font-weight: 700;
         border-radius: $radius-lg;
-        margin-bottom: $spacing-md;
     }
 
     &__logo-text {

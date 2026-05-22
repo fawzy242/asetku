@@ -17,8 +17,20 @@ const AuthLayout = ({ children, title = "Welcome Back" }) => {
       <div className="auth-layout__container">
         <div className="auth-layout__card">
           <div className="auth-layout__logo">
-            <span className="auth-layout__logo-icon">W</span>
-            <h1 className="auth-layout__logo-text">Whitebird</h1>
+            <img 
+              src="/logo.png" 
+              alt="AsetKu Logo" 
+              className="auth-layout__logo-img"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'flex';
+              }}
+            />
+            <div className="auth-layout__logo-fallback" style={{ display: 'none' }}>
+              <span>A</span>
+            </div>
+            <h1 className="auth-layout__logo-text">AsetKu</h1>
           </div>
           <h2 className="auth-layout__title">{title}</h2>
           {children}
@@ -26,7 +38,7 @@ const AuthLayout = ({ children, title = "Welcome Back" }) => {
       </div>
 
       <div className="auth-layout__footer">
-        <p>&copy; {new Date().getFullYear()} Whitebird Asset Management System. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} AsetKu Asset Management System. All rights reserved.</p>
       </div>
     </div>
   );
