@@ -2,27 +2,29 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Security.Cryptography;
+using Whitebird.Infra.Configuration;
 
 namespace Whitebird.App.Features.FileAttachment;
 
 public class StorageService : IStorageService
 {
-    private readonly IConfiguration _configuration;
     private readonly ILogger<StorageService> _logger;
     private readonly string _basePath;
 
     public StorageService(IConfiguration configuration, ILogger<StorageService> logger)
     {
-        _configuration = configuration;
         _logger = logger;
-        _basePath = _configuration["Storage:BasePath"] ?? Path.Combine(Directory.GetCurrentDirectory(), "Uploads");
+        _basePath = StoragePathResolver.Resolve(configuration);
+        _logger.LogInformation("Storage path initialized: {BasePath}", _basePath);
     }
 
     public async Task<string> SaveFileAsync(IFormFile file, string subDirectory)
     {
         var directoryPath = Path.Combine(_basePath, subDirectory);
         if (!Directory.Exists(directoryPath))
+        {
             Directory.CreateDirectory(directoryPath);
+        }
 
         var fileName = $"{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}";
         var filePath = Path.Combine(directoryPath, fileName);

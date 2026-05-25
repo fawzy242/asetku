@@ -4,6 +4,7 @@ using Whitebird.App.Features.Common;
 using Whitebird.App.Features.Common.Import;
 using Whitebird.App.Features.MasterData;
 using Whitebird.Domain.Features.Asset;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Asset;
 using Whitebird.Infra.Features.Category;
 using Whitebird.Infra.Features.Common;
@@ -90,16 +91,16 @@ public class AssetImportService : BaseService, IImportService<AssetImportDto>
             var conditionPurchaseCache = new Dictionary<string, int>();
 
             var conditions = await _masterDataService.GetAssetConditionsAsync();
-            if (conditions.IsSuccess)
+            if (conditions.IsSuccess && conditions.Data != null)
             {
-                foreach (var c in conditions.Data!)
+                foreach (var c in conditions.Data)
                     conditionCache[c.Name.ToLowerInvariant()] = c.Code;
             }
 
             var conditionPurchases = await _masterDataService.GetAssetConditionPurchasesAsync();
-            if (conditionPurchases.IsSuccess)
+            if (conditionPurchases.IsSuccess && conditionPurchases.Data != null)
             {
-                foreach (var c in conditionPurchases.Data!)
+                foreach (var c in conditionPurchases.Data)
                     conditionPurchaseCache[c.Name.ToLowerInvariant()] = c.Code;
             }
 
@@ -111,33 +112,33 @@ public class AssetImportService : BaseService, IImportService<AssetImportDto>
 
                 try
                 {
-                    dto.AssetCode = GetString(row, "AssetCode");
-                    dto.AssetName = GetString(row, "AssetName");
-                    dto.Brand = GetString(row, "Brand");
-                    dto.Model = GetString(row, "Model");
-                    dto.SerialNumber = GetString(row, "SerialNumber");
-                    dto.Imei = GetString(row, "Imei");
-                    dto.MacAddress = GetString(row, "MacAddress");
-                    dto.InvoiceNumber = GetString(row, "InvoiceNumber");
-                    dto.SupplierName = GetString(row, "SupplierName");
-                    dto.OfficeName = GetString(row, "OfficeName");
-                    dto.Hostname = GetString(row, "Hostname");
-                    dto.IpAddress = GetString(row, "IpAddress");
-                    dto.Notes = GetString(row, "Notes");
-                    dto.AssetCondition = GetString(row, "AssetCondition");
-                    dto.AssetConditionPurchase = GetString(row, "AssetConditionPurchase");
+                    dto.AssetCode = ExcelDataReader.GetString(row, "AssetCode");
+                    dto.AssetName = ExcelDataReader.GetString(row, "AssetName");
+                    dto.Brand = ExcelDataReader.GetString(row, "Brand");
+                    dto.Model = ExcelDataReader.GetString(row, "Model");
+                    dto.SerialNumber = ExcelDataReader.GetString(row, "SerialNumber");
+                    dto.Imei = ExcelDataReader.GetString(row, "Imei");
+                    dto.MacAddress = ExcelDataReader.GetString(row, "MacAddress");
+                    dto.InvoiceNumber = ExcelDataReader.GetString(row, "InvoiceNumber");
+                    dto.SupplierName = ExcelDataReader.GetString(row, "SupplierName");
+                    dto.OfficeName = ExcelDataReader.GetString(row, "OfficeName");
+                    dto.Hostname = ExcelDataReader.GetString(row, "Hostname");
+                    dto.IpAddress = ExcelDataReader.GetString(row, "IpAddress");
+                    dto.Notes = ExcelDataReader.GetString(row, "Notes");
+                    dto.AssetCondition = ExcelDataReader.GetString(row, "AssetCondition");
+                    dto.AssetConditionPurchase = ExcelDataReader.GetString(row, "AssetConditionPurchase");
 
-                    dto.CategoryId = GetInt(row, "CategoryId");
-                    dto.CategoryName = GetString(row, "CategoryName");
-                    dto.WarrantyPeriod = GetNullableInt(row, "WarrantyPeriod");
-                    dto.PurchasePrice = GetNullableDecimal(row, "PurchasePrice");
-                    dto.ResidualValue = GetNullableDecimal(row, "ResidualValue");
-                    dto.UsefulLife = GetNullableInt(row, "UsefulLife");
-                    dto.OperasionalOffice = GetNullableBool(row, "OperasionalOffice");
+                    dto.CategoryId = ExcelDataReader.GetInt(row, "CategoryId");
+                    dto.CategoryName = ExcelDataReader.GetString(row, "CategoryName");
+                    dto.WarrantyPeriod = ExcelDataReader.GetNullableInt(row, "WarrantyPeriod");
+                    dto.PurchasePrice = ExcelDataReader.GetNullableDecimal(row, "PurchasePrice");
+                    dto.ResidualValue = ExcelDataReader.GetNullableDecimal(row, "ResidualValue");
+                    dto.UsefulLife = ExcelDataReader.GetNullableInt(row, "UsefulLife");
+                    dto.OperasionalOffice = ExcelDataReader.GetNullableBool(row, "OperasionalOffice");
 
-                    dto.PurchaseDate = GetNullableDateTime(row, "PurchaseDate");
-                    dto.WarrantyExpiryDate = GetNullableDateTime(row, "WarrantyExpiryDate");
-                    dto.DepreciationStartDate = GetNullableDateTime(row, "DepreciationStartDate");
+                    dto.PurchaseDate = ExcelDataReader.GetNullableDateTime(row, "PurchaseDate");
+                    dto.WarrantyExpiryDate = ExcelDataReader.GetNullableDateTime(row, "WarrantyExpiryDate");
+                    dto.DepreciationStartDate = ExcelDataReader.GetNullableDateTime(row, "DepreciationStartDate");
 
                     if (string.IsNullOrWhiteSpace(dto.AssetCode))
                     {
@@ -276,7 +277,7 @@ public class AssetImportService : BaseService, IImportService<AssetImportDto>
                         Hostname = dto.Hostname,
                         IpAddress = dto.IpAddress,
                         OperasionalOffice = dto.OperasionalOffice ?? false,
-                        IsActive = false,
+                        IsActive = true,
                         CreatedDate = DateTime.Now,
                         CreatedBy = createdByUser
                     };
@@ -298,9 +299,9 @@ public class AssetImportService : BaseService, IImportService<AssetImportDto>
                 foreach (var asset in assetsToInsert)
                 {
                     await _activityLogService.LogCreateAsync(
-                        "Asset",
+                        TableNames.Asset,
                         asset.AssetId,
-                        $"Asset '{asset.AssetCode}' imported (INACTIVE - needs activation)",
+                        $"Asset '{asset.AssetCode}' imported successfully",
                         createdByUser);
                 }
             }
@@ -309,7 +310,7 @@ public class AssetImportService : BaseService, IImportService<AssetImportDto>
                 $"Import completed: {result.SuccessCount} successful, {result.ErrorCount} errors");
         }, "import assets", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Asset", 0, "Import Assets", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Asset, 0, "Import Assets", ex, _currentUserService.GetDisplayName());
         });
     }
 
@@ -318,7 +319,7 @@ public class AssetImportService : BaseService, IImportService<AssetImportDto>
         return await ExecuteSafelyAsync(() =>
         {
             var template = ExcelHelper.GenerateTemplate("Assets", _templateColumns,
-                "Asset Import Template - Fill in the data below. Assets will be imported as INACTIVE and need manual activation.");
+                "Asset Import Template - Fill in the data below.");
             return Task.FromResult(ServiceResult<byte[]>.Success(template));
         }, "generate asset import template");
     }
@@ -329,320 +330,250 @@ public class AssetImportService : BaseService, IImportService<AssetImportDto>
         return ServiceResult<ImportResult>.Success(result);
     }
 
-public async Task<ServiceResult<ImportResult>> ImportFromTxtAsync(Stream fileStream, string? createdBy = null, char delimiter = '\t')
-{
-    return await ExecuteWithTransactionAsync(async () =>
+    public async Task<ServiceResult<ImportResult>> ImportFromTxtAsync(Stream fileStream, string? createdBy = null, char delimiter = '\t')
     {
-        var dataTable = await ExcelHelper.ReadTxtToDataTableAsync(fileStream, delimiter, true);
-        var result = await ProcessImportDataTable(dataTable, createdBy);
-        return ServiceResult<ImportResult>.Success(result, 
-            $"Import completed: {result.SuccessCount} successful, {result.ErrorCount} errors");
-    }, "import assets from txt", async (ex) =>
-    {
-        await _activityLogService.LogErrorAsync("Asset", 0, "Import Assets from TXT", ex, _currentUserService.GetDisplayName());
-    });
-}
-
-private async Task<ImportResult> ProcessImportDataTable(DataTable dataTable, string? createdBy)
-{
-    var result = new ImportResult();
-    var assetsToInsert = new List<AssetEntity>();
-    var createdByUser = createdBy ?? _currentUserService.GetDisplayName();
-
-    result.TotalRows = dataTable.Rows.Count;
-
-    var categoryCache = new Dictionary<string, int>();
-    var supplierCache = new Dictionary<string, int>();
-    var officeCache = new Dictionary<string, int>();
-    var conditionCache = new Dictionary<string, int>();
-    var conditionPurchaseCache = new Dictionary<string, int>();
-
-    var conditions = await _masterDataService.GetAssetConditionsAsync();
-    if (conditions.IsSuccess && conditions.Data != null)
-    {
-        foreach (var c in conditions.Data)
-            conditionCache[c.Name.ToLowerInvariant()] = c.Code;
-    }
-
-    var conditionPurchases = await _masterDataService.GetAssetConditionPurchasesAsync();
-    if (conditionPurchases.IsSuccess && conditionPurchases.Data != null)
-    {
-        foreach (var c in conditionPurchases.Data)
-            conditionPurchaseCache[c.Name.ToLowerInvariant()] = c.Code;
-    }
-
-    for (int i = 0; i < dataTable.Rows.Count; i++)
-    {
-        var row = dataTable.Rows[i];
-        var rowNumber = i + 2;
-        var dto = new AssetImportDto();
-
-        try
+        return await ExecuteWithTransactionAsync(async () =>
         {
-            dto.AssetCode = GetString(row, "AssetCode");
-            dto.AssetName = GetString(row, "AssetName");
-            dto.Brand = GetString(row, "Brand");
-            dto.Model = GetString(row, "Model");
-            dto.SerialNumber = GetString(row, "SerialNumber");
-            dto.Imei = GetString(row, "Imei");
-            dto.MacAddress = GetString(row, "MacAddress");
-            dto.InvoiceNumber = GetString(row, "InvoiceNumber");
-            dto.SupplierName = GetString(row, "SupplierName");
-            dto.OfficeName = GetString(row, "OfficeName");
-            dto.Hostname = GetString(row, "Hostname");
-            dto.IpAddress = GetString(row, "IpAddress");
-            dto.Notes = GetString(row, "Notes");
-            dto.AssetCondition = GetString(row, "AssetCondition");
-            dto.AssetConditionPurchase = GetString(row, "AssetConditionPurchase");
-            
-            dto.CategoryId = GetInt(row, "CategoryId");
-            dto.CategoryName = GetString(row, "CategoryName");
-            dto.WarrantyPeriod = GetNullableInt(row, "WarrantyPeriod");
-            dto.PurchasePrice = GetNullableDecimal(row, "PurchasePrice");
-            dto.ResidualValue = GetNullableDecimal(row, "ResidualValue");
-            dto.UsefulLife = GetNullableInt(row, "UsefulLife");
-            dto.OperasionalOffice = GetNullableBool(row, "OperasionalOffice");
-            
-            dto.PurchaseDate = GetNullableDateTime(row, "PurchaseDate");
-            dto.WarrantyExpiryDate = GetNullableDateTime(row, "WarrantyExpiryDate");
-            dto.DepreciationStartDate = GetNullableDateTime(row, "DepreciationStartDate");
-
-            if (string.IsNullOrWhiteSpace(dto.AssetCode))
-            {
-                result.AddError(rowNumber, "AssetCode", "AssetCode is required");
-                continue;
-            }
-
-            if (string.IsNullOrWhiteSpace(dto.AssetName))
-            {
-                result.AddError(rowNumber, "AssetName", "AssetName is required");
-                continue;
-            }
-
-            if (await _assetReps.IsAssetCodeExistsAsync(dto.AssetCode))
-            {
-                result.AddError(rowNumber, "AssetCode", $"AssetCode '{dto.AssetCode}' already exists", dto.AssetCode);
-                continue;
-            }
-
-            int? categoryId = null;
-            if (dto.CategoryId > 0)
-            {
-                var category = await _categoryReps.GetByIdRawAsync(dto.CategoryId);
-                if (category == null)
-                    result.AddError(rowNumber, "CategoryId", $"Category with id {dto.CategoryId} not found", dto.CategoryId.ToString());
-                else
-                    categoryId = dto.CategoryId;
-            }
-            else if (!string.IsNullOrWhiteSpace(dto.CategoryName))
-            {
-                if (!categoryCache.ContainsKey(dto.CategoryName.ToLowerInvariant()))
-                {
-                    var categories = await _categoryReps.GetAllWithRelationsAsync();
-                    var category = categories.FirstOrDefault(c => 
-                        c.CategoryName.Equals(dto.CategoryName, StringComparison.OrdinalIgnoreCase));
-                    if (category != null)
-                        categoryCache[dto.CategoryName.ToLowerInvariant()] = category.CategoryId;
-                    else
-                        result.AddError(rowNumber, "CategoryName", $"Category '{dto.CategoryName}' not found", dto.CategoryName);
-                }
-                
-                if (categoryCache.ContainsKey(dto.CategoryName.ToLowerInvariant()))
-                    categoryId = categoryCache[dto.CategoryName.ToLowerInvariant()];
-            }
-            else
-            {
-                result.AddError(rowNumber, "Category", "Either CategoryId or CategoryName is required");
-                continue;
-            }
-
-            if (!categoryId.HasValue)
-                continue;
-
-            int? supplierId = null;
-            if (!string.IsNullOrWhiteSpace(dto.SupplierName))
-            {
-                if (!supplierCache.ContainsKey(dto.SupplierName.ToLowerInvariant()))
-                {
-                    var suppliers = await _supplierReps.GetAllAsync();
-                    var supplier = suppliers.FirstOrDefault(s => 
-                        s.SupplierName.Equals(dto.SupplierName, StringComparison.OrdinalIgnoreCase));
-                    if (supplier != null)
-                        supplierCache[dto.SupplierName.ToLowerInvariant()] = supplier.SupplierId;
-                    else
-                        result.AddWarning(rowNumber, "SupplierName", $"Supplier '{dto.SupplierName}' not found - will be created", dto.SupplierName);
-                }
-                
-                if (supplierCache.ContainsKey(dto.SupplierName.ToLowerInvariant()))
-                    supplierId = supplierCache[dto.SupplierName.ToLowerInvariant()];
-            }
-
-            int? officeId = null;
-            if (!string.IsNullOrWhiteSpace(dto.OfficeName))
-            {
-                if (!officeCache.ContainsKey(dto.OfficeName.ToLowerInvariant()))
-                {
-                    var offices = await _officeReps.GetAllAsync();
-                    var office = offices.FirstOrDefault(o => 
-                        o.OfficeName.Equals(dto.OfficeName, StringComparison.OrdinalIgnoreCase));
-                    if (office != null)
-                        officeCache[dto.OfficeName.ToLowerInvariant()] = office.OfficeId;
-                    else
-                        result.AddError(rowNumber, "OfficeName", $"Office '{dto.OfficeName}' not found", dto.OfficeName);
-                }
-                
-                if (officeCache.ContainsKey(dto.OfficeName.ToLowerInvariant()))
-                    officeId = officeCache[dto.OfficeName.ToLowerInvariant()];
-            }
-
-            int? conditionId = null;
-            if (!string.IsNullOrWhiteSpace(dto.AssetCondition))
-            {
-                var key = dto.AssetCondition.ToLowerInvariant();
-                if (conditionCache.ContainsKey(key))
-                    conditionId = conditionCache[key];
-                else
-                    result.AddError(rowNumber, "AssetCondition", $"Invalid AssetCondition '{dto.AssetCondition}'. Valid: Good, Normal, Damaged", dto.AssetCondition);
-            }
-
-            int? conditionPurchaseId = null;
-            if (!string.IsNullOrWhiteSpace(dto.AssetConditionPurchase))
-            {
-                var key = dto.AssetConditionPurchase.ToLowerInvariant();
-                if (conditionPurchaseCache.ContainsKey(key))
-                    conditionPurchaseId = conditionPurchaseCache[key];
-                else
-                    result.AddError(rowNumber, "AssetConditionPurchase", $"Invalid AssetConditionPurchase '{dto.AssetConditionPurchase}'. Valid: New, Second Hand", dto.AssetConditionPurchase);
-            }
-
-            if (result.Errors.Any(e => e.RowNumber == rowNumber))
-                continue;
-
-            var entity = new AssetEntity
-            {
-                AssetCode = dto.AssetCode,
-                AssetName = dto.AssetName,
-                CategoryId = categoryId.Value,
-                Brand = dto.Brand,
-                Model = dto.Model,
-                SerialNumber = dto.SerialNumber,
-                Imei = dto.Imei,
-                MacAddress = dto.MacAddress,
-                PurchaseDate = dto.PurchaseDate,
-                PurchasePrice = dto.PurchasePrice,
-                InvoiceNumber = dto.InvoiceNumber,
-                SupplierId = supplierId,
-                WarrantyPeriod = dto.WarrantyPeriod,
-                WarrantyExpiryDate = dto.WarrantyExpiryDate,
-                AssetCondition = conditionId,
-                AssetConditionPurchase = conditionPurchaseId,
-                ResidualValue = dto.ResidualValue,
-                UsefulLife = dto.UsefulLife,
-                DepreciationStartDate = dto.DepreciationStartDate,
-                Notes = dto.Notes,
-                OfficeId = officeId,
-                Hostname = dto.Hostname,
-                IpAddress = dto.IpAddress,
-                OperasionalOffice = dto.OperasionalOffice ?? false,
-                IsActive = false,
-                CreatedDate = DateTime.Now,
-                CreatedBy = createdByUser
-            };
-
-            assetsToInsert.Add(entity);
-            result.SuccessCount++;
-        }
-        catch (Exception ex)
+            var dataTable = await ExcelHelper.ReadTxtToDataTableAsync(fileStream, delimiter, true);
+            var result = await ProcessImportDataTable(dataTable, createdBy);
+            return ServiceResult<ImportResult>.Success(result,
+                $"Import completed: {result.SuccessCount} successful, {result.ErrorCount} errors");
+        }, "import assets from txt", async (ex) =>
         {
-            result.AddError(rowNumber, "General", $"Error processing row: {ex.Message}");
-            _logger.LogError(ex, "Error processing asset import row {RowNumber}", rowNumber);
-        }
+            await _activityLogService.LogErrorAsync(TableNames.Asset, 0, "Import Assets from TXT", ex, _currentUserService.GetDisplayName());
+        });
     }
 
-    if (assetsToInsert.Any())
+    private async Task<ImportResult> ProcessImportDataTable(DataTable dataTable, string? createdBy)
     {
-        await _repository.BulkInsertAsync(assetsToInsert);
-        
-        foreach (var asset in assetsToInsert)
+        var result = new ImportResult();
+        var assetsToInsert = new List<AssetEntity>();
+        var createdByUser = createdBy ?? _currentUserService.GetDisplayName();
+
+        result.TotalRows = dataTable.Rows.Count;
+
+        var categoryCache = new Dictionary<string, int>();
+        var supplierCache = new Dictionary<string, int>();
+        var officeCache = new Dictionary<string, int>();
+        var conditionCache = new Dictionary<string, int>();
+        var conditionPurchaseCache = new Dictionary<string, int>();
+
+        var conditions = await _masterDataService.GetAssetConditionsAsync();
+        if (conditions.IsSuccess && conditions.Data != null)
         {
-            await _activityLogService.LogCreateAsync(
-                "Asset",
-                asset.AssetId,
-                $"Asset '{asset.AssetCode}' imported (INACTIVE - needs activation)",
-                createdByUser);
+            foreach (var c in conditions.Data)
+                conditionCache[c.Name.ToLowerInvariant()] = c.Code;
         }
+
+        var conditionPurchases = await _masterDataService.GetAssetConditionPurchasesAsync();
+        if (conditionPurchases.IsSuccess && conditionPurchases.Data != null)
+        {
+            foreach (var c in conditionPurchases.Data)
+                conditionPurchaseCache[c.Name.ToLowerInvariant()] = c.Code;
+        }
+
+        for (int i = 0; i < dataTable.Rows.Count; i++)
+        {
+            var row = dataTable.Rows[i];
+            var rowNumber = i + 2;
+            var dto = new AssetImportDto();
+
+            try
+            {
+                dto.AssetCode = ExcelDataReader.GetString(row, "AssetCode");
+                dto.AssetName = ExcelDataReader.GetString(row, "AssetName");
+                dto.Brand = ExcelDataReader.GetString(row, "Brand");
+                dto.Model = ExcelDataReader.GetString(row, "Model");
+                dto.SerialNumber = ExcelDataReader.GetString(row, "SerialNumber");
+                dto.Imei = ExcelDataReader.GetString(row, "Imei");
+                dto.MacAddress = ExcelDataReader.GetString(row, "MacAddress");
+                dto.InvoiceNumber = ExcelDataReader.GetString(row, "InvoiceNumber");
+                dto.SupplierName = ExcelDataReader.GetString(row, "SupplierName");
+                dto.OfficeName = ExcelDataReader.GetString(row, "OfficeName");
+                dto.Hostname = ExcelDataReader.GetString(row, "Hostname");
+                dto.IpAddress = ExcelDataReader.GetString(row, "IpAddress");
+                dto.Notes = ExcelDataReader.GetString(row, "Notes");
+                dto.AssetCondition = ExcelDataReader.GetString(row, "AssetCondition");
+                dto.AssetConditionPurchase = ExcelDataReader.GetString(row, "AssetConditionPurchase");
+
+                dto.CategoryId = ExcelDataReader.GetInt(row, "CategoryId");
+                dto.CategoryName = ExcelDataReader.GetString(row, "CategoryName");
+                dto.WarrantyPeriod = ExcelDataReader.GetNullableInt(row, "WarrantyPeriod");
+                dto.PurchasePrice = ExcelDataReader.GetNullableDecimal(row, "PurchasePrice");
+                dto.ResidualValue = ExcelDataReader.GetNullableDecimal(row, "ResidualValue");
+                dto.UsefulLife = ExcelDataReader.GetNullableInt(row, "UsefulLife");
+                dto.OperasionalOffice = ExcelDataReader.GetNullableBool(row, "OperasionalOffice");
+
+                dto.PurchaseDate = ExcelDataReader.GetNullableDateTime(row, "PurchaseDate");
+                dto.WarrantyExpiryDate = ExcelDataReader.GetNullableDateTime(row, "WarrantyExpiryDate");
+                dto.DepreciationStartDate = ExcelDataReader.GetNullableDateTime(row, "DepreciationStartDate");
+
+                if (string.IsNullOrWhiteSpace(dto.AssetCode))
+                {
+                    result.AddError(rowNumber, "AssetCode", "AssetCode is required");
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(dto.AssetName))
+                {
+                    result.AddError(rowNumber, "AssetName", "AssetName is required");
+                    continue;
+                }
+
+                if (await _assetReps.IsAssetCodeExistsAsync(dto.AssetCode))
+                {
+                    result.AddError(rowNumber, "AssetCode", $"AssetCode '{dto.AssetCode}' already exists", dto.AssetCode);
+                    continue;
+                }
+
+                int? categoryId = null;
+                if (dto.CategoryId > 0)
+                {
+                    var category = await _categoryReps.GetByIdRawAsync(dto.CategoryId);
+                    if (category == null)
+                        result.AddError(rowNumber, "CategoryId", $"Category with id {dto.CategoryId} not found", dto.CategoryId.ToString());
+                    else
+                        categoryId = dto.CategoryId;
+                }
+                else if (!string.IsNullOrWhiteSpace(dto.CategoryName))
+                {
+                    if (!categoryCache.ContainsKey(dto.CategoryName.ToLowerInvariant()))
+                    {
+                        var categories = await _categoryReps.GetAllWithRelationsAsync();
+                        var category = categories.FirstOrDefault(c =>
+                            c.CategoryName.Equals(dto.CategoryName, StringComparison.OrdinalIgnoreCase));
+                        if (category != null)
+                            categoryCache[dto.CategoryName.ToLowerInvariant()] = category.CategoryId;
+                        else
+                            result.AddError(rowNumber, "CategoryName", $"Category '{dto.CategoryName}' not found", dto.CategoryName);
+                    }
+
+                    if (categoryCache.ContainsKey(dto.CategoryName.ToLowerInvariant()))
+                        categoryId = categoryCache[dto.CategoryName.ToLowerInvariant()];
+                }
+                else
+                {
+                    result.AddError(rowNumber, "Category", "Either CategoryId or CategoryName is required");
+                    continue;
+                }
+
+                if (!categoryId.HasValue)
+                    continue;
+
+                int? supplierId = null;
+                if (!string.IsNullOrWhiteSpace(dto.SupplierName))
+                {
+                    if (!supplierCache.ContainsKey(dto.SupplierName.ToLowerInvariant()))
+                    {
+                        var suppliers = await _supplierReps.GetAllAsync();
+                        var supplier = suppliers.FirstOrDefault(s =>
+                            s.SupplierName.Equals(dto.SupplierName, StringComparison.OrdinalIgnoreCase));
+                        if (supplier != null)
+                            supplierCache[dto.SupplierName.ToLowerInvariant()] = supplier.SupplierId;
+                        else
+                            result.AddWarning(rowNumber, "SupplierName", $"Supplier '{dto.SupplierName}' not found - will be created", dto.SupplierName);
+                    }
+
+                    if (supplierCache.ContainsKey(dto.SupplierName.ToLowerInvariant()))
+                        supplierId = supplierCache[dto.SupplierName.ToLowerInvariant()];
+                }
+
+                int? officeId = null;
+                if (!string.IsNullOrWhiteSpace(dto.OfficeName))
+                {
+                    if (!officeCache.ContainsKey(dto.OfficeName.ToLowerInvariant()))
+                    {
+                        var offices = await _officeReps.GetAllAsync();
+                        var office = offices.FirstOrDefault(o =>
+                            o.OfficeName.Equals(dto.OfficeName, StringComparison.OrdinalIgnoreCase));
+                        if (office != null)
+                            officeCache[dto.OfficeName.ToLowerInvariant()] = office.OfficeId;
+                        else
+                            result.AddError(rowNumber, "OfficeName", $"Office '{dto.OfficeName}' not found", dto.OfficeName);
+                    }
+
+                    if (officeCache.ContainsKey(dto.OfficeName.ToLowerInvariant()))
+                        officeId = officeCache[dto.OfficeName.ToLowerInvariant()];
+                }
+
+                int? conditionId = null;
+                if (!string.IsNullOrWhiteSpace(dto.AssetCondition))
+                {
+                    var key = dto.AssetCondition.ToLowerInvariant();
+                    if (conditionCache.ContainsKey(key))
+                        conditionId = conditionCache[key];
+                    else
+                        result.AddError(rowNumber, "AssetCondition", $"Invalid AssetCondition '{dto.AssetCondition}'. Valid: Good, Normal, Damaged", dto.AssetCondition);
+                }
+
+                int? conditionPurchaseId = null;
+                if (!string.IsNullOrWhiteSpace(dto.AssetConditionPurchase))
+                {
+                    var key = dto.AssetConditionPurchase.ToLowerInvariant();
+                    if (conditionPurchaseCache.ContainsKey(key))
+                        conditionPurchaseId = conditionPurchaseCache[key];
+                    else
+                        result.AddError(rowNumber, "AssetConditionPurchase", $"Invalid AssetConditionPurchase '{dto.AssetConditionPurchase}'. Valid: New, Second Hand", dto.AssetConditionPurchase);
+                }
+
+                if (result.Errors.Any(e => e.RowNumber == rowNumber))
+                    continue;
+
+                var entity = new AssetEntity
+                {
+                    AssetCode = dto.AssetCode,
+                    AssetName = dto.AssetName,
+                    CategoryId = categoryId.Value,
+                    Brand = dto.Brand,
+                    Model = dto.Model,
+                    SerialNumber = dto.SerialNumber,
+                    Imei = dto.Imei,
+                    MacAddress = dto.MacAddress,
+                    PurchaseDate = dto.PurchaseDate,
+                    PurchasePrice = dto.PurchasePrice,
+                    InvoiceNumber = dto.InvoiceNumber,
+                    SupplierId = supplierId,
+                    WarrantyPeriod = dto.WarrantyPeriod,
+                    WarrantyExpiryDate = dto.WarrantyExpiryDate,
+                    AssetCondition = conditionId,
+                    AssetConditionPurchase = conditionPurchaseId,
+                    ResidualValue = dto.ResidualValue,
+                    UsefulLife = dto.UsefulLife,
+                    DepreciationStartDate = dto.DepreciationStartDate,
+                    Notes = dto.Notes,
+                    OfficeId = officeId,
+                    Hostname = dto.Hostname,
+                    IpAddress = dto.IpAddress,
+                    OperasionalOffice = dto.OperasionalOffice ?? false,
+                    IsActive = true,
+                    CreatedDate = DateTime.Now,
+                    CreatedBy = createdByUser
+                };
+
+                assetsToInsert.Add(entity);
+                result.SuccessCount++;
+            }
+            catch (Exception ex)
+            {
+                result.AddError(rowNumber, "General", $"Error processing row: {ex.Message}");
+                _logger.LogError(ex, "Error processing asset import row {RowNumber}", rowNumber);
+            }
+        }
+
+        if (assetsToInsert.Any())
+        {
+            await _repository.BulkInsertAsync(assetsToInsert);
+
+            foreach (var asset in assetsToInsert)
+            {
+                await _activityLogService.LogCreateAsync(
+                    TableNames.Asset,
+                    asset.AssetId,
+                    $"Asset '{asset.AssetCode}' imported successfully",
+                    createdByUser);
+            }
+        }
+
+        return result;
     }
-
-    return result;
-}
-
-    #region Helper Methods
-
-    private string? GetString(DataRow row, string columnName)
-    {
-        if (!row.Table.Columns.Contains(columnName))
-            return null;
-        var value = row[columnName]?.ToString();
-        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    }
-
-    private int GetInt(DataRow row, string columnName)
-    {
-        if (!row.Table.Columns.Contains(columnName))
-            return 0;
-        var value = row[columnName]?.ToString();
-        if (string.IsNullOrWhiteSpace(value))
-            return 0;
-        return int.TryParse(value, out var result) ? result : 0;
-    }
-
-    private int? GetNullableInt(DataRow row, string columnName)
-    {
-        if (!row.Table.Columns.Contains(columnName))
-            return null;
-        var value = row[columnName]?.ToString();
-        if (string.IsNullOrWhiteSpace(value))
-            return null;
-        return int.TryParse(value, out var result) ? result : null;
-    }
-
-    private decimal? GetNullableDecimal(DataRow row, string columnName)
-    {
-        if (!row.Table.Columns.Contains(columnName))
-            return null;
-        var value = row[columnName]?.ToString();
-        if (string.IsNullOrWhiteSpace(value))
-            return null;
-        return decimal.TryParse(value, out var result) ? result : null;
-    }
-
-    private DateTime? GetNullableDateTime(DataRow row, string columnName)
-    {
-        if (!row.Table.Columns.Contains(columnName))
-            return null;
-        var value = row[columnName]?.ToString();
-        if (string.IsNullOrWhiteSpace(value))
-            return null;
-        return DateTime.TryParse(value, out var result) ? result : null;
-    }
-
-    private bool? GetNullableBool(DataRow row, string columnName)
-    {
-        if (!row.Table.Columns.Contains(columnName))
-            return null;
-        var value = row[columnName]?.ToString();
-        if (string.IsNullOrWhiteSpace(value))
-            return null;
-
-        if (bool.TryParse(value, out var boolResult))
-            return boolResult;
-        if (value.Equals("1") || value.Equals("TRUE", StringComparison.OrdinalIgnoreCase))
-            return true;
-        if (value.Equals("0") || value.Equals("FALSE", StringComparison.OrdinalIgnoreCase))
-            return false;
-
-        return null;
-    }
-
-    #endregion
 }

@@ -1,10 +1,10 @@
 using Mapster;
 using Microsoft.Extensions.Logging;
-using Whitebird.App.Features.Asset;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.MasterData;
 using Whitebird.Domain.Features.Asset;
 using Whitebird.Domain.Features.AssetTransaction;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Domain.Features.Reports;
 using Whitebird.Infra.Features.Asset;
 using Whitebird.Infra.Features.AssetTransaction;
@@ -28,12 +28,6 @@ public class AssetService : BaseService, IAssetService
     private readonly IMasterDataService _masterDataService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
-
-    private const int HANDOVER = 1;
-    private const int TRANSFER = 2;
-    private const int LOAN = 3;
-    private const int MAINTENANCE = 6;
-    private const int DISPOSAL = 8;
 
     public AssetService(
         IGenericRepository<AssetEntity> repository,
@@ -144,7 +138,7 @@ public class AssetService : BaseService, IAssetService
             if (created != null)
             {
                 await _activityLogService.LogCreateAsync(
-                    "Asset",
+                    TableNames.Asset,
                     created.AssetId,
                     $"Asset '{created.AssetCode}' - '{created.AssetName}' created successfully",
                     _currentUserService.GetDisplayName());
@@ -155,7 +149,7 @@ public class AssetService : BaseService, IAssetService
                 : ServiceResult<AssetDetailViewModel>.Success(created.Adapt<AssetDetailViewModel>(), "Asset created successfully");
         }, "create asset", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Asset", 0, "Create Asset", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Asset, 0, "Create Asset", ex, _currentUserService.GetDisplayName());
         });
     }
 
@@ -184,7 +178,7 @@ public class AssetService : BaseService, IAssetService
             var updated = await _assetReps.GetByIdWithRelationsAsync(id);
 
             await _activityLogService.LogUpdateAsync(
-                "Asset",
+                TableNames.Asset,
                 id,
                 $"Asset updated: Code '{oldCode}' -> '{model.AssetCode}', Name '{oldName}' -> '{model.AssetName}'",
                 _currentUserService.GetDisplayName());
@@ -192,7 +186,7 @@ public class AssetService : BaseService, IAssetService
             return ServiceResult<AssetDetailViewModel>.Success(updated!.Adapt<AssetDetailViewModel>(), "Asset updated successfully");
         }, "update asset", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Asset", id, "Update Asset", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Asset, id, "Update Asset", ex, _currentUserService.GetDisplayName());
         });
     }
 
@@ -213,7 +207,7 @@ public class AssetService : BaseService, IAssetService
             if (result > 0)
             {
                 await _activityLogService.LogDeleteAsync(
-                    "Asset",
+                    TableNames.Asset,
                     id,
                     $"Asset '{existing.AssetCode}' - '{existing.AssetName}' deleted permanently",
                     _currentUserService.GetDisplayName());
@@ -224,7 +218,7 @@ public class AssetService : BaseService, IAssetService
                 : ServiceResult.Success("Asset deleted successfully");
         }, "delete asset", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Asset", id, "Delete Asset", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Asset, id, "Delete Asset", ex, _currentUserService.GetDisplayName());
         });
     }
 
@@ -245,7 +239,7 @@ public class AssetService : BaseService, IAssetService
             if (result > 0)
             {
                 await _activityLogService.LogSoftDeleteAsync(
-                    "Asset",
+                    TableNames.Asset,
                     id,
                     $"Asset '{existing.AssetCode}' - '{existing.AssetName}' soft deleted",
                     _currentUserService.GetDisplayName());
@@ -256,7 +250,7 @@ public class AssetService : BaseService, IAssetService
                 : ServiceResult.Success("Asset soft deleted successfully");
         }, "soft delete asset", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Asset", id, "Soft Delete Asset", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Asset, id, "Soft Delete Asset", ex, _currentUserService.GetDisplayName());
         });
     }
 
@@ -353,9 +347,9 @@ public class AssetService : BaseService, IAssetService
             var activeTransaction = await _transactionReps.GetActiveTransactionByAssetIdAsync(assetId);
 
             var currentStatus = DeriveAssetStatus(activeTransaction);
-            var isOnLoan = activeTransaction?.TransactionType == LOAN;
-            var isInMaintenance = activeTransaction?.TransactionType == MAINTENANCE;
-            var isOverdue = activeTransaction?.TransactionType == LOAN
+            var isOnLoan = activeTransaction?.TransactionType == 3;
+            var isInMaintenance = activeTransaction?.TransactionType == 6;
+            var isOverdue = activeTransaction?.TransactionType == 3
                 && activeTransaction.ExpectedReturnDate.HasValue
                 && activeTransaction.ExpectedReturnDate.Value < DateTime.Now;
 
@@ -436,7 +430,7 @@ public class AssetService : BaseService, IAssetService
                 CurrentOfficeName = asset.OfficeName,
                 CurrentOfficeId = asset.OfficeId,
                 ExpectedReturnDate = activeTransaction?.ExpectedReturnDate,
-                IsOverdue = activeTransaction?.TransactionType == LOAN
+                IsOverdue = activeTransaction?.TransactionType == 3
                     && activeTransaction.ExpectedReturnDate.HasValue
                     && activeTransaction.ExpectedReturnDate.Value < DateTime.Now,
                 ConditionName = asset.AssetConditionName,
@@ -510,7 +504,7 @@ public class AssetService : BaseService, IAssetService
                     activatedCount++;
 
                     await _activityLogService.LogUpdateAsync(
-                        "Asset",
+                        TableNames.Asset,
                         id,
                         $"Asset '{asset.AssetCode}' {(request.Activate ? "activated" : "deactivated")} via bulk operation",
                         _currentUserService.GetDisplayName());
@@ -521,7 +515,7 @@ public class AssetService : BaseService, IAssetService
                 $"{activatedCount} asset(s) {(request.Activate ? "activated" : "deactivated")} successfully");
         }, "bulk activate assets", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Asset", 0, "Bulk Activate Assets", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Asset, 0, "Bulk Activate Assets", ex, _currentUserService.GetDisplayName());
         });
     }
 
@@ -532,12 +526,22 @@ public class AssetService : BaseService, IAssetService
         if (activeTransaction == null)
             return "Available";
 
+        if (activeTransaction.ActualReturnDate.HasValue)
+            return "Available";
+
+        if (activeTransaction.Approved == false)
+            return "Rejected";
+
+        if (activeTransaction.Approved == null)
+            return "Pending Approval";
+
         return activeTransaction.TransactionType switch
         {
-            HANDOVER or TRANSFER => "Assigned",
-            LOAN => "On Loan",
-            MAINTENANCE => "In Maintenance",
-            DISPOSAL => "Disposed",
+            1 or 2 => "Assigned",
+            3 => "On Loan",
+            6 => "In Maintenance",
+            5 => "Returned",
+            8 => "Disposed",
             _ => "Available"
         };
     }

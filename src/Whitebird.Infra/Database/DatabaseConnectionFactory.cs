@@ -17,7 +17,15 @@ public class DatabaseConnectionFactory : IDatabaseConnectionFactory
         var connectionStringsSection = _configuration.GetSection("ConnectionStrings");
         foreach (var child in connectionStringsSection.GetChildren())
         {
-            _connectionStrings[child.Key] = child.Value ?? string.Empty;
+            var value = child.Value ?? string.Empty;
+
+            // Expand environment variables in connection string
+            if (value.Contains("%"))
+            {
+                value = Environment.ExpandEnvironmentVariables(value);
+            }
+
+            _connectionStrings[child.Key] = value;
         }
     }
 
@@ -31,6 +39,18 @@ public class DatabaseConnectionFactory : IDatabaseConnectionFactory
         if (!_connectionStrings.TryGetValue(connectionStringName, out var connectionString))
         {
             throw new InvalidOperationException($"Connection string '{connectionStringName}' not found");
+        }
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException($"Connection string '{connectionStringName}' is empty");
+        }
+
+        // Ensure encryption is enabled for production
+        var isProduction = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Production";
+        if (isProduction && !connectionString.Contains("Encrypt=True", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Production connection must have Encrypt=True");
         }
 
         return new SqlConnection(connectionString);

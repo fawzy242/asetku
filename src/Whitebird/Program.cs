@@ -2,6 +2,9 @@
 using Whitebird.Infra.DependencyInjection;
 using Whitebird.App.DependencyInjection;
 using FluentMigrator.Runner;
+using Whitebird.Api.Middleware;
+using Microsoft.AspNetCore.Authentication;
+using Whitebird.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,6 +12,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHttpContextAccessor();
+
+// ========== AUTHENTICATION ==========
+builder.Services.AddAuthentication("Session")
+    .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>("Session", null);
 
 // ========== INFRASTRUCTURE SERVICES ==========
 builder.Services.AddInfrastructureServices(builder.Configuration);
@@ -81,6 +88,12 @@ Use session token from /api/Auth/login
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
     ?? new[] { "http://localhost:3000", "http://localhost:4200", "http://localhost:8080" };
 
+var productionOrigins = Environment.GetEnvironmentVariable("CORS__ALLOWED_ORIGINS");
+if (!string.IsNullOrEmpty(productionOrigins))
+{
+    allowedOrigins = productionOrigins.Split(';');
+}
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
@@ -149,6 +162,14 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// ========== MIDDLEWARE (ORDER MATTERS!) ==========
+app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseMiddleware<SecurityHeadersMiddleware>();
+app.UseMiddleware<AuthRateLimitingMiddleware>();
+
+// ========== HTTPS REDIRECTION ==========
+app.UseHttpsRedirection();
+
 // ========== SWAGGER ==========
 if (app.Environment.IsDevelopment())
 {
@@ -162,11 +183,8 @@ if (app.Environment.IsDevelopment())
 }
 
 // ========== SERVE STATIC FILES (Frontend) ==========
-// Ini kunci untuk IIS deployment: serve frontend dari wwwroot
 app.UseDefaultFiles();
 app.UseStaticFiles();
-
-// Fallback: Untuk SPA routing, semua request non-API diarahkan ke index.html
 app.MapFallbackToFile("/index.html");
 
 // ========== PRODUCTION SECURITY ==========
@@ -175,21 +193,11 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-// ========== SECURITY HEADERS ==========
-app.Use(async (context, next) =>
-{
-    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
-    context.Response.Headers.Append("X-Frame-Options", "DENY");
-    context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
-    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
-    context.Response.Headers.Append("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
-    await next();
-});
-
 app.UseResponseCompression();
 app.UseRateLimiter();
 app.UseCors("AllowFrontend");
 
+// ========== AUTHENTICATION & AUTHORIZATION ==========
 app.UseAuthentication();
 app.UseAuthorization();
 

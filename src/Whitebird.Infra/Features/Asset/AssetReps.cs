@@ -233,11 +233,14 @@ public class AssetReps : IAssetReps
     {
         const string sql = @"
             SELECT COUNT(*) FROM Asset a WHERE a.IsActive = 1 
-            AND NOT EXISTS (SELECT 1 FROM AssetTransaction at 
-                            WHERE at.AssetId = a.AssetId 
-                              AND at.Approved = 1 
-                              AND at.FromAssetTransactionId IS NULL 
-                              AND at.IsActive = 1)";
+            AND NOT EXISTS (
+                SELECT 1 FROM AssetTransaction at 
+                WHERE at.AssetId = a.AssetId 
+                  AND at.Approved = 1 
+                  AND at.FromAssetTransactionId IS NULL 
+                  AND at.IsActive = 1
+                  AND at.TransactionType IN (1, 2, 3, 6)
+            )";
         return await _context.ExecuteScalarAsync<int>(sql);
     }
 
@@ -246,7 +249,7 @@ public class AssetReps : IAssetReps
         const string sql = @"
             SELECT COUNT(DISTINCT at.AssetId) 
             FROM AssetTransaction at
-            WHERE at.TransactionType IN (1, 2) 
+            WHERE at.TransactionType IN (1, 2)
               AND at.Approved = 1 
               AND at.FromAssetTransactionId IS NULL 
               AND at.IsActive = 1";
@@ -258,10 +261,11 @@ public class AssetReps : IAssetReps
         const string sql = @"
             SELECT COUNT(DISTINCT at.AssetId) 
             FROM AssetTransaction at
-            WHERE at.TransactionType = 3 
+            WHERE at.TransactionType = 3
               AND at.Approved = 1 
               AND at.FromAssetTransactionId IS NULL 
-              AND at.IsActive = 1";
+              AND at.IsActive = 1
+              AND at.ActualReturnDate IS NULL";
         return await _context.ExecuteScalarAsync<int>(sql);
     }
 
@@ -270,10 +274,11 @@ public class AssetReps : IAssetReps
         const string sql = @"
             SELECT COUNT(DISTINCT at.AssetId) 
             FROM AssetTransaction at
-            WHERE at.TransactionType = 6 
+            WHERE at.TransactionType = 6
               AND at.Approved = 1 
               AND at.FromAssetTransactionId IS NULL 
-              AND at.IsActive = 1";
+              AND at.IsActive = 1
+              AND at.ActualReturnDate IS NULL";
         return await _context.ExecuteScalarAsync<int>(sql);
     }
 

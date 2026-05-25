@@ -29,6 +29,7 @@
     
     <!-- Excel Export -->
     <PackageReference Include="EPPlus" />
+    <PackageReference Include="Polly" />
   </ItemGroup>
 
 </Project>

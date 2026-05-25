@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Whitebird.Domain.Features.ActivityLog;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.ActivityLog;
 
 namespace Whitebird.App.Features.Common;
@@ -67,31 +68,21 @@ public class ActivityLogService : IActivityLogService
     {
         try
         {
-            await Task.Run(async () =>
+            var log = new CreateActivityLogDto
             {
-                try
-                {
-                    var log = new CreateActivityLogDto
-                    {
-                        ReferenceTable = referenceTable,
-                        ReferenceId = referenceId,
-                        ActivityType = activityType,
-                        Description = description,
-                        CreatedBy = createdBy ?? "System"
-                    };
+                ReferenceTable = referenceTable,
+                ReferenceId = referenceId,
+                ActivityType = activityType,
+                Description = description,
+                CreatedBy = createdBy ?? "System"
+            };
 
-                    await _activityLogReps.InsertAsync(log);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to insert activity log (safe mode) for {Table}.{Id}",
-                        referenceTable, referenceId);
-                }
-            });
+            await _activityLogReps.InsertAsync(log);
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore
+            _logger.LogWarning(ex, "Failed to insert activity log (safe mode) for {Table}.{Id}",
+                referenceTable, referenceId);
         }
     }
 }

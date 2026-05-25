@@ -1,10 +1,10 @@
 using Mapster;
 using Microsoft.Extensions.Logging;
-using Whitebird.App.Features.AssetTransaction;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.MasterData;
 using Whitebird.Domain.Features.Asset;
 using Whitebird.Domain.Features.AssetTransaction;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Asset;
 using Whitebird.Infra.Features.AssetTransaction;
 using Whitebird.Infra.Features.Common;
@@ -23,16 +23,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     private readonly IMasterDataService _masterDataService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
-
-    // Transaction type constants
-    private const int HANDOVER = 1;
-    private const int TRANSFER = 2;
-    private const int LOAN = 3;
-    private const int RETURN = 4;
-    private const int LOAN_RETURN = 5;
-    private const int MAINTENANCE = 6;
-    private const int POST_MAINTENANCE = 7;
-    private const int DISPOSAL = 8;
 
     public AssetTransactionService(
         IGenericRepository<AssetTransactionEntity> repository,
@@ -156,6 +146,11 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
         return await ExecuteWithTransactionAsync(async () =>
         {
+            var freshAsset = await _assetReps.GetByIdRawAsync(model.AssetId);
+            var reValidationResult = await ValidateTransactionRulesAsync(model, freshAsset!);
+            if (reValidationResult != null)
+                return reValidationResult;
+
             var entity = model.Adapt<AssetTransactionEntity>();
             entity.Approved = null;
             entity.IsActive = true;
@@ -165,15 +160,20 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             var id = await _repository.InsertAsync(entity);
 
             if (entity.FromAssetTransactionId.HasValue &&
-                (entity.TransactionType == LOAN_RETURN || entity.TransactionType == POST_MAINTENANCE))
+                (entity.TransactionType == 5 || entity.TransactionType == 7))
             {
                 var pairedTxn = await _transactionReps.GetByIdRawAsync(entity.FromAssetTransactionId.Value);
-                if (pairedTxn != null)
+                if (pairedTxn != null && !pairedTxn.FromAssetTransactionId.HasValue)
                 {
                     pairedTxn.FromAssetTransactionId = Convert.ToInt32(id);
                     pairedTxn.ModifiedDate = DateTime.Now;
                     pairedTxn.ModifiedBy = _currentUserService.GetDisplayName();
                     await _repository.UpdateAsync(pairedTxn);
+                }
+                else
+                {
+                    return ServiceResult<AssetTransactionDetailViewModel>.Conflict(
+                        $"Transaction {entity.FromAssetTransactionId} is already paired or invalid");
                 }
             }
 
@@ -183,7 +183,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             {
                 var typeName = await _masterDataService.GetValueAsync("TransactionType", created.TransactionType);
                 await _activityLogService.LogCreateAsync(
-                    "AssetTransaction",
+                    TableNames.AssetTransaction,
                     created.AssetTransactionId,
                     $"Transaction created: Type '{typeName.Data}' for Asset '{created.AssetCode}'",
                     _currentUserService.GetDisplayName());
@@ -194,7 +194,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 : ServiceResult<AssetTransactionDetailViewModel>.Success(created.Adapt<AssetTransactionDetailViewModel>(), "Transaction created successfully");
         }, "create transaction", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("AssetTransaction", 0, "Create Transaction", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.AssetTransaction, 0, "Create Transaction", ex, _currentUserService.GetDisplayName());
         });
     }
 
@@ -223,7 +223,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             var updated = await _transactionReps.GetByIdWithRelationsAsync(id);
 
             await _activityLogService.LogUpdateAsync(
-                "AssetTransaction",
+                TableNames.AssetTransaction,
                 id,
                 $"Transaction updated: Type '{oldType}' -> '{existing.TransactionType}', Approved '{oldApproved}' -> '{existing.Approved}'",
                 _currentUserService.GetDisplayName());
@@ -231,7 +231,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             return ServiceResult<AssetTransactionDetailViewModel>.Success(updated!.Adapt<AssetTransactionDetailViewModel>(), "Transaction updated successfully");
         }, "update transaction", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("AssetTransaction", id, "Update Transaction", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.AssetTransaction, id, "Update Transaction", ex, _currentUserService.GetDisplayName());
         });
     }
 
@@ -259,7 +259,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                     : $"{existing.Notes}\nApproval note: {model.ApprovalNotes}";
 
                 await _activityLogService.LogUpdateAsync(
-                    "AssetTransaction",
+                    TableNames.AssetTransaction,
                     id,
                     $"Transaction approved: Type '{existing.TransactionType}' for Asset '{asset.AssetCode}'",
                     _currentUserService.GetDisplayName());
@@ -273,7 +273,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                     : $"{existing.Notes}\nRejected: {model.ApprovalNotes}";
 
                 await _activityLogService.LogUpdateAsync(
-                    "AssetTransaction",
+                    TableNames.AssetTransaction,
                     id,
                     $"Transaction rejected: Type '{existing.TransactionType}' for Asset '{asset.AssetCode}'",
                     _currentUserService.GetDisplayName());
@@ -289,7 +289,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 : ServiceResult.Success(model.IsApproved ? "Transaction approved successfully" : "Transaction rejected successfully");
         }, "approve transaction", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("AssetTransaction", id, "Approve Transaction", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.AssetTransaction, id, "Approve Transaction", ex, _currentUserService.GetDisplayName());
         });
     }
 
@@ -331,7 +331,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 logDesc += $" (Condition: {conditionName})";
 
             await _activityLogService.LogUpdateAsync(
-                "AssetTransaction",
+                TableNames.AssetTransaction,
                 model.AssetTransactionId,
                 logDesc,
                 _currentUserService.GetDisplayName());
@@ -339,7 +339,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             return ServiceResult.Success("Asset returned successfully");
         }, "return asset", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("AssetTransaction", model.AssetTransactionId, "Return Asset", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.AssetTransaction, model.AssetTransactionId, "Return Asset", ex, _currentUserService.GetDisplayName());
         });
     }
 
@@ -363,7 +363,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             if (result > 0)
             {
                 await _activityLogService.LogUpdateAsync(
-                    "AssetTransaction",
+                    TableNames.AssetTransaction,
                     id,
                     $"Transaction cancelled: Type '{existing.TransactionType}'",
                     _currentUserService.GetDisplayName());
@@ -374,7 +374,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 : ServiceResult.Success("Transaction cancelled successfully");
         }, "cancel transaction", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("AssetTransaction", id, "Cancel Transaction", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.AssetTransaction, id, "Cancel Transaction", ex, _currentUserService.GetDisplayName());
         });
     }
 
@@ -407,7 +407,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         if (!typeExists.IsSuccess || typeExists.Data == null)
             return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Invalid TransactionType: {type}");
 
-        if (type == HANDOVER)
+        if (type == 1)
         {
             if (!model.ToEmployeeId.HasValue)
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("HANDOVER requires ToEmployeeId");
@@ -417,7 +417,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Asset '{asset.AssetCode}' is currently in an active transaction");
         }
 
-        if (type == TRANSFER)
+        if (type == 2)
         {
             if (!model.FromEmployeeId.HasValue || !model.ToEmployeeId.HasValue)
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("TRANSFER requires both FromEmployeeId and ToEmployeeId");
@@ -427,7 +427,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Asset '{asset.AssetCode}' is not currently held by employee {model.FromEmployeeId}");
         }
 
-        if (type == LOAN)
+        if (type == 3)
         {
             if (!model.ToEmployeeId.HasValue)
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("LOAN requires ToEmployeeId");
@@ -438,12 +438,12 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             if (model.ExpectedReturnDate.Value <= model.TransactionDate)
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("ExpectedReturnDate must be after TransactionDate");
 
-            var hasOpenLoan = await _transactionReps.HasOpenPairedTransactionAsync(asset.AssetId, LOAN);
+            var hasOpenLoan = await _transactionReps.HasOpenPairedTransactionAsync(asset.AssetId, 3);
             if (hasOpenLoan)
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Asset '{asset.AssetCode}' already has an active loan");
         }
 
-        if (type == RETURN)
+        if (type == 4)
         {
             if (!model.FromEmployeeId.HasValue)
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("RETURN requires FromEmployeeId");
@@ -452,11 +452,11 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             if (activeTransaction == null || activeTransaction.ToEmployeeId != model.FromEmployeeId)
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Asset '{asset.AssetCode}' is not currently held by employee {model.FromEmployeeId}");
 
-            if (activeTransaction.TransactionType != HANDOVER && activeTransaction.TransactionType != TRANSFER)
+            if (activeTransaction.TransactionType != 1 && activeTransaction.TransactionType != 2)
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Asset '{asset.AssetCode}' is not in assigned state");
         }
 
-        if (type == LOAN_RETURN)
+        if (type == 5)
         {
             if (!model.FromAssetTransactionId.HasValue)
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("LOAN_RETURN requires FromAssetTransactionId");
@@ -468,21 +468,21 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             if (pairedTransaction.AssetId != model.AssetId)
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("Paired transaction must be for the same asset");
 
-            if (pairedTransaction.TransactionType != LOAN)
+            if (pairedTransaction.TransactionType != 3)
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Cannot pair LOAN_RETURN with transaction type {pairedTransaction.TransactionType}");
 
             if (pairedTransaction.FromAssetTransactionId != null)
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("Loan transaction is already closed");
         }
 
-        if (type == MAINTENANCE)
+        if (type == 6)
         {
             var activeTransaction = await _transactionReps.GetActiveTransactionByAssetIdAsync(asset.AssetId);
-            if (activeTransaction != null && activeTransaction.TransactionType == MAINTENANCE)
+            if (activeTransaction != null && activeTransaction.TransactionType == 6)
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Asset '{asset.AssetCode}' is already in maintenance");
         }
 
-        if (type == POST_MAINTENANCE)
+        if (type == 7)
         {
             if (!model.FromAssetTransactionId.HasValue)
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("POST_MAINTENANCE requires FromAssetTransactionId");
@@ -494,7 +494,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             if (pairedTransaction.AssetId != model.AssetId)
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("Paired transaction must be for the same asset");
 
-            if (pairedTransaction.TransactionType != MAINTENANCE)
+            if (pairedTransaction.TransactionType != 6)
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest($"Cannot pair POST_MAINTENANCE with transaction type {pairedTransaction.TransactionType}");
 
             if (pairedTransaction.FromAssetTransactionId != null)
@@ -504,7 +504,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult<AssetTransactionDetailViewModel>.BadRequest("POST_MAINTENANCE requires ConditionAfter");
         }
 
-        if (type == DISPOSAL)
+        if (type == 8)
         {
             var activeTransaction = await _transactionReps.GetActiveTransactionByAssetIdAsync(asset.AssetId);
             if (activeTransaction != null)
@@ -561,7 +561,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         var now = DateTime.Now;
         foreach (var t in transactions)
         {
-            t.IsOverdue = t.TransactionType == LOAN
+            t.IsOverdue = t.TransactionType == 3
                 && t.Approved == true
                 && t.FromAssetTransactionId == null
                 && t.ExpectedReturnDate.HasValue
