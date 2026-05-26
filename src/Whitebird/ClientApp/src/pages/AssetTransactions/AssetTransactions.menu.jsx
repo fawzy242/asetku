@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { FiEdit2, FiCheck, FiX, FiRotateCcw, FiPlus, FiUpload } from "react-icons/fi";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { FiEdit2, FiCheck, FiX, FiRotateCcw, FiPlus, FiUpload, FiCheckSquare } from "react-icons/fi";
 import { Grid, Box, Chip } from "@mui/material";
 import AssetTransactionsData from "./AssetTransactions.data";
 import DataTable from "../../components/molecules/DataTable/DataTable";
@@ -19,16 +19,24 @@ import IconButton from "../../components/atoms/IconButton/IconButton";
 import ImportModal from "../../components/molecules/ImportModal/ImportModal";
 import FileUploader from "../../components/molecules/FileUploader/FileUploader";
 import ModalActions from "../../components/molecules/ModalActions/ModalActions";
+import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
 import { useGridData } from "../../hooks/useGridData";
 import { useReferenceData } from "../../hooks/useReferenceData";
 import { useCrudForm } from "../../hooks/useCrudForm";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
 import { TRANSACTION_TYPE_OPTIONS, TRANSACTION_TYPE_FILTER_OPTIONS, TRANSACTION_TYPES_REQUIRING_PAIR, TRANSACTION_TYPES_REQUIRING_TO_EMPLOYEE, TRANSACTION_TYPES_REQUIRING_FROM_EMPLOYEE, TRANSACTION_TYPES, getTransactionTypeName } from "../../core/constants/transactionTypes";
 import { cleanTransactionFormData } from "../../core/utils/formHelpers";
-import { TRANSACTION_STATUS_TABS } from "../../core/constants/tabs";
-import { getTransactionTypeCode } from "../../core/utils/mappingHelpers";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./AssetTransactions.scss";
+
+// REMOVED "all" tab
+const TRANSACTION_TABS = [
+  { id: "pending", label: "Pending" },
+  { id: "approved", label: "Approved" },
+  { id: "rejected", label: "Rejected" },
+  { id: "active-loans", label: "Active Loans" },
+  { id: "overdue-loans", label: "Overdue Loans" },
+];
 
 const transactionsData = new AssetTransactionsData();
 transactionsData.transformFormData = cleanTransactionFormData;
@@ -50,11 +58,14 @@ const INITIAL_FORM_DATA = {
 
 const CRUD_OPTIONS = { idField: 'assetTransactionId' };
 
+const TABS_WITH_CHECKBOX = ["pending", "approved"];
+
 const AssetTransactionsMenu = () => {
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState("pending");
   const [showFilters, setShowFilters] = useState(false);
   const [approvalFilter, setApprovalFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [selectedRows, setSelectedRows] = useState([]);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [isReturnSubmitting, setIsReturnSubmitting] = useState(false);
@@ -66,10 +77,13 @@ const AssetTransactionsMenu = () => {
   const [pairedTransactionOptions, setPairedTransactionOptions] = useState([]);
   const [loadingPairedOptions, setLoadingPairedOptions] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const isMountedRef = useRef(true);
 
-  const { employees, offices, assets: refAssets, transactionTypes, assetConditions } = useReferenceData();
+  const { employees, offices, assets: refAssets, assetConditions } = useReferenceData();
 
   const { 
     showModal, editingRecord: editingTransaction, isSubmitting, 
@@ -77,46 +91,117 @@ const AssetTransactionsMenu = () => {
     handleSubmit: crudHandleSubmit 
   } = useCrudForm(INITIAL_FORM_DATA, transactionsData, CRUD_OPTIONS);
 
-  const fetchGridData = useCallback(async (params) => {
-    const filters = { ...params };
+  const showCheckbox = TABS_WITH_CHECKBOX.includes(activeTab);
+
+  const getBulkButtonText = () => {
+    if (activeTab === "pending") return "Approve Selected";
+    if (activeTab === "approved") return "Reject Selected";
+    return "";
+  };
+
+  const getBulkAction = () => {
+    if (activeTab === "pending") return "approve";
+    if (activeTab === "approved") return "reject";
+    return "";
+  };
+
+  // CRITICAL FIX: Build params based on active tab
+  const getRequestParams = useCallback(() => {
+    const params = {
+      page: 1,
+      pageSize: 10,
+    };
     
+    if (searchTerm) {
+      params.search = searchTerm;
+    }
+    
+    if (typeFilter) {
+      params.transactionType = typeFilter;
+    }
+    
+    // FIX: Set approved parameter based on active tab
     if (activeTab === 'pending') {
-      return transactionsData.fetchGridData({ ...filters, approved: null });
+      params.approved = 'null'; // Send as string 'null' for backend
     } else if (activeTab === 'approved') {
-      return transactionsData.fetchGridData({ ...filters, approved: true });
+      params.approved = 'true';
     } else if (activeTab === 'rejected') {
-      return transactionsData.fetchGridData({ ...filters, approved: false });
-    } else if (activeTab === 'active-loans') {
+      params.approved = 'false';
+    }
+    // active-loans and overdue-loans use different endpoints
+    
+    return params;
+  }, [activeTab, searchTerm, typeFilter]);
+
+  const fetchGridData = useCallback(async (params) => {
+    const requestParams = { ...params };
+    
+    // Handle special tabs
+    if (activeTab === 'active-loans') {
       try {
         const result = await transactionsData.api.getActiveLoans();
-        if (result?.data) {
+        if (result?.data && isMountedRef.current) {
           const loans = result.data?.data || result.data || [];
           return { success: true, data: { data: loans, totalCount: loans.length } };
         }
       } catch { }
+      return { success: true, data: { data: [], totalCount: 0 } };
     } else if (activeTab === 'overdue-loans') {
       try {
         const result = await transactionsData.api.getOverdueLoans();
-        if (result?.data) {
+        if (result?.data && isMountedRef.current) {
           const loans = result.data?.data || result.data || [];
           return { success: true, data: { data: loans, totalCount: loans.length } };
         }
       } catch { }
+      return { success: true, data: { data: [], totalCount: 0 } };
     }
     
-    if (approvalFilter === 'pending') filters.approved = null;
-    else if (approvalFilter === 'approved') filters.approved = true;
-    else if (approvalFilter === 'rejected') filters.approved = false;
+    // For pending, approved, rejected - set approved parameter
+    if (activeTab === 'pending') {
+      requestParams.approved = null;
+    } else if (activeTab === 'approved') {
+      requestParams.approved = true;
+    } else if (activeTab === 'rejected') {
+      requestParams.approved = false;
+    }
     
-    if (typeFilter) filters.transactionType = typeFilter;
+    // Apply manual approval filter if set
+    if (approvalFilter === 'pending') {
+      requestParams.approved = null;
+    } else if (approvalFilter === 'approved') {
+      requestParams.approved = true;
+    } else if (approvalFilter === 'rejected') {
+      requestParams.approved = false;
+    }
     
-    return transactionsData.fetchGridData(filters);
-  }, [activeTab, approvalFilter, typeFilter]);
+    if (typeFilter) {
+      requestParams.transactionType = typeFilter;
+    }
+    
+    if (searchTerm) {
+      requestParams.search = searchTerm;
+    }
+    
+    const result = await transactionsData.fetchGridData(requestParams);
+    return result;
+  }, [activeTab, approvalFilter, typeFilter, searchTerm]);
 
-  const { 
-    data: transactions, totalCount, loading, page, setPage, 
-    pageSize, setPageSize, updateFilters, reload 
-  } = useGridData(['transactions', activeTab, approvalFilter, typeFilter], fetchGridData);
+  const {
+    data: transactions, totalCount, loading, page, setPage,
+    pageSize, setPageSize, updateFilters, reload
+  } = useGridData(['transactions', activeTab, approvalFilter, typeFilter, searchTerm], fetchGridData);
+
+  // Force reload when tab changes
+  useEffect(() => {
+    isMountedRef.current = true;
+    setPage(1);
+    setSelectedRows([]);
+    reload();
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [activeTab, reload, setPage]);
 
   useEffect(() => {
     if (formData.transactionType && TRANSACTION_TYPES_REQUIRING_PAIR.includes(parseInt(formData.transactionType)) && formData.assetId) {
@@ -132,14 +217,16 @@ const AssetTransactionsMenu = () => {
             t.approved === true && 
             !t.fromAssetTransactionId
           );
-          setPairedTransactionOptions(validPairs.map(t => ({ 
-            value: t.assetTransactionId, 
-            label: `${getTransactionTypeName(t.transactionType)} - ${utilsHelper.formatDate(t.transactionDate)} (${t.assetCode || 'N/A'})` 
-          })));
+          if (isMountedRef.current) {
+            setPairedTransactionOptions(validPairs.map(t => ({ 
+              value: t.assetTransactionId, 
+              label: `${getTransactionTypeName(t.transactionType)} - ${utilsHelper.formatDate(t.transactionDate)} (${t.assetCode || 'N/A'})` 
+            })));
+          }
         } catch { 
-          setPairedTransactionOptions([]); 
+          if (isMountedRef.current) setPairedTransactionOptions([]); 
         }
-        setLoadingPairedOptions(false);
+        if (isMountedRef.current) setLoadingPairedOptions(false);
       })();
     } else {
       setPairedTransactionOptions([]);
@@ -149,16 +236,37 @@ const AssetTransactionsMenu = () => {
     }
   }, [formData.transactionType, formData.assetId, setFormData, transactionsData.api]);
 
-  const handleSearch = useCallback((search) => updateFilters({ search }), [updateFilters]);
+  const handleSearch = useCallback((search) => {
+    setSearchTerm(search);
+    updateFilters({ search });
+    setPage(1);
+  }, [updateFilters, setPage]);
   
   const handleApprove = useCallback(async (tx) => { 
     const r = await transactionsData.approve(tx.assetTransactionId, true); 
-    if (r.success) reload(); 
+    if (r.success && isMountedRef.current) reload(); 
   }, [reload]);
   
   const handleReject = useCallback(async (tx) => { 
     const r = await transactionsData.approve(tx.assetTransactionId, false); 
-    if (r.success) reload(); 
+    if (r.success && isMountedRef.current) reload(); 
+  }, [reload]);
+  
+  const handleBulkAction = useCallback(async (ids, action) => {
+    let successCount = 0;
+    for (const id of ids) {
+      let result;
+      if (action === "approve") {
+        result = await transactionsData.approve(id, true);
+      } else {
+        result = await transactionsData.approve(id, false);
+      }
+      if (result.success) successCount++;
+    }
+    if (successCount > 0 && isMountedRef.current) {
+      setSelectedRows([]);
+      reload();
+    }
   }, [reload]);
   
   const handleReturn = useCallback((tx) => { 
@@ -181,7 +289,7 @@ const AssetTransactionsMenu = () => {
       returnData.notes
     ); 
     setIsReturnSubmitting(false); 
-    if (r.success) { 
+    if (r.success && isMountedRef.current) { 
       setShowReturnModal(false); 
       reload(); 
     } 
@@ -189,20 +297,20 @@ const AssetTransactionsMenu = () => {
   
   const handleCancel = useCallback(async (tx) => { 
     const r = await transactionsData.cancel(tx.assetTransactionId); 
-    if (r.success) reload(); 
+    if (r.success && isMountedRef.current) reload(); 
   }, [reload]);
   
   const onSubmit = useCallback(async (e) => { 
     e.preventDefault(); 
     const success = await crudHandleSubmit(); 
-    if (success) reload(); 
+    if (success && isMountedRef.current) reload(); 
   }, [crudHandleSubmit, reload]);
   
   const handleImport = useCallback(async (file) => {
     setIsImporting(true);
     const r = await transactionsData.importTransactions(file);
     setIsImporting(false);
-    if (r.success) {
+    if (r.success && isMountedRef.current) {
       setImportResult(r.data);
       reload();
     }
@@ -224,7 +332,16 @@ const AssetTransactionsMenu = () => {
     { field: "transactionTypeName", headerName: "Type", width: 150 },
     { field: "fromEmployeeName", headerName: "From", width: 150 },
     { field: "toEmployeeName", headerName: "To", width: 150 },
-    { field: "transactionDate", headerName: "Date", width: 160, valueFormatter: (p) => p?.value ? utilsHelper.formatDateTime(p.value) : '-' },
+    { 
+      field: "transactionDate", 
+      headerName: "Date", 
+      width: 180, 
+      valueGetter: (params) => params?.row?.transactionDate,
+      valueFormatter: (params) => {
+        if (!params || !params.value) return '-';
+        return utilsHelper.formatDateTime(params.value);
+      }
+    },
     { 
       field: "approved", 
       headerName: "Status", 
@@ -234,12 +351,15 @@ const AssetTransactionsMenu = () => {
         return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
       }
     },
-    { field: "expectedReturnDate", headerName: "Exp. Return", width: 130, valueFormatter: (p) => p?.value ? utilsHelper.formatDate(p.value) : "-" },
     { 
-      field: "isOverdue", 
-      headerName: "Overdue", 
-      width: 90, 
-      renderCell: (p) => p?.value ? <Chip label="Overdue" size="small" sx={{ bgcolor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', fontWeight: 500, fontSize: '0.75rem', height: 24, borderRadius: '4px' }} /> : null 
+      field: "expectedReturnDate", 
+      headerName: "Exp. Return", 
+      width: 130, 
+      valueGetter: (params) => params?.row?.expectedReturnDate,
+      valueFormatter: (params) => {
+        if (!params || !params.value) return '-';
+        return utilsHelper.formatDate(params.value);
+      }
     },
     { 
       field: "actions", 
@@ -265,6 +385,12 @@ const AssetTransactionsMenu = () => {
                 <IconButton onClick={() => handleCancel(row)} title="Cancel" variant="danger" size="lg"><FiX size={18} /></IconButton>
               </>
             )}
+            {isApproved && (
+              <>
+                <IconButton onClick={() => handleEdit(row)} title="Edit" size="lg"><FiEdit2 size={18} /></IconButton>
+                <IconButton onClick={() => handleCancel(row)} title="Cancel" variant="danger" size="lg"><FiX size={18} /></IconButton>
+              </>
+            )}
             {isReturnable && (
               <Button variant="primary" size="sm" onClick={() => handleReturn(row)} startIcon={<FiRotateCcw />}>Return</Button>
             )}
@@ -276,7 +402,11 @@ const AssetTransactionsMenu = () => {
 
   const handleTabChange = useCallback((tab) => { 
     setActiveTab(tab); 
-    setPage(1); 
+    setPage(1);
+    setApprovalFilter("");
+    setTypeFilter("");
+    setSearchTerm("");
+    setSelectedRows([]);
   }, [setPage]);
   
   const showFromEmployee = TRANSACTION_TYPES_REQUIRING_FROM_EMPLOYEE.includes(parseInt(formData.transactionType));
@@ -291,6 +421,9 @@ const AssetTransactionsMenu = () => {
 
   if (loading && !transactions.length) return <div className="page-loading"><Spinner size="lg" /></div>;
 
+  const bulkButtonText = getBulkButtonText();
+  const bulkAction = getBulkAction();
+
   return (
     <div className="transactions-menu">
       <div className="page-header">
@@ -299,29 +432,36 @@ const AssetTransactionsMenu = () => {
           <Button variant="outline" onClick={() => setShowImportModal(true)} startIcon={<FiUpload />}>
             Import
           </Button>
+          {selectedRows.length > 0 && showCheckbox && bulkButtonText && (
+            <Button variant="primary" onClick={() => setShowBulkActivateModal(true)} startIcon={<FiCheckSquare />}>
+              {bulkButtonText} ({selectedRows.length})
+            </Button>
+          )}
           <PageHeader title="Asset Transactions" buttonText="New Transaction" onButtonClick={handleCreate} buttonIcon={<FiPlus />} />
         </div>
       </div>
       
-      <Tabs tabs={TRANSACTION_STATUS_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+      <Tabs tabs={TRANSACTION_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar onSearch={handleSearch} onFilterToggle={() => setShowFilters(!showFilters)} showFilters={showFilters} placeholder="Search by asset, employee..." />
       <FilterPanel visible={showFilters}>
         <Select label="Approval Status" value={approvalFilter} onChange={(e) => { setApprovalFilter(e.target.value); setPage(1); }} options={[{ value: "", label: "All" }, { value: "pending", label: "Pending" }, { value: "approved", label: "Approved" }, { value: "rejected", label: "Rejected" }]} />
         <Select label="Type" value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }} options={TRANSACTION_TYPE_FILTER_OPTIONS} />
       </FilterPanel>
       
-<div className="transactions-menu__table" style={{ width: '100%', minWidth: 0 }}>
-  <DataTable 
-    rows={transactions} 
-    columns={columns} 
-    loading={loading} 
-    pageSize={pageSize} 
-    getRowId={(row) => row.assetTransactionId} 
-    hideFooter={true} 
-    autoHeight={true}  // TAMBAHKAN INI
-    ariaLabel="Transactions data table" 
-  />
-</div>
+      <div className="transactions-menu__table" style={{ width: '100%', minWidth: 0 }}>
+        <DataTable 
+          rows={transactions} 
+          columns={columns} 
+          loading={loading} 
+          pageSize={pageSize} 
+          getRowId={(row) => row.assetTransactionId} 
+          hideFooter={true} 
+          autoHeight={false}
+          checkboxSelection={showCheckbox}
+          onSelectionChange={(newSelection) => setSelectedRows(newSelection)}
+          ariaLabel="Transactions data table" 
+        />
+      </div>
       <Pagination 
         currentPage={page} 
         totalPages={Math.ceil(totalCount / pageSize) || 1} 
@@ -460,7 +600,12 @@ const AssetTransactionsMenu = () => {
       <Modal isOpen={showReturnModal} onClose={() => !isReturnSubmitting && setShowReturnModal(false)} title="Return Asset" size="md">
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <Box sx={{ p: 2, bgcolor: 'var(--surface)', borderRadius: 2 }}>
-            <strong>{selectedTransaction?.assetCode} - {selectedTransaction?.assetName}</strong>
+            <strong style={{ color: 'var(--text-primary)' }}>
+              {selectedTransaction?.assetCode} - {selectedTransaction?.assetName}
+            </strong>
+            <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              Transaction ID: {selectedTransaction?.assetTransactionId}
+            </p>
             <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
               Type: {selectedTransaction?.transactionTypeName} | Holder: {selectedTransaction?.toEmployeeName || 'None'}
             </p>
@@ -502,6 +647,17 @@ const AssetTransactionsMenu = () => {
         importResult={importResult}
         title="Import Transactions"
         description="Upload Excel or TXT file with transaction data. Transactions will be imported as PENDING and need approval."
+      />
+
+      {/* Bulk Action Modal */}
+      <BulkActivateModal
+        isOpen={showBulkActivateModal}
+        onClose={() => setShowBulkActivateModal(false)}
+        onConfirm={(ids) => handleBulkAction(ids, bulkAction)}
+        selectedIds={selectedRows}
+        itemName="transactions"
+        title={bulkButtonText === "Approve Selected" ? "Approve Transactions" : "Reject Transactions"}
+        description={`This action will ${bulkAction === "approve" ? "approve" : "reject"} the selected transactions.`}
       />
     </div>
   );

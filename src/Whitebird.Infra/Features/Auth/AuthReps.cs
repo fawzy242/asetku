@@ -112,6 +112,7 @@ public class AuthReps : IAuthReps
         const string sql = @"
             UPDATE Users SET 
                 FullName = @FullName,
+                Email = @Email,
                 PhoneNumber = @PhoneNumber,
                 ProfilePhotoPath = @ProfilePhotoPath,
                 ProfilePhotoFileName = @ProfilePhotoFileName,

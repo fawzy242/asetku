@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FiSearch, FiSun, FiMoon, FiChevronDown, FiX, FiUser, FiLogOut } from "react-icons/fi";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../../context/AuthContext";
 import { useUIStore } from "../../../stores/uiStore";
@@ -11,19 +11,32 @@ import "./Topbar.scss";
 
 const fetchSearchResults = async (keyword) => {
   if (!keyword || keyword.trim().length < 2) return [];
-  const [assetRes, employeeRes] = await Promise.all([
-    apiService.get(`/Asset/search?keyword=${encodeURIComponent(keyword)}`),
-    apiService.get(`/Employee/grid?search=${encodeURIComponent(keyword)}&pageSize=2`)
-      .catch(() => apiService.get(`/Employee?search=${encodeURIComponent(keyword)}`))
-      .catch(() => ({ data: { data: [] } })),
-  ]);
-  const assets = (assetRes.data?.data || []).slice(0, 3).map(item => ({
-    type: "asset", id: item.assetId, title: item.assetName, code: item.assetCode,
-  }));
-  const employees = (employeeRes.data?.data || []).slice(0, 2).map(item => ({
-    type: "employee", id: item.employeeId, title: item.fullName, code: item.employeeCode,
-  }));
-  return [...assets, ...employees];
+  
+  try {
+    const [assetRes, employeeRes] = await Promise.all([
+      apiService.get(`/Asset/search?keyword=${encodeURIComponent(keyword)}`),
+      apiService.get(`/Employee/grid?search=${encodeURIComponent(keyword)}&pageSize=5`)
+    ]);
+    
+    const assets = (assetRes.data?.data || []).slice(0, 5).map(item => ({
+      type: "asset",
+      id: item.assetId,
+      title: item.assetName,
+      code: item.assetCode,
+    }));
+    
+    const employees = (employeeRes.data?.data?.data || employeeRes.data?.data || []).slice(0, 5).map(item => ({
+      type: "employee",
+      id: item.employeeId,
+      title: item.fullName,
+      code: item.employeeCode,
+    }));
+    
+    return [...assets, ...employees];
+  } catch (error) {
+    console.error("Search failed:", error);
+    return [];
+  }
 };
 
 const Topbar = ({ user = null }) => {
@@ -34,23 +47,33 @@ const Topbar = ({ user = null }) => {
   const searchRef = useRef(null);
   const userMenuRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { logout } = useAuth();
   const { theme, toggleTheme } = useUIStore();
 
-  const { data: searchResults = [], isLoading: isSearching } = useQuery({
-    queryKey: ['search', debouncedSearch],
+  const { data: searchResults = [], isLoading: isSearching, refetch } = useQuery({
+    queryKey: ['global-search', debouncedSearch],
     queryFn: () => fetchSearchResults(debouncedSearch),
     enabled: debouncedSearch.length >= 2,
     staleTime: 30000,
     placeholderData: (prev) => prev,
   });
 
-  const debouncedSetSearch = useDebounce((value) => setDebouncedSearch(value), 300);
+  const debouncedSetSearch = useDebounce((value) => {
+    setDebouncedSearch(value);
+    if (value.length >= 2) {
+      refetch();
+    }
+  }, 300);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (searchRef.current && !searchRef.current.contains(e.target)) setShowSearchResults(false);
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) setShowUserMenu(false);
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setShowSearchResults(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setShowUserMenu(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -69,13 +92,32 @@ const Topbar = ({ user = null }) => {
     setShowSearchResults(false);
   };
 
+  // FIXED: Redirect to Asset Tracking or Employee Summary page with query parameter
   const handleSearchSelect = (r) => {
     setSearchValue("");
     setDebouncedSearch("");
     setShowSearchResults(false);
-    if (r.type === "asset") navigate(`/assets?search=${r.code}`);
-    else if (r.type === "employee") navigate(`/employees?search=${r.code}`);
+    if (r.type === "asset") {
+      navigate(`/tracking?assetId=${r.id}`);
+    } else if (r.type === "employee") {
+      navigate(`/employee-summary?employeeId=${r.id}`);
+    }
   };
+
+  // Also handle URL parameters on page load for direct navigation
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const assetId = params.get('assetId');
+    const employeeId = params.get('employeeId');
+    
+    if (assetId && location.pathname === '/tracking') {
+      // The AssetTracking page will handle loading the data
+      // Just ensure the page is ready
+    }
+    if (employeeId && location.pathname === '/employee-summary') {
+      // The EmployeeSummary page will handle loading the data
+    }
+  }, [location]);
 
   const handleLogout = async () => {
     const confirmed = await ConfirmDialog.show({
@@ -96,13 +138,7 @@ const Topbar = ({ user = null }) => {
 
   return (
     <header className="topbar">
-      {/* ISSUE #2: Hapus topbar__title — page-title di MainLayout sudah menampilkan judul */}
-      <div className="topbar__left">
-        {/* <div className="topbar__brand">
-          <span className="topbar__brand-icon">W</span>
-          <span className="topbar__brand-text">Whitebird</span>
-        </div> */}
-      </div>
+      <div className="topbar__left"></div>
 
       <div className="topbar__center">
         <div className="topbar__search" ref={searchRef}>
@@ -134,7 +170,7 @@ const Topbar = ({ user = null }) => {
                   </div>
                 ))
               ) : searchValue.length >= 2 && (
-                <div className="topbar__search-empty">No results found</div>
+                <div className="topbar__search-empty">No results found for "{searchValue}"</div>
               )}
             </div>
           )}

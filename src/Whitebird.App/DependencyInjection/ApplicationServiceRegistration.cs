@@ -19,11 +19,11 @@ public static class ApplicationServiceRegistration
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         services.AddHttpContextAccessor();
-        
+
         // Common Services
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IActivityLogService, ActivityLogService>();
-        
+
         // Core Services
         services.AddScoped<IAssetService, AssetService>();
         services.AddScoped<IAssetTransactionService, AssetTransactionService>();
@@ -33,19 +33,19 @@ public static class ApplicationServiceRegistration
         services.AddScoped<IEmployeeService, EmployeeService>();
         services.AddScoped<ISupplierService, SupplierService>();
         services.AddScoped<IReportsService, ReportsService>();
-        
+
         // New Modules
         services.AddScoped<IMasterDataService, MasterDataService>();
         services.AddScoped<IDepartmentService, DepartmentService>();
         services.AddScoped<IOfficeService, OfficeService>();
         services.AddScoped<IFileAttachmentService, FileAttachmentService>();
         services.AddScoped<IStorageService, StorageService>();
-        
+
         // Import Services
         services.AddScoped<AssetImportService>();
         services.AddScoped<EmployeeImportService>();
         services.AddScoped<TransactionImportService>();
-        
+
         return services;
     }
 }

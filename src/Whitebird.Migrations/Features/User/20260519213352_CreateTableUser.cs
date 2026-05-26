@@ -23,7 +23,7 @@ namespace Whitebird.Migrations.Features.User
                 [Username] NVARCHAR(100) NOT NULL,
                 [Email] NVARCHAR(100) NOT NULL,
                 [PasswordHash] NVARCHAR(255) NOT NULL,
-                [MustChangePassword] BOT NOT NULL CONSTRAINT [DF_Users_MustChangePassword] DEFAULT 0,
+                [MustChangePassword] BIT NOT NULL CONSTRAINT [DF_Users_MustChangePassword] DEFAULT 0,
                 [FullName] NVARCHAR(100) NOT NULL,
                 [PhoneNumber] NVARCHAR(20) NULL,
                 [SessionToken] NVARCHAR(255) NULL,

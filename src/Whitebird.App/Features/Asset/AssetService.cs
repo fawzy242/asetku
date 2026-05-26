@@ -279,19 +279,12 @@ public class AssetService : BaseService, IAssetService
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            if (string.IsNullOrWhiteSpace(keyword))
+            if (string.IsNullOrWhiteSpace(keyword) || keyword.Length < 2)
                 return ServiceResult<IEnumerable<AssetListViewModel>>.Success(new List<AssetListViewModel>());
 
-            var assets = await _assetReps.GetAllWithRelationsAsync();
-            var filtered = assets.Where(a =>
-                (a.AssetCode != null && a.AssetCode.Contains(keyword, StringComparison.OrdinalIgnoreCase)) ||
-                (a.AssetName != null && a.AssetName.Contains(keyword, StringComparison.OrdinalIgnoreCase)) ||
-                (a.SerialNumber != null && a.SerialNumber.Contains(keyword, StringComparison.OrdinalIgnoreCase)) ||
-                (a.Brand != null && a.Brand.Contains(keyword, StringComparison.OrdinalIgnoreCase)) ||
-                (a.Model != null && a.Model.Contains(keyword, StringComparison.OrdinalIgnoreCase))
-            );
+            var assets = await _assetReps.SearchAssetsAsync(keyword, 10);
 
-            return ServiceResult<IEnumerable<AssetListViewModel>>.Success(filtered.Adapt<IEnumerable<AssetListViewModel>>());
+            return ServiceResult<IEnumerable<AssetListViewModel>>.Success(assets.Adapt<IEnumerable<AssetListViewModel>>());
         }, "search assets");
     }
 

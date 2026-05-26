@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { FiDownload, FiFileText, FiCalendar, FiBox, FiUsers, FiTool, FiTrendingUp } from "react-icons/fi";
 import { Grid, Box, Typography, Chip } from "@mui/material";
 import ReportsData from "./Reports.data";
@@ -12,7 +12,6 @@ import "./Reports.scss";
 
 const reportsData = new ReportsData();
 
-// Report type definitions
 const REPORT_TYPES = [
   { 
     id: "transactions", 
@@ -64,34 +63,81 @@ const ReportsMenu = () => {
   const [employeeFilter, setEmployeeFilter] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
   
-  // Reference data for filters
   const [categories, setCategories] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
-  
   const [loadingFilters, setLoadingFilters] = useState(true);
+  
+  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef(null);
 
-  // Load filter options on mount
-  React.useEffect(() => {
+  useEffect(() => {
+    isMountedRef.current = true;
+    
     const loadFilters = async () => {
-      setLoadingFilters(true);
-      try {
-        const [catsRes, empsRes] = await Promise.all([
-          reportsData.api.getCategories(),
-          reportsData.api.getEmployees()
-        ]);
-        if (catsRes?.data) setCategories(catsRes.data);
-        if (empsRes?.data) {
-          setEmployees(empsRes.data);
-          const depts = [...new Set(empsRes.data.map(e => e.department).filter(Boolean))];
-          setDepartments(depts);
-        }
-      } catch (error) {
-        console.error("Failed to load filters:", error);
+      // Cancel previous request if exists
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
-      setLoadingFilters(false);
+      
+      // Create new AbortController
+      abortControllerRef.current = new AbortController();
+      
+      setLoadingFilters(true);
+      
+      try {
+        // Use Promise.allSettled instead of Promise.all to handle individual failures
+        const results = await Promise.allSettled([
+          reportsData.api.getCategories({ signal: abortControllerRef.current.signal }),
+          reportsData.api.getEmployees({ signal: abortControllerRef.current.signal })
+        ]);
+        
+        // Only update state if component is still mounted
+        if (!isMountedRef.current) return;
+        
+        // Handle categories result
+        if (results[0].status === 'fulfilled' && results[0].value?.data) {
+          setCategories(results[0].value.data);
+        } else {
+          console.warn("Failed to load categories:", results[0].reason);
+          setCategories([]);
+        }
+        
+        // Handle employees result
+        if (results[1].status === 'fulfilled' && results[1].value?.data) {
+          const empData = results[1].value.data;
+          setEmployees(empData);
+          const depts = [...new Set(empData.map(e => e.departmentName || e.department).filter(Boolean))];
+          setDepartments(depts);
+        } else {
+          console.warn("Failed to load employees:", results[1].reason);
+          setEmployees([]);
+          setDepartments([]);
+        }
+        
+      } catch (error) {
+        // Ignore cancel errors (they are expected)
+        if (error?.name === 'CanceledError' || error?.message === 'canceled') {
+          console.log("Request was cancelled - this is normal when component unmounts");
+        } else {
+          console.error("Failed to load filters:", error);
+        }
+      } finally {
+        if (isMountedRef.current) {
+          setLoadingFilters(false);
+        }
+      }
     };
+    
     loadFilters();
+    
+    // Cleanup function: cancel requests and mark component as unmounted
+    return () => {
+      isMountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, []);
 
   const currentReport = REPORT_TYPES.find(r => r.id === selectedReport) || REPORT_TYPES[0];
@@ -116,24 +162,29 @@ const ReportsMenu = () => {
     const params = buildParams();
     let result = { success: false };
     
-    switch (selectedReport) {
-      case "transactions":
-        result = await reportsData.exportTransaction(params, []);
-        break;
-      case "inventory":
-        result = await reportsData.exportInventory(params, []);
-        break;
-      case "employee":
-        result = await reportsData.exportEmployee(params, []);
-        break;
-      case "maintenance":
-        result = await reportsData.exportMaintenance(params, []);
-        break;
-      case "financial":
-        result = await reportsData.exportFinancial(params, []);
-        break;
-      default:
-        break;
+    try {
+      switch (selectedReport) {
+        case "transactions":
+          result = await reportsData.exportTransaction(params, []);
+          break;
+        case "inventory":
+          result = await reportsData.exportInventory(params, []);
+          break;
+        case "employee":
+          result = await reportsData.exportEmployee(params, []);
+          break;
+        case "maintenance":
+          result = await reportsData.exportMaintenance(params, []);
+          break;
+        case "financial":
+          result = await reportsData.exportFinancial(params, []);
+          break;
+        default:
+          break;
+      }
+    } catch (error) {
+      console.error("Export failed:", error);
+      ConfirmDialog.toast.error("Failed to generate report. Please try again.");
     }
     
     setIsExporting(false);
@@ -203,7 +254,6 @@ const ReportsMenu = () => {
       </div>
       
       <Grid container spacing={3}>
-        {/* Report Type Selection */}
         <Grid item xs={12}>
           <Card title="Select Report Type">
             <div className="reports-menu__report-types">
@@ -227,7 +277,6 @@ const ReportsMenu = () => {
           </Card>
         </Grid>
 
-        {/* Filter Panel */}
         <Grid item xs={12}>
           <Card title="Filter Options">
             <div className="reports-menu__filters">
@@ -300,7 +349,6 @@ const ReportsMenu = () => {
           </Card>
         </Grid>
 
-        {/* Export Action */}
         <Grid item xs={12}>
           <Card className="reports-menu__export-card">
             <div className="reports-menu__export-content">

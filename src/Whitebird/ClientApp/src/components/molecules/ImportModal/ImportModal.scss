@@ -223,3 +223,55 @@
         margin-top: $spacing-xl;
     }
 }
+
+// Dark mode specific fixes
+[data-theme='dark'] {
+    .import-modal {
+        &__dropzone {
+            background-color: #1f2937;
+            border-color: #4b5563;
+
+            &:hover {
+                border-color: #ef4444;
+                background-color: rgba(239, 68, 68, 0.05);
+            }
+
+            &--active {
+                border-color: #ef4444;
+                background-color: rgba(239, 68, 68, 0.1);
+            }
+        }
+
+        &__dropzone-text {
+            color: #f9fafb;
+        }
+
+        &__dropzone-icon {
+            color: #9ca3af;
+        }
+
+        &__selected-file {
+            background-color: #1f2937;
+            border-color: #4b5563;
+        }
+
+        &__selected-file-name {
+            color: #f9fafb;
+        }
+
+        &__warnings-title,
+        &__errors-title {
+            color: #f9fafb;
+        }
+
+        &__warning-message,
+        &__error-message {
+            color: #f9fafb;
+        }
+
+        &__warning,
+        &__error {
+            border-bottom-color: #4b5563;
+        }
+    }
+}

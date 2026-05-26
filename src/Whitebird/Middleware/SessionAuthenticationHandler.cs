@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using Whitebird.App.Features.Auth;
 
-namespace Whitebird.Middleware;
+namespace Whitebird.Api.Middleware;
 
 public class SessionAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
@@ -14,7 +14,7 @@ public class SessionAuthenticationHandler : AuthenticationHandler<Authentication
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder,
-        ISystemClock clock,
+        ISystemClock clock,  // Keep for backward compatibility - will be removed in .NET 9
         IAuthService authService)
         : base(options, logger, encoder, clock)
     {

@@ -46,19 +46,19 @@
     &--outline {
         background-color: transparent;
         border-color: var(--border);
-        color: var(--text-primary);
+        color: var(--text-primary) !important;
 
         &:hover:not(:disabled) {
             background-color: var(--surface);
             border-color: var(--primary);
-            color: var(--primary);
+            color: var(--primary) !important;
         }
     }
 
     &--text {
         background-color: transparent;
         border-color: transparent;
-        color: var(--text-primary);
+        color: var(--text-primary) !important;
 
         &:hover:not(:disabled) {
             background-color: var(--surface);
@@ -139,6 +139,22 @@
 
     &__text {
         color: inherit;
+    }
+}
+
+// Dark mode specific fixes
+[data-theme='dark'] {
+    .btn--outline {
+        color: #f9fafb !important;
+        border-color: #4b5563;
+
+        &:hover {
+            color: var(--primary) !important;
+        }
+    }
+
+    .btn--text {
+        color: #f9fafb !important;
     }
 }
 

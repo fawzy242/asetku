@@ -41,8 +41,21 @@ public class EmployeeController : ControllerBase
         => this.HandleResult(await _employeeService.GetAssetSummaryAsync(id));
 
     [HttpGet("grid")]
-    public async Task<IActionResult> GetGridData([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string? search = null, [FromQuery] string? sortBy = null, [FromQuery] bool sortDescending = false)
-        => this.HandleResult(await _employeeService.GetGridDataAsync(page, pageSize, search, sortBy, sortDescending));
+    public async Task<IActionResult> GetGridData(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? search = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] bool sortDescending = false,
+        [FromQuery] bool? isActive = null,
+        [FromQuery] int? departmentId = null)
+    {
+        var filters = new Dictionary<string, object>();
+        if (isActive.HasValue) filters["isActive"] = isActive.Value;
+        if (departmentId.HasValue) filters["departmentId"] = departmentId;
+
+        return this.HandleResult(await _employeeService.GetGridDataAsync(page, pageSize, search, sortBy, sortDescending, filters));
+    }
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] EmployeeCreateViewModel model)

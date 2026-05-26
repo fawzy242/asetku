@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { FiPlus, FiUpload, FiCheckSquare } from "react-icons/fi";
 import { Box } from "@mui/material";
 import AssetsData from "./Assets.data";
@@ -21,8 +21,18 @@ import { useGridData } from "../../hooks/useGridData";
 import { useReferenceData } from "../../hooks/useReferenceData";
 import { useCrudForm } from "../../hooks/useCrudForm";
 import { cleanAssetFormData } from "../../core/utils/formHelpers";
-import { ASSET_STATUS_TABS } from "../../core/constants/tabs";
 import "./Assets.scss";
+
+// Tab definitions
+const ASSET_TABS = [
+  { id: "all", label: "All Assets" },
+  { id: "Active", label: "Active" },
+  { id: "Inactive", label: "Inactive" },
+  { id: "Available", label: "Available" },
+  { id: "Assigned", label: "Assigned" },
+  { id: "On Loan", label: "On Loan" },
+  { id: "In Maintenance", label: "In Maintenance" },
+];
 
 const assetsData = new AssetsData();
 assetsData.transformFormData = cleanAssetFormData;
@@ -48,6 +58,8 @@ const AssetsMenu = () => {
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const isMountedRef = useRef(true);
 
   const { categories, suppliers, offices, assetConditions } = useReferenceData();
 
@@ -57,17 +69,55 @@ const AssetsMenu = () => {
     handleSubmit: crudHandleSubmit,
   } = useCrudForm(INITIAL_FORM_DATA, assetsData, CRUD_OPTIONS);
 
+  const showCheckbox = useMemo(() => {
+    return activeTab === "Active" || activeTab === "Inactive";
+  }, [activeTab]);
+
   const fetchGridData = useCallback(async (params) => {
-    const filters = { ...params };
-    if (activeTab !== 'all') filters.status = activeTab;
-    if (statusFilter) filters.status = statusFilter;
-    if (categoryFilter) filters.categoryId = categoryFilter;
-    return assetsData.fetchGridData(filters);
-  }, [activeTab, statusFilter, categoryFilter]);
+    const filters = { 
+      page: params.page || 1,
+      pageSize: params.pageSize || 10,
+      search: params.search || searchTerm,
+      ...params 
+    };
+    
+    if (activeTab !== 'all') {
+      filters.status = activeTab;
+    }
+    
+    if (statusFilter && statusFilter !== 'all') {
+      filters.status = statusFilter;
+    }
+    
+    if (categoryFilter) {
+      filters.categoryId = categoryFilter;
+    }
+    
+    const result = await assetsData.fetchGridData(filters);
+    return result;
+  }, [activeTab, statusFilter, categoryFilter, searchTerm]);
 
   const {
-    data: rawAssets, loading, page, setPage, pageSize, setPageSize, updateFilters, reload
-  } = useGridData(['assets', activeTab, statusFilter, categoryFilter], fetchGridData);
+    data: rawAssets,
+    totalCount,
+    loading,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    updateFilters,
+    reload
+  } = useGridData(['assets', activeTab, statusFilter, categoryFilter, searchTerm], fetchGridData);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    setPage(1);
+    setSelectedRows([]);
+    reload();
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [activeTab, reload, setPage]);
 
   const assets = useMemo(() => {
     return (rawAssets || []).map(asset => ({
@@ -77,24 +127,26 @@ const AssetsMenu = () => {
     }));
   }, [rawAssets]);
 
-  const totalCount = assets.length;
-
-  const handleSearch = useCallback((search) => updateFilters({ search }), [updateFilters]);
+  const handleSearch = useCallback((search) => {
+    setSearchTerm(search);
+    updateFilters({ search });
+    setPage(1);
+  }, [updateFilters, setPage]);
   
   const handleDelete = useCallback(async (asset) => {
     const r = await assetsData.delete(asset.assetId);
-    if (r.success) reload();
+    if (r.success && isMountedRef.current) reload();
   }, [reload]);
   
   const onSubmit = useCallback(async (e) => {
     e.preventDefault();
     const success = await crudHandleSubmit();
-    if (success) reload();
+    if (success && isMountedRef.current) reload();
   }, [crudHandleSubmit, reload]);
   
   const handleBulkActivate = useCallback(async (ids, activate) => {
     const r = await assetsData.bulkActivate(ids, activate);
-    if (r.success) {
+    if (r.success && isMountedRef.current) {
       setSelectedRows([]);
       reload();
     }
@@ -104,7 +156,7 @@ const AssetsMenu = () => {
     setIsImporting(true);
     const r = await assetsData.importAssets(file);
     setIsImporting(false);
-    if (r.success) {
+    if (r.success && isMountedRef.current) {
       setImportResult(r.data);
       reload();
     }
@@ -118,10 +170,17 @@ const AssetsMenu = () => {
 
   const handleTabChange = useCallback((tab) => { 
     setActiveTab(tab); 
-    setPage(1); 
+    setPage(1);
+    setStatusFilter("");
+    setCategoryFilter("");
+    setSearchTerm("");
+    setSelectedRows([]);
   }, [setPage]);
 
   if (loading && !rawAssets.length) return <div className="page-loading"><Spinner size="lg" /></div>;
+
+  const bulkButtonText = activeTab === "Active" ? "Deactivate" : "Activate";
+  const bulkActivateValue = activeTab === "Active" ? false : true;
 
   return (
     <div className="assets-menu">
@@ -129,16 +188,16 @@ const AssetsMenu = () => {
         <h1 className="page-title">Asset</h1>
         <div style={{ display: 'flex', gap: '12px' }}>
           <Button variant="outline" onClick={() => setShowImportModal(true)} startIcon={<FiUpload />}>Import</Button>
-          {selectedRows.length > 0 && (
+          {selectedRows.length > 0 && showCheckbox && (
             <Button variant="primary" onClick={() => setShowBulkActivateModal(true)} startIcon={<FiCheckSquare />}>
-              Activate ({selectedRows.length})
+              {bulkButtonText} ({selectedRows.length})
             </Button>
           )}
           <PageHeader title="Asset Management" buttonText="Add Asset" onButtonClick={handleCreate} buttonIcon={<FiPlus />} />
         </div>
       </div>
 
-      <Tabs tabs={ASSET_STATUS_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+      <Tabs tabs={ASSET_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar onSearch={handleSearch} onFilterToggle={() => setShowFilters(!showFilters)} showFilters={showFilters} placeholder="Search by code, name, serial..." />
       <FilterPanel visible={showFilters}>
         <AssetFilters 
@@ -148,20 +207,21 @@ const AssetsMenu = () => {
         />
       </FilterPanel>
       
-<div className="assets-menu__table" style={{ width: '100%', minWidth: 0 }}>
-  <DataTable 
-    rows={assets} 
-    columns={columns} 
-    loading={loading} 
-    pageSize={pageSize} 
-    getRowId={(row) => row.assetId} 
-    hideFooter={true} 
-    autoHeight={true}  // TAMBAHKAN INI
-    checkboxSelection={true}
-    onSelectionChange={(newSelection) => setSelectedRows(newSelection)}
-    ariaLabel="Assets data table" 
-  />
-</div>
+      <div className="assets-menu__table" style={{ width: '100%', minWidth: 0 }}>
+        <DataTable 
+          rows={assets} 
+          columns={columns} 
+          loading={loading} 
+          pageSize={pageSize} 
+          getRowId={(row) => row.assetId} 
+          hideFooter={true} 
+          autoHeight={false}
+          checkboxSelection={showCheckbox}
+          onSelectionChange={(newSelection) => setSelectedRows(newSelection)}
+          ariaLabel="Assets data table" 
+        />
+      </div>
+      
       <Pagination 
         currentPage={page} 
         totalPages={Math.ceil(totalCount / pageSize) || 1} 
@@ -196,15 +256,17 @@ const AssetsMenu = () => {
         isImporting={isImporting}
         importResult={importResult}
         title="Import Assets"
-        description="Upload Excel or TXT file with asset data. Assets will be imported as INACTIVE and need activation."
+        description="Upload Excel or TXT file with asset data. Assets will be imported as ACTIVE."
       />
 
       <BulkActivateModal
         isOpen={showBulkActivateModal}
         onClose={() => setShowBulkActivateModal(false)}
-        onConfirm={handleBulkActivate}
+        onConfirm={(ids) => handleBulkActivate(ids, bulkActivateValue)}
         selectedIds={selectedRows}
         itemName="assets"
+        title={bulkButtonText === "Activate" ? "Activate Assets" : "Deactivate Assets"}
+        description={`This action will ${bulkButtonText.toLowerCase()} the selected assets.`}
       />
     </div>
   );

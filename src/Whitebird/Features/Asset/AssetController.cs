@@ -50,8 +50,25 @@ public class AssetController : ControllerBase
         => this.HandleResult(await _assetService.GetAssetTransactionHistoryAsync(assetId));
 
     [HttpGet("grid")]
-    public async Task<IActionResult> GetGridData([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string? search = null, [FromQuery] string? sortBy = null, [FromQuery] bool sortDescending = false)
-        => this.HandleResult(await _assetService.GetGridDataAsync(page, pageSize, search, sortBy, sortDescending));
+    public async Task<IActionResult> GetGridData(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? search = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] bool sortDescending = false,
+        [FromQuery] string? status = null,
+        [FromQuery] int? categoryId = null,
+        [FromQuery] int? officeId = null,
+        [FromQuery] bool? isActive = null)
+    {
+        var filters = new Dictionary<string, object>();
+        if (!string.IsNullOrEmpty(status)) filters["status"] = status;
+        if (categoryId.HasValue) filters["categoryId"] = categoryId;
+        if (officeId.HasValue) filters["officeId"] = officeId;
+        if (isActive.HasValue) filters["isActive"] = isActive.Value;
+
+        return this.HandleResult(await _assetService.GetGridDataAsync(page, pageSize, search, sortBy, sortDescending, filters));
+    }
 
     [HttpGet("search")]
     public async Task<IActionResult> Search([FromQuery] string keyword)
@@ -101,32 +118,32 @@ public class AssetController : ControllerBase
         return this.HandleResult(await _assetService.BulkActivateAsync(request));
     }
 
-[HttpPost("import")]
-public async Task<IActionResult> Import(IFormFile file)
-{
-    if (file == null || file.Length == 0)
-        return BadRequest("No file provided");
-    
-    var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-    
-    using var stream = file.OpenReadStream();
-    ServiceResult<ImportResult> result;
-    
-    if (extension == ".txt" || extension == ".csv")
+    [HttpPost("import")]
+    public async Task<IActionResult> Import(IFormFile file)
     {
-        result = await _assetImportService.ImportFromTxtAsync(stream);
+        if (file == null || file.Length == 0)
+            return BadRequest("No file provided");
+
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+
+        using var stream = file.OpenReadStream();
+        ServiceResult<ImportResult> result;
+
+        if (extension == ".txt" || extension == ".csv")
+        {
+            result = await _assetImportService.ImportFromTxtAsync(stream);
+        }
+        else if (extension == ".xlsx" || extension == ".xls")
+        {
+            result = await _assetImportService.ImportFromExcelAsync(stream);
+        }
+        else
+        {
+            return BadRequest($"Unsupported file format: {extension}. Supported: .xlsx, .xls, .csv, .txt");
+        }
+
+        return this.HandleResult(result);
     }
-    else if (extension == ".xlsx" || extension == ".xls")
-    {
-        result = await _assetImportService.ImportFromExcelAsync(stream);
-    }
-    else
-    {
-        return BadRequest($"Unsupported file format: {extension}. Supported: .xlsx, .xls, .csv, .txt");
-    }
-    
-    return this.HandleResult(result);
-}
 
     [HttpGet("import/template")]
     public async Task<IActionResult> DownloadImportTemplate()

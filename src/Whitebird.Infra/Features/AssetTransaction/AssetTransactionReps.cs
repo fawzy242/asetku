@@ -16,7 +16,7 @@ public class AssetTransactionReps : IAssetTransactionReps
 
     public async Task<AssetTransactionEntity?> GetByIdRawAsync(int transactionId)
     {
-        const string sql = "SELECT * FROM AssetTransaction WHERE AssetTransactionId = @TransactionId AND IsActive = 1";
+        const string sql = "SELECT * FROM AssetTransaction WHERE AssetTransactionId = @TransactionId";
         return await _context.QueryFirstOrDefaultAsync<AssetTransactionEntity>(sql, new { TransactionId = transactionId });
     }
 
@@ -33,15 +33,15 @@ public class AssetTransactionReps : IAssetTransactionReps
                    md3.MasterDataName as ConditionAfterName,
                    md4.MasterDataName as MaintenanceTypeName
             FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId AND a.IsActive = 1
-            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId AND fe.IsActive = 1
-            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId AND te.IsActive = 1
-            LEFT JOIN Office tl ON t.ToLocationId = tl.OfficeId AND tl.IsActive = 1
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
-            LEFT JOIN MasterData md2 ON t.ConditionBefore = md2.ReferenceCode AND md2.ReferenceName = 'AssetCondition' AND md2.IsActive = 1
-            LEFT JOIN MasterData md3 ON t.ConditionAfter = md3.ReferenceCode AND md3.ReferenceName = 'AssetCondition' AND md3.IsActive = 1
-            LEFT JOIN MasterData md4 ON t.MaintenanceType = md4.ReferenceCode AND md4.ReferenceName = 'MaintenanceType' AND md4.IsActive = 1
-            WHERE t.AssetTransactionId = @TransactionId AND t.IsActive = 1";
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            LEFT JOIN Office tl ON t.ToLocationId = tl.OfficeId
+            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
+            LEFT JOIN MasterData md2 ON t.ConditionBefore = md2.ReferenceCode AND md2.ReferenceName = 'AssetCondition'
+            LEFT JOIN MasterData md3 ON t.ConditionAfter = md3.ReferenceCode AND md3.ReferenceName = 'AssetCondition'
+            LEFT JOIN MasterData md4 ON t.MaintenanceType = md4.ReferenceCode AND md4.ReferenceName = 'MaintenanceType'
+            WHERE t.AssetTransactionId = @TransactionId";
         return await _context.QueryFirstOrDefaultAsync<AssetTransactionEntity>(sql, new { TransactionId = transactionId });
     }
 
@@ -52,10 +52,10 @@ public class AssetTransactionReps : IAssetTransactionReps
                    fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName,
                    md1.MasterDataName as TransactionTypeName
             FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId AND a.IsActive = 1
-            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId AND fe.IsActive = 1
-            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId AND te.IsActive = 1
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
             WHERE t.IsActive = 1
             ORDER BY t.TransactionDate DESC";
         return await _context.QueryAsync<AssetTransactionEntity>(sql);
@@ -68,10 +68,10 @@ public class AssetTransactionReps : IAssetTransactionReps
                    fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName,
                    md1.MasterDataName as TransactionTypeName
             FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId AND a.IsActive = 1
-            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId AND fe.IsActive = 1
-            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId AND te.IsActive = 1
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
             WHERE t.AssetId = @AssetId AND t.IsActive = 1
             ORDER BY t.TransactionDate DESC";
         return await _context.QueryAsync<AssetTransactionEntity>(sql, new { AssetId = assetId });
@@ -84,10 +84,10 @@ public class AssetTransactionReps : IAssetTransactionReps
                    fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName,
                    md1.MasterDataName as TransactionTypeName
             FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId AND a.IsActive = 1
-            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId AND fe.IsActive = 1
-            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId AND te.IsActive = 1
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
             WHERE (t.FromEmployeeId = @EmployeeId OR t.ToEmployeeId = @EmployeeId) AND t.IsActive = 1
             ORDER BY t.TransactionDate DESC";
         return await _context.QueryAsync<AssetTransactionEntity>(sql, new { EmployeeId = employeeId });
@@ -100,14 +100,21 @@ public class AssetTransactionReps : IAssetTransactionReps
                    fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName,
                    md1.MasterDataName as TransactionTypeName
             FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId AND a.IsActive = 1
-            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId AND fe.IsActive = 1
-            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId AND te.IsActive = 1
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
             WHERE t.IsActive = 1";
 
-        if (approved.HasValue)
-            sql += " AND t.Approved = @Approved";
+        if (approved == true)
+        {
+            sql += " AND t.Approved = 1";
+        }
+        else if (approved == false)
+        {
+            sql += " AND t.Approved = 0";
+        }
+        // If approved is null, show all (no filter)
 
         sql += " ORDER BY t.TransactionDate DESC";
 
@@ -121,12 +128,85 @@ public class AssetTransactionReps : IAssetTransactionReps
                    fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName,
                    md1.MasterDataName as TransactionTypeName
             FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId AND a.IsActive = 1
-            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId AND fe.IsActive = 1
-            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId AND te.IsActive = 1
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
             WHERE t.Approved IS NULL AND t.IsActive = 1
             ORDER BY t.TransactionDate ASC";
+        return await _context.QueryAsync<AssetTransactionEntity>(sql);
+    }
+
+    public async Task<IEnumerable<AssetTransactionEntity>> GetApprovedWithRelationsAsync()
+    {
+        const string sql = @"
+            SELECT t.*, a.AssetCode, a.AssetName, 
+                   fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName,
+                   md1.MasterDataName as TransactionTypeName
+            FROM AssetTransaction t
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
+            WHERE t.Approved = 1 AND t.IsActive = 1
+            ORDER BY t.TransactionDate DESC";
+        return await _context.QueryAsync<AssetTransactionEntity>(sql);
+    }
+
+    public async Task<IEnumerable<AssetTransactionEntity>> GetRejectedWithRelationsAsync()
+    {
+        const string sql = @"
+            SELECT t.*, a.AssetCode, a.AssetName, 
+                   fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName,
+                   md1.MasterDataName as TransactionTypeName
+            FROM AssetTransaction t
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
+            WHERE t.Approved = 0 AND t.IsActive = 1
+            ORDER BY t.TransactionDate DESC";
+        return await _context.QueryAsync<AssetTransactionEntity>(sql);
+    }
+
+    public async Task<IEnumerable<AssetTransactionEntity>> GetActiveLoansWithRelationsAsync()
+    {
+        const string sql = @"
+            SELECT t.*, a.AssetCode, a.AssetName, 
+                   fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName,
+                   md1.MasterDataName as TransactionTypeName
+            FROM AssetTransaction t
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
+            WHERE t.TransactionType = 3
+              AND t.Approved = 1
+              AND t.FromAssetTransactionId IS NULL
+              AND t.ActualReturnDate IS NULL
+              AND t.IsActive = 1
+            ORDER BY t.ExpectedReturnDate";
+        return await _context.QueryAsync<AssetTransactionEntity>(sql);
+    }
+
+    public async Task<IEnumerable<AssetTransactionEntity>> GetOverdueLoansWithRelationsAsync()
+    {
+        const string sql = @"
+            SELECT t.*, a.AssetCode, a.AssetName, 
+                   fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName,
+                   md1.MasterDataName as TransactionTypeName
+            FROM AssetTransaction t
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
+            WHERE t.TransactionType = 3
+              AND t.Approved = 1
+              AND t.FromAssetTransactionId IS NULL
+              AND t.ExpectedReturnDate < GETDATE()
+              AND t.ActualReturnDate IS NULL
+              AND t.IsActive = 1
+            ORDER BY t.ExpectedReturnDate";
         return await _context.QueryAsync<AssetTransactionEntity>(sql);
     }
 
@@ -137,10 +217,10 @@ public class AssetTransactionReps : IAssetTransactionReps
                    fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName,
                    md1.MasterDataName as TransactionTypeName
             FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId AND a.IsActive = 1
-            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId AND fe.IsActive = 1
-            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId AND te.IsActive = 1
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
             WHERE t.TransactionDate BETWEEN @StartDate AND @EndDate AND t.IsActive = 1
             ORDER BY t.TransactionDate DESC";
         return await _context.QueryAsync<AssetTransactionEntity>(sql, new { StartDate = startDate, EndDate = endDate });
@@ -153,10 +233,10 @@ public class AssetTransactionReps : IAssetTransactionReps
                    fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName,
                    md1.MasterDataName as TransactionTypeName
             FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId AND a.IsActive = 1
-            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId AND fe.IsActive = 1
-            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId AND te.IsActive = 1
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
             WHERE t.AssetId = @AssetId 
               AND t.Approved = 1 
               AND t.FromAssetTransactionId IS NULL
@@ -172,11 +252,36 @@ public class AssetTransactionReps : IAssetTransactionReps
         return await _context.ExecuteScalarAsync<int>(sql, new { AssetId = assetId });
     }
 
+    // CRITICAL FIX: Use nullable bool? approved with correct logic
+    // - approved = true -> only approved (Approved = 1)
+    // - approved = false -> only rejected (Approved = 0)
+    // - approved = null -> ALL (no filter on Approved) - THIS IS FOR "ALL" TAB
+    // For PENDING (Approved IS NULL), we use a separate endpoint or a special value
+    // But in frontend, we'll use a different approach
     public async Task<PaginatedResult<AssetTransactionEntity>> GetPagedWithRelationsAsync(
         int page, int pageSize, string? search = null, bool? approved = null, int? assetId = null)
     {
         var conditions = new List<string> { "t.IsActive = 1" };
         var parameters = new DynamicParameters();
+
+        // approved = true -> hanya yang approved
+        // approved = false -> hanya yang rejected
+        // approved = null -> SEMUA (tidak difilter)
+        if (approved == true)
+        {
+            conditions.Add("t.Approved = 1");
+        }
+        else if (approved == false)
+        {
+            conditions.Add("t.Approved = 0");
+        }
+        // Jika approved == null, tidak ada filter (menampilkan semua)
+
+        if (assetId.HasValue)
+        {
+            conditions.Add("t.AssetId = @AssetId");
+            parameters.Add("@AssetId", assetId.Value);
+        }
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -184,16 +289,62 @@ public class AssetTransactionReps : IAssetTransactionReps
             parameters.Add("@Search", $"%{search}%");
         }
 
-        if (approved.HasValue)
+        var whereClause = conditions.Any() ? $"WHERE {string.Join(" AND ", conditions)}" : "";
+
+        var countSql = $@"
+            SELECT COUNT(*) FROM AssetTransaction t
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            {whereClause}";
+        var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
+
+        var offset = (page - 1) * pageSize;
+        var dataSql = $@"
+            SELECT t.*, a.AssetCode, a.AssetName, 
+                   fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName,
+                   md1.MasterDataName as TransactionTypeName
+            FROM AssetTransaction t
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
+            {whereClause}
+            ORDER BY t.TransactionDate DESC
+            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+
+        parameters.Add("@Offset", offset);
+        parameters.Add("@PageSize", pageSize);
+
+        var data = await _context.QueryAsync<AssetTransactionEntity>(dataSql, parameters);
+
+        return new PaginatedResult<AssetTransactionEntity>
         {
-            conditions.Add("t.Approved = @Approved");
-            parameters.Add("@Approved", approved.Value);
-        }
+            Data = data.ToList(),
+            TotalCount = totalCount,
+            PageNumber = page,
+            PageSize = pageSize,
+            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+        };
+    }
+
+    // Special method for PENDING (Approved IS NULL)
+    public async Task<PaginatedResult<AssetTransactionEntity>> GetPendingPagedWithRelationsAsync(
+        int page, int pageSize, string? search = null, int? assetId = null)
+    {
+        var conditions = new List<string> { "t.IsActive = 1", "t.Approved IS NULL" };
+        var parameters = new DynamicParameters();
 
         if (assetId.HasValue)
         {
             conditions.Add("t.AssetId = @AssetId");
             parameters.Add("@AssetId", assetId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            conditions.Add(@"(a.AssetCode LIKE @Search OR a.AssetName LIKE @Search OR fe.FullName LIKE @Search OR te.FullName LIKE @Search)");
+            parameters.Add("@Search", $"%{search}%");
         }
 
         var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
@@ -212,12 +363,12 @@ public class AssetTransactionReps : IAssetTransactionReps
                    fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName,
                    md1.MasterDataName as TransactionTypeName
             FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId AND a.IsActive = 1
-            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId AND fe.IsActive = 1
-            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId AND te.IsActive = 1
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
             {whereClause}
-            ORDER BY t.TransactionDate DESC
+            ORDER BY t.TransactionDate ASC
             OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
         parameters.Add("@Offset", offset);
@@ -242,10 +393,10 @@ public class AssetTransactionReps : IAssetTransactionReps
                    fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName,
                    md1.MasterDataName as TransactionTypeName
             FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId AND a.IsActive = 1
-            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId AND fe.IsActive = 1
-            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId AND te.IsActive = 1
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId
+            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
             WHERE t.FromAssetTransactionId = @TransactionId AND t.IsActive = 1";
         return await _context.QueryFirstOrDefaultAsync<AssetTransactionEntity>(sql, new { TransactionId = transactionId });
     }
@@ -262,47 +413,9 @@ public class AssetTransactionReps : IAssetTransactionReps
               AND TransactionType = @TransactionType
               AND Approved = 1
               AND FromAssetTransactionId IS NULL
+              AND ActualReturnDate IS NULL
               AND IsActive = 1";
         return await _context.ExecuteScalarAsync<int>(sql, new { AssetId = assetId, TransactionType = transactionType }) > 0;
-    }
-
-    public async Task<IEnumerable<AssetTransactionEntity>> GetActiveLoansWithRelationsAsync()
-    {
-        const string sql = @"
-            SELECT t.*, a.AssetCode, a.AssetName, 
-                   fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName,
-                   md1.MasterDataName as TransactionTypeName
-            FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId AND a.IsActive = 1
-            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId AND fe.IsActive = 1
-            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId AND te.IsActive = 1
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
-            WHERE t.TransactionType = 3
-              AND t.Approved = 1
-              AND t.FromAssetTransactionId IS NULL
-              AND t.IsActive = 1
-            ORDER BY t.ExpectedReturnDate";
-        return await _context.QueryAsync<AssetTransactionEntity>(sql);
-    }
-
-    public async Task<IEnumerable<AssetTransactionEntity>> GetOverdueLoansWithRelationsAsync()
-    {
-        const string sql = @"
-            SELECT t.*, a.AssetCode, a.AssetName, 
-                   fe.FullName as FromEmployeeName, te.FullName as ToEmployeeName,
-                   md1.MasterDataName as TransactionTypeName
-            FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId AND a.IsActive = 1
-            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId AND fe.IsActive = 1
-            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId AND te.IsActive = 1
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
-            WHERE t.TransactionType = 3
-              AND t.Approved = 1
-              AND t.FromAssetTransactionId IS NULL
-              AND t.ExpectedReturnDate < GETDATE()
-              AND t.IsActive = 1
-            ORDER BY t.ExpectedReturnDate";
-        return await _context.QueryAsync<AssetTransactionEntity>(sql);
     }
 
     public async Task<IEnumerable<AssetTransactionEntity>> GetAssetTransactionHistoryAsync(int assetId)

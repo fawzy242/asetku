@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { FiEdit2, FiTrash2, FiPlus } from "react-icons/fi";
 import { Grid, Box, Chip } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
@@ -37,6 +37,7 @@ const TABS = [
 
 const CategoriesMenu = () => {
   const [activeTab, setActiveTab] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
   const queryClient = useQueryClient();
 
   const { categories: parentCategories } = useReferenceData();
@@ -53,7 +54,13 @@ const CategoriesMenu = () => {
   } = useCrudForm(INITIAL_FORM_DATA, categoriesData, CRUD_OPTIONS);
 
   const fetchGridData = useCallback(async (params) => {
-    const result = await categoriesData.fetchGridData(params);
+    const filters = { 
+      page: params.page || 1,
+      pageSize: params.pageSize || 10,
+      search: params.search || searchTerm,
+      ...params 
+    };
+    const result = await categoriesData.fetchGridData(filters);
     if (result.success) {
       const rawData = result.data;
       let dataArray = [];
@@ -75,7 +82,7 @@ const CategoriesMenu = () => {
       return { success: true, data: { data: dataArray, totalCount: dataArray.length } };
     }
     return result;
-  }, [activeTab]);
+  }, [activeTab, searchTerm]);
 
   const {
     data: categories,
@@ -87,16 +94,21 @@ const CategoriesMenu = () => {
     setPageSize,
     updateFilters,
     reload
-  } = useGridData(['categories', activeTab], fetchGridData);
+  } = useGridData(['categories', activeTab, searchTerm], fetchGridData);
+
+  useEffect(() => {
+    reload();
+  }, [activeTab, reload]);
 
   const handleSearch = useCallback((search) => {
+    setSearchTerm(search);
     updateFilters({ search });
-  }, [updateFilters]);
+    setPage(1);
+  }, [updateFilters, setPage]);
 
   const handleDelete = useCallback(async (cat) => {
     const r = await categoriesData.delete(cat.categoryId);
     if (r.success) {
-      // Invalidate reference cache agar parent dropdown terupdate
       queryClient.invalidateQueries({ queryKey: ['reference', 'categories'] });
       reload();
     }
@@ -107,7 +119,6 @@ const CategoriesMenu = () => {
     if (!formData.categoryName.trim()) return;
     if (isSubmitting) return;
     
-    // FIX: Convert empty string to null for parentCategoryId
     const data = { ...formData, isActive: editingCategory ? editingCategory.isActive : true };
     if (data.parentCategoryId === "" || data.parentCategoryId === undefined || data.parentCategoryId === null) {
       data.parentCategoryId = null;
@@ -117,7 +128,6 @@ const CategoriesMenu = () => {
       ? await categoriesData.update(editingCategory.categoryId, data)
       : await categoriesData.create(data);
     if (r.success) {
-      // Invalidate reference cache agar parent dropdown terupdate
       queryClient.invalidateQueries({ queryKey: ['reference', 'categories'] });
       handleClose();
       reload();
@@ -175,22 +185,27 @@ const CategoriesMenu = () => {
 
   return (
     <div className="categories-menu">
-      <div className="page-header"><h1 className="page-title">Category</h1>      <PageHeader title="Category Management" buttonText="Add Category" onButtonClick={handleCreate} buttonIcon={<FiPlus />} /></div>
+      <div className="page-header">
+        <h1 className="page-title">Category</h1>
+        <PageHeader title="Category Management" buttonText="Add Category" onButtonClick={handleCreate} buttonIcon={<FiPlus />} />
+      </div>
 
       <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar onSearch={handleSearch} placeholder="Search by name..." />
-<div className="categories-menu__table" style={{ width: '100%', minWidth: 0 }}>
-  <DataTable
-    rows={categories}
-    columns={columns}
-    loading={loading}
-    pageSize={pageSize}
-    getRowId={(row) => row.categoryId}
-    hideFooter={true}
-    autoHeight={true}  // TAMBAHKAN INI
-    ariaLabel="Categories data table"
-  />
-</div>
+      
+      <div className="categories-menu__table" style={{ width: '100%', minWidth: 0 }}>
+        <DataTable
+          rows={categories}
+          columns={columns}
+          loading={loading}
+          pageSize={pageSize}
+          getRowId={(row) => row.categoryId}
+          hideFooter={true}
+          autoHeight={true}
+          ariaLabel="Categories data table"
+        />
+      </div>
+      
       <Pagination
         currentPage={page}
         totalPages={Math.ceil(totalCount / pageSize) || 1}

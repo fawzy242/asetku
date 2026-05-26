@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { FiSearch, FiUser, FiBox, FiDollarSign, FiCalendar, FiMail, FiPhone, FiBriefcase, FiRefreshCw, FiAlertTriangle, FiLayers } from "react-icons/fi";
-import { Grid, Box, Typography, Avatar, Chip } from "@mui/material";
+import { Grid, Box, Typography, Avatar, Chip, Paper } from "@mui/material";
+import { useLocation } from "react-router-dom";
 import EmployeeSummaryData from "./EmployeeSummary.data";
 import DataTable from "../../components/molecules/DataTable/DataTable";
 import Card from "../../components/atoms/Card/Card";
@@ -9,46 +10,6 @@ import Spinner from "../../components/atoms/Spinner/Spinner";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./EmployeeSummary.scss";
-
-/**
- * ============================================================
- * FUTURE BACKEND ENDPOINTS NEEDED FOR EMPLOYEE SUMMARY
- * ============================================================
- * 
- * 1. GET /api/Employee/{id}/summary
- *    Returns complete aggregated summary for a single employee.
- *    
- *    Response:
- *    {
- *      "isSuccess": true,
- *      "data": {
- *        "employeeId": 1,
- *        "employeeCode": "EMP-001",
- *        "fullName": "John Doe",
- *        "department": "IT",
- *        "position": "Developer",
- *        "email": "john@example.com",
- *        "phoneNumber": "+62...",
- *        "employmentStatus": "Active",
- *        "joinDate": "2023-01-15T00:00:00",
- *        "totalAssets": 5,
- *        "totalAssetValue": 15000000,
- *        "totalTransactions": 25,
- *        "lastTransactionDate": "2024-01-20T10:30:00",
- *        "pendingReturns": 1,
- *        "recentAssets": [...],
- *        "recentTransactions": [...],
- *        "assetsByStatus": { "available": 2, "assigned": 3, "underRepair": 0, "retired": 0 }
- *      }
- *    }
- * 
- * 2. GET /api/Employee/summary-list
- *    Returns lightweight summary for all employees (for selector/dropdown).
- *    Query: ?search=&status=&department=&page=&pageSize=
- * 
- * Currently using: /api/Employee/{id} + /api/Employee/{id}/asset-summary
- * ============================================================
- */
 
 const summaryData = new EmployeeSummaryData();
 
@@ -59,14 +20,36 @@ const EmployeeSummaryMenu = () => {
   const [employeeDetail, setEmployeeDetail] = useState(null);
   const [assetSummary, setAssetSummary] = useState(null);
   const [loadingData, setLoadingData] = useState(false);
+  const isMountedRef = useRef(true);
+  const location = useLocation();
 
-  useEffect(() => { loadEmployees(); }, []);
+  useEffect(() => {
+    isMountedRef.current = true;
+    loadEmployees();
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const loadEmployees = async () => {
     setLoading(true);
     const r = await summaryData.fetchEmployees();
-    if (r.success) setEmployees(r.data);
-    setLoading(false);
+    if (isMountedRef.current && r.success) {
+      setEmployees(r.data);
+      
+      const params = new URLSearchParams(location.search);
+      const employeeIdParam = params.get('employeeId');
+      if (employeeIdParam) {
+        const employeeId = parseInt(employeeIdParam, 10);
+        const employeeExists = r.data.some(e => e.employeeId === employeeId);
+        if (employeeExists) {
+          handleEmployeeSelect(employeeId);
+        }
+      }
+    }
+    if (isMountedRef.current) {
+      setLoading(false);
+    }
   };
 
   const handleEmployeeSelect = useCallback(async (employeeId) => {
@@ -84,24 +67,39 @@ const EmployeeSummaryMenu = () => {
       summaryData.fetchAssetSummary(employeeId)
     ]);
     
-    if (detailRes.success) setEmployeeDetail(detailRes.data);
-    if (summaryRes.success) {
-      setAssetSummary(summaryRes.data);
-    } else {
-      // Fallback to empty summary if endpoint fails
-      setAssetSummary({
-        currentlyHeldAssets: 0,
-        assetsOnLoan: 0,
-        overdueLoans: 0,
-        totalHistoricalAssets: 0,
-        returnedAssets: 0,
-        damagedReturns: 0,
-        currentAssets: [],
-        assetHistory: []
-      });
+    if (isMountedRef.current) {
+      if (detailRes.success) setEmployeeDetail(detailRes.data);
+      if (summaryRes.success) {
+        setAssetSummary(summaryRes.data);
+      } else {
+        setAssetSummary({
+          currentlyHeldAssets: 0,
+          assetsOnLoan: 0,
+          overdueLoans: 0,
+          totalHistoricalAssets: 0,
+          returnedAssets: 0,
+          damagedReturns: 0,
+          currentAssets: [],
+          assetHistory: []
+        });
+      }
+      setLoadingData(false);
     }
-    setLoadingData(false);
   }, []);
+
+  useEffect(() => {
+    if (employees.length > 0) {
+      const params = new URLSearchParams(location.search);
+      const employeeIdParam = params.get('employeeId');
+      if (employeeIdParam) {
+        const employeeId = parseInt(employeeIdParam, 10);
+        const employeeExists = employees.some(e => e.employeeId === employeeId);
+        if (employeeExists && selectedEmployee !== employeeId) {
+          handleEmployeeSelect(employeeId);
+        }
+      }
+    }
+  }, [location.search, employees, selectedEmployee, handleEmployeeSelect]);
 
   const getStatusChip = (status) => (
     <Chip 
@@ -139,7 +137,7 @@ const EmployeeSummaryMenu = () => {
   ];
 
   const historyColumns = [
-    { field: "transactionDate", headerName: "Date", width: 160, valueFormatter: (p) => p?.value ? utilsHelper.formatDateTime(p.value) : '-' },
+    { field: "transactionDate", headerName: "Date", width: 180, valueFormatter: (p) => p?.value ? utilsHelper.formatDateTime(p.value) : '-' },
     { field: "transactionTypeName", headerName: "Type", width: 150 },
     { field: "assetCode", headerName: "Asset", width: 130 },
     { field: "assetName", headerName: "Asset Name", flex: 1, minWidth: 180 },
@@ -164,12 +162,13 @@ const EmployeeSummaryMenu = () => {
       <div className="page-header">
         <h1 className="page-title">Employee Summary</h1>
       </div>
+      
       <Grid container spacing={3}>
         <Grid item xs={12}>
           <Card>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
               <FiSearch size={20} style={{ color: 'var(--primary)' }} />
-              <Box sx={{ flex: 1, maxWidth: 500 }}>
+              <Box sx={{ flex: 1, minWidth: 250 }}>
                 <Select 
                   label="Select Employee" 
                   value={selectedEmployee || ""} 
@@ -181,9 +180,8 @@ const EmployeeSummaryMenu = () => {
           </Card>
         </Grid>
         
-        {selectedEmployee && (
+        {selectedEmployee && !loadingData && employeeDetail && (
           <>
-            {/* Employee Profile Card */}
             <Grid item xs={12}>
               <Card>
                 <Grid container spacing={3} alignItems="center">
@@ -196,7 +194,7 @@ const EmployeeSummaryMenu = () => {
                     <Typography variant="h5" fontWeight={700}>
                       {employeeDetail?.fullName || '-'}
                     </Typography>
-                    <Box sx={{ display: 'flex', gap: 2, mt: 1, flexWrap: 'wrap' }}>
+                    <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
                       <Chip icon={<FiBriefcase />} label={employeeDetail?.employeeCode || '-'} size="small" variant="outlined" />
                       <Chip icon={<FiBriefcase />} label={employeeDetail?.positionName || '-'} size="small" variant="outlined" />
                       <Chip icon={<FiBriefcase />} label={employeeDetail?.departmentName || '-'} size="small" variant="outlined" />
@@ -217,114 +215,123 @@ const EmployeeSummaryMenu = () => {
               </Card>
             </Grid>
 
-            {/* Summary Statistics Cards */}
-            <Grid item xs={12} sm={6} md={2}>
-              <Card className="summary-stat-card">
-                <FiBox size={28} style={{ color: 'var(--primary)' }} />
-                <Typography variant="h4" fontWeight={700}>
-                  {assetSummary?.currentlyHeldAssets || currentAssets.length}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">Total Assets</Typography>
-              </Card>
+            <Grid item xs={12}>
+              <Grid container spacing={2}>
+                <Grid item xs={6} sm={4} md={2}>
+                  <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'var(--card-bg)', borderRadius: 2, border: '1px solid var(--border)', height: '100%' }}>
+                    <FiBox size={24} style={{ color: 'var(--primary)', marginBottom: 8 }} />
+                    <Typography variant="h4" fontWeight={700}>
+                      {assetSummary?.currentlyHeldAssets || currentAssets.length}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">Total Assets</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={4} md={2}>
+                  <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'var(--card-bg)', borderRadius: 2, border: '1px solid var(--border)', height: '100%' }}>
+                    <FiLayers size={24} style={{ color: '#8b5cf6', marginBottom: 8 }} />
+                    <Typography variant="h4" fontWeight={700}>
+                      {assetSummary?.assetsOnLoan || 0}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">On Loan</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={4} md={2}>
+                  <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'var(--card-bg)', borderRadius: 2, border: '1px solid var(--border)', height: '100%' }}>
+                    <FiDollarSign size={24} style={{ color: 'var(--success)', marginBottom: 8 }} />
+                    <Typography variant="h4" fontWeight={700}>
+                      {utilsHelper.formatCurrency(totalAssetValue)}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">Total Value</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={4} md={2}>
+                  <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'var(--card-bg)', borderRadius: 2, border: '1px solid var(--border)', height: '100%' }}>
+                    <FiRefreshCw size={24} style={{ color: 'var(--info)', marginBottom: 8 }} />
+                    <Typography variant="h4" fontWeight={700}>
+                      {assetSummary?.returnedAssets || assetHistory.filter(t => 
+                        t.transactionTypeName === 'RETURN' || t.transactionTypeName === 'LOAN_RETURN'
+                      ).length}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">Returns</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={4} md={2}>
+                  <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'var(--card-bg)', borderRadius: 2, border: '1px solid var(--border)', height: '100%' }}>
+                    <FiAlertTriangle size={24} style={{ color: 'var(--error)', marginBottom: 8 }} />
+                    <Typography variant="h4" fontWeight={700}>
+                      {assetSummary?.damagedReturns || 0}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">Damaged</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={4} md={2}>
+                  <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'var(--card-bg)', borderRadius: 2, border: '1px solid var(--border)', height: '100%' }}>
+                    <FiAlertTriangle size={24} style={{ color: 'var(--warning)', marginBottom: 8 }} />
+                    <Typography variant="h4" fontWeight={700}>
+                      {assetSummary?.overdueLoans || 0}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">Overdue</Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
             </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <Card className="summary-stat-card">
-                <FiLayers size={28} style={{ color: '#8b5cf6' }} />
-                <Typography variant="h4" fontWeight={700}>
-                  {assetSummary?.assetsOnLoan || 0}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">On Loan</Typography>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <Card className="summary-stat-card">
-                <FiDollarSign size={28} style={{ color: 'var(--success)' }} />
-                <Typography variant="h4" fontWeight={700}>
-                  {utilsHelper.formatCurrency(totalAssetValue)}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">Total Value</Typography>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <Card className="summary-stat-card">
-                <FiRefreshCw size={28} style={{ color: 'var(--info)' }} />
-                <Typography variant="h4" fontWeight={700}>
-                  {assetSummary?.returnedAssets || assetHistory.filter(t => 
-                    t.transactionTypeName === 'RETURN' || t.transactionTypeName === 'LOAN_RETURN'
-                  ).length}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">Returns</Typography>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <Card className="summary-stat-card">
-                <FiAlertTriangle size={28} style={{ color: 'var(--error)' }} />
-                <Typography variant="h4" fontWeight={700}>
-                  {assetSummary?.damagedReturns || 0}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">Damaged</Typography>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <Card className="summary-stat-card">
-                <FiAlertTriangle size={28} style={{ color: 'var(--warning)' }} />
-                <Typography variant="h4" fontWeight={700}>
-                  {assetSummary?.overdueLoans || 0}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">Overdue</Typography>
+
+            <Grid item xs={12}>
+              <Card title={`Current Assets (${currentAssets.length})`}>
+                {loadingData ? (
+                  <div className="page-loading"><Spinner size="lg" /></div>
+                ) : currentAssets.length === 0 ? (
+                  <Box sx={{ textAlign: 'center', py: 4, color: 'var(--text-secondary)' }}>
+                    <FiBox size={40} />
+                    <Typography>No assets assigned</Typography>
+                  </Box>
+                ) : (
+                  <div style={{ width: '100%', minWidth: 0 }}>
+                    <DataTable 
+                      rows={currentAssets} 
+                      columns={assetColumns} 
+                      pageSize={10} 
+                      getRowId={(row) => row.assetId || `asset-${Math.random()}`} 
+                      hideFooter={true} 
+                      autoHeight={true}
+                      ariaLabel="Employee current assets table" 
+                    />
+                  </div>
+                )}
               </Card>
             </Grid>
 
-            {/* Current Assets Table */}
             <Grid item xs={12}>
-<Card title={`Current Assets (${currentAssets.length})`}>
-  {loadingData ? (
-    <div className="page-loading"><Spinner size="lg" /></div>
-  ) : currentAssets.length === 0 ? (
-    <Box sx={{ textAlign: 'center', py: 4, color: 'var(--text-secondary)' }}>
-      <FiBox size={40} />
-      <Typography>No assets assigned</Typography>
-    </Box>
-  ) : (
-    <div style={{ width: '100%', minWidth: 0 }}>
-      <DataTable 
-        rows={currentAssets} 
-        columns={assetColumns} 
-        pageSize={10} 
-        getRowId={(row) => row.assetId || `asset-${Math.random()}`} 
-        hideFooter={true} 
-        autoHeight={true}  // TAMBAHKAN INI
-        ariaLabel="Employee current assets table" 
-      />
-    </div>
-  )}
-</Card>
-            </Grid>
-
-            {/* Asset History Table */}
-            <Grid item xs={12}>
-<Card title={`Asset History (${assetHistory.length})`}>
-  {assetHistory.length === 0 ? (
-    <Box sx={{ textAlign: 'center', py: 4, color: 'var(--text-secondary)' }}>
-      <FiRefreshCw size={40} />
-      <Typography>No transaction history</Typography>
-    </Box>
-  ) : (
-    <div style={{ width: '100%', minWidth: 0 }}>
-      <DataTable 
-        rows={assetHistory.slice(0, 20)} 
-        columns={historyColumns} 
-        pageSize={10} 
-        getRowId={(row) => row.assetTransactionId || `hist-${Math.random()}`} 
-        hideFooter={true} 
-        autoHeight={true}  // TAMBAHKAN INI
-        ariaLabel="Employee asset history table" 
-      />
-    </div>
-  )}
-</Card>
+              <Card title={`Asset History (${assetHistory.length})`}>
+                {assetHistory.length === 0 ? (
+                  <Box sx={{ textAlign: 'center', py: 4, color: 'var(--text-secondary)' }}>
+                    <FiRefreshCw size={40} />
+                    <Typography>No transaction history</Typography>
+                  </Box>
+                ) : (
+                  <div style={{ width: '100%', minWidth: 0 }}>
+                    <DataTable 
+                      rows={assetHistory.slice(0, 20)} 
+                      columns={historyColumns} 
+                      pageSize={10} 
+                      getRowId={(row) => row.assetTransactionId || `hist-${Math.random()}`} 
+                      hideFooter={true} 
+                      autoHeight={true}
+                      ariaLabel="Employee asset history table" 
+                    />
+                  </div>
+                )}
+              </Card>
             </Grid>
           </>
+        )}
+        
+        {selectedEmployee && loadingData && (
+          <Grid item xs={12}>
+            <Card>
+              <div className="page-loading"><Spinner size="lg" /></div>
+            </Card>
+          </Grid>
         )}
       </Grid>
     </div>

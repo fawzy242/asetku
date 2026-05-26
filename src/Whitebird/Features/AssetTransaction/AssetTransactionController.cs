@@ -54,8 +54,16 @@ public class AssetTransactionController : ControllerBase
         => this.HandleResult(await _transactionService.GetOverdueLoansAsync());
 
     [HttpGet("grid")]
-    public async Task<IActionResult> GetGridData([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string? search = null, [FromQuery] bool? approved = null, [FromQuery] int? assetId = null)
-        => this.HandleResult(await _transactionService.GetGridDataAsync(page, pageSize, search, approved, assetId));
+    public async Task<IActionResult> GetGridData(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? search = null,
+        [FromQuery] bool? approved = null,
+        [FromQuery] int? assetId = null,
+        [FromQuery] int? transactionType = null)
+    {
+        return this.HandleResult(await _transactionService.GetGridDataAsync(page, pageSize, search, approved, assetId));
+    }
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] AssetTransactionCreateViewModel model)
@@ -98,7 +106,7 @@ public class AssetTransactionController : ControllerBase
     {
         if (file == null || file.Length == 0)
             return BadRequest("No file provided");
-        
+
         using var stream = file.OpenReadStream();
         var result = await _transactionImportService.ImportFromExcelAsync(stream);
         return this.HandleResult(result);
@@ -110,7 +118,7 @@ public class AssetTransactionController : ControllerBase
         var result = await _transactionImportService.GenerateTemplateAsync();
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
-        
+
         return File(result.Data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Transaction_Import_Template.xlsx");
     }
 }

@@ -80,10 +80,18 @@ public class DapperContext : IDisposable, IAsyncDisposable
         return await Connection.ExecuteAsync(command);
     }
 
-    public async Task<T> ExecuteScalarAsync<T>(string sql, object? parameters = null, CommandType? commandType = null)
+    // FIXED: Handle null return properly
+    public async Task<T?> ExecuteScalarAsync<T>(string sql, object? parameters = null, CommandType? commandType = null)
     {
         var command = new CommandDefinition(sql, parameters, _transaction, commandType: commandType);
-        return await Connection.ExecuteScalarAsync<T>(command);
+        var result = await Connection.ExecuteScalarAsync(command);
+
+        if (result == null || result == DBNull.Value)
+        {
+            return default;
+        }
+
+        return (T)result;
     }
 
     public async Task<SqlMapper.GridReader> QueryMultipleAsync(string sql, object? parameters = null, CommandType? commandType = null)

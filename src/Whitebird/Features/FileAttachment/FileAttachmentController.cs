@@ -3,7 +3,7 @@ using Whitebird.App.Features.Common;
 using Whitebird.App.Features.FileAttachment;
 using Whitebird.Features.Common;
 
-namespace Whitebird.Features.FileAttachment.Controllers;
+namespace Whitebird.Features.FileAttachment;
 
 [ApiController]
 [Route("api/[controller]")]

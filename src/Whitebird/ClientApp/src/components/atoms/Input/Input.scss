@@ -3,3 +3,87 @@
 .input-wrapper {
     width: 100%;
 }
+
+// MUI TextField dark mode fixes
+[data-theme='dark'] {
+    .MuiInputLabel-root {
+        color: #9ca3af !important;
+
+        &.Mui-focused {
+            color: var(--primary) !important;
+        }
+
+        &.Mui-error {
+            color: #ef4444 !important;
+        }
+    }
+
+    .MuiOutlinedInput-root {
+        color: #f9fafb !important;
+
+        fieldset {
+            border-color: #4b5563 !important;
+        }
+
+        &:hover fieldset {
+            border-color: var(--primary) !important;
+        }
+
+        &.Mui-focused fieldset {
+            border-color: var(--primary) !important;
+        }
+
+        &.Mui-error fieldset {
+            border-color: #ef4444 !important;
+        }
+
+        input {
+            color: #f9fafb !important;
+
+            &::placeholder {
+                color: #6b7280 !important;
+            }
+        }
+
+        textarea {
+            color: #f9fafb !important;
+
+            &::placeholder {
+                color: #6b7280 !important;
+            }
+        }
+    }
+
+    .MuiFormHelperText-root {
+        color: #9ca3af !important;
+
+        &.Mui-error {
+            color: #ef4444 !important;
+        }
+    }
+
+    .MuiInputAdornment-root {
+        color: #9ca3af !important;
+
+        button {
+            color: #9ca3af !important;
+
+            &:hover {
+                color: var(--primary) !important;
+            }
+        }
+    }
+}
+
+// Light mode fixes
+[data-theme='light'] {
+    .MuiOutlinedInput-root {
+        input {
+            color: #111827 !important;
+        }
+
+        textarea {
+            color: #111827 !important;
+        }
+    }
+}

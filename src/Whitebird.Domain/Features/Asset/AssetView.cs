@@ -220,6 +220,7 @@ public class AssetTrackingViewModel
 
 public class AssetTimelineEntry
 {
+    public int? Id { get; set; }
     public DateTime Date { get; set; }
     public string ActivityType { get; set; } = default!;
     public string Description { get; set; } = default!;

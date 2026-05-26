@@ -14,6 +14,7 @@ public class AuthService : BaseService, IAuthService
     private readonly IActivityLogService _activityLogService;
     private readonly IStorageService _storageService;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ICurrentUserService _currentUserService;
 
     public AuthService(
         IAuthReps authRepository,
@@ -21,6 +22,7 @@ public class AuthService : BaseService, IAuthService
         IActivityLogService activityLogService,
         IStorageService storageService,
         IHttpContextAccessor httpContextAccessor,
+        ICurrentUserService currentUserService,
         ILogger<AuthService> logger) : base(logger)
     {
         _authRepository = authRepository;
@@ -28,18 +30,17 @@ public class AuthService : BaseService, IAuthService
         _activityLogService = activityLogService;
         _storageService = storageService;
         _httpContextAccessor = httpContextAccessor;
+        _currentUserService = currentUserService;
     }
 
     public async Task<ServiceResult<LoginResponse>> LoginAsync(LoginRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            // CHANGED: Use GetUserByUsernameAsync instead of GetUserByEmailAsync
             var user = await _authRepository.GetUserByUsernameAsync(request.Username);
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
-                // CHANGED: Log username instead of email
                 await _activityLogService.LogAsync("User", 0, "LOGIN_FAILED", $"Failed login attempt for username: {request.Username}", "System");
                 return ServiceResult<LoginResponse>.Failure("Invalid username or password");
             }
@@ -346,5 +347,54 @@ public class AuthService : BaseService, IAuthService
 
             return ServiceResult.Success("Profile photo deleted successfully");
         }, "delete profile photo");
+    }
+
+    // ========== NEW METHOD ==========
+    public async Task<ServiceResult<UserDto>> UpdateProfileAsync(int userId, UpdateProfileRequest request)
+    {
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var user = await _authRepository.GetUserByIdAsync(userId);
+            if (user == null || !user.IsActive)
+                return ServiceResult<UserDto>.NotFound("User not found");
+
+            var oldFullName = user.FullName;
+            var oldEmail = user.Email;
+            var oldPhoneNumber = user.PhoneNumber;
+
+            user.FullName = request.FullName;
+            user.Email = request.Email;
+            user.PhoneNumber = request.PhoneNumber;
+            user.ModifiedDate = DateTime.Now;
+            user.ModifiedBy = user.Username;
+
+            var result = await _authRepository.UpdateUserAsync(user);
+            if (result <= 0)
+                return ServiceResult<UserDto>.Failure("Failed to update profile");
+
+            await _activityLogService.LogUpdateAsync(
+                "User",
+                userId,
+                $"Profile updated: Name '{oldFullName}' -> '{request.FullName}', Email '{oldEmail}' -> '{request.Email}', Phone '{oldPhoneNumber}' -> '{request.PhoneNumber}'",
+                user.Username);
+
+            var requestContext = _httpContextAccessor.HttpContext?.Request;
+            var profilePhotoUrl = !string.IsNullOrEmpty(user.ProfilePhotoPath) && requestContext != null
+                ? $"{requestContext.Scheme}://{requestContext.Host}/api/Auth/profile-photo/{userId}"
+                : null;
+
+            return ServiceResult<UserDto>.Success(new UserDto
+            {
+                UserId = user.UserId,
+                Email = user.Email,
+                FullName = user.FullName,
+                RoleId = user.RoleId,
+                Username = user.Username,
+                ProfilePhotoUrl = profilePhotoUrl
+            }, "Profile updated successfully");
+        }, "update profile", async (ex) =>
+        {
+            await _activityLogService.LogErrorAsync("User", userId, "Update Profile", ex, _currentUserService.GetDisplayName());
+        });
     }
 }

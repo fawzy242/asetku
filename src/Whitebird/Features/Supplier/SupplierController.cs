@@ -4,7 +4,7 @@ using Whitebird.App.Features.Supplier;
 using Whitebird.Domain.Features.Supplier;
 using Whitebird.Features.Common;
 
-namespace Whitebird.Features.Supplier.Controllers;
+namespace Whitebird.Features.Supplier;
 
 [ApiController]
 [Route("api/[controller]")]

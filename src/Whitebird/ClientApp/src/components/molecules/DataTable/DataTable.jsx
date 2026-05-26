@@ -1,4 +1,4 @@
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { useUIStore } from '../../../stores/uiStore';
@@ -9,13 +9,13 @@ const DataTable = memo(({
   columns = [],
   loading = false,
   pageSize = 10,
-  pageSizeOptions = [10, 25, 50],
+  pageSizeOptions = [10, 25, 50, 100],
   onRowClick = null,
   checkboxSelection = false,
   onSelectionChange = null,
   rowHeight = 52,
   headerHeight = 56,
-  autoHeight = true,  // UBAH: default ke true untuk mencegah error width 0
+  autoHeight = false,
   getRowId = null,
   hideFooter = true,
   className = '',
@@ -23,6 +23,12 @@ const DataTable = memo(({
 }) => {
   const theme = useUIStore((s) => s.theme);
   const isDark = theme === 'dark';
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: pageSize });
+
+  // Update pagination model when pageSize prop changes
+  useEffect(() => {
+    setPaginationModel(prev => ({ ...prev, pageSize: pageSize }));
+  }, [pageSize]);
 
   const safeRows = useMemo(() => {
     if (!rows) return [];
@@ -57,7 +63,12 @@ const DataTable = memo(({
     };
   }, [getRowId]);
 
-  const effectiveAutoHeight = autoHeight || hideFooter;
+  // Use flex to allow DataGrid to take available space and scroll internally
+  const gridHeight = hideFooter ? 'auto' : 500;
+
+  const handlePaginationModelChange = (newModel) => {
+    setPaginationModel(newModel);
+  };
 
   const muiTheme = useMemo(() => createTheme({
     palette: {
@@ -85,7 +96,13 @@ const DataTable = memo(({
             backgroundColor: 'transparent',
             width: '100%',
             minWidth: '100%',
+            flex: 1,
             '& .MuiDataGrid-main': { width: '100%', minWidth: '100%' },
+            '& .MuiDataGrid-virtualScroller': {
+              overflowY: 'auto !important',
+              overflowX: 'auto !important',
+              minHeight: 200,
+            },
             '& .MuiDataGrid-columnHeaders': {
               backgroundColor: isDark ? '#374151' : '#f9fafb',
               color: isDark ? '#f9fafb' : '#374151',
@@ -172,21 +189,30 @@ const DataTable = memo(({
       role="region"
       aria-label={ariaLabel}
       aria-busy={loading}
-      style={{ width: '100%', minWidth: '100%', maxWidth: '100%', display: 'flex', flexDirection: 'column' }}
+      style={{ 
+        width: '100%', 
+        minWidth: '100%', 
+        maxWidth: '100%', 
+        display: 'flex', 
+        flexDirection: 'column',
+        height: '100%',
+        minHeight: 400,
+      }}
     >
       <ThemeProvider theme={muiTheme}>
         <DataGrid
           rows={safeRows}
           columns={safeColumns}
           loading={loading}
-          initialState={{ pagination: { paginationModel: { pageSize, page: 0 } } }}
+          paginationModel={paginationModel}
+          onPaginationModelChange={handlePaginationModelChange}
           pageSizeOptions={pageSizeOptions}
           onRowClick={onRowClick}
           checkboxSelection={checkboxSelection}
           onRowSelectionModelChange={onSelectionChange}
           rowHeight={rowHeight}
           columnHeaderHeight={headerHeight}
-          autoHeight={effectiveAutoHeight}
+          autoHeight={autoHeight}
           getRowId={safeGetRowId}
           disableRowSelectionOnClick
           hideFooter={hideFooter}
@@ -198,8 +224,12 @@ const DataTable = memo(({
             width: '100%',
             minWidth: '100%',
             maxWidth: '100%',
-            flex: effectiveAutoHeight ? 'none' : 1,
-            minHeight: effectiveAutoHeight ? undefined : 400,
+            height: gridHeight,
+            minHeight: 300,
+            '& .MuiDataGrid-virtualScroller': {
+              overflowY: 'auto !important',
+              overflowX: 'auto !important',
+            },
           }}
         />
       </ThemeProvider>

@@ -3,7 +3,7 @@ using Whitebird.App.Features.Category;
 using Whitebird.Domain.Features.Category;
 using Whitebird.Features.Common;
 
-namespace Whitebird.Features.Category.Controllers;
+namespace Whitebird.Features.Category;
 
 [ApiController]
 [Route("api/[controller]")]

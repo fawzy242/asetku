@@ -19,3 +19,12 @@
         border: 1px solid var(--border);
     }
 }
+
+// FIX: Dark mode for return modal
+[data-theme='dark'] {
+    .transactions-menu {
+        .MuiBox-root {
+            background-color: #1f2937 !important;
+        }
+    }
+}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { FiEdit2, FiTrash2, FiPlus } from "react-icons/fi";
 import { Grid, Box, Chip } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,7 +24,6 @@ import "./Offices.scss";
 
 const officesData = new OfficesData();
 
-// OFFICE TYPE OPTIONS - hardcoded, bisa pindah ke constants jika perlu
 const OFFICE_TYPE_OPTIONS = [
   { value: "", label: "Select Type" },
   { value: "1", label: "Head Office" },
@@ -38,31 +37,18 @@ const INITIAL_FORM_DATA = {
   city: "",
   address: "",
   phone: "",
-  parentOfficeId: null,  // IMPORTANT: gunakan null, BUKAN string kosong
+  parentOfficeId: null,
 };
 
-/**
- * Transform form data untuk dikirim ke API
- * Pastikan parentOfficeId dikirim sebagai null (bukan string kosong)
- */
 const transformOfficeFormData = (data) => {
-  // Step 1: Clean nullable string fields (empty string -> null)
   let result = cleanNullableStrings(data, ['officeCode', 'city', 'address', 'phone']);
-  
-  // Step 2: Clean ID fields (string -> int or null)
-  // Pastikan parentOfficeId yang kosong jadi null, BUKAN string kosong ""
   result = cleanIdFields(result, ['officeType', 'parentOfficeId']);
-  
-  // Step 3: Pastikan officeName tidak kosong
   if (!result.officeName || result.officeName.trim() === '') {
     result.officeName = null;
   }
-  
-  // Step 4: VERIFIKASI - parentOfficeId HARUS null atau number, BUKAN string
   if (result.parentOfficeId === '' || result.parentOfficeId === undefined) {
     result.parentOfficeId = null;
   }
-  
   return result;
 };
 
@@ -74,6 +60,7 @@ const CRUD_OPTIONS = {
 
 const OfficesMenu = () => {
   const [activeTab, setActiveTab] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
   const queryClient = useQueryClient();
   const { offices: parentOffices } = useReferenceData();
 
@@ -89,7 +76,13 @@ const OfficesMenu = () => {
   } = useCrudForm(INITIAL_FORM_DATA, officesData, CRUD_OPTIONS);
 
   const fetchGridData = useCallback(async (params) => {
-    const result = await officesData.fetchGridData(params);
+    const filters = { 
+      page: params.page || 1,
+      pageSize: params.pageSize || 10,
+      search: params.search || searchTerm,
+      ...params 
+    };
+    const result = await officesData.fetchGridData(filters);
     if (result.success) {
       const rawData = result.data;
       let dataArray = [];
@@ -111,7 +104,7 @@ const OfficesMenu = () => {
       return { success: true, data: { data: dataArray, totalCount: dataArray.length } };
     }
     return result;
-  }, [activeTab]);
+  }, [activeTab, searchTerm]);
 
   const {
     data: offices,
@@ -123,9 +116,17 @@ const OfficesMenu = () => {
     setPageSize,
     updateFilters,
     reload
-  } = useGridData(['offices', activeTab], fetchGridData);
+  } = useGridData(['offices', activeTab, searchTerm], fetchGridData);
 
-  const handleSearch = useCallback((search) => updateFilters({ search }), [updateFilters]);
+  useEffect(() => {
+    reload();
+  }, [activeTab, reload]);
+
+  const handleSearch = useCallback((search) => {
+    setSearchTerm(search);
+    updateFilters({ search });
+    setPage(1);
+  }, [updateFilters, setPage]);
 
   const handleDelete = useCallback(async (office) => {
     const r = await officesData.delete(office.officeId);
@@ -140,13 +141,11 @@ const OfficesMenu = () => {
     if (!formData.officeName?.trim()) return;
     if (isSubmitting) return;
     
-    // Prepare data with isActive flag
     const data = { 
       ...formData, 
       isActive: editingOffice ? editingOffice.isActive : true 
     };
     
-    // Pastikan parentOfficeId tidak pernah string kosong
     if (data.parentOfficeId === '' || data.parentOfficeId === undefined) {
       data.parentOfficeId = null;
     }
@@ -162,9 +161,7 @@ const OfficesMenu = () => {
     }
   }, [formData, isSubmitting, editingOffice, handleClose, reload, queryClient]);
 
-  // Handler untuk perubahan parentOfficeId di form
   const handleParentOfficeChange = useCallback((value) => {
-    // Jika value adalah string kosong, set ke null
     const newValue = (value === '' || value === undefined || value === null) ? null : value;
     setFormData(prev => ({ ...prev, parentOfficeId: newValue }));
   }, [setFormData]);
@@ -227,7 +224,6 @@ const OfficesMenu = () => {
 
   if (loading && !offices.length) return <div className="page-loading"><Spinner size="lg" /></div>;
 
-  // Nilai parentOfficeId untuk form - pastikan null menjadi "" untuk display di Select
   const parentOfficeValue = formData.parentOfficeId === null ? "" : (formData.parentOfficeId || "");
 
   return (
@@ -245,18 +241,19 @@ const OfficesMenu = () => {
       <Tabs tabs={STATUS_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar onSearch={handleSearch} placeholder="Search by name, code, city..." />
       
-<div className="offices-menu__table" style={{ width: '100%', minWidth: 0 }}>
-  <DataTable
-    rows={offices}
-    columns={columns}
-    loading={loading}
-    pageSize={pageSize}
-    getRowId={(row) => row.officeId}
-    hideFooter={true}
-    autoHeight={true}  // TAMBAHKAN INI
-    ariaLabel="Offices data table"
-  />
-</div>
+      <div className="offices-menu__table" style={{ width: '100%', minWidth: 0 }}>
+        <DataTable
+          rows={offices}
+          columns={columns}
+          loading={loading}
+          pageSize={pageSize}
+          getRowId={(row) => row.officeId}
+          hideFooter={true}
+          autoHeight={true}
+          ariaLabel="Offices data table"
+        />
+      </div>
+      
       <Pagination
         currentPage={page}
         totalPages={Math.ceil(totalCount / pageSize) || 1}

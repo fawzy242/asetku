@@ -85,4 +85,30 @@ public class ActivityLogService : IActivityLogService
                 referenceTable, referenceId);
         }
     }
+
+    // NEW: Safe async wrapper for any action
+    public async Task<T?> ExecuteSafeAsync<T>(Func<Task<T>> action, T? fallback = default)
+    {
+        try
+        {
+            return await action();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error executing safe action");
+            return fallback;
+        }
+    }
+
+    public async Task ExecuteSafeAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error executing safe action");
+        }
+    }
 }

@@ -9,6 +9,7 @@ const Card = memo(({
   className = "",
   hoverable = false,
   padding = true,
+  onClick = null,  // ADD onClick prop
 }) => {
   const classNames = [
     "card",
@@ -20,7 +21,11 @@ const Card = memo(({
     .join(" ");
 
   return (
-    <div className={classNames}>
+    <div 
+      className={classNames} 
+      onClick={onClick}
+      style={{ cursor: onClick ? 'pointer' : 'default' }}
+    >
       {(title || subtitle || actions) && (
         <div className="card__header">
           <div className="card__header-content">

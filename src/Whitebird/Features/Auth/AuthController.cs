@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Whitebird.Domain.Features.Common;
 using Whitebird.Features.Common;
+using Whitebird.App.Features.Auth;
 
-namespace Whitebird.App.Features.Auth.Controllers;
+namespace Whitebird.App.Features.Auth;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -134,6 +135,22 @@ public class AuthController : ControllerBase
 
         var result = await _authService.DeleteProfilePhotoAsync(user.Data.UserId);
         return this.HandleResult(result);
+    }
+
+    // ========== NEW ENDPOINT ==========
+    [HttpPut("profile")]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+
+        var sessionToken = GetSessionToken();
+        if (string.IsNullOrEmpty(sessionToken)) return Unauthorized();
+
+        var userResult = await _authService.GetUserBySessionTokenAsync(sessionToken);
+        if (!userResult.IsSuccess || userResult.Data == null) return Unauthorized();
+
+        return this.HandleResult(await _authService.UpdateProfileAsync(userResult.Data.UserId, request));
     }
 
     private string? GetSessionToken()

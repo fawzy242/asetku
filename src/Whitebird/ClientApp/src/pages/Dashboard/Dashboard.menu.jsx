@@ -16,27 +16,6 @@ import "./Dashboard.scss";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement);
 
-/**
- * ============================================================
- * FUTURE BACKEND ENDPOINTS NEEDED FOR DASHBOARD
- * ============================================================
- * 
- * 1. GET /api/Reports/dashboard/monthly-stats
- *    Returns monthly transaction counts for the dashboard chart.
- *    
- *    Response:
- *    {
- *      "isSuccess": true,
- *      "data": {
- *        "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
- *        "counts": [65, 59, 80, 81, 56, 55, 40, 45, 60, 70, 75, 80]
- *      }
- *    }
- * 
- * Currently using /api/Reports/asset-transaction/data?groupBy=month as fallback
- * ============================================================
- */
-
 const dashboardData = new DashboardData();
 
 const DashboardMenu = () => {
@@ -95,18 +74,17 @@ const DashboardMenu = () => {
   const transactionColumns = [
     { field: "assetCode", headerName: "Asset Code", width: 120 },
     { field: "assetName", headerName: "Asset Name", flex: 1, minWidth: 180 },
-    { field: "transactionType", headerName: "Type", width: 150 },
+    { field: "transactionTypeName", headerName: "Type", width: 150 },
     {
-      field: "transactionStatus",
+      field: "approved",
       headerName: "Status",
       width: 120,
-      renderCell: (p) => (
-        <Chip
-          label={p?.value || '-'}
-          size="small"
-          sx={getStatusChipStyles(p?.value)}
-        />
-      ),
+      renderCell: (p) => {
+        let status = 'Pending';
+        if (p?.value === true) status = 'Approved';
+        if (p?.value === false) status = 'Rejected';
+        return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
+      },
     },
     {
       field: "transactionDate",
@@ -119,6 +97,7 @@ const DashboardMenu = () => {
     },
   ];
 
+  // CRITICAL FIX: Make cards clickable with proper event handler
   const statCardsConfig = [
     { icon: FiPackage, label: 'Total Assets', value: stats.totalAssets || 0, endpoint: '/Asset/grid', params: {} },
     { icon: FiCheckCircle, label: 'Available', value: stats.availableAssets || 0, endpoint: '/Asset/grid', params: { status: 'Available' } },
@@ -131,15 +110,20 @@ const DashboardMenu = () => {
     { icon: FiDollarSign, label: 'Total Value', value: utilsHelper.formatCurrency(stats.totalAssetValue), noDrilldown: true },
   ];
 
+  // CRITICAL FIX: Card click handler
   const handleCardClick = (card) => {
-    if (card.noDrilldown) return;
+    console.log('Card clicked:', card.label);
+    if (card.noDrilldown) {
+      console.log('No drilldown for this card');
+      return;
+    }
     
     setDrilldown({
       isOpen: true,
       title: `${card.label} Details`,
       endpoint: card.endpoint,
       params: card.params,
-      columns: card.label.includes('Transaction') || card.label.includes('Txn') ? transactionColumns : null,
+      columns: card.label.includes('Transaction') || card.label.includes('Txn') || card.label.includes('Pending') ? transactionColumns : null,
     });
   };
 
@@ -153,17 +137,18 @@ const DashboardMenu = () => {
 
       <div className="dashboard__stats">
         {statCardsConfig.map((card) => (
-          <Card 
+          <div 
             key={card.label} 
             className={`dashboard__stat-card ${!card.noDrilldown ? 'dashboard__stat-card--clickable' : ''}`}
             onClick={() => handleCardClick(card)}
+            style={{ cursor: !card.noDrilldown ? 'pointer' : 'default' }}
           >
             <card.icon aria-hidden="true" />
             <div>
               <h3>{card.label}</h3>
               <p>{card.value}</p>
             </div>
-          </Card>
+          </div>
         ))}
       </div>
 
@@ -243,19 +228,19 @@ const DashboardMenu = () => {
         )}
       </div>
 
-<Card title="Recent Transactions">
-  <div style={{ width: '100%', overflowX: 'auto' }}>
-    <DataTable
-      rows={recentTransactions.data || []}
-      columns={transactionColumns}
-      pageSize={5}
-      getRowId={(row) => row?.assetTransactionId || `txn-${Math.random()}`}
-      hideFooter={true}
-      autoHeight={true}  // TAMBAHKAN INI
-      ariaLabel="Recent transactions table"
-    />
-  </div>
-</Card>
+      <Card title="Recent Transactions">
+        <div style={{ width: '100%', overflowX: 'auto' }}>
+          <DataTable
+            rows={recentTransactions.data || []}
+            columns={transactionColumns}
+            pageSize={5}
+            getRowId={(row) => row?.assetTransactionId || `txn-${Math.random()}`}
+            hideFooter={true}
+            autoHeight={true}
+            ariaLabel="Recent transactions table"
+          />
+        </div>
+      </Card>
 
       {/* Drilldown Modal */}
       <DrilldownModal

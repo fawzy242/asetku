@@ -66,7 +66,14 @@ namespace Whitebird.Migrations.Features.MasterData
 
         public override void Down()
         {
-            Execute.Sql(@"");
+            Execute.Sql(@"
+            DELETE FROM [dbo].[MasterData]
+            WHERE ReferenceName IN (
+                'Position', 'EmployeeStatus', 'OfficeType', 
+                'AssetConditionPurchase', 'AssetCondition', 
+                'TransactionType', 'MaintenanceType'
+            );
+        ");
         }
     }
 }

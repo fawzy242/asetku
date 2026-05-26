@@ -4,7 +4,7 @@ using Whitebird.App.Features.Office;
 using Whitebird.Domain.Features.Office;
 using Whitebird.Features.Common;
 
-namespace Whitebird.Features.Office.Controllers;
+namespace Whitebird.Features.Office;
 
 [ApiController]
 [Route("api/[controller]")]

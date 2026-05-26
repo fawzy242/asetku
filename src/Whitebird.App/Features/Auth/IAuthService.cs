@@ -18,4 +18,7 @@ public interface IAuthService
     Task<ServiceResult<string>> UploadProfilePhotoAsync(int userId, IFormFile file);
     Task<ServiceResult<byte[]>> GetProfilePhotoAsync(int userId);
     Task<ServiceResult> DeleteProfilePhotoAsync(int userId);
+
+    // ========== NEW METHOD ==========
+    Task<ServiceResult<UserDto>> UpdateProfileAsync(int userId, UpdateProfileRequest request);
 }

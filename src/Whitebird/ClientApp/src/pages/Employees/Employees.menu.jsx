@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { FiEdit2, FiTrash2, FiPlus, FiUpload, FiCheckSquare } from "react-icons/fi";
 import { Grid, Box, Chip } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
@@ -25,9 +25,14 @@ import { useReferenceData } from "../../hooks/useReferenceData";
 import { useCrudForm } from "../../hooks/useCrudForm";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
 import { cleanEmployeeFormData } from "../../core/utils/formHelpers";
-import { STATUS_TABS } from "../../core/constants/tabs";
-import utilsHelper from "../../core/utils/utils.helper";
 import "./Employees.scss";
+
+// Tab definitions
+const EMPLOYEE_TABS = [
+  { id: "all", label: "All" },
+  { id: "Active", label: "Active" },
+  { id: "Inactive", label: "Inactive" },
+];
 
 const employeesData = new EmployeesData();
 employeesData.transformFormData = cleanEmployeeFormData;
@@ -50,6 +55,8 @@ const EmployeesMenu = () => {
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const isMountedRef = useRef(true);
   const queryClient = useQueryClient();
 
   const { departments, offices, employeePositions, employeeStatuses } = useReferenceData();
@@ -60,26 +67,65 @@ const EmployeesMenu = () => {
     handleSubmit: crudHandleSubmit,
   } = useCrudForm(INITIAL_FORM_DATA, employeesData, CRUD_OPTIONS);
 
+  // Determine if checkbox should be shown based on active tab
+  const showCheckbox = useMemo(() => {
+    return activeTab === "Active" || activeTab === "Inactive";
+  }, [activeTab]);
+
   const fetchGridData = useCallback(async (params) => {
-    const filters = { ...params };
-    if (activeTab === "active") filters.isActive = true;
-    else if (activeTab === "inactive") filters.isActive = false;
-    if (statusFilter === "active") filters.isActive = true;
-    else if (statusFilter === "inactive") filters.isActive = false;
-    if (departmentFilter) filters.departmentId = departmentFilter;
+    const filters = { 
+      page: params.page || 1,
+      pageSize: params.pageSize || 10,
+      search: params.search || searchTerm,
+      ...params 
+    };
+    
+    // Apply tab filter
+    if (activeTab === "Active") {
+      filters.isActive = true;
+    } else if (activeTab === "Inactive") {
+      filters.isActive = false;
+    }
+    
+    // Apply manual status filter (overrides tab filter)
+    if (statusFilter === "active") {
+      filters.isActive = true;
+    } else if (statusFilter === "inactive") {
+      filters.isActive = false;
+    }
+    
+    if (departmentFilter) {
+      filters.departmentId = departmentFilter;
+    }
+    
     return employeesData.fetchGridData(filters);
-  }, [activeTab, statusFilter, departmentFilter]);
+  }, [activeTab, statusFilter, departmentFilter, searchTerm]);
 
   const {
     data: employees, totalCount, loading, page, setPage,
     pageSize, setPageSize, updateFilters, reload
-  } = useGridData(['employees', activeTab, statusFilter, departmentFilter], fetchGridData);
+  } = useGridData(['employees', activeTab, statusFilter, departmentFilter, searchTerm], fetchGridData);
 
-  const handleSearch = useCallback((search) => updateFilters({ search }), [updateFilters]);
+  // Force reload when tab changes
+  useEffect(() => {
+    isMountedRef.current = true;
+    setPage(1);
+    setSelectedRows([]);
+    reload();
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [activeTab, reload, setPage]);
+
+  const handleSearch = useCallback((search) => {
+    setSearchTerm(search);
+    updateFilters({ search });
+    setPage(1);
+  }, [updateFilters, setPage]);
   
   const handleDelete = useCallback(async (emp) => {
     const r = await employeesData.delete(emp.employeeId);
-    if (r.success) {
+    if (r.success && isMountedRef.current) {
       queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
       reload();
     }
@@ -88,7 +134,7 @@ const EmployeesMenu = () => {
   const onSubmit = useCallback(async (e) => {
     e.preventDefault();
     const success = await crudHandleSubmit();
-    if (success) {
+    if (success && isMountedRef.current) {
       queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
       reload();
     }
@@ -96,7 +142,7 @@ const EmployeesMenu = () => {
   
   const handleBulkActivate = useCallback(async (ids, activate) => {
     const r = await employeesData.bulkActivate(ids, activate);
-    if (r.success) {
+    if (r.success && isMountedRef.current) {
       setSelectedRows([]);
       queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
       reload();
@@ -107,7 +153,7 @@ const EmployeesMenu = () => {
     setIsImporting(true);
     const r = await employeesData.importEmployees(file);
     setIsImporting(false);
-    if (r.success) {
+    if (r.success && isMountedRef.current) {
       setImportResult(r.data);
       queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
       reload();
@@ -168,6 +214,10 @@ const EmployeesMenu = () => {
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
     setPage(1);
+    setStatusFilter("");
+    setDepartmentFilter("");
+    setSearchTerm("");
+    setSelectedRows([]);
   }, [setPage]);
   
   const filterDepartmentOptions = useMemo(() => [
@@ -177,22 +227,25 @@ const EmployeesMenu = () => {
 
   if (loading && !employees.length) return <div className="page-loading"><Spinner size="lg" /></div>;
 
+  const bulkActivateValue = activeTab === "Active" ? false : true;
+  const bulkButtonText = activeTab === "Active" ? "Deactivate" : "Activate";
+
   return (
     <div className="employees-menu">
       <div className="page-header">
         <h1 className="page-title">Employee</h1>
         <div style={{ display: 'flex', gap: '12px' }}>
           <Button variant="outline" onClick={() => setShowImportModal(true)} startIcon={<FiUpload />}>Import</Button>
-          {selectedRows.length > 0 && (
+          {selectedRows.length > 0 && showCheckbox && (
             <Button variant="primary" onClick={() => setShowBulkActivateModal(true)} startIcon={<FiCheckSquare />}>
-              Activate ({selectedRows.length})
+              {bulkButtonText} ({selectedRows.length})
             </Button>
           )}
           <PageHeader title="Employee Management" buttonText="Add Employee" onButtonClick={handleCreate} buttonIcon={<FiPlus />} />
         </div>
       </div>
      
-      <Tabs tabs={STATUS_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+      <Tabs tabs={EMPLOYEE_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar 
         onSearch={handleSearch} 
         onFilterToggle={() => setShowFilters(!showFilters)} 
@@ -214,20 +267,20 @@ const EmployeesMenu = () => {
         />
       </FilterPanel>
       
-<div className="employees-menu__table" style={{ width: '100%', minWidth: 0 }}>
-  <DataTable 
-    rows={employees} 
-    columns={columns} 
-    loading={loading} 
-    pageSize={pageSize} 
-    getRowId={(row) => row.employeeId} 
-    hideFooter={true} 
-    autoHeight={true}  // TAMBAHKAN INI
-    checkboxSelection={true}
-    onSelectionChange={(newSelection) => setSelectedRows(newSelection)}
-    ariaLabel="Employees data table" 
-  />
-</div>
+      <div className="employees-menu__table" style={{ width: '100%', minWidth: 0 }}>
+        <DataTable 
+          rows={employees} 
+          columns={columns} 
+          loading={loading} 
+          pageSize={pageSize} 
+          getRowId={(row) => row.employeeId} 
+          hideFooter={true} 
+          autoHeight={false}
+          checkboxSelection={showCheckbox}
+          onSelectionChange={(newSelection) => setSelectedRows(newSelection)}
+          ariaLabel="Employees data table" 
+        />
+      </div>
       <Pagination 
         currentPage={page} 
         totalPages={Math.ceil(totalCount / pageSize) || 1} 
@@ -299,16 +352,18 @@ const EmployeesMenu = () => {
         isImporting={isImporting}
         importResult={importResult}
         title="Import Employees"
-        description="Upload Excel or TXT file with employee data. Employees will be imported as INACTIVE and need activation."
+        description="Upload Excel or TXT file with employee data. Employees will be imported as ACTIVE."
       />
 
       {/* Bulk Activate Modal */}
       <BulkActivateModal
         isOpen={showBulkActivateModal}
         onClose={() => setShowBulkActivateModal(false)}
-        onConfirm={handleBulkActivate}
+        onConfirm={(ids) => handleBulkActivate(ids, bulkActivateValue)}
         selectedIds={selectedRows}
         itemName="employees"
+        title={bulkButtonText === "Activate" ? "Activate Employees" : "Deactivate Employees"}
+        description={`This action will ${bulkButtonText.toLowerCase()} the selected employees.`}
       />
     </div>
   );

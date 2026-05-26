@@ -17,7 +17,7 @@ namespace Whitebird.Migrations.Features.User
             VALUES (
                 'admin',
                 'admin@company.com',
-                '$2a$12$LJ3m4ys3Lk0TSwHCpNqrAOq7MqE3qOZxqJvGr6vQxqj6lFqCqJ7e',
+                '$2a$12$Ro1JV3xi5liZ1MuufZ13OOOP2Y0OtbV0oHyzhWqCAA14naJoI.OIK',
                 'System Administrator',
                 '+62-000-0000-0000',
                 1, 0, 'System'
@@ -30,7 +30,7 @@ namespace Whitebird.Migrations.Features.User
             VALUES (
                 'it.support',
                 'it.support@company.com',
-                '$2a$12$LJ3m4ys3Lk0TSwHCpNqrAOq7MqE3qOZxqJvGr6vQxqj6lFqCqJ7e',
+                '$2a$12$Ro1JV3xi5liZ1MuufZ13OOOP2Y0OtbV0oHyzhWqCAA14naJoI.OIK',
                 'IT Support',
                 '+62-000-0000-0001',
                 1, 0, 'System'
@@ -43,7 +43,7 @@ namespace Whitebird.Migrations.Features.User
             VALUES (
                 'asset.manager',
                 'asset.manager@company.com',
-                '$2a$12$LJ3m4ys3Lk0TSwHCpNqrAOq7MqE3qOZxqJvGr6vQxqj6lFqCqJ7e',
+                '$2a$12$Ro1JV3xi5liZ1MuufZ13OOOP2Y0OtbV0oHyzhWqCAA14naJoI.OIK',
                 'Asset Manager',
                 '+62-000-0000-0002',
                 1, 0, 'System'
@@ -54,7 +54,11 @@ namespace Whitebird.Migrations.Features.User
 
         public override void Down()
         {
-            Execute.Sql(@"");
+            // FIXED: Delete seeded users (only the ones seeded by this migration)
+            Execute.Sql(@"
+            DELETE FROM [dbo].[Users]
+            WHERE [Username] IN ('admin', 'it.support', 'asset.manager');
+        ");
         }
     }
 }

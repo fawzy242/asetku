@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { FiEdit2, FiTrash2, FiPlus } from "react-icons/fi";
 import { Grid, Box, Chip } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
@@ -34,12 +34,19 @@ const INITIAL_FORM_DATA = {
 
 const SuppliersMenu = () => {
   const [activeTab, setActiveTab] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
   const queryClient = useQueryClient();
   
   const { showModal, editingRecord: editingSupplier, isSubmitting, formData, setFormData, handleCreate, handleEdit, handleClose } = useCrudForm(INITIAL_FORM_DATA, suppliersData, { idField: 'supplierId' });
 
   const fetchGridData = useCallback(async (params) => {
-    const result = await suppliersData.fetchGridData(params);
+    const filters = { 
+      page: params.page || 1,
+      pageSize: params.pageSize || 10,
+      search: params.search || searchTerm,
+      ...params 
+    };
+    const result = await suppliersData.fetchGridData(filters);
     if (result.success) {
       const rawData = result.data;
       let dataArray = [];
@@ -51,11 +58,19 @@ const SuppliersMenu = () => {
       return { success: true, data: { data: dataArray, totalCount: dataArray.length } };
     }
     return result;
-  }, [activeTab]);
+  }, [activeTab, searchTerm]);
 
-  const { data: suppliers, totalCount, loading, page, setPage, pageSize, setPageSize, updateFilters, reload } = useGridData(['suppliers', activeTab], fetchGridData);
+  const { data: suppliers, totalCount, loading, page, setPage, pageSize, setPageSize, updateFilters, reload } = useGridData(['suppliers', activeTab, searchTerm], fetchGridData);
 
-  const handleSearch = useCallback((search) => updateFilters({ search }), [updateFilters]);
+  useEffect(() => {
+    reload();
+  }, [activeTab, reload]);
+
+  const handleSearch = useCallback((search) => {
+    setSearchTerm(search);
+    updateFilters({ search });
+    setPage(1);
+  }, [updateFilters, setPage]);
   
   const handleDelete = useCallback(async (sup) => { 
     const r = await suppliersData.delete(sup.supplierId); 
@@ -129,18 +144,20 @@ const SuppliersMenu = () => {
       </div>
       <Tabs tabs={STATUS_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar onSearch={handleSearch} placeholder="Search by name, contact..." />
-<div className="suppliers-menu__table" style={{ width: '100%', minWidth: 0 }}>
-  <DataTable 
-    rows={suppliers} 
-    columns={columns} 
-    loading={loading} 
-    pageSize={pageSize} 
-    getRowId={(row) => row.supplierId} 
-    hideFooter={true} 
-    autoHeight={true}  // TAMBAHKAN INI
-    ariaLabel="Suppliers data table" 
-  />
-</div>
+      
+      <div className="suppliers-menu__table" style={{ width: '100%', minWidth: 0 }}>
+        <DataTable 
+          rows={suppliers} 
+          columns={columns} 
+          loading={loading} 
+          pageSize={pageSize} 
+          getRowId={(row) => row.supplierId} 
+          hideFooter={true} 
+          autoHeight={true}
+          ariaLabel="Suppliers data table" 
+        />
+      </div>
+      
       <Pagination 
         currentPage={page} 
         totalPages={Math.ceil(totalCount / pageSize) || 1} 

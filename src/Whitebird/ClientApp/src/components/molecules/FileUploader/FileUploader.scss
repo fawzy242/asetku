@@ -34,6 +34,7 @@
     &__empty {
         text-align: center;
         padding: $spacing-xl;
+        color: var(--text-secondary);
     }
 
     &__list {
@@ -97,6 +98,14 @@
     &__actions {
         display: flex;
         gap: $spacing-xs;
+
+        button {
+            color: var(--text-secondary);
+
+            &:hover {
+                color: var(--primary);
+            }
+        }
     }
 }
 
@@ -106,4 +115,41 @@
     border: 1px dashed var(--border);
     border-radius: $radius-md;
     color: var(--text-secondary);
+    background-color: var(--surface);
+}
+
+// Dark mode specific fixes
+[data-theme='dark'] {
+    .file-uploader {
+        background-color: #1f2937;
+        border-color: #4b5563;
+
+        &__item {
+            background-color: #374151;
+            border-color: #4b5563;
+
+            &--primary {
+                border-color: #ef4444;
+                background-color: rgba(239, 68, 68, 0.1);
+            }
+        }
+
+        &__name {
+            color: #f9fafb;
+        }
+
+        &__meta {
+            color: #9ca3af;
+        }
+
+        &__icon {
+            color: #9ca3af;
+        }
+    }
+
+    .file-uploader-placeholder {
+        background-color: #1f2937;
+        border-color: #4b5563;
+        color: #9ca3af;
+    }
 }

@@ -1,7 +1,6 @@
 using Mapster;
 using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Common;
-using Whitebird.App.Features.Employee;
 using Whitebird.App.Features.MasterData;
 using Whitebird.Domain.Features.Employee;
 using Whitebird.Domain.Features.AssetTransaction;
@@ -11,6 +10,7 @@ using Whitebird.Infra.Features.Employee;
 using Whitebird.Infra.Features.Office;
 using Whitebird.Infra.Features.Asset;
 using Whitebird.Infra.Features.AssetTransaction;
+using Whitebird.Domain.Features.Common;
 
 namespace Whitebird.App.Features.Employee;
 
@@ -25,10 +25,6 @@ public class EmployeeService : BaseService, IEmployeeService
     private readonly IMasterDataService _masterDataService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
-
-    private const int HANDOVER = 1;
-    private const int TRANSFER = 2;
-    private const int LOAN = 3;
 
     public EmployeeService(
         IGenericRepository<EmployeeEntity> repository,
@@ -149,7 +145,7 @@ public class EmployeeService : BaseService, IEmployeeService
             if (created != null)
             {
                 await _activityLogService.LogCreateAsync(
-                    "Employee",
+                    TableNames.Employee,
                     created.EmployeeId,
                     $"Employee '{created.EmployeeCode}' - '{created.FullName}' created successfully",
                     _currentUserService.GetDisplayName());
@@ -160,7 +156,7 @@ public class EmployeeService : BaseService, IEmployeeService
                 : ServiceResult<EmployeeDetailViewModel>.Success(MapToDetailViewModel(created), "Employee created successfully");
         }, "create employee", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Employee", 0, "Create Employee", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Employee, 0, "Create Employee", ex, _currentUserService.GetDisplayName());
         });
     }
 
@@ -190,7 +186,7 @@ public class EmployeeService : BaseService, IEmployeeService
             var updated = await _employeeReps.GetByIdWithRelationsAsync(id);
 
             await _activityLogService.LogUpdateAsync(
-                "Employee",
+                TableNames.Employee,
                 id,
                 $"Employee updated: Code '{oldCode}', Name '{oldName}' -> '{model.FullName}', Status '{oldStatus}' -> '{model.EmploymentStatus}'",
                 _currentUserService.GetDisplayName());
@@ -198,7 +194,7 @@ public class EmployeeService : BaseService, IEmployeeService
             return ServiceResult<EmployeeDetailViewModel>.Success(MapToDetailViewModel(updated!), "Employee updated successfully");
         }, "update employee", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Employee", id, "Update Employee", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Employee, id, "Update Employee", ex, _currentUserService.GetDisplayName());
         });
     }
 
@@ -219,7 +215,7 @@ public class EmployeeService : BaseService, IEmployeeService
             if (result > 0)
             {
                 await _activityLogService.LogDeleteAsync(
-                    "Employee",
+                    TableNames.Employee,
                     id,
                     $"Employee '{existing.EmployeeCode}' - '{existing.FullName}' deleted permanently",
                     _currentUserService.GetDisplayName());
@@ -230,7 +226,7 @@ public class EmployeeService : BaseService, IEmployeeService
                 : ServiceResult.Success("Employee deleted successfully");
         }, "delete employee", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Employee", id, "Delete Employee", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Employee, id, "Delete Employee", ex, _currentUserService.GetDisplayName());
         });
     }
 
@@ -251,7 +247,7 @@ public class EmployeeService : BaseService, IEmployeeService
             if (result > 0)
             {
                 await _activityLogService.LogSoftDeleteAsync(
-                    "Employee",
+                    TableNames.Employee,
                     id,
                     $"Employee '{existing.EmployeeCode}' - '{existing.FullName}' soft deleted",
                     _currentUserService.GetDisplayName());
@@ -262,48 +258,30 @@ public class EmployeeService : BaseService, IEmployeeService
                 : ServiceResult.Success("Employee soft deleted successfully");
         }, "soft delete employee", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Employee", id, "Soft Delete Employee", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Employee, id, "Soft Delete Employee", ex, _currentUserService.GetDisplayName());
         });
     }
 
-    public async Task<ServiceResult<PaginatedResult<EmployeeListViewModel>>> GetGridDataAsync(int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false)
+    // FIXED: Update GetGridDataAsync to use repository pagination
+    public async Task<ServiceResult<PaginatedResult<EmployeeListViewModel>>> GetGridDataAsync(
+        int page, int pageSize, string? search = null, string? sortBy = null,
+        bool sortDescending = false, Dictionary<string, object>? filters = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var employees = await _employeeReps.GetAllAsync();
-            var query = employees.AsQueryable();
-
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                query = query.Where(e =>
-                    (e.EmployeeCode != null && e.EmployeeCode.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
-                    (e.FullName != null && e.FullName.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
-                    (e.Email != null && e.Email.Contains(search, StringComparison.OrdinalIgnoreCase))
-                );
-            }
-
-            if (!string.IsNullOrWhiteSpace(sortBy))
-            {
-                var propertyInfo = typeof(EmployeeEntity).GetProperty(sortBy, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                if (propertyInfo != null)
-                {
-                    query = sortDescending
-                        ? query.OrderByDescending(e => propertyInfo.GetValue(e, null))
-                        : query.OrderBy(e => propertyInfo.GetValue(e, null));
-                }
-            }
-
-            var totalCount = query.Count();
-            var pagedData = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-            var viewModels = MapToViewModels(pagedData);
+            var result = await _employeeReps.GetPagedWithRelationsAsync(page, pageSize, search, sortBy, sortDescending, filters);
+            var viewModels = result.Data.Adapt<List<EmployeeListViewModel>>();
 
             return ServiceResult<PaginatedResult<EmployeeListViewModel>>.Success(new PaginatedResult<EmployeeListViewModel>
             {
-                Data = viewModels.ToList(),
-                TotalCount = totalCount,
-                PageNumber = page,
-                PageSize = pageSize,
-                TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+                Data = viewModels,
+                TotalCount = result.TotalCount,
+                PageNumber = result.PageNumber,
+                PageSize = result.PageSize,
+                TotalPages = result.TotalPages,
+                Filters = filters,
+                SortBy = sortBy,
+                SortDescending = sortDescending
             });
         }, "get employee grid data");
     }
@@ -348,10 +326,10 @@ public class EmployeeService : BaseService, IEmployeeService
                     AssetName = asset.AssetName,
                     CategoryName = asset.CategoryName ?? "Unknown",
                     Status = DeriveAssetStatusFromTransaction(lastTxn),
-                    AssociationType = lastTxn?.TransactionType == LOAN ? "On Loan" : "Assigned",
+                    AssociationType = lastTxn?.TransactionType == 3 ? "On Loan" : "Assigned",
                     SinceDate = lastTxn?.TransactionDate ?? asset.CreatedDate,
                     ExpectedReturnDate = lastTxn?.ExpectedReturnDate,
-                    IsOverdue = lastTxn?.TransactionType == LOAN && lastTxn.ExpectedReturnDate.HasValue && lastTxn.ExpectedReturnDate.Value < DateTime.Now,
+                    IsOverdue = lastTxn?.TransactionType == 3 && lastTxn.ExpectedReturnDate.HasValue && lastTxn.ExpectedReturnDate.Value < DateTime.Now,
                     ConditionName = asset.AssetConditionName
                 });
             }
@@ -398,7 +376,7 @@ public class EmployeeService : BaseService, IEmployeeService
                     activatedCount++;
 
                     await _activityLogService.LogUpdateAsync(
-                        "Employee",
+                        TableNames.Employee,
                         id,
                         $"Employee '{employee.EmployeeCode}' {(request.Activate ? "activated" : "deactivated")} via bulk operation",
                         _currentUserService.GetDisplayName());
@@ -409,7 +387,7 @@ public class EmployeeService : BaseService, IEmployeeService
                 $"{activatedCount} employee(s) {(request.Activate ? "activated" : "deactivated")} successfully");
         }, "bulk activate employees", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Employee", 0, "Bulk Activate Employees", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Employee, 0, "Bulk Activate Employees", ex, _currentUserService.GetDisplayName());
         });
     }
 
@@ -453,8 +431,8 @@ public class EmployeeService : BaseService, IEmployeeService
 
         return transaction.TransactionType switch
         {
-            HANDOVER or TRANSFER => "Assigned",
-            LOAN => "On Loan",
+            1 or 2 => "Assigned",
+            3 => "On Loan",
             6 => "In Maintenance",
             _ => "Available"
         };

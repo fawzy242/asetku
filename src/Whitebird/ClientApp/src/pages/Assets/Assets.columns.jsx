@@ -18,13 +18,16 @@ export const getAssetColumns = (handleEdit, handleDelete) => [
     renderCell: (p) => <Chip label={p?.value || '-'} size="small" sx={getStatusChipStyles(p?.value)} /> 
   },
   { field: "displayCondition", headerName: "Condition", width: 100 },
-  { field: "currentHolderName", headerName: "Holder", width: 150 },
+  // REMOVED: holder column
   { field: "officeName", headerName: "Office", width: 150 },
   { 
     field: "purchasePrice", 
     headerName: "Price", 
     width: 130, 
-    valueFormatter: (p) => p?.value != null ? utilsHelper.formatCurrency(p.value) : '-' 
+    valueFormatter: (params) => {
+      if (!params || params.value === null || params.value === undefined) return '-';
+      return utilsHelper.formatCurrency(params.value);
+    }
   },
   { 
     field: "actions", 
