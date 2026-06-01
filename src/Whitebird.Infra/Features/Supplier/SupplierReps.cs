@@ -99,27 +99,49 @@ public class SupplierReps : ISupplierReps
     // GRID/LIST METHODS
     // ============================================================
 
-    public async Task<PaginatedResult<SupplierListView>> GetPagedListAsync(
-        int page, int pageSize, string? search = null, string? sortBy = null,
-        bool sortDescending = false, Dictionary<string, object>? filters = null)
+    private string BuildBaseSupplierQueryWithPagination(string selectClause, string whereClause, string orderBy, int offset, int pageSize)
+    {
+        return $@"
+            {selectClause}
+            FROM Supplier s
+            {whereClause}
+            {orderBy}
+            OFFSET @Offset ROWS
+            FETCH NEXT @PageSize ROWS ONLY";
+    }
+
+    private string BuildSupplierListViewSelectClause()
+    {
+        return @"
+            SELECT 
+                s.SupplierId,
+                s.SupplierName,
+                s.ContactPerson,
+                s.PhoneNumber,
+                s.Email,
+                s.Address,
+                s.IsActive,
+                s.CreatedDate,
+                s.CreatedBy,
+                s.ModifiedDate,
+                s.ModifiedBy,
+                (SELECT COUNT(*) FROM Asset WHERE SupplierId = s.SupplierId AND IsActive = 1) as AssetCount";
+    }
+
+    private (string WhereClause, DynamicParameters Parameters) BuildSupplierWhereClause(
+        string? search = null,
+        bool? isActive = null,
+        Dictionary<string, object>? additionalFilters = null)
     {
         var conditions = new List<string>();
         var parameters = new DynamicParameters();
 
-        bool? isActiveFilter = null;
-        if (filters != null && filters.ContainsKey("isActive"))
+        // Handle isActive filter
+        if (isActive.HasValue)
         {
-            if (filters["isActive"] is bool isActive)
-            {
-                isActiveFilter = isActive;
-            }
-            filters.Remove("isActive");
+            conditions.Add($"s.IsActive = {(isActive.Value ? 1 : 0)}");
         }
-
-        if (isActiveFilter.HasValue)
-        {
-            conditions.Add($"s.IsActive = {(isActiveFilter.Value ? 1 : 0)}");
-        }
+        // No default - show all suppliers if not specified
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -127,9 +149,9 @@ public class SupplierReps : ISupplierReps
             parameters.Add("@Search", $"%{search}%");
         }
 
-        if (filters != null)
+        if (additionalFilters != null)
         {
-            foreach (var filter in filters.Where(f => f.Value != null && !string.IsNullOrEmpty(f.Value.ToString())))
+            foreach (var filter in additionalFilters.Where(f => f.Value != null && !string.IsNullOrEmpty(f.Value.ToString())))
             {
                 conditions.Add($"s.{filter.Key} = @{filter.Key}");
                 parameters.Add($"@{filter.Key}", filter.Value);
@@ -137,7 +159,26 @@ public class SupplierReps : ISupplierReps
         }
 
         var whereClause = conditions.Any() ? $"WHERE {string.Join(" AND ", conditions)}" : "";
-        
+        return (whereClause, parameters);
+    }
+
+    public async Task<PaginatedResult<SupplierListView>> GetPagedListAsync(
+        int page, int pageSize, string? search = null, string? sortBy = null,
+        bool sortDescending = false, Dictionary<string, object>? filters = null)
+    {
+        bool? isActiveFilter = null;
+
+        if (filters != null)
+        {
+            if (filters.ContainsKey("isActive") && bool.TryParse(filters["isActive"]?.ToString(), out bool isActive))
+            {
+                isActiveFilter = isActive;
+            }
+            filters?.Remove("isActive");
+        }
+
+        var (whereClause, parameters) = BuildSupplierWhereClause(search, isActiveFilter, filters);
+
         if (string.IsNullOrEmpty(sortBy))
         {
             sortBy = "s.SupplierName";
@@ -151,33 +192,18 @@ public class SupplierReps : ISupplierReps
             }
         }
         
-        var orderBy = $"{sortBy} {(sortDescending ? "DESC" : "ASC")}";
+        var orderBy = $"ORDER BY {sortBy} {(sortDescending ? "DESC" : "ASC")}";
 
         var countSql = $@"
             SELECT COUNT(*) 
             FROM Supplier s
             {whereClause}";
+        
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
+        var selectClause = BuildSupplierListViewSelectClause();
         var offset = (page - 1) * pageSize;
-        var dataSql = $@"
-            SELECT 
-                s.SupplierId,
-                s.SupplierName,
-                s.ContactPerson,
-                s.PhoneNumber,
-                s.Email,
-                s.Address,
-                s.IsActive,
-                s.CreatedDate,
-                s.CreatedBy,
-                s.ModifiedDate,
-                s.ModifiedBy,
-                (SELECT COUNT(*) FROM Asset WHERE SupplierId = s.SupplierId AND IsActive = 1) as AssetCount
-            FROM Supplier s
-            {whereClause}
-            ORDER BY {orderBy}
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+        var dataSql = BuildBaseSupplierQueryWithPagination(selectClause, whereClause, orderBy, offset, pageSize);
 
         parameters.Add("@Offset", offset);
         parameters.Add("@PageSize", pageSize);

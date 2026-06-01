@@ -1,6 +1,7 @@
 using Dapper;
 using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.Office;
+using Whitebird.Domain.Features.MasterData;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.Office;
@@ -149,68 +150,22 @@ public class OfficeReps : IOfficeReps
     // GRID/LIST METHODS
     // ============================================================
 
-    public async Task<PaginatedResult<OfficeListView>> GetPagedListAsync(
-        int page, int pageSize, string? search = null, string? sortBy = null,
-        bool sortDescending = false, Dictionary<string, object>? filters = null)
+    private string BuildBaseOfficeQueryWithPagination(string selectClause, string whereClause, string orderBy, int offset, int pageSize)
     {
-        var conditions = new List<string>();
-        var parameters = new DynamicParameters();
-
-        bool? isActiveFilter = null;
-        if (filters != null && filters.ContainsKey("isActive"))
-        {
-            if (filters["isActive"] is bool isActive)
-            {
-                isActiveFilter = isActive;
-            }
-            filters.Remove("isActive");
-        }
-
-        if (isActiveFilter.HasValue)
-        {
-            conditions.Add($"o.IsActive = {(isActiveFilter.Value ? 1 : 0)}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            conditions.Add(@"(o.OfficeName LIKE @Search OR o.OfficeCode LIKE @Search OR o.City LIKE @Search OR o.Address LIKE @Search)");
-            parameters.Add("@Search", $"%{search}%");
-        }
-
-        if (filters != null)
-        {
-            foreach (var filter in filters.Where(f => f.Value != null && !string.IsNullOrEmpty(f.Value.ToString())))
-            {
-                conditions.Add($"o.{filter.Key} = @{filter.Key}");
-                parameters.Add($"@{filter.Key}", filter.Value);
-            }
-        }
-
-        var whereClause = conditions.Any() ? $"WHERE {string.Join(" AND ", conditions)}" : "";
-        
-        if (string.IsNullOrEmpty(sortBy))
-        {
-            sortBy = "o.OfficeName";
-            sortDescending = false;
-        }
-        else
-        {
-            if (!sortBy.StartsWith("o.") && !sortBy.StartsWith("p."))
-            {
-                sortBy = $"o.{sortBy}";
-            }
-        }
-        
-        var orderBy = $"{sortBy} {(sortDescending ? "DESC" : "ASC")}";
-
-        var countSql = $@"
-            SELECT COUNT(*) 
+        return $@"
+            {selectClause}
             FROM Office o
-            {whereClause}";
-        var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
+            LEFT JOIN Office p ON o.ParentOfficeId = p.OfficeId
+            LEFT JOIN MasterData md ON o.OfficeType = md.ReferenceCode AND md.ReferenceName = 'OfficeType' AND md.IsActive = 1
+            {whereClause}
+            {orderBy}
+            OFFSET @Offset ROWS
+            FETCH NEXT @PageSize ROWS ONLY";
+    }
 
-        var offset = (page - 1) * pageSize;
-        var dataSql = $@"
+    private string BuildOfficeListViewSelectClause()
+    {
+        return @"
             SELECT 
                 o.OfficeId,
                 o.OfficeCode,
@@ -227,13 +182,85 @@ public class OfficeReps : IOfficeReps
                 o.CreatedDate,
                 o.CreatedBy,
                 o.ModifiedDate,
-                o.ModifiedBy
+                o.ModifiedBy";
+    }
+
+    private (string WhereClause, DynamicParameters Parameters) BuildOfficeWhereClause(
+        string? search = null,
+        bool? isActive = null,
+        Dictionary<string, object>? additionalFilters = null)
+    {
+        var conditions = new List<string>();
+        var parameters = new DynamicParameters();
+
+        // Handle isActive filter
+        if (isActive.HasValue)
+        {
+            conditions.Add($"o.IsActive = {(isActive.Value ? 1 : 0)}");
+        }
+        // No default - show all offices if not specified
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            conditions.Add(@"(o.OfficeName LIKE @Search OR o.OfficeCode LIKE @Search OR o.City LIKE @Search OR o.Address LIKE @Search)");
+            parameters.Add("@Search", $"%{search}%");
+        }
+
+        if (additionalFilters != null)
+        {
+            foreach (var filter in additionalFilters.Where(f => f.Value != null && !string.IsNullOrEmpty(f.Value.ToString())))
+            {
+                conditions.Add($"o.{filter.Key} = @{filter.Key}");
+                parameters.Add($"@{filter.Key}", filter.Value);
+            }
+        }
+
+        var whereClause = conditions.Any() ? $"WHERE {string.Join(" AND ", conditions)}" : "";
+        return (whereClause, parameters);
+    }
+
+    public async Task<PaginatedResult<OfficeListView>> GetPagedListAsync(
+        int page, int pageSize, string? search = null, string? sortBy = null,
+        bool sortDescending = false, Dictionary<string, object>? filters = null)
+    {
+        bool? isActiveFilter = null;
+
+        if (filters != null)
+        {
+            if (filters.ContainsKey("isActive") && bool.TryParse(filters["isActive"]?.ToString(), out bool isActive))
+            {
+                isActiveFilter = isActive;
+            }
+            filters?.Remove("isActive");
+        }
+
+        var (whereClause, parameters) = BuildOfficeWhereClause(search, isActiveFilter, filters);
+
+        if (string.IsNullOrEmpty(sortBy))
+        {
+            sortBy = "o.OfficeName";
+            sortDescending = false;
+        }
+        else
+        {
+            if (!sortBy.StartsWith("o.") && !sortBy.StartsWith("p."))
+            {
+                sortBy = $"o.{sortBy}";
+            }
+        }
+        
+        var orderBy = $"ORDER BY {sortBy} {(sortDescending ? "DESC" : "ASC")}";
+
+        var countSql = $@"
+            SELECT COUNT(*) 
             FROM Office o
-            LEFT JOIN Office p ON o.ParentOfficeId = p.OfficeId
-            LEFT JOIN MasterData md ON o.OfficeType = md.ReferenceCode AND md.ReferenceName = 'OfficeType' AND md.IsActive = 1
-            {whereClause}
-            ORDER BY {orderBy}
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+            {whereClause}";
+        
+        var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
+
+        var selectClause = BuildOfficeListViewSelectClause();
+        var offset = (page - 1) * pageSize;
+        var dataSql = BuildBaseOfficeQueryWithPagination(selectClause, whereClause, orderBy, offset, pageSize);
 
         parameters.Add("@Offset", offset);
         parameters.Add("@PageSize", pageSize);

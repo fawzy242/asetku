@@ -27,8 +27,24 @@ public class CategoryController : ControllerBase
     public async Task<IActionResult> GetSubCategories(int parentId) => this.HandleResult(await _categoryService.GetSubCategoriesAsync(parentId));
 
     [HttpGet("grid")]
-    public async Task<IActionResult> GetGridData([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string? search = null)
-        => this.HandleResult(await _categoryService.GetGridDataAsync(page, pageSize, search));
+    public async Task<IActionResult> GetGridData(
+        [FromQuery] int page = 1, 
+        [FromQuery] int pageSize = 10, 
+        [FromQuery] string? search = null,
+        [FromQuery] bool? isActive = null)
+    {
+        var filters = new Dictionary<string, object>();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            filters["search"] = search;
+        }
+        if (isActive.HasValue)
+        {
+            filters["isActive"] = isActive.Value;
+        }
+
+        return this.HandleResult(await _categoryService.GetGridDataAsync(page, pageSize, search, isActive, filters));
+    }
 
     [HttpGet("dropdown")]
     public async Task<IActionResult> GetDropdownList()

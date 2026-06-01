@@ -1,8 +1,10 @@
 import DashboardApi from './Dashboard.api';
+import BaseData from '../../core/services/BaseData';
+import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
 
-class DashboardData {
+class DashboardData extends BaseData {
   constructor() {
-    this.api = DashboardApi;
+    super(DashboardApi);
   }
 
   async fetchDashboardData() {

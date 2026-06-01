@@ -1,11 +1,12 @@
 import ReportsApi from './Reports.api';
+import BaseData from '../../core/services/BaseData';
 import * as XLSX from 'xlsx';
 import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
 import utilsHelper from '../../core/utils/utils.helper';
 
-class ReportsData {
+class ReportsData extends BaseData {
   constructor() {
-    this.api = ReportsApi;
+    super(ReportsApi);
   }
 
   async fetchDashboardStats() {
@@ -24,7 +25,7 @@ class ReportsData {
         this.api.getSuppliers(),
         this.api.getEmployees()
       ]);
-      const departments = [...new Set((employees.data || []).map(e => e.department).filter(Boolean))];
+      const departments = [...new Set((employees.data || []).map(e => e.departmentName || e.department).filter(Boolean))];
       return {
         success: true,
         data: {

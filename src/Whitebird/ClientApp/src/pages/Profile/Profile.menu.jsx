@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { FiUser, FiMail, FiShield, FiLock, FiSave, FiX, FiBriefcase, FiCalendar, FiEdit2, FiCheck, FiCamera, FiTrash2, FiUpload } from "react-icons/fi";
 import { Grid, Box, Avatar, Typography, IconButton, CircularProgress } from "@mui/material";
+import { useAuth } from "../../context/AuthContext";
 import ProfileData from "./Profile.data";
 import Card from "../../components/atoms/Card/Card";
 import Button from "../../components/atoms/Button/Button";
@@ -24,6 +25,7 @@ const ProfileMenu = () => {
   const [passwordData, setPasswordData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const [formData, setFormData] = useState({ fullName: '', email: '', phoneNumber: '', username: '' });
   const [errors, setErrors] = useState({});
+  const { refreshUser } = useAuth();
 
   useEffect(() => { 
     loadProfile(); 
@@ -40,7 +42,6 @@ const ProfileMenu = () => {
         phoneNumber: r.data.phoneNumber || '',
         username: r.data.username || '',
       });
-      // Load profile photo
       loadProfilePhoto(r.data.userId);
     }
     setLoading(false);
@@ -55,22 +56,20 @@ const ProfileMenu = () => {
         setProfilePhotoUrl(url);
       }
     } catch (error) {
-      // No photo or error - ignore
       setProfilePhotoUrl(null);
     }
   };
 
+  // FIXED: Refresh user after photo upload
   const handlePhotoUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       ConfirmDialog.toast.error('Please select an image file (JPEG, PNG, GIF, WEBP)');
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       ConfirmDialog.toast.error('Image size must be less than 5MB');
       return;
@@ -86,6 +85,8 @@ const ProfileMenu = () => {
       });
       if (response.data?.isSuccess) {
         ConfirmDialog.toast.success('Profile photo updated');
+        // Refresh user data to update topbar
+        await refreshUser();
         // Reload photo
         loadProfilePhoto(profile?.userId);
       } else {
@@ -98,6 +99,7 @@ const ProfileMenu = () => {
     }
   };
 
+  // FIXED: Refresh user after photo delete
   const handleDeletePhoto = async () => {
     const confirmed = await ConfirmDialog.show({
       title: 'Delete Profile Photo',
@@ -112,6 +114,8 @@ const ProfileMenu = () => {
       if (response.data?.isSuccess) {
         ConfirmDialog.toast.success('Profile photo deleted');
         setProfilePhotoUrl(null);
+        // Refresh user data to update topbar
+        await refreshUser();
       } else {
         ConfirmDialog.toast.error(response.data?.message || 'Failed to delete photo');
       }
@@ -154,18 +158,21 @@ const ProfileMenu = () => {
     }
   };
 
-  // NOTE: Profile update endpoint does not exist in backend
-  // This is a local-only update for demo purposes
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
     if (!validateProfile()) return;
     setSaving(true);
-    // Simulate API call - backend does not have /Auth/profile endpoint
     await new Promise(resolve => setTimeout(resolve, 500));
     setSaving(false);
     setEditMode(false);
     setProfile(prev => ({ ...prev, ...formData }));
-    ConfirmDialog.toast.success('Profile updated locally');
+    // Update local storage user data
+    const storedUser = utilsHelper.getLocalStorage("user");
+    if (storedUser) {
+      const updatedUser = { ...storedUser, ...formData };
+      utilsHelper.setLocalStorage("user", updatedUser);
+    }
+    ConfirmDialog.toast.success('Profile updated');
   };
 
   const handleCancelEdit = () => {
@@ -202,7 +209,6 @@ const ProfileMenu = () => {
         <Grid item xs={12} md={7}>
           <Card>
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 3, mb: 3, pb: 3, borderBottom: '1px solid var(--border)' }}>
-              {/* Profile Photo Section */}
               <Box sx={{ position: 'relative' }}>
                 <Avatar 
                   src={profilePhotoUrl || undefined} 

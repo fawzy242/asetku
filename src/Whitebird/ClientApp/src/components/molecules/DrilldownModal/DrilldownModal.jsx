@@ -14,19 +14,36 @@ const DrilldownModal = ({ isOpen, onClose, title, endpoint, params = {}, columns
   const [pageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const isMountedRef = useRef(true);
+  const abortControllerRef = useRef(null);
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
   }, []);
+
+  // Reset page when modal opens or endpoint/params change
+  useEffect(() => {
+    if (isOpen) {
+      setPage(1);
+    }
+  }, [isOpen, endpoint, JSON.stringify(params)]);
 
   const fetchData = useCallback(async () => {
     if (!endpoint) {
       console.warn('DrilldownModal: No endpoint provided');
       return;
     }
+    
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
     
     setLoading(true);
     try {
@@ -37,19 +54,30 @@ const DrilldownModal = ({ isOpen, onClose, title, endpoint, params = {}, columns
       queryParams.append('page', page);
       queryParams.append('pageSize', pageSize);
       
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== null && value !== undefined && value !== '') {
-          if (value === null) {
-            return;
+      // Handle special case for overdue-loans endpoint (no pagination params)
+      const isOverdueLoans = endpoint === '/AssetTransaction/overdue-loans';
+      const isActiveLoans = endpoint === '/AssetTransaction/active-loans';
+      
+      // For special endpoints, don't add pagination params
+      if (!isOverdueLoans && !isActiveLoans) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== null && value !== undefined && value !== '') {
+            if (key === 'approved' && value === null) {
+              queryParams.append(key, 'null');
+            } else {
+              queryParams.append(key, value);
+            }
           }
-          queryParams.append(key, value);
-        }
-      });
+        });
+      }
       
       const url = `${endpoint}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       console.log('DrilldownModal fetching:', url);
       
-      const response = await apiService.get(url);
+      const response = await apiService.get(url, {
+        signal: abortControllerRef.current.signal
+      });
+      
       const responseData = response.data;
       
       let items = [];
@@ -97,25 +125,19 @@ const DrilldownModal = ({ isOpen, onClose, title, endpoint, params = {}, columns
         setTotalCount(0);
         setTotalPages(1);
       }
-    }
-    if (isMountedRef.current) {
-      setLoading(false);
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [endpoint, params, page, pageSize]);
 
+  // Fetch data when modal opens or page changes
   useEffect(() => {
     if (isOpen && endpoint) {
-      setPage(1); // Reset page when modal opens
       fetchData();
     }
-  }, [isOpen, endpoint, fetchData]);
-
-  // Refetch when page changes
-  useEffect(() => {
-    if (isOpen && endpoint && page > 0) {
-      fetchData();
-    }
-  }, [page, isOpen, endpoint, fetchData]);
+  }, [isOpen, endpoint, page, fetchData]);
 
   const handlePageChange = (event, newPage) => {
     setPage(newPage);

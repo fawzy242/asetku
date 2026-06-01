@@ -25,7 +25,6 @@ const DataTable = memo(({
   const isDark = theme === 'dark';
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: pageSize });
 
-  // Update pagination model when pageSize prop changes
   useEffect(() => {
     setPaginationModel(prev => ({ ...prev, pageSize: pageSize }));
   }, [pageSize]);
@@ -63,7 +62,6 @@ const DataTable = memo(({
     };
   }, [getRowId]);
 
-  // Use flex to allow DataGrid to take available space and scroll internally
   const gridHeight = hideFooter ? 'auto' : 500;
 
   const handlePaginationModelChange = (newModel) => {
@@ -180,6 +178,13 @@ const DataTable = memo(({
           },
         },
       },
+      MuiChip: {
+        styleOverrides: {
+          root: {
+            borderRadius: '16px !important',  // Force pill shape
+          },
+        },
+      },
     },
   }), [isDark, hideFooter]);
 
@@ -229,6 +234,10 @@ const DataTable = memo(({
             '& .MuiDataGrid-virtualScroller': {
               overflowY: 'auto !important',
               overflowX: 'auto !important',
+            },
+            // Force Chip styling
+            '& .MuiChip-root': {
+              borderRadius: '16px !important',
             },
           }}
         />

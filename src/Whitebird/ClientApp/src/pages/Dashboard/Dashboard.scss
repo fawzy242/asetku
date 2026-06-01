@@ -5,9 +5,10 @@
 .dashboard {
     color: var(--text-primary);
 
+    // Stats Cards Grid - 4 columns on desktop
     &__stats {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         gap: $spacing-lg;
         margin-bottom: $spacing-xl;
 
@@ -21,106 +22,122 @@
 
         @include respond-to('sm') {
             grid-template-columns: 1fr;
+            gap: $spacing-md;
         }
     }
 
+    // Modern Stat Card
     &__stat-card {
         display: flex;
         align-items: center;
         gap: $spacing-md;
         padding: $spacing-lg;
-        background-color: var(--card-bg);
+        background: var(--card-bg);
         border: 1px solid var(--border);
-        border-radius: $radius-lg;
+        border-radius: $radius-xl;
+        transition: all $transition-base;
 
-        svg {
-            font-size: 28px;
-            color: var(--primary);
-            flex-shrink: 0;
+        &--clickable {
+            cursor: pointer;
+            
+            &:hover {
+                transform: translateY(-4px);
+                box-shadow: $shadow-lg;
+                border-color: var(--primary);
+            }
         }
+    }
 
+    &__stat-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 52px;
+        height: 52px;
+        border-radius: $radius-lg;
+        flex-shrink: 0;
+    }
+
+    &__stat-info {
+        flex: 1;
+        
         h3 {
             font-size: $font-size-xs;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            margin-bottom: $spacing-xs;
+            font-weight: 500;
         }
-
+        
         p {
-            font-size: $font-size-xl;
+            font-size: $font-size-2xl;
             font-weight: 700;
             color: var(--text-primary);
-        }
-
-        &--clickable {
-            cursor: pointer;
-            transition: transform $transition-fast, box-shadow $transition-fast;
-            
-            &:hover {
-                transform: translateY(-4px);
-                box-shadow: $shadow-lg;
-            }
+            line-height: 1.2;
         }
     }
 
+    // Charts Row
     &__charts {
         display: grid;
-        grid-template-columns: 1.5fr 1fr;
+        grid-template-columns: 1fr 1fr;
         gap: $spacing-lg;
         margin-bottom: $spacing-xl;
 
         @include respond-to('md') {
             grid-template-columns: 1fr;
+            gap: $spacing-lg;
         }
     }
 
+    &__full-width {
+        margin-bottom: $spacing-xl;
+    }
+
     &__chart-card {
-        min-height: 400px;
-        background-color: var(--card-bg);
+        background: var(--card-bg);
+        border-radius: $radius-xl;
+        overflow: hidden;
     }
 
     &__chart-container {
         width: 100%;
-        height: 350px;
+        height: 320px;
         display: flex;
         align-items: center;
         justify-content: center;
         padding: $spacing-md;
-        background-color: var(--card-bg);
-        
+        position: relative;
+
         @include respond-to('sm') {
-            height: 250px;
+            height: 280px;
             padding: $spacing-sm;
         }
     }
 
-    &__summary-list {
+    &__chart-container--large {
+        width: 100%;
+        height: 400px;
         display: flex;
-        flex-direction: column;
-        gap: $spacing-md;
-        padding: $spacing-md 0;
-    }
-
-    &__summary-item {
-        display: flex;
-        justify-content: space-between;
         align-items: center;
-        padding: $spacing-sm 0;
-        border-bottom: 1px solid var(--border);
-        font-size: $font-size-sm;
-        color: var(--text-secondary);
+        justify-content: center;
+        padding: $spacing-md;
 
-        &:last-child {
-            border-bottom: none;
+        @include respond-to('sm') {
+            height: 320px;
+            padding: $spacing-sm;
         }
     }
 
-    &__summary-value {
-        font-weight: 700;
-        font-size: $font-size-lg;
-        color: var(--text-primary);
+    &__chart-insight {
+        padding: $spacing-sm $spacing-lg $spacing-lg;
+        text-align: center;
+        border-top: 1px solid var(--border);
+        margin-top: $spacing-sm;
     }
 
+    // Alerts Section
     &__alerts {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -130,36 +147,48 @@
         @include respond-to('md') {
             grid-template-columns: 1fr;
         }
+    }
 
-        .card {
-            background-color: var(--card-bg);
+    &__alert-title {
+        display: flex;
+        align-items: center;
+        font-weight: 600;
+    }
+
+    &__alert-list {
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-md;
+    }
+
+    &__alert-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: $spacing-sm 0;
+        border-bottom: 1px solid var(--border);
+        
+        &:last-child {
+            border-bottom: none;
         }
+    }
 
-        ul {
-            display: flex;
-            flex-direction: column;
-            gap: $spacing-sm;
-        }
+    &__alert-info {
+        display: flex;
+        align-items: center;
+        gap: $spacing-md;
+        flex-wrap: wrap;
+    }
 
-        li {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: $spacing-sm 0;
-            border-bottom: 1px solid var(--border);
-            color: var(--text-primary);
+    &__alert-code {
+        font-weight: 600;
+        font-size: $font-size-sm;
+        color: var(--text-primary);
+        min-width: 100px;
+    }
 
-            span:first-child {
-                font-weight: 600;
-                min-width: 100px;
-            }
-
-            span:nth-child(2) {
-                flex: 1;
-                margin: 0 $spacing-md;
-                color: var(--text-secondary);
-                @include truncate;
-            }
-        }
+    &__alert-name {
+        font-size: $font-size-sm;
+        color: var(--text-secondary);
     }
 }

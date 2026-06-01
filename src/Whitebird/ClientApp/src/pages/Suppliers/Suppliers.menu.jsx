@@ -1,23 +1,19 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { FiEdit2, FiTrash2, FiPlus } from "react-icons/fi";
-import { Grid, Box, Chip } from "@mui/material";
+import { Grid, Chip } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
 import SuppliersData from "./Suppliers.data";
-import DataTable from "../../components/molecules/DataTable/DataTable";
-import Pagination from "../../components/molecules/Pagination/Pagination";
-import Button from "../../components/atoms/Button/Button";
-import Modal from "../../components/molecules/Modal/Modal";
+import GridView from "../../components/organisms/GridView/GridView";
+import CrudModal from "../../components/molecules/CrudModal/CrudModal";
 import Input from "../../components/atoms/Input/Input";
 import Spinner from "../../components/atoms/Spinner/Spinner";
-import PageHeader from "../../components/molecules/PageHeader/PageHeader";
-import SearchToolbar from "../../components/molecules/SearchToolbar/SearchToolbar";
-import Tabs from "../../components/molecules/Tabs/Tabs";
 import IconButton from "../../components/atoms/IconButton/IconButton";
-import StatusBadge from "../../components/atoms/StatusBadge/StatusBadge";
+import Button from "../../components/atoms/Button/Button";
 import FileUploader from "../../components/molecules/FileUploader/FileUploader";
-import ModalActions from "../../components/molecules/ModalActions/ModalActions";
+import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
+import { getStatusChipStyles } from "../../core/constants/statusColors";
+import { FiEdit2, FiTrash2, FiCheckSquare } from "react-icons/fi";
 import { useGridData } from "../../hooks/useGridData";
-import { useCrudForm } from "../../hooks/useCrudForm";
+import { useCrudFormBase } from "../../hooks/useCrudFormBase";
 import { cleanSupplierFormData } from "../../core/utils/formHelpers";
 import "./Suppliers.scss";
 
@@ -41,41 +37,77 @@ const TABS = [
 const SuppliersMenu = () => {
   const [activeTab, setActiveTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const queryClient = useQueryClient();
-  
-  const { showModal, editingRecord: editingSupplier, isSubmitting, formData, setFormData, handleCreate, handleEdit, handleClose } = useCrudForm(INITIAL_FORM_DATA, suppliersData, { idField: 'supplierId' });
 
-  const fetchGridData = useCallback(async (params) => {
-    const filters = { 
-      page: params.page || 1,
-      pageSize: params.pageSize || 10,
-      search: params.search || searchTerm,
-      ...params 
-    };
-    
-    // Apply tab filter
+  const {
+    showModal,
+    editingRecord: editingSupplier,
+    isSubmitting,
+    formData,
+    setFormField,
+    handleCreate,
+    handleEdit,
+    handleClose,
+    handleSubmit: crudHandleSubmit,
+  } = useCrudFormBase(INITIAL_FORM_DATA, suppliersData, {
+    idField: 'supplierId',
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] });
+    },
+  });
+
+  const showCheckbox = activeTab === "active" || activeTab === "inactive";
+
+  const buildFilters = useCallback(() => {
+    const filters = {};
     if (activeTab === "active") {
       filters.isActive = true;
     } else if (activeTab === "inactive") {
       filters.isActive = false;
     }
-    
-    const result = await suppliersData.fetchGridData(filters);
-    return result;
+    if (searchTerm) {
+      filters.search = searchTerm;
+    }
+    return filters;
   }, [activeTab, searchTerm]);
 
-  const { data: suppliers, totalCount, loading, page, setPage, pageSize, setPageSize, updateFilters, reload } = useGridData(['suppliers', activeTab, searchTerm], fetchGridData);
+  const fetchGridData = useCallback(async (params) => {
+    const filters = buildFilters();
+    const requestParams = {
+      page: params.page || 1,
+      pageSize: params.pageSize || 10,
+      ...filters,
+      ...params,
+    };
+    
+    const result = await suppliersData.fetchGridData(requestParams);
+    return result;
+  }, [buildFilters]);
+
+  const {
+    data: suppliers,
+    totalCount,
+    loading,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    reload
+  } = useGridData(['suppliers', activeTab, searchTerm], fetchGridData);
 
   useEffect(() => {
     reload();
+    setSelectedRows([]);
   }, [activeTab, reload]);
 
   const handleSearch = useCallback((search) => {
     setSearchTerm(search);
-    updateFilters({ search });
     setPage(1);
-  }, [updateFilters, setPage]);
-  
+    setSelectedRows([]);
+  }, [setPage]);
+
   const handleDelete = useCallback(async (sup) => { 
     const r = await suppliersData.delete(sup.supplierId); 
     if (r.success) { 
@@ -84,22 +116,52 @@ const SuppliersMenu = () => {
     } 
   }, [reload, queryClient]);
 
-  const onSubmit = useCallback(async (e) => {
-    e.preventDefault();
-    if (!formData.supplierName?.trim()) return;
-    if (isSubmitting) return;
-    const data = { ...formData, isActive: editingSupplier ? editingSupplier.isActive : true };
-    if (data.contactPerson === '') data.contactPerson = null;
-    if (data.phoneNumber === '') data.phoneNumber = null;
-    if (data.email === '') data.email = null;
-    if (data.address === '') data.address = null;
-    const r = editingSupplier ? await suppliersData.update(editingSupplier.supplierId, data) : await suppliersData.create(data);
-    if (r.success) { 
-      queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] }); 
-      handleClose(); 
-      reload(); 
+  const handleBulkActivate = useCallback(async (ids, activate) => {
+    let successCount = 0;
+    for (const id of ids) {
+      const result = await suppliersData.fetchById(id);
+      if (result.success && result.data) {
+        const updateData = { ...result.data, isActive: activate };
+        const updateResult = await suppliersData.update(id, updateData);
+        if (updateResult.success) successCount++;
+      }
     }
-  }, [formData, isSubmitting, editingSupplier, handleClose, reload, queryClient]);
+    if (successCount > 0) {
+      queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] });
+      reload();
+      setSelectedRows([]);
+    }
+    return successCount;
+  }, [reload, queryClient]);
+
+  const onSubmit = useCallback(async () => {
+    const submitData = { 
+      ...formData, 
+      isActive: editingSupplier ? editingSupplier.isActive : true 
+    };
+    
+    if (submitData.contactPerson === '') submitData.contactPerson = null;
+    if (submitData.phoneNumber === '') submitData.phoneNumber = null;
+    if (submitData.email === '') submitData.email = null;
+    if (submitData.address === '') submitData.address = null;
+    
+    Object.keys(submitData).forEach(key => {
+      setFormField(key)(submitData[key]);
+    });
+    
+    const success = await crudHandleSubmit();
+    if (success) {
+      reload();
+    }
+    return success;
+  }, [formData, editingSupplier, crudHandleSubmit, setFormField, reload]);
+
+  const handleTabChange = useCallback((tab) => { 
+    setActiveTab(tab); 
+    setPage(1);
+    setSearchTerm("");
+    setSelectedRows([]);
+  }, [setPage]);
 
   const columns = useMemo(() => [
     { field: "supplierName", headerName: "Name", flex: 1, minWidth: 180 },
@@ -111,7 +173,10 @@ const SuppliersMenu = () => {
       field: "isActive", 
       headerName: "Status", 
       width: 110, 
-      renderCell: (p) => <StatusBadge status={p?.value ? 'Active' : 'Inactive'} />,
+      renderCell: (p) => {
+        const status = p?.value ? 'Active' : 'Inactive';
+        return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
+      },
     },
     { 
       field: "actions", 
@@ -127,83 +192,115 @@ const SuppliersMenu = () => {
     },
   ], [handleEdit, handleDelete]);
 
-  const handleTabChange = useCallback((tab) => { 
-    setActiveTab(tab); 
-    setPage(1);
-    setSearchTerm("");
-  }, [setPage]);
-  
+  const extraActions = (
+    <>
+      {selectedRows.length > 0 && showCheckbox && (
+        <Button variant="primary" onClick={() => setShowBulkActivateModal(true)} startIcon={<FiCheckSquare />}>
+          {activeTab === "active" ? "Deactivate" : "Activate"} ({selectedRows.length})
+        </Button>
+      )}
+    </>
+  );
+
   if (loading && !suppliers.length) return <div className="page-loading"><Spinner size="lg" /></div>;
+
+  const bulkActivateValue = activeTab === "active" ? false : true;
+  const bulkButtonText = activeTab === "active" ? "Deactivate" : "Activate";
 
   return (
     <div className="suppliers-menu">
-      <PageHeader 
+      <GridView
         title="Supplier Management"
-        actions={
-          <Button variant="primary" onClick={handleCreate} startIcon={<FiPlus />}>
-            Add Supplier
-          </Button>
-        }
+        tabs={TABS}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        onCreate={handleCreate}
+        columns={columns}
+        data={suppliers}
+        loading={loading}
+        page={page}
+        totalPages={Math.ceil(totalCount / pageSize) || 1}
+        pageSize={pageSize}
+        totalItems={totalCount}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        onSearch={handleSearch}
+        showCheckbox={showCheckbox}
+        selectedRows={selectedRows}
+        onSelectionChange={setSelectedRows}
+        createButtonText="Add Supplier"
+        ariaLabel="Suppliers data table"
+        extraActions={extraActions}
       />
-      
-      <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
-      <SearchToolbar onSearch={handleSearch} placeholder="Search by name, contact..." />
-      
-      <div className="suppliers-menu__table" style={{ width: '100%', minWidth: 0 }}>
-        <DataTable 
-          rows={suppliers} 
-          columns={columns} 
-          loading={loading} 
-          pageSize={pageSize} 
-          getRowId={(row) => row.supplierId} 
-          hideFooter={true} 
-          autoHeight={true}
-          ariaLabel="Suppliers data table" 
-        />
-      </div>
-      
-      <Pagination 
-        currentPage={page} 
-        totalPages={Math.ceil(totalCount / pageSize) || 1} 
-        pageSize={pageSize} 
-        totalItems={totalCount} 
-        onPageChange={setPage} 
-        onPageSizeChange={setPageSize} 
-      />
-      
-      <Modal isOpen={showModal} onClose={handleClose} title={editingSupplier ? "Edit Supplier" : "Add Supplier"} size="lg">
-        <form onSubmit={onSubmit}>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <Input label="Supplier Name" value={formData.supplierName || ""} onChange={e => setFormData({ ...formData, supplierName: e.target.value })} required />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Input label="Contact Person" value={formData.contactPerson || ""} onChange={e => setFormData({ ...formData, contactPerson: e.target.value })} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Input label="Phone Number" value={formData.phoneNumber || ""} onChange={e => setFormData({ ...formData, phoneNumber: e.target.value })} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Input label="Email" type="email" value={formData.email || ""} onChange={e => setFormData({ ...formData, email: e.target.value })} />
-            </Grid>
-            <Grid item xs={12}>
-              <Input label="Address" value={formData.address || ""} onChange={e => setFormData({ ...formData, address: e.target.value })} multiline rows={2} />
-            </Grid>
-            <Grid item xs={12}>
-              <FileUploader 
-                referenceTable="Supplier"
-                referenceId={editingSupplier?.supplierId}
-                onUploadComplete={reload}
-              />
-            </Grid>
+
+      <CrudModal
+        isOpen={showModal}
+        onClose={handleClose}
+        title={editingSupplier ? "Edit Supplier" : "Add Supplier"}
+        onSubmit={onSubmit}
+        isSubmitting={isSubmitting}
+        submitText={editingSupplier ? "Update" : "Create"}
+        size="lg"
+      >
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}>
+            <Input 
+              label="Supplier Name" 
+              value={formData.supplierName || ""} 
+              onChange={(e) => setFormField('supplierName')(e.target.value)} 
+              required 
+            />
           </Grid>
-          <ModalActions 
-            onCancel={handleClose} 
-            isSubmitting={isSubmitting}
-            submitText={editingSupplier ? "Update" : "Create"}
-          />
-        </form>
-      </Modal>
+          <Grid item xs={12} sm={6}>
+            <Input 
+              label="Contact Person" 
+              value={formData.contactPerson || ""} 
+              onChange={(e) => setFormField('contactPerson')(e.target.value)} 
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <Input 
+              label="Phone Number" 
+              value={formData.phoneNumber || ""} 
+              onChange={(e) => setFormField('phoneNumber')(e.target.value)} 
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <Input 
+              label="Email" 
+              type="email" 
+              value={formData.email || ""} 
+              onChange={(e) => setFormField('email')(e.target.value)} 
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <Input 
+              label="Address" 
+              value={formData.address || ""} 
+              onChange={(e) => setFormField('address')(e.target.value)} 
+              multiline 
+              rows={2} 
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <FileUploader 
+              referenceTable="Supplier"
+              referenceId={editingSupplier?.supplierId}
+              onUploadComplete={reload}
+            />
+          </Grid>
+        </Grid>
+      </CrudModal>
+
+      <BulkActivateModal
+        isOpen={showBulkActivateModal}
+        onClose={() => setShowBulkActivateModal(false)}
+        onConfirm={(ids) => handleBulkActivate(ids, bulkActivateValue)}
+        selectedIds={selectedRows}
+        itemName="suppliers"
+        title={bulkButtonText === "Activate" ? "Activate Suppliers" : "Deactivate Suppliers"}
+        description={`This action will ${bulkButtonText.toLowerCase()} the selected suppliers.`}
+      />
     </div>
   );
 };

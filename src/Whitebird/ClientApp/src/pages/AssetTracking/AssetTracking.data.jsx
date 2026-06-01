@@ -1,8 +1,10 @@
 import AssetTrackingApi from './AssetTracking.api';
+import BaseData from '../../core/services/BaseData';
+import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
 
-class AssetTrackingData {
+class AssetTrackingData extends BaseData {
   constructor() {
-    this.api = AssetTrackingApi;
+    super(AssetTrackingApi);
   }
 
   async fetchAssets() {

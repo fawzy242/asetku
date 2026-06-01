@@ -1,8 +1,10 @@
 import EmployeeSummaryApi from './EmployeeSummary.api';
+import BaseData from '../../core/services/BaseData';
+import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
 
-class EmployeeSummaryData {
+class EmployeeSummaryData extends BaseData {
   constructor() {
-    this.api = EmployeeSummaryApi;
+    super(EmployeeSummaryApi);
   }
 
   async fetchEmployees() {

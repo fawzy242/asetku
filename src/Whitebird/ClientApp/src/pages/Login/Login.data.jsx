@@ -1,10 +1,11 @@
 import LoginApi from './Login.api';
+import BaseData from '../../core/services/BaseData';
 import utilsHelper from '../../core/utils/utils.helper';
 import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
 
-class LoginData {
+class LoginData extends BaseData {
   constructor() {
-    this.api = LoginApi;
+    super(LoginApi);
   }
 
   async handleLogin(username, password) {

@@ -31,6 +31,37 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // NEW: Refresh user data from API
+  const refreshUser = useCallback(async () => {
+    const token = localStorage.getItem("whitebird_session_token");
+    if (!token) return false;
+    
+    try {
+      const response = await apiService.get("/Auth/me");
+      if (response.data?.isSuccess && response.data?.data) {
+        const userData = response.data.data;
+        
+        // Build profile photo URL
+        const request = { scheme: window.location.protocol.replace(':', ''), host: window.location.host };
+        const profilePhotoUrl = userData.userId 
+          ? `${request.scheme}://${request.host}/api/Auth/profile-photo/${userData.userId}`
+          : null;
+        
+        const updatedUser = { ...userData, profilePhotoUrl };
+        
+        utilsHelper.setLocalStorage("user", updatedUser);
+        if (mountedRef.current) {
+          setUser(updatedUser);
+        }
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Failed to refresh user:", error);
+      return false;
+    }
+  }, []);
+
   const checkAuth = useCallback(async () => {
     if (checkingRef.current) return;
     checkingRef.current = true;
@@ -70,19 +101,27 @@ export const AuthProvider = ({ children }) => {
     };
   }, [checkAuth]);
 
-  // UPDATED: Login now uses username instead of email
   const login = useCallback(async (username, password) => {
     try {
       const response = await apiService.post("/Auth/login", { username, password });
       if (response.data?.isSuccess) {
         const { sessionToken, user: userData } = response.data.data;
+        
+        // Build profile photo URL
+        const request = { scheme: window.location.protocol.replace(':', ''), host: window.location.host };
+        const profilePhotoUrl = userData.userId 
+          ? `${request.scheme}://${request.host}/api/Auth/profile-photo/${userData.userId}`
+          : null;
+        
+        const userWithPhoto = { ...userData, profilePhotoUrl };
+        
         localStorage.setItem("whitebird_session_token", sessionToken);
-        utilsHelper.setLocalStorage("user", userData);
+        utilsHelper.setLocalStorage("user", userWithPhoto);
         if (mountedRef.current) {
-          setUser(userData);
+          setUser(userWithPhoto);
           setIsAuthenticated(true);
         }
-        ConfirmDialog.toast.success(`Welcome back, ${userData.fullName || userData.username}!`);
+        ConfirmDialog.toast.success(`Welcome back, ${userWithPhoto.fullName || userWithPhoto.username}!`);
         return { success: true };
       }
       ConfirmDialog.toast.error(response.data?.message || "Login failed");
@@ -104,7 +143,8 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated, 
     login, 
     logout, 
-    checkAuth 
+    checkAuth,
+    refreshUser  // EXPORT refreshUser function
   };
   
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

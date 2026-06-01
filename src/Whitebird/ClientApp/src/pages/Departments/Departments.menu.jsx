@@ -1,21 +1,18 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { FiEdit2, FiTrash2, FiPlus } from "react-icons/fi";
-import { Grid, Box, Chip } from "@mui/material";
+import { Grid, Chip } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
 import DepartmentsData from "./Departments.data";
-import DataTable from "../../components/molecules/DataTable/DataTable";
-import Pagination from "../../components/molecules/Pagination/Pagination";
-import Button from "../../components/atoms/Button/Button";
-import Modal from "../../components/molecules/Modal/Modal";
+import GridView from "../../components/organisms/GridView/GridView";
+import CrudModal from "../../components/molecules/CrudModal/CrudModal";
 import Input from "../../components/atoms/Input/Input";
 import Spinner from "../../components/atoms/Spinner/Spinner";
-import PageHeader from "../../components/molecules/PageHeader/PageHeader";
-import SearchToolbar from "../../components/molecules/SearchToolbar/SearchToolbar";
-import Tabs from "../../components/molecules/Tabs/Tabs";
 import IconButton from "../../components/atoms/IconButton/IconButton";
-import StatusBadge from "../../components/atoms/StatusBadge/StatusBadge";
+import Button from "../../components/atoms/Button/Button";
+import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
+import { getStatusChipStyles } from "../../core/constants/statusColors";
+import { FiEdit2, FiTrash2, FiCheckSquare } from "react-icons/fi";
 import { useGridData } from "../../hooks/useGridData";
-import { useCrudForm } from "../../hooks/useCrudForm";
+import { useCrudFormBase } from "../../hooks/useCrudFormBase";
 import { cleanDepartmentFormData } from "../../core/utils/formHelpers";
 import "./Departments.scss";
 
@@ -34,13 +31,11 @@ const TABS = [
   { id: "inactive", label: "Inactive" },
 ];
 
-const CRUD_OPTIONS = { 
-  idField: 'departmentId',
-};
-
 const DepartmentsMenu = () => {
   const [activeTab, setActiveTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const queryClient = useQueryClient();
 
   const {
@@ -48,30 +43,45 @@ const DepartmentsMenu = () => {
     editingRecord: editingDepartment,
     isSubmitting,
     formData,
-    setFormData,
+    setFormField,
     handleCreate,
     handleEdit,
     handleClose,
-  } = useCrudForm(INITIAL_FORM_DATA, departmentsData, CRUD_OPTIONS);
+    handleSubmit: crudHandleSubmit,
+  } = useCrudFormBase(INITIAL_FORM_DATA, departmentsData, {
+    idField: 'departmentId',
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reference', 'departments'] });
+    },
+  });
 
-  const fetchGridData = useCallback(async (params) => {
-    const filters = { 
-      page: params.page || 1,
-      pageSize: params.pageSize || 10,
-      search: params.search || searchTerm,
-      ...params 
-    };
-    
-    // Apply tab filter
+  const showCheckbox = activeTab === "active" || activeTab === "inactive";
+
+  const buildFilters = useCallback(() => {
+    const filters = {};
     if (activeTab === "active") {
       filters.isActive = true;
     } else if (activeTab === "inactive") {
       filters.isActive = false;
     }
-    
-    const result = await departmentsData.fetchGridData(filters);
-    return result;
+    if (searchTerm) {
+      filters.search = searchTerm;
+    }
+    return filters;
   }, [activeTab, searchTerm]);
+
+  const fetchGridData = useCallback(async (params) => {
+    const filters = buildFilters();
+    const requestParams = {
+      page: params.page || 1,
+      pageSize: params.pageSize || 10,
+      ...filters,
+      ...params,
+    };
+    
+    const result = await departmentsData.fetchGridData(requestParams);
+    return result;
+  }, [buildFilters]);
 
   const {
     data: departments,
@@ -81,19 +91,19 @@ const DepartmentsMenu = () => {
     setPage,
     pageSize,
     setPageSize,
-    updateFilters,
     reload
   } = useGridData(['departments', activeTab, searchTerm], fetchGridData);
 
   useEffect(() => {
     reload();
+    setSelectedRows([]);
   }, [activeTab, reload]);
 
   const handleSearch = useCallback((search) => {
     setSearchTerm(search);
-    updateFilters({ search });
     setPage(1);
-  }, [updateFilters, setPage]);
+    setSelectedRows([]);
+  }, [setPage]);
 
   const handleDelete = useCallback(async (dept) => {
     const r = await departmentsData.delete(dept.departmentId);
@@ -103,25 +113,47 @@ const DepartmentsMenu = () => {
     }
   }, [reload, queryClient]);
 
-  const onSubmit = useCallback(async (e) => {
-    e.preventDefault();
-    if (!formData.departmentName?.trim()) return;
-    if (isSubmitting) return;
-    
-    const data = { 
+  const handleBulkActivate = useCallback(async (ids, activate) => {
+    let successCount = 0;
+    for (const id of ids) {
+      const result = await departmentsData.fetchById(id);
+      if (result.success && result.data) {
+        const updateData = { ...result.data, isActive: activate };
+        const updateResult = await departmentsData.update(id, updateData);
+        if (updateResult.success) successCount++;
+      }
+    }
+    if (successCount > 0) {
+      queryClient.invalidateQueries({ queryKey: ['reference', 'departments'] });
+      reload();
+      setSelectedRows([]);
+    }
+    return successCount;
+  }, [reload, queryClient]);
+
+  const onSubmit = useCallback(async () => {
+    const submitData = { 
       ...formData, 
       isActive: editingDepartment ? editingDepartment.isActive : true 
     };
     
-    const r = editingDepartment
-      ? await departmentsData.update(editingDepartment.departmentId, data)
-      : await departmentsData.create(data);
-    if (r.success) {
-      queryClient.invalidateQueries({ queryKey: ['reference', 'departments'] });
-      handleClose();
+    Object.keys(submitData).forEach(key => {
+      setFormField(key)(submitData[key]);
+    });
+    
+    const success = await crudHandleSubmit();
+    if (success) {
       reload();
     }
-  }, [formData, isSubmitting, editingDepartment, handleClose, reload, queryClient]);
+    return success;
+  }, [formData, editingDepartment, crudHandleSubmit, setFormField, reload]);
+
+  const handleTabChange = useCallback((tab) => {
+    setActiveTab(tab);
+    setPage(1);
+    setSearchTerm("");
+    setSelectedRows([]);
+  }, [setPage]);
 
   const columns = useMemo(() => [
     { field: "departmentCode", headerName: "Code", width: 150 },
@@ -132,7 +164,10 @@ const DepartmentsMenu = () => {
       field: "isActive",
       headerName: "Status",
       width: 110,
-      renderCell: (p) => <StatusBadge status={p.value ? 'Active' : 'Inactive'} />,
+      renderCell: (p) => {
+        const status = p.value ? 'Active' : 'Inactive';
+        return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
+      },
     },
     {
       field: "actions",
@@ -152,87 +187,94 @@ const DepartmentsMenu = () => {
     },
   ], [handleEdit, handleDelete]);
 
-  const handleTabChange = useCallback((tab) => {
-    setActiveTab(tab);
-    setPage(1);
-    setSearchTerm("");
-  }, [setPage]);
+  const extraActions = (
+    <>
+      {selectedRows.length > 0 && showCheckbox && (
+        <Button variant="primary" onClick={() => setShowBulkActivateModal(true)} startIcon={<FiCheckSquare />}>
+          {activeTab === "active" ? "Deactivate" : "Activate"} ({selectedRows.length})
+        </Button>
+      )}
+    </>
+  );
 
   if (loading && !departments.length) return <div className="page-loading"><Spinner size="lg" /></div>;
 
+  const bulkActivateValue = activeTab === "active" ? false : true;
+  const bulkButtonText = activeTab === "active" ? "Deactivate" : "Activate";
+
   return (
     <div className="departments-menu">
-      <PageHeader 
+      <GridView
         title="Department Management"
-        actions={
-          <Button variant="primary" onClick={handleCreate} startIcon={<FiPlus />}>
-            Add Department
-          </Button>
-        }
-      />
-
-      <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
-      <SearchToolbar onSearch={handleSearch} placeholder="Search by name, code..." />
-      
-      <div className="departments-menu__table" style={{ width: '100%', minWidth: 0 }}>
-        <DataTable
-          rows={departments}
-          columns={columns}
-          loading={loading}
-          pageSize={pageSize}
-          getRowId={(row) => row.departmentId}
-          hideFooter={true}
-          autoHeight={true}
-          ariaLabel="Departments data table"
-        />
-      </div>
-      
-      <Pagination
-        currentPage={page}
+        tabs={TABS}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        onCreate={handleCreate}
+        columns={columns}
+        data={departments}
+        loading={loading}
+        page={page}
         totalPages={Math.ceil(totalCount / pageSize) || 1}
         pageSize={pageSize}
         totalItems={totalCount}
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
+        onSearch={handleSearch}
+        showCheckbox={showCheckbox}
+        selectedRows={selectedRows}
+        onSelectionChange={setSelectedRows}
+        createButtonText="Add Department"
+        ariaLabel="Departments data table"
+        extraActions={extraActions}
       />
 
-      <Modal isOpen={showModal} onClose={handleClose} title={editingDepartment ? "Edit Department" : "Add Department"} size="md">
-        <form onSubmit={onSubmit}>
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <Input 
-                label="Department Code" 
-                value={formData.departmentCode || ""} 
-                onChange={e => setFormData({ ...formData, departmentCode: e.target.value })} 
-                placeholder="Optional (max 100 chars)"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Input 
-                label="Department Name" 
-                value={formData.departmentName || ""} 
-                onChange={e => setFormData({ ...formData, departmentName: e.target.value })} 
-                required 
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Input 
-                label="Description" 
-                value={formData.description || ""} 
-                onChange={e => setFormData({ ...formData, description: e.target.value })} 
-                multiline 
-                rows={2} 
-              />
-            </Grid>
+      <CrudModal
+        isOpen={showModal}
+        onClose={handleClose}
+        title={editingDepartment ? "Edit Department" : "Add Department"}
+        onSubmit={onSubmit}
+        isSubmitting={isSubmitting}
+        submitText={editingDepartment ? "Update" : "Create"}
+        size="md"
+      >
+        <Grid container spacing={2}>
+          <Grid item xs={12}>
+            <Input 
+              label="Department Code" 
+              value={formData.departmentCode || ""} 
+              onChange={(e) => setFormField('departmentCode')(e.target.value)} 
+              placeholder="Optional (max 100 chars)"
+            />
           </Grid>
-          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 3 }}>
-            <Button variant="outline" onClick={handleClose} type="button">Cancel</Button>
-            <Button type="submit" variant="primary" loading={isSubmitting}>
-              {editingDepartment ? "Update" : "Create"}
-            </Button>
-          </Box>
-        </form>
-      </Modal>
+          <Grid item xs={12}>
+            <Input 
+              label="Department Name" 
+              value={formData.departmentName || ""} 
+              onChange={(e) => setFormField('departmentName')(e.target.value)} 
+              required 
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <Input 
+              label="Description" 
+              value={formData.description || ""} 
+              onChange={(e) => setFormField('description')(e.target.value)} 
+              multiline 
+              rows={2} 
+            />
+          </Grid>
+        </Grid>
+      </CrudModal>
+
+      <BulkActivateModal
+        isOpen={showBulkActivateModal}
+        onClose={() => setShowBulkActivateModal(false)}
+        onConfirm={(ids) => handleBulkActivate(ids, bulkActivateValue)}
+        selectedIds={selectedRows}
+        itemName="departments"
+        title={bulkButtonText === "Activate" ? "Activate Departments" : "Deactivate Departments"}
+        description={`This action will ${bulkButtonText.toLowerCase()} the selected departments.`}
+      />
     </div>
   );
 };

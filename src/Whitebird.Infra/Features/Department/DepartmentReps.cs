@@ -115,27 +115,47 @@ public class DepartmentReps : IDepartmentReps
     // GRID/LIST METHODS
     // ============================================================
 
-    public async Task<PaginatedResult<DepartmentListView>> GetPagedListAsync(
-        int page, int pageSize, string? search = null, string? sortBy = null,
-        bool sortDescending = false, Dictionary<string, object>? filters = null)
+    private string BuildBaseDepartmentQueryWithPagination(string selectClause, string whereClause, string orderBy, int offset, int pageSize)
+    {
+        return $@"
+            {selectClause}
+            FROM Department d
+            {whereClause}
+            {orderBy}
+            OFFSET @Offset ROWS
+            FETCH NEXT @PageSize ROWS ONLY";
+    }
+
+    private string BuildDepartmentListViewSelectClause()
+    {
+        return @"
+            SELECT 
+                d.DepartmentId,
+                d.DepartmentCode,
+                d.DepartmentName,
+                d.Description,
+                d.IsActive,
+                d.CreatedDate,
+                d.CreatedBy,
+                d.ModifiedDate,
+                d.ModifiedBy,
+                (SELECT COUNT(*) FROM Employee WHERE DepartmentId = d.DepartmentId AND IsActive = 1) as EmployeeCount";
+    }
+
+    private (string WhereClause, DynamicParameters Parameters) BuildDepartmentWhereClause(
+        string? search = null,
+        bool? isActive = null,
+        Dictionary<string, object>? additionalFilters = null)
     {
         var conditions = new List<string>();
         var parameters = new DynamicParameters();
 
-        bool? isActiveFilter = null;
-        if (filters != null && filters.ContainsKey("isActive"))
+        // Handle isActive filter
+        if (isActive.HasValue)
         {
-            if (filters["isActive"] is bool isActive)
-            {
-                isActiveFilter = isActive;
-            }
-            filters.Remove("isActive");
+            conditions.Add($"d.IsActive = {(isActive.Value ? 1 : 0)}");
         }
-
-        if (isActiveFilter.HasValue)
-        {
-            conditions.Add($"d.IsActive = {(isActiveFilter.Value ? 1 : 0)}");
-        }
+        // No default - show all departments if not specified
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -143,9 +163,9 @@ public class DepartmentReps : IDepartmentReps
             parameters.Add("@Search", $"%{search}%");
         }
 
-        if (filters != null)
+        if (additionalFilters != null)
         {
-            foreach (var filter in filters.Where(f => f.Value != null && !string.IsNullOrEmpty(f.Value.ToString())))
+            foreach (var filter in additionalFilters.Where(f => f.Value != null && !string.IsNullOrEmpty(f.Value.ToString())))
             {
                 conditions.Add($"d.{filter.Key} = @{filter.Key}");
                 parameters.Add($"@{filter.Key}", filter.Value);
@@ -153,7 +173,26 @@ public class DepartmentReps : IDepartmentReps
         }
 
         var whereClause = conditions.Any() ? $"WHERE {string.Join(" AND ", conditions)}" : "";
-        
+        return (whereClause, parameters);
+    }
+
+    public async Task<PaginatedResult<DepartmentListView>> GetPagedListAsync(
+        int page, int pageSize, string? search = null, string? sortBy = null,
+        bool sortDescending = false, Dictionary<string, object>? filters = null)
+    {
+        bool? isActiveFilter = null;
+
+        if (filters != null)
+        {
+            if (filters.ContainsKey("isActive") && bool.TryParse(filters["isActive"]?.ToString(), out bool isActive))
+            {
+                isActiveFilter = isActive;
+            }
+            filters?.Remove("isActive");
+        }
+
+        var (whereClause, parameters) = BuildDepartmentWhereClause(search, isActiveFilter, filters);
+
         if (string.IsNullOrEmpty(sortBy))
         {
             sortBy = "d.DepartmentName";
@@ -167,31 +206,18 @@ public class DepartmentReps : IDepartmentReps
             }
         }
         
-        var orderBy = $"{sortBy} {(sortDescending ? "DESC" : "ASC")}";
+        var orderBy = $"ORDER BY {sortBy} {(sortDescending ? "DESC" : "ASC")}";
 
         var countSql = $@"
             SELECT COUNT(*) 
             FROM Department d
             {whereClause}";
+        
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
+        var selectClause = BuildDepartmentListViewSelectClause();
         var offset = (page - 1) * pageSize;
-        var dataSql = $@"
-            SELECT 
-                d.DepartmentId,
-                d.DepartmentCode,
-                d.DepartmentName,
-                d.Description,
-                d.IsActive,
-                d.CreatedDate,
-                d.CreatedBy,
-                d.ModifiedDate,
-                d.ModifiedBy,
-                (SELECT COUNT(*) FROM Employee WHERE DepartmentId = d.DepartmentId AND IsActive = 1) as EmployeeCount
-            FROM Department d
-            {whereClause}
-            ORDER BY {orderBy}
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+        var dataSql = BuildBaseDepartmentQueryWithPagination(selectClause, whereClause, orderBy, offset, pageSize);
 
         parameters.Add("@Offset", offset);
         parameters.Add("@PageSize", pageSize);

@@ -3,8 +3,8 @@
  * Single source of truth untuk semua status colors di seluruh aplikasi.
  * 
  * Usage:
- *   import { STATUS_COLORS } from '../../core/constants/statusColors';
- *   const colors = STATUS_COLORS[status] || STATUS_COLORS.default;
+ *   import { STATUS_COLORS, getStatusChipStyles } from '../../core/constants/statusColors';
+ *   <Chip label={status} size="small" sx={getStatusChipStyles(status)} />
  */
 
 export const STATUS_COLORS = {
@@ -27,6 +27,7 @@ export const STATUS_COLORS = {
 
   // Employee Status
   'Active':          { bg: 'rgba(16, 185, 129, 0.1)', color: '#10b981', label: 'success' },
+  'Inactive':        { bg: 'rgba(107, 114, 128, 0.1)', color: '#6b7280', label: 'secondary' },
   'Resigned':        { bg: 'rgba(107, 114, 128, 0.1)', color: '#6b7280', label: 'secondary' },
   'On Leave':        { bg: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', label: 'warning' },
 
@@ -37,7 +38,7 @@ export const STATUS_COLORS = {
 /**
  * Get status chip styles for MUI Chip component
  * @param {string} status - Status text
- * @returns {{ bg: string, color: string }}
+ * @returns {Object} MUI sx styles for Chip
  */
 export const getStatusChipStyles = (status) => {
   const colors = STATUS_COLORS[status] || STATUS_COLORS.default;
@@ -46,8 +47,12 @@ export const getStatusChipStyles = (status) => {
     color: colors.color,
     fontWeight: 500,
     fontSize: '0.75rem',
-    height: 24,
-    borderRadius: '4px',
+    height: '24px',
+    borderRadius: '16px',
+    px: 1,
+    '& .MuiChip-label': {
+      px: 1.5,
+    },
   };
 };
 

@@ -225,14 +225,24 @@ public class SupplierService : BaseService, ISupplierService
     }
 
     /// <inheritdoc />
-    public async Task<ServiceResult<PaginatedResult<SupplierListView>>> GetGridDataAsync(int page, int pageSize, string? search = null)
+    public async Task<ServiceResult<PaginatedResult<SupplierListView>>> GetGridDataAsync(
+        int page, int pageSize, string? search = null, bool? isActive = null, Dictionary<string, object>? filters = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var filters = new Dictionary<string, object>();
+            if (filters == null)
+            {
+                filters = new Dictionary<string, object>();
+            }
+            
             if (!string.IsNullOrWhiteSpace(search))
             {
                 filters["search"] = search;
+            }
+            
+            if (isActive.HasValue)
+            {
+                filters["isActive"] = isActive.Value;
             }
 
             var result = await _supplierReps.GetPagedListAsync(page, pageSize, search, "SupplierName", false, filters);

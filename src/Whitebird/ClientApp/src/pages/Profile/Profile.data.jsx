@@ -1,9 +1,10 @@
 import ProfileApi from './Profile.api';
+import BaseData from '../../core/services/BaseData';
 import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
 
-class ProfileData {
+class ProfileData extends BaseData {
   constructor() {
-    this.api = ProfileApi;
+    super(ProfileApi);
   }
 
   async fetchProfile() {

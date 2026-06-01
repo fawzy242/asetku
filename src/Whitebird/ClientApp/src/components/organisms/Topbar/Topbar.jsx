@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FiSearch, FiSun, FiMoon, FiChevronDown, FiX, FiUser, FiLogOut } from "react-icons/fi";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { Avatar, Box } from "@mui/material";
 import { useAuth } from "../../../context/AuthContext";
 import { useUIStore } from "../../../stores/uiStore";
 import ConfirmDialog from "../../molecules/ConfirmDialog/ConfirmDialog";
@@ -44,12 +45,36 @@ const Topbar = ({ user = null }) => {
   const [searchValue, setSearchValue] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState(null);
   const searchRef = useRef(null);
   const userMenuRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
+  const { logout, refreshUser } = useAuth();
   const { theme, toggleTheme } = useUIStore();
+
+  // Load profile photo
+  const loadProfilePhoto = useCallback(async (userId) => {
+    if (!userId) return;
+    try {
+      const response = await apiService.get(`/Auth/profile-photo/${userId}`, { responseType: 'blob' });
+      if (response.data && response.data.size > 0) {
+        const url = URL.createObjectURL(response.data);
+        setProfilePhotoUrl(url);
+      } else {
+        setProfilePhotoUrl(null);
+      }
+    } catch (error) {
+      setProfilePhotoUrl(null);
+    }
+  }, []);
+
+  // Load photo when user changes
+  useEffect(() => {
+    if (user?.userId) {
+      loadProfilePhoto(user.userId);
+    }
+  }, [user?.userId, loadProfilePhoto]);
 
   const { data: searchResults = [], isLoading: isSearching, refetch } = useQuery({
     queryKey: ['global-search', debouncedSearch],
@@ -92,7 +117,6 @@ const Topbar = ({ user = null }) => {
     setShowSearchResults(false);
   };
 
-  // FIXED: Redirect to Asset Tracking or Employee Summary page with query parameter
   const handleSearchSelect = (r) => {
     setSearchValue("");
     setDebouncedSearch("");
@@ -104,7 +128,6 @@ const Topbar = ({ user = null }) => {
     }
   };
 
-  // Also handle URL parameters on page load for direct navigation
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const assetId = params.get('assetId');
@@ -112,7 +135,6 @@ const Topbar = ({ user = null }) => {
     
     if (assetId && location.pathname === '/tracking') {
       // The AssetTracking page will handle loading the data
-      // Just ensure the page is ready
     }
     if (employeeId && location.pathname === '/employee-summary') {
       // The EmployeeSummary page will handle loading the data
@@ -193,14 +215,28 @@ const Topbar = ({ user = null }) => {
             aria-label="User menu"
             aria-expanded={showUserMenu}
           >
-            <span className="topbar__user-avatar">{userInitial}</span>
+            {profilePhotoUrl ? (
+              <Avatar 
+                src={profilePhotoUrl} 
+                sx={{ width: 36, height: 36 }}
+              />
+            ) : (
+              <span className="topbar__user-avatar">{userInitial}</span>
+            )}
             <span className="topbar__user-name">{user?.fullName || "User"}</span>
             <FiChevronDown size={16} />
           </button>
           {showUserMenu && (
             <div className="topbar__user-dropdown">
               <div className="topbar__user-header">
-                <span className="topbar__user-avatar--large">{userInitial}</span>
+                {profilePhotoUrl ? (
+                  <Avatar 
+                    src={profilePhotoUrl} 
+                    sx={{ width: 48, height: 48 }}
+                  />
+                ) : (
+                  <span className="topbar__user-avatar--large">{userInitial}</span>
+                )}
                 <div>
                   <p className="topbar__user-fullname">{user?.fullName}</p>
                   <p className="topbar__user-email">{user?.email}</p>

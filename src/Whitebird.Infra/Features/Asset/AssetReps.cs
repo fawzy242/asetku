@@ -642,9 +642,9 @@ public class AssetReps : IAssetReps
     // GRID/LIST METHODS
     // ============================================================
 
-    private string BuildBaseAssetQuery(string selectClause, string whereClause, string orderBy, bool includePagination = false, int offset = 0, int pageSize = 0)
+    private string BuildBaseAssetQueryWithPagination(string selectClause, string whereClause, string orderBy, int offset, int pageSize)
     {
-        var sql = $@"
+        return $@"
             {selectClause}
             FROM Asset a
             LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
@@ -653,23 +653,18 @@ public class AssetReps : IAssetReps
             LEFT JOIN MasterData md1 ON a.AssetCondition = md1.ReferenceCode AND md1.ReferenceName = 'AssetCondition' AND md1.IsActive = 1
             LEFT JOIN MasterData md2 ON a.AssetConditionPurchase = md2.ReferenceCode AND md2.ReferenceName = 'AssetConditionPurchase' AND md2.IsActive = 1
             LEFT JOIN (
-                SELECT AssetId, TransactionType, ToEmployeeId,
+                SELECT AssetId, TransactionType,
                        ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
                 FROM AssetTransaction
                 WHERE Approved = 1 AND FromAssetTransactionId IS NULL AND IsActive = 1
             ) at2 ON a.AssetId = at2.AssetId AND at2.rn = 1
             {whereClause}
-            {orderBy}";
-
-        if (includePagination)
-        {
-            sql += $" OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
-        }
-
-        return sql;
+            {orderBy}
+            OFFSET @Offset ROWS
+            FETCH NEXT @PageSize ROWS ONLY";
     }
 
-    private string BuildAssetListViewSelectClause()
+    private string BuildAssetListViewSelectClauseWithParams()
     {
         return @"
             SELECT 
@@ -719,7 +714,7 @@ public class AssetReps : IAssetReps
                 END as CurrentStatus";
     }
 
-    private (string WhereClause, DynamicParameters Parameters) BuildAssetWhereClause(
+    private (string WhereClause, DynamicParameters Parameters) BuildAssetWhereClauseForGrid(
         string? search = null, 
         string? statusFilter = null,
         int? categoryId = null,
@@ -741,13 +736,15 @@ public class AssetReps : IAssetReps
         parameters.Add("@TransferType", transferType);
         parameters.Add("@MaintenanceType", maintenanceType);
 
+        // Handle isActive filter
         if (isActive.HasValue)
         {
             conditions.Add($"a.IsActive = {(isActive.Value ? 1 : 0)}");
         }
         else
         {
-            conditions.Add("a.IsActive = 1");
+            // Default: show all assets (both active and inactive)
+            // No condition added
         }
 
         if (!string.IsNullOrEmpty(statusFilter))
@@ -792,9 +789,12 @@ public class AssetReps : IAssetReps
                       AND at.IsActive = 1 
                       AND at.TransactionType = @MaintenanceType)");
             }
+            else if (statusFilter == "Active")
+            {
+                conditions.Add("a.IsActive = 1");
+            }
             else if (statusFilter == "Inactive")
             {
-                conditions.RemoveAll(c => c.Contains("a.IsActive = 1"));
                 conditions.Add("a.IsActive = 0");
             }
         }
@@ -861,7 +861,7 @@ public class AssetReps : IAssetReps
             filters.Remove("isActive");
         }
 
-        var (whereClause, parameters) = BuildAssetWhereClause(search, statusFilter, categoryId, officeId, supplierId, isActive, filters);
+        var (whereClause, parameters) = BuildAssetWhereClauseForGrid(search, statusFilter, categoryId, officeId, supplierId, isActive, filters);
 
         if (string.IsNullOrEmpty(sortBy))
         {
@@ -876,14 +876,14 @@ public class AssetReps : IAssetReps
             }
         }
         
-        var orderBy = $"{sortBy} {(sortDescending ? "DESC" : "ASC")}";
+        var orderBy = $"ORDER BY {sortBy} {(sortDescending ? "DESC" : "ASC")}";
 
         var countSql = $"SELECT COUNT(*) FROM Asset a {whereClause}";
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        var selectClause = BuildAssetListViewSelectClause();
+        var selectClause = BuildAssetListViewSelectClauseWithParams();
         var offset = (page - 1) * pageSize;
-        var dataSql = BuildBaseAssetQuery(selectClause, whereClause, orderBy, true, offset, pageSize);
+        var dataSql = BuildBaseAssetQueryWithPagination(selectClause, whereClause, orderBy, offset, pageSize);
 
         parameters.Add("@Offset", offset);
         parameters.Add("@PageSize", pageSize);
