@@ -2,6 +2,9 @@ using Whitebird.Domain.Features.Reports;
 
 namespace Whitebird.Infra.Features.Reports;
 
+/// <summary>
+/// Repository interface for Reports operations
+/// </summary>
 public interface IReportsReps
 {
     // Report data

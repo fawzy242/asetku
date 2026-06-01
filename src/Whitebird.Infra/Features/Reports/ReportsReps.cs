@@ -4,6 +4,9 @@ using Whitebird.Domain.Features.Reports;
 
 namespace Whitebird.Infra.Features.Reports;
 
+/// <summary>
+/// Repository implementation for Reports operations using Dapper
+/// </summary>
 public class ReportsReps : IReportsReps
 {
     private readonly DapperContext _context;
@@ -13,6 +16,7 @@ public class ReportsReps : IReportsReps
         _context = context;
     }
 
+    /// <inheritdoc />
     public async Task<IEnumerable<ReportsAssetTransactionViewModel>> GetAssetTransactionReportsAsync(
         DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null)
     {
@@ -66,6 +70,7 @@ public class ReportsReps : IReportsReps
         return await _context.QueryAsync<ReportsAssetTransactionViewModel>(sql, parameters);
     }
 
+    /// <inheritdoc />
     public async Task<IEnumerable<ReportsAssetInventoryViewModel>> GetAssetInventoryReportsAsync(
         string? status = null, int? categoryId = null, int? supplierId = null)
     {
@@ -74,7 +79,6 @@ public class ReportsReps : IReportsReps
 
         if (!string.IsNullOrEmpty(status))
         {
-            // Status is derived from active transaction
             if (status == "Available")
                 conditions.Add("NOT EXISTS (SELECT 1 FROM AssetTransaction at WHERE at.AssetId = a.AssetId AND at.Approved = 1 AND at.FromAssetTransactionId IS NULL AND at.IsActive = 1)");
             else if (status == "On Loan")
@@ -135,6 +139,7 @@ public class ReportsReps : IReportsReps
         return await _context.QueryAsync<ReportsAssetInventoryViewModel>(sql, parameters);
     }
 
+    /// <inheritdoc />
     public async Task<IEnumerable<ReportsEmployeeAssetViewModel>> GetEmployeeAssetReportsAsync(
         int? employeeId = null, string? department = null)
     {
@@ -183,6 +188,7 @@ public class ReportsReps : IReportsReps
         return await _context.QueryAsync<ReportsEmployeeAssetViewModel>(sql, parameters);
     }
 
+    /// <inheritdoc />
     public async Task<IEnumerable<ReportsMaintenanceViewModel>> GetMaintenanceReportsAsync(
         DateTime? startDate = null, DateTime? endDate = null, bool? isUpcoming = null)
     {
@@ -249,6 +255,7 @@ public class ReportsReps : IReportsReps
         return await _context.QueryAsync<ReportsMaintenanceViewModel>(sql, parameters);
     }
 
+    /// <inheritdoc />
     public async Task<IEnumerable<ReportsFinancialViewModel>> GetFinancialReportsAsync(
         DateTime? startDate = null, DateTime? endDate = null)
     {
@@ -299,6 +306,7 @@ public class ReportsReps : IReportsReps
         return await _context.QueryAsync<ReportsFinancialViewModel>(sql, parameters);
     }
 
+    /// <inheritdoc />
     public async Task<DashboardStatsViewModel> GetDashboardStatsAsync()
     {
         const string sql = @"
@@ -339,24 +347,28 @@ public class ReportsReps : IReportsReps
         return await _context.QueryFirstOrDefaultAsync<DashboardStatsViewModel>(sql) ?? new DashboardStatsViewModel();
     }
 
+    /// <inheritdoc />
     public async Task<int> GetPendingApprovalsCountAsync()
     {
         const string sql = "SELECT COUNT(*) FROM AssetTransaction WHERE Approved IS NULL AND IsActive = 1";
         return await _context.ExecuteScalarAsync<int>(sql);
     }
 
+    /// <inheritdoc />
     public async Task<int> GetActiveEmployeesCountAsync()
     {
         const string sql = "SELECT COUNT(*) FROM Employee WHERE IsActive = 1 AND EmploymentStatus = 4";
         return await _context.ExecuteScalarAsync<int>(sql);
     }
 
+    /// <inheritdoc />
     public async Task<int> GetTotalOfficesCountAsync()
     {
         const string sql = "SELECT COUNT(*) FROM Office WHERE IsActive = 1";
         return await _context.ExecuteScalarAsync<int>(sql);
     }
 
+    /// <inheritdoc />
     public async Task<int> GetTotalDepartmentsCountAsync()
     {
         const string sql = "SELECT COUNT(*) FROM Department WHERE IsActive = 1";

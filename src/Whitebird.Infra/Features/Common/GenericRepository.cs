@@ -2,9 +2,9 @@ using System.Data;
 using System.Reflection;
 using System.Text;
 using Dapper;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Whitebird.Infra.Database;
-using Whitebird.Domain.Features.Common;
 
 namespace Whitebird.Infra.Features.Common;
 
@@ -57,10 +57,9 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
 
         foreach (var prop in properties)
         {
-            if (prop.GetCustomAttribute<NotMappedAttribute>() != null)
-                continue;
-
             var propType = prop.PropertyType;
+            
+            // Skip complex navigation properties (only value types, string, DateTime)
             if (!propType.IsValueType && propType != typeof(string) && propType != typeof(DateTime) && propType != typeof(DateTime?))
                 continue;
 
@@ -118,7 +117,6 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
 
         try
         {
-            // Try OUTPUT INSERTED first (works for tables without triggers or with simple triggers)
             var insertQuery = $@"
                 INSERT INTO {_tableName} ({columns}) 
                 OUTPUT INSERTED.{_primaryKeyName}
@@ -139,14 +137,11 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
         }
         catch (Exception ex) when (ex.Message.Contains("OUTPUT") || ex.Message.Contains("trigger"))
         {
-            // Fallback: Table has triggers that prevent OUTPUT clause
-            // Use INSERT + SELECT SCOPE_IDENTITY() as two-step operation
-            _logger.LogWarning("OUTPUT clause failed for {TableName}, using fallback INSERT + IDENTITY/SCOPE_IDENTITY", _tableName);
+            _logger.LogWarning(ex, "OUTPUT clause failed for {TableName}, using fallback INSERT + IDENTITY/SCOPE_IDENTITY", _tableName);
 
             var insertQuery = $"INSERT INTO {_tableName} ({columns}) VALUES ({values});";
             await _context.Connection.ExecuteAsync(insertQuery, parameters, transaction);
 
-            // Get the last inserted ID using the sequence directly
             var getLastIdQuery = $@"
                 SELECT CAST(current_value AS INT) 
                 FROM sys.sequences 
@@ -349,5 +344,56 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
     public async Task<int> ExecuteStoredProcedureNonQueryAsync(string procedureName, object? parameters = null)
     {
         return await _context.ExecuteAsync(procedureName, parameters, CommandType.StoredProcedure);
+    }
+
+    // ============================================================
+    // OPTIMIZED BULK INSERT USING SQLBULKCOPY
+    // ============================================================
+
+    public async Task<int> BulkInsertOptimizedAsync(IEnumerable<T> entities, IDbTransaction? transaction = null)
+    {
+        var entityList = entities.ToList();
+        if (!entityList.Any()) return 0;
+
+        var insertableProps = GetInsertableProperties();
+        var dataTable = new DataTable();
+        
+        foreach (var prop in insertableProps)
+        {
+            var columnType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+            dataTable.Columns.Add(prop.Name, columnType);
+        }
+
+        foreach (var entity in entityList)
+        {
+            var row = dataTable.NewRow();
+            foreach (var prop in insertableProps)
+            {
+                var value = prop.GetValue(entity);
+                row[prop.Name] = value ?? DBNull.Value;
+            }
+            dataTable.Rows.Add(row);
+        }
+
+        try
+        {
+            var connection = _context.Connection as SqlConnection;
+            if (connection != null && transaction != null)
+            {
+                using var bulkCopy = new SqlBulkCopy(connection, SqlBulkCopyOptions.Default, (SqlTransaction)transaction);
+                bulkCopy.DestinationTableName = _tableName;
+                bulkCopy.BatchSize = 1000;
+                bulkCopy.BulkCopyTimeout = 300;
+                
+                await bulkCopy.WriteToServerAsync(dataTable);
+                return entityList.Count;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "SqlBulkCopy failed for {TableName}, falling back to regular insert", _tableName);
+        }
+
+        return await BulkInsertAsync(entityList);
     }
 }

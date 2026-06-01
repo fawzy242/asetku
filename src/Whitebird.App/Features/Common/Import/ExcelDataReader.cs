@@ -88,4 +88,22 @@ public static class ExcelDataReader
 
         return Enum.TryParse<T>(value, true, out var result) ? result : defaultValue;
     }
+
+    /// <summary>
+    /// Validates email format
+    /// </summary>
+    /// <param name="email">Email address to validate</param>
+    /// <returns>True if email format is valid, false otherwise</returns>
+    public static bool IsValidEmail(string email)
+    {
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email);
+            return addr.Address == email;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }

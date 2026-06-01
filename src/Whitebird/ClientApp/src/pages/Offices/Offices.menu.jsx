@@ -14,12 +14,12 @@ import PageHeader from "../../components/molecules/PageHeader/PageHeader";
 import SearchToolbar from "../../components/molecules/SearchToolbar/SearchToolbar";
 import Tabs from "../../components/molecules/Tabs/Tabs";
 import IconButton from "../../components/atoms/IconButton/IconButton";
+import StatusBadge from "../../components/atoms/StatusBadge/StatusBadge";
 import ModalActions from "../../components/molecules/ModalActions/ModalActions";
 import { useGridData } from "../../hooks/useGridData";
 import { useReferenceData } from "../../hooks/useReferenceData";
 import { useCrudForm } from "../../hooks/useCrudForm";
 import { cleanNullableStrings, cleanIdFields } from "../../core/utils/formHelpers";
-import { STATUS_TABS } from "../../core/constants/tabs";
 import "./Offices.scss";
 
 const officesData = new OfficesData();
@@ -54,6 +54,12 @@ const transformOfficeFormData = (data) => {
 
 officesData.transformFormData = transformOfficeFormData;
 
+const TABS = [
+  { id: "all", label: "All" },
+  { id: "active", label: "Active" },
+  { id: "inactive", label: "Inactive" },
+];
+
 const CRUD_OPTIONS = { 
   idField: 'officeId',
 };
@@ -82,27 +88,15 @@ const OfficesMenu = () => {
       search: params.search || searchTerm,
       ...params 
     };
-    const result = await officesData.fetchGridData(filters);
-    if (result.success) {
-      const rawData = result.data;
-      let dataArray = [];
-
-      if (rawData?.data?.data && Array.isArray(rawData.data.data)) {
-        dataArray = rawData.data.data;
-      } else if (rawData?.data && Array.isArray(rawData.data)) {
-        dataArray = rawData.data;
-      } else if (Array.isArray(rawData)) {
-        dataArray = rawData;
-      }
-
-      if (activeTab === "active") {
-        dataArray = dataArray.filter(o => o.isActive === true);
-      } else if (activeTab === "inactive") {
-        dataArray = dataArray.filter(o => o.isActive === false);
-      }
-
-      return { success: true, data: { data: dataArray, totalCount: dataArray.length } };
+    
+    // Apply tab filter
+    if (activeTab === "active") {
+      filters.isActive = true;
+    } else if (activeTab === "inactive") {
+      filters.isActive = false;
     }
+    
+    const result = await officesData.fetchGridData(filters);
     return result;
   }, [activeTab, searchTerm]);
 
@@ -184,20 +178,7 @@ const OfficesMenu = () => {
       field: "isActive",
       headerName: "Status",
       width: 110,
-      renderCell: (p) => (
-        <Chip
-          label={p.value ? 'Active' : 'Inactive'}
-          size="small"
-          sx={{
-            bgcolor: p.value ? 'rgba(16, 185, 129, 0.1)' : 'rgba(107, 114, 128, 0.1)',
-            color: p.value ? '#10b981' : '#6b7280',
-            fontWeight: 500,
-            fontSize: '0.75rem',
-            height: 24,
-            borderRadius: '4px',
-          }}
-        />
-      ),
+      renderCell: (p) => <StatusBadge status={p.value ? 'Active' : 'Inactive'} />,
     },
     {
       field: "actions",
@@ -220,6 +201,7 @@ const OfficesMenu = () => {
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
     setPage(1);
+    setSearchTerm("");
   }, [setPage]);
 
   if (loading && !offices.length) return <div className="page-loading"><Spinner size="lg" /></div>;
@@ -228,17 +210,16 @@ const OfficesMenu = () => {
 
   return (
     <div className="offices-menu">
-      <div className="page-header">
-        <h1 className="page-title">Office</h1>
-        <PageHeader 
-          title="Office Management" 
-          buttonText="Add Office" 
-          onButtonClick={handleCreate} 
-          buttonIcon={<FiPlus />} 
-        />
-      </div>
+      <PageHeader 
+        title="Office Management"
+        actions={
+          <Button variant="primary" onClick={handleCreate} startIcon={<FiPlus />}>
+            Add Office
+          </Button>
+        }
+      />
 
-      <Tabs tabs={STATUS_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+      <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar onSearch={handleSearch} placeholder="Search by name, code, city..." />
       
       <div className="offices-menu__table" style={{ width: '100%', minWidth: 0 }}>

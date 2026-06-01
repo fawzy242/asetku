@@ -40,6 +40,10 @@ public class EmployeeController : ControllerBase
     public async Task<IActionResult> GetAssetSummary(int id)
         => this.HandleResult(await _employeeService.GetAssetSummaryAsync(id));
 
+    [HttpGet("dropdown")]
+    public async Task<IActionResult> GetDropdownList()
+        => this.HandleResult(await _employeeService.GetDropdownListAsync());
+
     [HttpGet("grid")]
     public async Task<IActionResult> GetGridData(
         [FromQuery] int page = 1,

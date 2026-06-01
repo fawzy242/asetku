@@ -137,7 +137,7 @@ public class AuthController : ControllerBase
         return this.HandleResult(result);
     }
 
-    // ========== NEW ENDPOINT ==========
+    // ========== PROFILE UPDATE ENDPOINT ==========
     [HttpPut("profile")]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
     {

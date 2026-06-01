@@ -1,4 +1,5 @@
 using Whitebird.Domain.Features.Common;
+
 namespace Whitebird.Domain.Features.Office;
 
 public class OfficeEntity : AuditableEntity
@@ -11,11 +12,7 @@ public class OfficeEntity : AuditableEntity
     public string? Address { get; set; }
     public string? Phone { get; set; }
     public int? ParentOfficeId { get; set; }
-
-    // NotMapped properties untuk JOIN results
-    [NotMapped]
-    public string? ParentOfficeName { get; set; }
-
-    [NotMapped]
-    public int ChildCount { get; set; }
+    
+    // NOTE: Semua NotMapped properties telah dihapus.
+    // Untuk query dengan JOIN, gunakan OfficeListView.
 }

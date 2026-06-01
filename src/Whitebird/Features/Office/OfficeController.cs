@@ -38,6 +38,10 @@ public class OfficeController : ControllerBase
     public async Task<IActionResult> GetGridData([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string? search = null)
         => this.HandleResult(await _officeService.GetGridDataAsync(page, pageSize, search));
 
+    [HttpGet("dropdown")]
+    public async Task<IActionResult> GetDropdownList()
+        => this.HandleResult(await _officeService.GetDropdownListAsync());
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] OfficeCreateViewModel model)
     {

@@ -7,6 +7,9 @@ using Whitebird.Infra.Features.Auth;
 
 namespace Whitebird.App.Features.Auth;
 
+/// <summary>
+/// Service implementation for Authentication business logic
+/// </summary>
 public class AuthService : BaseService, IAuthService
 {
     private readonly IAuthReps _authRepository;
@@ -33,6 +36,7 @@ public class AuthService : BaseService, IAuthService
         _currentUserService = currentUserService;
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult<LoginResponse>> LoginAsync(LoginRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -46,14 +50,24 @@ public class AuthService : BaseService, IAuthService
             }
 
             if (!user.IsActive)
+            {
                 return ServiceResult<LoginResponse>.Failure("Account is inactive");
+            }
+
             if (user.IsLocked)
+            {
                 return ServiceResult<LoginResponse>.Failure("Account is locked");
+            }
 
             var sessionToken = Guid.NewGuid().ToString("N");
             var sessionExpiry = DateTime.Now.AddHours(8);
 
-            await _authRepository.CreateSessionAsync(user.UserId, sessionToken, sessionExpiry);
+            var sessionCreated = await _authRepository.CreateSessionAsync(user.UserId, sessionToken, sessionExpiry);
+            if (!sessionCreated)
+            {
+                return ServiceResult<LoginResponse>.Failure("Failed to create session");
+            }
+
             await _authRepository.UpdateLastLoginAsync(user.UserId);
 
             await _activityLogService.LogAsync("User", user.UserId, "LOGIN", $"User '{user.Username}' logged in successfully", user.Username);
@@ -82,12 +96,15 @@ public class AuthService : BaseService, IAuthService
         }, "login");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> LogoutAsync(string sessionToken)
     {
         return await ExecuteSafelyAsync(async () =>
         {
             if (string.IsNullOrEmpty(sessionToken))
+            {
                 return ServiceResult.Success("Already logged out");
+            }
 
             var user = await _authRepository.GetUserBySessionTokenAsync(sessionToken);
             if (user != null)
@@ -100,6 +117,7 @@ public class AuthService : BaseService, IAuthService
         }, "logout");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> ForgotPasswordAsync(string email)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -107,14 +125,18 @@ public class AuthService : BaseService, IAuthService
             var user = await _authRepository.GetUserByEmailAsync(email);
 
             if (user == null || !user.IsActive)
+            {
                 return ServiceResult.Success("If your email is registered, you will receive a password reset link");
+            }
 
             var resetToken = new Random().Next(100000, 999999).ToString();
             var resetTokenExpiry = DateTime.Now.AddHours(1);
 
             var updated = await _authRepository.UpdateResetTokenAsync(user.UserId, resetToken, resetTokenExpiry);
             if (!updated)
+            {
                 return ServiceResult.Failure("Failed to process password reset request");
+            }
 
             await _emailService.SendPasswordResetEmailAsync(user.Email, resetToken, user.FullName);
 
@@ -124,15 +146,21 @@ public class AuthService : BaseService, IAuthService
         }, "forgot password");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> ResetPasswordAsync(int userId, ResetPasswordRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
             var user = await _authRepository.GetUserByIdAsync(userId);
             if (user == null || !user.IsActive)
+            {
                 return ServiceResult.Failure("User not found");
+            }
+
             if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+            {
                 return ServiceResult.Failure("Current password is incorrect");
+            }
 
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
             var updated = await _authRepository.UpdatePasswordAsync(userId, passwordHash);
@@ -148,18 +176,23 @@ public class AuthService : BaseService, IAuthService
         }, "reset password");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> ResetPasswordWithTokenAsync(ResetPasswordWithTokenRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
             var user = await _authRepository.GetUserByResetTokenAsync(request.Email, request.ResetToken);
             if (user == null)
+            {
                 return ServiceResult.Failure("Invalid or expired reset token");
+            }
 
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
             var updated = await _authRepository.UpdatePasswordAsync(user.UserId, passwordHash);
             if (!updated)
+            {
                 return ServiceResult.Failure("Failed to reset password");
+            }
 
             await _authRepository.ClearResetTokenAsync(user.UserId);
 
@@ -169,13 +202,16 @@ public class AuthService : BaseService, IAuthService
         }, "reset password with token");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult<UserDto>> GetUserByIdAsync(int userId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
             var user = await _authRepository.GetUserByIdAsync(userId);
             if (user == null || !user.IsActive)
+            {
                 return ServiceResult<UserDto>.NotFound("User not found");
+            }
 
             var request = _httpContextAccessor.HttpContext?.Request;
             var profilePhotoUrl = !string.IsNullOrEmpty(user.ProfilePhotoPath) && request != null
@@ -194,13 +230,16 @@ public class AuthService : BaseService, IAuthService
         }, "get user by id");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult<UserDto>> GetUserBySessionTokenAsync(string sessionToken)
     {
         return await ExecuteSafelyAsync(async () =>
         {
             var user = await _authRepository.GetUserBySessionTokenAsync(sessionToken);
             if (user == null)
+            {
                 return ServiceResult<UserDto>.NotFound("Invalid or expired session");
+            }
 
             var request = _httpContextAccessor.HttpContext?.Request;
             var profilePhotoUrl = !string.IsNullOrEmpty(user.ProfilePhotoPath) && request != null
@@ -219,15 +258,21 @@ public class AuthService : BaseService, IAuthService
         }, "get user by session token");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> ChangePasswordAsync(int userId, ChangePasswordRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
             var user = await _authRepository.GetUserByIdAsync(userId);
             if (user == null || !user.IsActive)
+            {
                 return ServiceResult.Failure("User not found");
+            }
+
             if (!BCrypt.Net.BCrypt.Verify(request.OldPassword, user.PasswordHash))
+            {
                 return ServiceResult.Failure("Old password is incorrect");
+            }
 
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
             var updated = await _authRepository.UpdatePasswordAsync(userId, passwordHash);
@@ -243,6 +288,7 @@ public class AuthService : BaseService, IAuthService
         }, "change password");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> ValidateSessionAsync(string sessionToken)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -254,24 +300,30 @@ public class AuthService : BaseService, IAuthService
         }, "validate session");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult<string>> UploadProfilePhotoAsync(int userId, IFormFile file)
     {
         if (file == null || file.Length == 0)
+        {
             return ServiceResult<string>.BadRequest("No file provided");
+        }
 
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+        if (!FileSizeConstants.IsAllowedProfilePhotoExtension(extension))
+        {
+            return ServiceResult<string>.BadRequest($"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedProfilePhotoExtensions)}");
+        }
 
-        if (!allowedExtensions.Contains(extension))
-            return ServiceResult<string>.BadRequest($"File type '{extension}' is not allowed. Allowed: {string.Join(", ", allowedExtensions)}");
-
-        var maxSize = 5 * 1024 * 1024;
-        if (file.Length > maxSize)
-            return ServiceResult<string>.BadRequest($"File size exceeds 5MB limit");
+        if (file.Length > FileSizeConstants.MaxProfilePhotoBytes)
+        {
+            return ServiceResult<string>.BadRequest($"File size exceeds {FileSizeConstants.MaxProfilePhotoMB}MB limit");
+        }
 
         var user = await _authRepository.GetUserByIdAsync(userId);
         if (user == null)
+        {
             return ServiceResult<string>.NotFound("User not found");
+        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
@@ -303,32 +355,42 @@ public class AuthService : BaseService, IAuthService
         }, "upload profile photo");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult<byte[]>> GetProfilePhotoAsync(int userId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
             var user = await _authRepository.GetUserByIdAsync(userId);
             if (user == null)
+            {
                 return ServiceResult<byte[]>.NotFound("User not found");
+            }
 
             if (string.IsNullOrEmpty(user.ProfilePhotoPath))
+            {
                 return ServiceResult<byte[]>.NotFound("Profile photo not found");
+            }
 
             var fileBytes = await _storageService.ReadFileAsync(user.ProfilePhotoPath);
             return ServiceResult<byte[]>.Success(fileBytes);
         }, "get profile photo");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> DeleteProfilePhotoAsync(int userId)
     {
         var user = await _authRepository.GetUserByIdAsync(userId);
         if (user == null)
+        {
             return ServiceResult.NotFound("User not found");
+        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
             if (string.IsNullOrEmpty(user.ProfilePhotoPath))
+            {
                 return ServiceResult.Success("No profile photo to delete");
+            }
 
             await _storageService.DeleteFileAsync(user.ProfilePhotoPath);
 
@@ -349,14 +411,16 @@ public class AuthService : BaseService, IAuthService
         }, "delete profile photo");
     }
 
-    // ========== NEW METHOD ==========
+    /// <inheritdoc />
     public async Task<ServiceResult<UserDto>> UpdateProfileAsync(int userId, UpdateProfileRequest request)
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
             var user = await _authRepository.GetUserByIdAsync(userId);
             if (user == null || !user.IsActive)
+            {
                 return ServiceResult<UserDto>.NotFound("User not found");
+            }
 
             var oldFullName = user.FullName;
             var oldEmail = user.Email;
@@ -370,7 +434,9 @@ public class AuthService : BaseService, IAuthService
 
             var result = await _authRepository.UpdateUserAsync(user);
             if (result <= 0)
+            {
                 return ServiceResult<UserDto>.Failure("Failed to update profile");
+            }
 
             await _activityLogService.LogUpdateAsync(
                 "User",

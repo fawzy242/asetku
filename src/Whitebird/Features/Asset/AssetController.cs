@@ -86,6 +86,10 @@ public class AssetController : ControllerBase
     public async Task<IActionResult> GetDashboardStats()
         => this.HandleResult(await _assetService.GetDashboardStatsAsync());
 
+    [HttpGet("dropdown")]
+    public async Task<IActionResult> GetDropdownList()
+        => this.HandleResult(await _assetService.GetDropdownListAsync());
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] AssetCreateViewModel model)
     {

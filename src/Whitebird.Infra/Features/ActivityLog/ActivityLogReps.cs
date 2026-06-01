@@ -4,6 +4,9 @@ using Whitebird.Domain.Features.ActivityLog;
 
 namespace Whitebird.Infra.Features.ActivityLog;
 
+/// <summary>
+/// Repository implementation for Activity Log operations using Dapper
+/// </summary>
 public class ActivityLogReps : IActivityLogReps
 {
     private readonly DapperContext _context;
@@ -13,6 +16,7 @@ public class ActivityLogReps : IActivityLogReps
         _context = context;
     }
 
+    /// <inheritdoc />
     public async Task<int> InsertAsync(CreateActivityLogDto log)
     {
         const string sql = @"
@@ -30,46 +34,51 @@ public class ActivityLogReps : IActivityLogReps
         return await _context.ExecuteScalarAsync<int>(sql, parameters);
     }
 
-    public async Task<IEnumerable<ActivityLogListDto>> GetByReferenceAsync(string referenceTable, int referenceId)
+    /// <inheritdoc />
+    public async Task<IEnumerable<ActivityLogListViewModel>> GetByReferenceAsync(string referenceTable, int referenceId)
     {
         const string sql = @"
             SELECT LogId, ReferenceTable, ReferenceId, ActivityType, Description, CreatedDate, CreatedBy
             FROM ActivityLogs
-            WHERE ReferenceTable = @ReferenceTable AND ReferenceId = @ReferenceId
+            WHERE ReferenceTable = @ReferenceTable AND ReferenceId = @ReferenceId AND IsActive = 1
             ORDER BY CreatedDate DESC";
 
-        return await _context.QueryAsync<ActivityLogListDto>(sql, new { ReferenceTable = referenceTable, ReferenceId = referenceId });
+        return await _context.QueryAsync<ActivityLogListViewModel>(sql, new { ReferenceTable = referenceTable, ReferenceId = referenceId });
     }
 
-    public async Task<IEnumerable<ActivityLogListDto>> GetByActivityTypeAsync(string activityType, int limit = 100)
+    /// <inheritdoc />
+    public async Task<IEnumerable<ActivityLogListViewModel>> GetByActivityTypeAsync(string activityType, int limit = 100)
     {
         const string sql = @"
             SELECT TOP (@Limit) LogId, ReferenceTable, ReferenceId, ActivityType, Description, CreatedDate, CreatedBy
             FROM ActivityLogs
-            WHERE ActivityType = @ActivityType
+            WHERE ActivityType = @ActivityType AND IsActive = 1
             ORDER BY CreatedDate DESC";
 
-        return await _context.QueryAsync<ActivityLogListDto>(sql, new { ActivityType = activityType, Limit = limit });
+        return await _context.QueryAsync<ActivityLogListViewModel>(sql, new { ActivityType = activityType, Limit = limit });
     }
 
-    public async Task<IEnumerable<ActivityLogListDto>> GetRecentAsync(int limit = 50)
+    /// <inheritdoc />
+    public async Task<IEnumerable<ActivityLogListViewModel>> GetRecentAsync(int limit = 50)
     {
         const string sql = @"
             SELECT TOP (@Limit) LogId, ReferenceTable, ReferenceId, ActivityType, Description, CreatedDate, CreatedBy
             FROM ActivityLogs
+            WHERE IsActive = 1
             ORDER BY CreatedDate DESC";
 
-        return await _context.QueryAsync<ActivityLogListDto>(sql, new { Limit = limit });
+        return await _context.QueryAsync<ActivityLogListViewModel>(sql, new { Limit = limit });
     }
 
-    public async Task<IEnumerable<ActivityLogListDto>> GetByDateRangeAsync(DateTime startDate, DateTime endDate)
+    /// <inheritdoc />
+    public async Task<IEnumerable<ActivityLogListViewModel>> GetByDateRangeAsync(DateTime startDate, DateTime endDate)
     {
         const string sql = @"
             SELECT LogId, ReferenceTable, ReferenceId, ActivityType, Description, CreatedDate, CreatedBy
             FROM ActivityLogs
-            WHERE CreatedDate BETWEEN @StartDate AND @EndDate
+            WHERE CreatedDate BETWEEN @StartDate AND @EndDate AND IsActive = 1
             ORDER BY CreatedDate DESC";
 
-        return await _context.QueryAsync<ActivityLogListDto>(sql, new { StartDate = startDate, EndDate = endDate });
+        return await _context.QueryAsync<ActivityLogListViewModel>(sql, new { StartDate = startDate, EndDate = endDate });
     }
 }

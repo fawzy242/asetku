@@ -96,6 +96,18 @@ if (!string.IsNullOrEmpty(productionOrigins))
 
 builder.Services.AddCors(options =>
 {
+    // Development: Allow any origin (lebih simpel)
+    if (builder.Environment.IsDevelopment())
+    {
+        options.AddDefaultPolicy(policy =>
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        });
+    }
+    
+    // Production: Hanya origins yang diizinkan
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy.WithOrigins(allowedOrigins)
@@ -162,13 +174,27 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// ========== MIDDLEWARE (ORDER MATTERS!) ==========
+// ========== MIDDLEWARE (URUTAN PENTING!) ==========
+// CORS HARUS PALING ATAS
+if (app.Environment.IsDevelopment())
+{
+    app.UseCors(); // Pakai default policy (AllowAnyOrigin)
+}
+else
+{
+    app.UseCors("AllowFrontend");
+}
+
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseMiddleware<AuthRateLimitingMiddleware>();
 
 // ========== HTTPS REDIRECTION ==========
-app.UseHttpsRedirection();
+// HANYA AKTIF DI PRODUCTION (supaya tidak redirect di development)
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 // ========== SWAGGER ==========
 if (app.Environment.IsDevelopment())
@@ -195,7 +221,6 @@ if (!app.Environment.IsDevelopment())
 
 app.UseResponseCompression();
 app.UseRateLimiter();
-app.UseCors("AllowFrontend");
 
 // ========== AUTHENTICATION & AUTHORIZATION ==========
 app.UseAuthentication();

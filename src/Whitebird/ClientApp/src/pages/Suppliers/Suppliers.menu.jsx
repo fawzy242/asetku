@@ -13,12 +13,12 @@ import PageHeader from "../../components/molecules/PageHeader/PageHeader";
 import SearchToolbar from "../../components/molecules/SearchToolbar/SearchToolbar";
 import Tabs from "../../components/molecules/Tabs/Tabs";
 import IconButton from "../../components/atoms/IconButton/IconButton";
+import StatusBadge from "../../components/atoms/StatusBadge/StatusBadge";
 import FileUploader from "../../components/molecules/FileUploader/FileUploader";
 import ModalActions from "../../components/molecules/ModalActions/ModalActions";
 import { useGridData } from "../../hooks/useGridData";
 import { useCrudForm } from "../../hooks/useCrudForm";
 import { cleanSupplierFormData } from "../../core/utils/formHelpers";
-import { STATUS_TABS } from "../../core/constants/tabs";
 import "./Suppliers.scss";
 
 const suppliersData = new SuppliersData();
@@ -31,6 +31,12 @@ const INITIAL_FORM_DATA = {
   email: "", 
   address: "" 
 };
+
+const TABS = [
+  { id: "all", label: "All" },
+  { id: "active", label: "Active" },
+  { id: "inactive", label: "Inactive" },
+];
 
 const SuppliersMenu = () => {
   const [activeTab, setActiveTab] = useState("all");
@@ -46,17 +52,15 @@ const SuppliersMenu = () => {
       search: params.search || searchTerm,
       ...params 
     };
-    const result = await suppliersData.fetchGridData(filters);
-    if (result.success) {
-      const rawData = result.data;
-      let dataArray = [];
-      if (rawData?.data?.data && Array.isArray(rawData.data.data)) dataArray = rawData.data.data;
-      else if (rawData?.data && Array.isArray(rawData.data)) dataArray = rawData.data;
-      else if (Array.isArray(rawData)) dataArray = rawData;
-      if (activeTab === "active") dataArray = dataArray.filter(s => s.isActive === true);
-      else if (activeTab === "inactive") dataArray = dataArray.filter(s => s.isActive === false);
-      return { success: true, data: { data: dataArray, totalCount: dataArray.length } };
+    
+    // Apply tab filter
+    if (activeTab === "active") {
+      filters.isActive = true;
+    } else if (activeTab === "inactive") {
+      filters.isActive = false;
     }
+    
+    const result = await suppliersData.fetchGridData(filters);
     return result;
   }, [activeTab, searchTerm]);
 
@@ -82,7 +86,7 @@ const SuppliersMenu = () => {
 
   const onSubmit = useCallback(async (e) => {
     e.preventDefault();
-    if (!formData.supplierName.trim()) return;
+    if (!formData.supplierName?.trim()) return;
     if (isSubmitting) return;
     const data = { ...formData, isActive: editingSupplier ? editingSupplier.isActive : true };
     if (data.contactPerson === '') data.contactPerson = null;
@@ -107,13 +111,7 @@ const SuppliersMenu = () => {
       field: "isActive", 
       headerName: "Status", 
       width: 110, 
-      renderCell: (p) => (
-        <Chip 
-          label={p?.value ? 'Active' : 'Inactive'} 
-          size="small" 
-          sx={{ bgcolor: p?.value ? 'rgba(16, 185, 129, 0.1)' : 'rgba(107, 114, 128, 0.1)', color: p?.value ? '#10b981' : '#6b7280', fontWeight: 500, fontSize: '0.75rem', height: 24, borderRadius: '4px' }} 
-        />
-      ) 
+      renderCell: (p) => <StatusBadge status={p?.value ? 'Active' : 'Inactive'} />,
     },
     { 
       field: "actions", 
@@ -131,18 +129,24 @@ const SuppliersMenu = () => {
 
   const handleTabChange = useCallback((tab) => { 
     setActiveTab(tab); 
-    setPage(1); 
+    setPage(1);
+    setSearchTerm("");
   }, [setPage]);
   
   if (loading && !suppliers.length) return <div className="page-loading"><Spinner size="lg" /></div>;
 
   return (
     <div className="suppliers-menu">
-      <div className="page-header">
-        <h1 className="page-title">Supplier</h1>
-        <PageHeader title="Supplier Management" buttonText="Add Supplier" onButtonClick={handleCreate} buttonIcon={<FiPlus />} />
-      </div>
-      <Tabs tabs={STATUS_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+      <PageHeader 
+        title="Supplier Management"
+        actions={
+          <Button variant="primary" onClick={handleCreate} startIcon={<FiPlus />}>
+            Add Supplier
+          </Button>
+        }
+      />
+      
+      <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar onSearch={handleSearch} placeholder="Search by name, contact..." />
       
       <div className="suppliers-menu__table" style={{ width: '100%', minWidth: 0 }}>

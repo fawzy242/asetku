@@ -3,16 +3,22 @@ using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.MasterData;
 using Whitebird.Domain.Features.Office;
+using Whitebird.Domain.Features.Common;
+using Whitebird.Domain.Features.MasterData;
 using Whitebird.Infra.Features.Common;
 using Whitebird.Infra.Features.Office;
 
 namespace Whitebird.App.Features.Office;
 
+/// <summary>
+/// Service implementation for Office business logic
+/// </summary>
 public class OfficeService : BaseService, IOfficeService
 {
     private readonly IGenericRepository<OfficeEntity> _repository;
     private readonly IOfficeReps _officeReps;
     private readonly IMasterDataService _masterDataService;
+    private readonly IMasterDataLookupService _masterDataLookupService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
 
@@ -20,6 +26,7 @@ public class OfficeService : BaseService, IOfficeService
         IGenericRepository<OfficeEntity> repository,
         IOfficeReps officeReps,
         IMasterDataService masterDataService,
+        IMasterDataLookupService masterDataLookupService,
         ICurrentUserService currentUserService,
         IActivityLogService activityLogService,
         ILogger<OfficeService> logger) : base(logger)
@@ -27,110 +34,100 @@ public class OfficeService : BaseService, IOfficeService
         _repository = repository;
         _officeReps = officeReps;
         _masterDataService = masterDataService;
+        _masterDataLookupService = masterDataLookupService;
         _currentUserService = currentUserService;
         _activityLogService = activityLogService;
     }
 
-    public async Task<ServiceResult<OfficeDetailViewModel>> GetByIdAsync(int id)
+    /// <inheritdoc />
+    public async Task<ServiceResult<OfficeDetailView>> GetByIdAsync(int id)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var office = await _officeReps.GetByIdWithRelationsAsync(id);
+            var office = await _officeReps.GetDetailByIdAsync(id);
             if (office == null)
-                return ServiceResult<OfficeDetailViewModel>.NotFound($"Office with id {id} not found");
-
-            var viewModel = office.Adapt<OfficeDetailViewModel>();
-            viewModel.ChildCount = await _officeReps.GetChildCountAsync(id);
-            
-            if (viewModel.OfficeType.HasValue)
             {
-                var typeResult = await _masterDataService.GetValueAsync("OfficeType", viewModel.OfficeType.Value);
-                if (typeResult.IsSuccess)
-                    viewModel.OfficeTypeName = typeResult.Data;
+                return ServiceResult<OfficeDetailView>.NotFound($"Office with id {id} not found");
             }
-
-            return ServiceResult<OfficeDetailViewModel>.Success(viewModel);
+            return ServiceResult<OfficeDetailView>.Success(office);
         }, "get office by id");
     }
 
-    public async Task<ServiceResult<IEnumerable<OfficeListViewModel>>> GetAllAsync()
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<OfficeListView>>> GetAllAsync()
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var offices = await _officeReps.GetAllAsync();
-            var viewModels = offices.Adapt<List<OfficeListViewModel>>();
-            
-            var officeTypes = await _masterDataService.GetOfficeTypesAsync();
-            var typeDict = officeTypes.IsSuccess && officeTypes.Data != null
-                ? officeTypes.Data.ToDictionary(t => t.Code, t => t.Name)
-                : new Dictionary<int, string>();
-
-            foreach (var vm in viewModels)
-            {
-                if (vm.OfficeType.HasValue && typeDict.ContainsKey(vm.OfficeType.Value))
-                    vm.OfficeTypeName = typeDict[vm.OfficeType.Value];
-            }
-
-            return ServiceResult<IEnumerable<OfficeListViewModel>>.Success(viewModels);
+            var offices = await _officeReps.GetAllListViewAsync();
+            return ServiceResult<IEnumerable<OfficeListView>>.Success(offices);
         }, "get all offices");
     }
 
-    public async Task<ServiceResult<IEnumerable<OfficeListViewModel>>> GetActiveOnlyAsync()
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<OfficeListView>>> GetActiveOnlyAsync()
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var offices = await _officeReps.GetActiveOnlyAsync();
-            var viewModels = offices.Adapt<List<OfficeListViewModel>>();
-            
-            var officeTypes = await _masterDataService.GetOfficeTypesAsync();
-            var typeDict = officeTypes.IsSuccess && officeTypes.Data != null
-                ? officeTypes.Data.ToDictionary(t => t.Code, t => t.Name)
-                : new Dictionary<int, string>();
-
-            foreach (var vm in viewModels)
-            {
-                if (vm.OfficeType.HasValue && typeDict.ContainsKey(vm.OfficeType.Value))
-                    vm.OfficeTypeName = typeDict[vm.OfficeType.Value];
-            }
-
-            return ServiceResult<IEnumerable<OfficeListViewModel>>.Success(viewModels);
+            var offices = await _officeReps.GetActiveOnlyListViewAsync();
+            return ServiceResult<IEnumerable<OfficeListView>>.Success(offices);
         }, "get active offices");
     }
 
-    public async Task<ServiceResult<IEnumerable<OfficeListViewModel>>> GetSubOfficesAsync(int parentId)
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<OfficeListView>>> GetSubOfficesAsync(int parentId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var offices = await _officeReps.GetSubOfficesAsync(parentId);
-            var viewModels = offices.Adapt<List<OfficeListViewModel>>();
-            return ServiceResult<IEnumerable<OfficeListViewModel>>.Success(viewModels);
+            var parent = await _officeReps.GetByIdRawAsync(parentId);
+            if (parent == null)
+            {
+                return ServiceResult<IEnumerable<OfficeListView>>.NotFound($"Parent office with id {parentId} not found");
+            }
+
+            var offices = await _officeReps.GetSubOfficesListViewAsync(parentId);
+            return ServiceResult<IEnumerable<OfficeListView>>.Success(offices);
         }, "get sub offices");
     }
 
-    public async Task<ServiceResult<OfficeDetailViewModel>> CreateAsync(OfficeCreateViewModel model)
+    /// <inheritdoc />
+    public async Task<ServiceResult<OfficeDetailView>> CreateAsync(OfficeCreateViewModel model)
     {
         if (string.IsNullOrWhiteSpace(model.OfficeName))
-            return ServiceResult<OfficeDetailViewModel>.BadRequest("Office name is required");
+        {
+            return ServiceResult<OfficeDetailView>.BadRequest("Office name is required");
+        }
 
-        if (await _officeReps.IsOfficeNameExistsAsync(model.OfficeName))
-            return ServiceResult<OfficeDetailViewModel>.Conflict($"Office '{model.OfficeName}' already exists");
+        var nameExists = await _officeReps.IsOfficeNameExistsAsync(model.OfficeName);
+        if (nameExists)
+        {
+            return ServiceResult<OfficeDetailView>.Conflict($"Office '{model.OfficeName}' already exists");
+        }
 
-        if (!string.IsNullOrWhiteSpace(model.OfficeCode) && 
-            await _officeReps.IsOfficeCodeExistsAsync(model.OfficeCode))
-            return ServiceResult<OfficeDetailViewModel>.Conflict($"Office code '{model.OfficeCode}' already exists");
+        if (!string.IsNullOrWhiteSpace(model.OfficeCode))
+        {
+            var codeExists = await _officeReps.IsOfficeCodeExistsAsync(model.OfficeCode);
+            if (codeExists)
+            {
+                return ServiceResult<OfficeDetailView>.Conflict($"Office code '{model.OfficeCode}' already exists");
+            }
+        }
 
         if (model.ParentOfficeId.HasValue && model.ParentOfficeId.Value > 0)
         {
-            var parentExists = await _officeReps.GetByIdAsync(model.ParentOfficeId.Value);
+            var parentExists = await _officeReps.GetByIdRawAsync(model.ParentOfficeId.Value);
             if (parentExists == null)
-                return ServiceResult<OfficeDetailViewModel>.BadRequest($"Parent office with id {model.ParentOfficeId} does not exist");
+            {
+                return ServiceResult<OfficeDetailView>.BadRequest($"Parent office with id {model.ParentOfficeId} does not exist");
+            }
         }
 
         if (model.OfficeType.HasValue)
         {
-            var typeExists = await _masterDataService.GetValueAsync("OfficeType", model.OfficeType.Value);
+            var typeExists = await _masterDataLookupService.GetOfficeTypeNameAsync(model.OfficeType.Value);
             if (!typeExists.IsSuccess || typeExists.Data == null)
-                return ServiceResult<OfficeDetailViewModel>.BadRequest($"Invalid office type: {model.OfficeType}");
+            {
+                return ServiceResult<OfficeDetailView>.BadRequest($"Invalid office type: {model.OfficeType}");
+            }
         }
 
         return await ExecuteWithTransactionAsync(async () =>
@@ -141,67 +138,76 @@ public class OfficeService : BaseService, IOfficeService
             entity.CreatedBy = _currentUserService.GetDisplayName();
 
             var id = await _repository.InsertAsync(entity);
-            var created = await _officeReps.GetByIdWithRelationsAsync(Convert.ToInt32(id));
+            var created = await _officeReps.GetDetailByIdAsync(Convert.ToInt32(id));
 
             if (created != null)
             {
                 await _activityLogService.LogCreateAsync(
-                    "Office",
+                    TableNames.Office,
                     created.OfficeId,
                     $"Office '{created.OfficeName}' created successfully",
                     _currentUserService.GetDisplayName());
             }
 
-            if (created == null)
-                return ServiceResult<OfficeDetailViewModel>.Failure("Failed to retrieve created office");
-
-            var viewModel = created.Adapt<OfficeDetailViewModel>();
-            if (viewModel.OfficeType.HasValue)
-            {
-                var typeResult = await _masterDataService.GetValueAsync("OfficeType", viewModel.OfficeType.Value);
-                if (typeResult.IsSuccess)
-                    viewModel.OfficeTypeName = typeResult.Data;
-            }
-
-            return ServiceResult<OfficeDetailViewModel>.Success(viewModel, "Office created successfully");
+            return created == null
+                ? ServiceResult<OfficeDetailView>.Failure("Failed to retrieve created office")
+                : ServiceResult<OfficeDetailView>.Success(created, "Office created successfully");
         }, "create office", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Office", 0, "Create Office", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Office, 0, "Create Office", ex, _currentUserService.GetDisplayName());
         });
     }
 
-    public async Task<ServiceResult<OfficeDetailViewModel>> UpdateAsync(int id, OfficeUpdateViewModel model)
+    /// <inheritdoc />
+    public async Task<ServiceResult<OfficeDetailView>> UpdateAsync(int id, OfficeUpdateViewModel model)
     {
-        if (await _officeReps.IsOfficeNameExistsAsync(model.OfficeName, id))
-            return ServiceResult<OfficeDetailViewModel>.Conflict($"Office '{model.OfficeName}' already exists");
+        var nameExists = await _officeReps.IsOfficeNameExistsAsync(model.OfficeName, id);
+        if (nameExists)
+        {
+            return ServiceResult<OfficeDetailView>.Conflict($"Office '{model.OfficeName}' already exists");
+        }
 
-        if (!string.IsNullOrWhiteSpace(model.OfficeCode) && 
-            await _officeReps.IsOfficeCodeExistsAsync(model.OfficeCode, id))
-            return ServiceResult<OfficeDetailViewModel>.Conflict($"Office code '{model.OfficeCode}' already exists");
+        if (!string.IsNullOrWhiteSpace(model.OfficeCode))
+        {
+            var codeExists = await _officeReps.IsOfficeCodeExistsAsync(model.OfficeCode, id);
+            if (codeExists)
+            {
+                return ServiceResult<OfficeDetailView>.Conflict($"Office code '{model.OfficeCode}' already exists");
+            }
+        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var existing = await _officeReps.GetByIdAsync(id);
+            var existing = await _officeReps.GetByIdRawAsync(id);
             if (existing == null)
-                return ServiceResult<OfficeDetailViewModel>.NotFound($"Office with id {id} not found");
+            {
+                return ServiceResult<OfficeDetailView>.NotFound($"Office with id {id} not found");
+            }
 
             if (model.ParentOfficeId.HasValue && model.ParentOfficeId.Value > 0)
             {
                 if (model.ParentOfficeId.Value == id)
-                    return ServiceResult<OfficeDetailViewModel>.BadRequest("Office cannot be parent of itself");
+                {
+                    return ServiceResult<OfficeDetailView>.BadRequest("Office cannot be parent of itself");
+                }
 
-                var parent = await _officeReps.GetByIdAsync(model.ParentOfficeId.Value);
+                var parent = await _officeReps.GetByIdRawAsync(model.ParentOfficeId.Value);
                 if (parent == null)
-                    return ServiceResult<OfficeDetailViewModel>.BadRequest($"Parent office with id {model.ParentOfficeId} does not exist");
+                {
+                    return ServiceResult<OfficeDetailView>.BadRequest($"Parent office with id {model.ParentOfficeId} does not exist");
+                }
 
-                var children = await _officeReps.GetSubOfficesAsync(id);
+                var children = await _officeReps.GetSubOfficesListViewAsync(id);
                 if (children.Any(c => c.OfficeId == model.ParentOfficeId.Value))
-                    return ServiceResult<OfficeDetailViewModel>.BadRequest("Circular reference detected: child cannot become parent");
+                {
+                    return ServiceResult<OfficeDetailView>.BadRequest("Circular reference detected: child cannot become parent");
+                }
             }
 
             var oldName = existing.OfficeName;
             var oldCode = existing.OfficeCode;
             var oldParentId = existing.ParentOfficeId;
+            var oldOfficeType = existing.OfficeType;
 
             model.Adapt(existing);
             existing.ModifiedDate = DateTime.Now;
@@ -209,48 +215,48 @@ public class OfficeService : BaseService, IOfficeService
 
             var result = await _repository.UpdateAsync(existing);
             if (result <= 0)
-                return ServiceResult<OfficeDetailViewModel>.Failure("Failed to update office");
-
-            var updated = await _officeReps.GetByIdWithRelationsAsync(id);
-
-            await _activityLogService.LogUpdateAsync(
-                "Office",
-                id,
-                $"Office updated: Name '{oldName}' -> '{model.OfficeName}', Code '{oldCode}' -> '{model.OfficeCode}', ParentId '{oldParentId}' -> '{model.ParentOfficeId}'",
-                _currentUserService.GetDisplayName());
-
-            var viewModel = updated!.Adapt<OfficeDetailViewModel>();
-            if (viewModel.OfficeType.HasValue)
             {
-                var typeResult = await _masterDataService.GetValueAsync("OfficeType", viewModel.OfficeType.Value);
-                if (typeResult.IsSuccess)
-                    viewModel.OfficeTypeName = typeResult.Data;
+                return ServiceResult<OfficeDetailView>.Failure("Failed to update office");
             }
 
-            return ServiceResult<OfficeDetailViewModel>.Success(viewModel, "Office updated successfully");
+            var updated = await _officeReps.GetDetailByIdAsync(id);
+
+            await _activityLogService.LogUpdateAsync(
+                TableNames.Office,
+                id,
+                $"Office updated: Name '{oldName}' -> '{model.OfficeName}', Code '{oldCode}' -> '{model.OfficeCode}', ParentId '{oldParentId}' -> '{model.ParentOfficeId}', OfficeType '{oldOfficeType}' -> '{model.OfficeType}'",
+                _currentUserService.GetDisplayName());
+
+            return ServiceResult<OfficeDetailView>.Success(updated!, "Office updated successfully");
         }, "update office", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Office", id, "Update Office", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Office, id, "Update Office", ex, _currentUserService.GetDisplayName());
         });
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var existing = await _officeReps.GetByIdAsync(id);
+            var existing = await _officeReps.GetByIdRawAsync(id);
             if (existing == null)
+            {
                 return ServiceResult.NotFound($"Office with id {id} not found");
+            }
 
-            if (await _officeReps.GetChildCountAsync(id) > 0)
-                return ServiceResult.BadRequest("Cannot delete office with sub-offices");
+            var childCount = await _officeReps.GetChildCountAsync(id);
+            if (childCount > 0)
+            {
+                return ServiceResult.BadRequest($"Cannot delete office with {childCount} sub-offices");
+            }
 
             var result = await _repository.DeleteAsync(id);
 
             if (result > 0)
             {
                 await _activityLogService.LogDeleteAsync(
-                    "Office",
+                    TableNames.Office,
                     id,
                     $"Office '{existing.OfficeName}' deleted permanently",
                     _currentUserService.GetDisplayName());
@@ -261,17 +267,20 @@ public class OfficeService : BaseService, IOfficeService
                 : ServiceResult.Success("Office deleted successfully");
         }, "delete office", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Office", id, "Delete Office", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Office, id, "Delete Office", ex, _currentUserService.GetDisplayName());
         });
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> SoftDeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var existing = await _officeReps.GetByIdAsync(id);
+            var existing = await _officeReps.GetByIdRawAsync(id);
             if (existing == null)
+            {
                 return ServiceResult.NotFound($"Office with id {id} not found");
+            }
 
             existing.IsActive = false;
             existing.ModifiedDate = DateTime.Now;
@@ -282,7 +291,7 @@ public class OfficeService : BaseService, IOfficeService
             if (result > 0)
             {
                 await _activityLogService.LogSoftDeleteAsync(
-                    "Office",
+                    TableNames.Office,
                     id,
                     $"Office '{existing.OfficeName}' soft deleted",
                     _currentUserService.GetDisplayName());
@@ -293,49 +302,33 @@ public class OfficeService : BaseService, IOfficeService
                 : ServiceResult.Success("Office soft deleted successfully");
         }, "soft delete office", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Office", id, "Soft Delete Office", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Office, id, "Soft Delete Office", ex, _currentUserService.GetDisplayName());
         });
     }
 
-    public async Task<ServiceResult<PaginatedResult<OfficeListViewModel>>> GetGridDataAsync(int page, int pageSize, string? search = null)
+    /// <inheritdoc />
+    public async Task<ServiceResult<PaginatedResult<OfficeListView>>> GetGridDataAsync(int page, int pageSize, string? search = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var offices = await _officeReps.GetAllAsync();
-            var query = offices.AsQueryable();
-
+            var filters = new Dictionary<string, object>();
             if (!string.IsNullOrWhiteSpace(search))
             {
-                query = query.Where(o =>
-                    (o.OfficeCode != null && o.OfficeCode.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
-                    o.OfficeName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                    (o.City != null && o.City.Contains(search, StringComparison.OrdinalIgnoreCase))
-                );
+                filters["search"] = search;
             }
 
-            var totalCount = query.Count();
-            var pagedData = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-            var viewModels = pagedData.Adapt<List<OfficeListViewModel>>();
-
-            var officeTypes = await _masterDataService.GetOfficeTypesAsync();
-            var typeDict = officeTypes.IsSuccess && officeTypes.Data != null
-                ? officeTypes.Data.ToDictionary(t => t.Code, t => t.Name)
-                : new Dictionary<int, string>();
-
-            foreach (var vm in viewModels)
-            {
-                if (vm.OfficeType.HasValue && typeDict.ContainsKey(vm.OfficeType.Value))
-                    vm.OfficeTypeName = typeDict[vm.OfficeType.Value];
-            }
-
-            return ServiceResult<PaginatedResult<OfficeListViewModel>>.Success(new PaginatedResult<OfficeListViewModel>
-            {
-                Data = viewModels,
-                TotalCount = totalCount,
-                PageNumber = page,
-                PageSize = pageSize,
-                TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
-            });
+            var result = await _officeReps.GetPagedListAsync(page, pageSize, search, "OfficeName", false, filters);
+            return ServiceResult<PaginatedResult<OfficeListView>>.Success(result);
         }, "get office grid data");
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<OfficeDropdownView>>> GetDropdownListAsync()
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var offices = await _officeReps.GetDropdownListAsync();
+            return ServiceResult<IEnumerable<OfficeDropdownView>>.Success(offices);
+        }, "get office dropdown list");
     }
 }

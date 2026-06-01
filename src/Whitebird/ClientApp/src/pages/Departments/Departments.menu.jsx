@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { FiEdit2, FiTrash2, FiPlus } from "react-icons/fi";
 import { Grid, Box, Chip } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
@@ -13,11 +13,14 @@ import PageHeader from "../../components/molecules/PageHeader/PageHeader";
 import SearchToolbar from "../../components/molecules/SearchToolbar/SearchToolbar";
 import Tabs from "../../components/molecules/Tabs/Tabs";
 import IconButton from "../../components/atoms/IconButton/IconButton";
+import StatusBadge from "../../components/atoms/StatusBadge/StatusBadge";
 import { useGridData } from "../../hooks/useGridData";
 import { useCrudForm } from "../../hooks/useCrudForm";
+import { cleanDepartmentFormData } from "../../core/utils/formHelpers";
 import "./Departments.scss";
 
 const departmentsData = new DepartmentsData();
+departmentsData.transformFormData = cleanDepartmentFormData;
 
 const INITIAL_FORM_DATA = {
   departmentName: "",
@@ -31,24 +34,13 @@ const TABS = [
   { id: "inactive", label: "Inactive" },
 ];
 
-const transformDepartmentFormData = (data) => {
-  const result = { ...data };
-  if (result.departmentCode === '' || result.departmentCode === undefined) {
-    result.departmentCode = null;
-  }
-  if (result.description === '' || result.description === undefined) {
-    result.description = null;
-  }
-  return result;
-};
-
 const CRUD_OPTIONS = { 
-  idField: 'departmentId', 
-  transformFormData: transformDepartmentFormData 
+  idField: 'departmentId',
 };
 
 const DepartmentsMenu = () => {
   const [activeTab, setActiveTab] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
   const queryClient = useQueryClient();
 
   const {
@@ -63,29 +55,23 @@ const DepartmentsMenu = () => {
   } = useCrudForm(INITIAL_FORM_DATA, departmentsData, CRUD_OPTIONS);
 
   const fetchGridData = useCallback(async (params) => {
-    const result = await departmentsData.fetchGridData(params);
-    if (result.success) {
-      const rawData = result.data;
-      let dataArray = [];
-
-      if (rawData?.data?.data && Array.isArray(rawData.data.data)) {
-        dataArray = rawData.data.data;
-      } else if (rawData?.data && Array.isArray(rawData.data)) {
-        dataArray = rawData.data;
-      } else if (Array.isArray(rawData)) {
-        dataArray = rawData;
-      }
-
-      if (activeTab === "active") {
-        dataArray = dataArray.filter(d => d.isActive === true);
-      } else if (activeTab === "inactive") {
-        dataArray = dataArray.filter(d => d.isActive === false);
-      }
-
-      return { success: true, data: { data: dataArray, totalCount: dataArray.length } };
+    const filters = { 
+      page: params.page || 1,
+      pageSize: params.pageSize || 10,
+      search: params.search || searchTerm,
+      ...params 
+    };
+    
+    // Apply tab filter
+    if (activeTab === "active") {
+      filters.isActive = true;
+    } else if (activeTab === "inactive") {
+      filters.isActive = false;
     }
+    
+    const result = await departmentsData.fetchGridData(filters);
     return result;
-  }, [activeTab]);
+  }, [activeTab, searchTerm]);
 
   const {
     data: departments,
@@ -97,9 +83,17 @@ const DepartmentsMenu = () => {
     setPageSize,
     updateFilters,
     reload
-  } = useGridData(['departments', activeTab], fetchGridData);
+  } = useGridData(['departments', activeTab, searchTerm], fetchGridData);
 
-  const handleSearch = useCallback((search) => updateFilters({ search }), [updateFilters]);
+  useEffect(() => {
+    reload();
+  }, [activeTab, reload]);
+
+  const handleSearch = useCallback((search) => {
+    setSearchTerm(search);
+    updateFilters({ search });
+    setPage(1);
+  }, [updateFilters, setPage]);
 
   const handleDelete = useCallback(async (dept) => {
     const r = await departmentsData.delete(dept.departmentId);
@@ -111,7 +105,7 @@ const DepartmentsMenu = () => {
 
   const onSubmit = useCallback(async (e) => {
     e.preventDefault();
-    if (!formData.departmentName.trim()) return;
+    if (!formData.departmentName?.trim()) return;
     if (isSubmitting) return;
     
     const data = { 
@@ -138,20 +132,7 @@ const DepartmentsMenu = () => {
       field: "isActive",
       headerName: "Status",
       width: 110,
-      renderCell: (p) => (
-        <Chip
-          label={p.value ? 'Active' : 'Inactive'}
-          size="small"
-          sx={{
-            bgcolor: p.value ? 'rgba(16, 185, 129, 0.1)' : 'rgba(107, 114, 128, 0.1)',
-            color: p.value ? '#10b981' : '#6b7280',
-            fontWeight: 500,
-            fontSize: '0.75rem',
-            height: 24,
-            borderRadius: '4px',
-          }}
-        />
-      ),
+      renderCell: (p) => <StatusBadge status={p.value ? 'Active' : 'Inactive'} />,
     },
     {
       field: "actions",
@@ -174,37 +155,38 @@ const DepartmentsMenu = () => {
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
     setPage(1);
+    setSearchTerm("");
   }, [setPage]);
 
   if (loading && !departments.length) return <div className="page-loading"><Spinner size="lg" /></div>;
 
   return (
     <div className="departments-menu">
-      <div className="page-header">
-        <h1 className="page-title">Department</h1>
-        <PageHeader 
-          title="Department Management" 
-          buttonText="Add Department" 
-          onButtonClick={handleCreate} 
-          buttonIcon={<FiPlus />} 
-        />
-      </div>
+      <PageHeader 
+        title="Department Management"
+        actions={
+          <Button variant="primary" onClick={handleCreate} startIcon={<FiPlus />}>
+            Add Department
+          </Button>
+        }
+      />
 
       <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
       <SearchToolbar onSearch={handleSearch} placeholder="Search by name, code..." />
       
-<div className="departments-menu__table" style={{ width: '100%', minWidth: 0 }}>
-  <DataTable
-    rows={departments}
-    columns={columns}
-    loading={loading}
-    pageSize={pageSize}
-    getRowId={(row) => row.departmentId}
-    hideFooter={true}
-    autoHeight={true}  // TAMBAHKAN INI
-    ariaLabel="Departments data table"
-  />
-</div>
+      <div className="departments-menu__table" style={{ width: '100%', minWidth: 0 }}>
+        <DataTable
+          rows={departments}
+          columns={columns}
+          loading={loading}
+          pageSize={pageSize}
+          getRowId={(row) => row.departmentId}
+          hideFooter={true}
+          autoHeight={true}
+          ariaLabel="Departments data table"
+        />
+      </div>
+      
       <Pagination
         currentPage={page}
         totalPages={Math.ceil(totalCount / pageSize) || 1}
@@ -228,7 +210,7 @@ const DepartmentsMenu = () => {
             <Grid item xs={12}>
               <Input 
                 label="Department Name" 
-                value={formData.departmentName} 
+                value={formData.departmentName || ""} 
                 onChange={e => setFormData({ ...formData, departmentName: e.target.value })} 
                 required 
               />
@@ -236,7 +218,7 @@ const DepartmentsMenu = () => {
             <Grid item xs={12}>
               <Input 
                 label="Description" 
-                value={formData.description} 
+                value={formData.description || ""} 
                 onChange={e => setFormData({ ...formData, description: e.target.value })} 
                 multiline 
                 rows={2} 

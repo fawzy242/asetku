@@ -2,6 +2,9 @@ using Whitebird.Domain.Features.FileAttachment;
 
 namespace Whitebird.Infra.Features.FileAttachment;
 
+/// <summary>
+/// Repository interface for File Attachment operations
+/// </summary>
 public interface IFileAttachmentReps
 {
     Task<FileAttachmentEntity?> GetByIdAsync(int fileAttachmentId);

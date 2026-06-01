@@ -1,13 +1,16 @@
 using Mapster;
 using Microsoft.Extensions.Logging;
-using Whitebird.App.Features.Category;
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.Category;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Category;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.App.Features.Category;
 
+/// <summary>
+/// Service implementation for Category business logic
+/// </summary>
 public class CategoryService : BaseService, ICategoryService
 {
     private readonly IGenericRepository<CategoryEntity> _repository;
@@ -28,60 +31,86 @@ public class CategoryService : BaseService, ICategoryService
         _activityLogService = activityLogService;
     }
 
-    public async Task<ServiceResult<CategoryDetailViewModel>> GetByIdAsync(int id)
+    /// <inheritdoc />
+    public async Task<ServiceResult<CategoryDetailView>> GetByIdAsync(int id)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var category = await _categoryReps.GetByIdWithRelationsAsync(id);
+            var category = await _categoryReps.GetDetailByIdAsync(id);
             if (category == null)
-                return ServiceResult<CategoryDetailViewModel>.NotFound($"Category with id {id} not found");
-
-            var viewModel = category.Adapt<CategoryDetailViewModel>();
-            viewModel.ChildCount = await _categoryReps.GetChildCountAsync(id);
-            return ServiceResult<CategoryDetailViewModel>.Success(viewModel);
+            {
+                return ServiceResult<CategoryDetailView>.NotFound($"Category with id {id} not found");
+            }
+            return ServiceResult<CategoryDetailView>.Success(category);
         }, "get category by id");
     }
 
-    public async Task<ServiceResult<IEnumerable<CategoryListViewModel>>> GetAllAsync()
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<CategoryListView>>> GetAllAsync()
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var categories = await _categoryReps.GetAllWithRelationsAsync();
-            return ServiceResult<IEnumerable<CategoryListViewModel>>.Success(categories.Adapt<IEnumerable<CategoryListViewModel>>());
+            var categories = await _categoryReps.GetAllListViewAsync();
+            return ServiceResult<IEnumerable<CategoryListView>>.Success(categories);
         }, "get all categories");
     }
 
-    public async Task<ServiceResult<IEnumerable<CategoryListViewModel>>> GetActiveOnlyAsync()
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<CategoryListView>>> GetActiveOnlyAsync()
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var categories = await _categoryReps.GetActiveOnlyWithRelationsAsync();
-            return ServiceResult<IEnumerable<CategoryListViewModel>>.Success(categories.Adapt<IEnumerable<CategoryListViewModel>>());
+            var categories = await _categoryReps.GetActiveOnlyListViewAsync();
+            return ServiceResult<IEnumerable<CategoryListView>>.Success(categories);
         }, "get active categories");
     }
 
-    public async Task<ServiceResult<IEnumerable<CategoryListViewModel>>> GetSubCategoriesAsync(int parentId)
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<CategoryListView>>> GetSubCategoriesAsync(int parentId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var categories = await _categoryReps.GetSubCategoryAsync(parentId);
-            return ServiceResult<IEnumerable<CategoryListViewModel>>.Success(categories.Adapt<IEnumerable<CategoryListViewModel>>());
+            var parent = await _categoryReps.GetByIdRawAsync(parentId);
+            if (parent == null)
+            {
+                return ServiceResult<IEnumerable<CategoryListView>>.NotFound($"Parent category with id {parentId} not found");
+            }
+
+            var categories = await _categoryReps.GetSubCategoryListViewAsync(parentId);
+            return ServiceResult<IEnumerable<CategoryListView>>.Success(categories);
         }, "get subcategories");
     }
 
-    public async Task<ServiceResult<CategoryDetailViewModel>> CreateAsync(CategoryCreateViewModel model)
+    /// <inheritdoc />
+    public async Task<ServiceResult<CategoryDetailView>> CreateAsync(CategoryCreateViewModel model)
     {
         if (string.IsNullOrWhiteSpace(model.CategoryName))
-            return ServiceResult<CategoryDetailViewModel>.BadRequest("Category name is required");
+        {
+            return ServiceResult<CategoryDetailView>.BadRequest("Category name is required");
+        }
 
-        if (await _categoryReps.IsCategoryNameExistsAsync(model.CategoryName))
-            return ServiceResult<CategoryDetailViewModel>.Conflict($"Category '{model.CategoryName}' already exists");
+        var nameExists = await _categoryReps.IsCategoryNameExistsAsync(model.CategoryName);
+        if (nameExists)
+        {
+            return ServiceResult<CategoryDetailView>.Conflict($"Category '{model.CategoryName}' already exists");
+        }
+
+        if (!string.IsNullOrWhiteSpace(model.CategoryCode))
+        {
+            var codeExists = await _categoryReps.IsCategoryCodeExistsAsync(model.CategoryCode);
+            if (codeExists)
+            {
+                return ServiceResult<CategoryDetailView>.Conflict($"Category code '{model.CategoryCode}' already exists");
+            }
+        }
 
         if (model.ParentCategoryId.HasValue && model.ParentCategoryId.Value > 0)
         {
             var parentExists = await _categoryReps.GetByIdRawAsync(model.ParentCategoryId.Value);
             if (parentExists == null)
-                return ServiceResult<CategoryDetailViewModel>.BadRequest($"Parent category with id {model.ParentCategoryId} does not exist");
+            {
+                return ServiceResult<CategoryDetailView>.BadRequest($"Parent category with id {model.ParentCategoryId} does not exist");
+            }
         }
 
         return await ExecuteWithTransactionAsync(async () =>
@@ -94,47 +123,65 @@ public class CategoryService : BaseService, ICategoryService
             var id = await _repository.InsertAsync(entity);
             entity.CategoryId = Convert.ToInt32(id);
 
-            var viewModel = entity.Adapt<CategoryDetailViewModel>();
+            var created = await _categoryReps.GetDetailByIdAsync(entity.CategoryId);
 
-            if (model.ParentCategoryId.HasValue && model.ParentCategoryId.Value > 0)
+            if (created != null)
             {
-                var parent = await _categoryReps.GetByIdRawAsync(model.ParentCategoryId.Value);
-                viewModel.ParentCategoryName = parent?.CategoryName;
+                await _activityLogService.LogCreateAsync(
+                    TableNames.Category,
+                    entity.CategoryId,
+                    $"Category '{entity.CategoryName}' created successfully",
+                    _currentUserService.GetDisplayName());
             }
 
-            await _activityLogService.LogCreateAsync(
-                "Category",
-                entity.CategoryId,
-                $"Category '{entity.CategoryName}' created successfully",
-                _currentUserService.GetDisplayName());
-
-            return ServiceResult<CategoryDetailViewModel>.Success(viewModel, "Category created successfully");
+            return created == null
+                ? ServiceResult<CategoryDetailView>.Failure("Failed to retrieve created category")
+                : ServiceResult<CategoryDetailView>.Success(created, "Category created successfully");
         }, "create category", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Category", 0, "Create Category", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Category, 0, "Create Category", ex, _currentUserService.GetDisplayName());
         });
     }
 
-    public async Task<ServiceResult<CategoryDetailViewModel>> UpdateAsync(int id, CategoryUpdateViewModel model)
+    /// <inheritdoc />
+    public async Task<ServiceResult<CategoryDetailView>> UpdateAsync(int id, CategoryUpdateViewModel model)
     {
         if (model.ParentCategoryId.HasValue && model.ParentCategoryId.Value > 0)
         {
             if (model.ParentCategoryId.Value == id)
-                return ServiceResult<CategoryDetailViewModel>.BadRequest("Category cannot be parent of itself");
+            {
+                return ServiceResult<CategoryDetailView>.BadRequest("Category cannot be parent of itself");
+            }
 
             var parent = await _categoryReps.GetByIdRawAsync(model.ParentCategoryId.Value);
             if (parent == null)
-                return ServiceResult<CategoryDetailViewModel>.BadRequest($"Parent category with id {model.ParentCategoryId} does not exist");
+            {
+                return ServiceResult<CategoryDetailView>.BadRequest($"Parent category with id {model.ParentCategoryId} does not exist");
+            }
         }
 
-        if (await _categoryReps.IsCategoryNameExistsAsync(model.CategoryName, id))
-            return ServiceResult<CategoryDetailViewModel>.Conflict($"Category '{model.CategoryName}' already exists");
+        var nameExists = await _categoryReps.IsCategoryNameExistsAsync(model.CategoryName, id);
+        if (nameExists)
+        {
+            return ServiceResult<CategoryDetailView>.Conflict($"Category '{model.CategoryName}' already exists");
+        }
+
+        if (!string.IsNullOrWhiteSpace(model.CategoryCode))
+        {
+            var codeExists = await _categoryReps.IsCategoryCodeExistsAsync(model.CategoryCode, id);
+            if (codeExists)
+            {
+                return ServiceResult<CategoryDetailView>.Conflict($"Category code '{model.CategoryCode}' already exists");
+            }
+        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _categoryReps.GetByIdRawAsync(id);
             if (existing == null)
-                return ServiceResult<CategoryDetailViewModel>.NotFound($"Category with id {id} not found");
+            {
+                return ServiceResult<CategoryDetailView>.NotFound($"Category with id {id} not found");
+            }
 
             var oldName = existing.CategoryName;
             var oldParentId = existing.ParentCategoryId;
@@ -145,40 +192,48 @@ public class CategoryService : BaseService, ICategoryService
 
             var result = await _repository.UpdateAsync(existing);
             if (result <= 0)
-                return ServiceResult<CategoryDetailViewModel>.Failure("Failed to update category");
+            {
+                return ServiceResult<CategoryDetailView>.Failure("Failed to update category");
+            }
 
-            var updated = await _categoryReps.GetByIdWithRelationsAsync(id);
+            var updated = await _categoryReps.GetDetailByIdAsync(id);
 
             await _activityLogService.LogUpdateAsync(
-                "Category",
+                TableNames.Category,
                 id,
                 $"Category updated: Name '{oldName}' -> '{existing.CategoryName}', ParentId '{oldParentId}' -> '{existing.ParentCategoryId}'",
                 _currentUserService.GetDisplayName());
 
-            return ServiceResult<CategoryDetailViewModel>.Success(updated!.Adapt<CategoryDetailViewModel>(), "Category updated successfully");
+            return ServiceResult<CategoryDetailView>.Success(updated!, "Category updated successfully");
         }, "update category", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Category", id, "Update Category", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Category, id, "Update Category", ex, _currentUserService.GetDisplayName());
         });
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _categoryReps.GetByIdRawAsync(id);
             if (existing == null)
+            {
                 return ServiceResult.NotFound($"Category with id {id} not found");
+            }
 
-            if (await _categoryReps.GetChildCountAsync(id) > 0)
-                return ServiceResult.BadRequest("Cannot delete category with subcategories");
+            var childCount = await _categoryReps.GetChildCountAsync(id);
+            if (childCount > 0)
+            {
+                return ServiceResult.BadRequest($"Cannot delete category with {childCount} subcategories");
+            }
 
             var result = await _repository.DeleteAsync(id);
 
             if (result > 0)
             {
                 await _activityLogService.LogDeleteAsync(
-                    "Category",
+                    TableNames.Category,
                     id,
                     $"Category '{existing.CategoryName}' deleted permanently",
                     _currentUserService.GetDisplayName());
@@ -189,17 +244,20 @@ public class CategoryService : BaseService, ICategoryService
                 : ServiceResult.Success("Category deleted successfully");
         }, "delete category", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Category", id, "Delete Category", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Category, id, "Delete Category", ex, _currentUserService.GetDisplayName());
         });
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> SoftDeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _categoryReps.GetByIdRawAsync(id);
             if (existing == null)
+            {
                 return ServiceResult.NotFound($"Category with id {id} not found");
+            }
 
             existing.IsActive = false;
             existing.ModifiedDate = DateTime.Now;
@@ -210,7 +268,7 @@ public class CategoryService : BaseService, ICategoryService
             if (result > 0)
             {
                 await _activityLogService.LogSoftDeleteAsync(
-                    "Category",
+                    TableNames.Category,
                     id,
                     $"Category '{existing.CategoryName}' soft deleted",
                     _currentUserService.GetDisplayName());
@@ -221,37 +279,33 @@ public class CategoryService : BaseService, ICategoryService
                 : ServiceResult.Success("Category soft deleted successfully");
         }, "soft delete category", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Category", id, "Soft Delete Category", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Category, id, "Soft Delete Category", ex, _currentUserService.GetDisplayName());
         });
     }
 
-    public async Task<ServiceResult<PaginatedResult<CategoryListViewModel>>> GetGridDataAsync(int page, int pageSize, string? search = null)
+    /// <inheritdoc />
+    public async Task<ServiceResult<PaginatedResult<CategoryListView>>> GetGridDataAsync(int page, int pageSize, string? search = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var categories = await _categoryReps.GetAllWithRelationsAsync();
-            var query = categories.AsQueryable();
-
+            var filters = new Dictionary<string, object>();
             if (!string.IsNullOrWhiteSpace(search))
             {
-                query = query.Where(c =>
-                    c.CategoryName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                    (c.Description != null && c.Description.Contains(search, StringComparison.OrdinalIgnoreCase))
-                );
+                filters["search"] = search;
             }
 
-            var totalCount = query.Count();
-            var pagedData = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-            var viewModels = pagedData.Adapt<List<CategoryListViewModel>>();
-
-            return ServiceResult<PaginatedResult<CategoryListViewModel>>.Success(new PaginatedResult<CategoryListViewModel>
-            {
-                Data = viewModels,
-                TotalCount = totalCount,
-                PageNumber = page,
-                PageSize = pageSize,
-                TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
-            });
+            var result = await _categoryReps.GetPagedListAsync(page, pageSize, search, "CategoryName", false, filters);
+            return ServiceResult<PaginatedResult<CategoryListView>>.Success(result);
         }, "get category grid data");
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<CategoryDropdownView>>> GetDropdownListAsync()
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var categories = await _categoryReps.GetDropdownListAsync();
+            return ServiceResult<IEnumerable<CategoryDropdownView>>.Success(categories);
+        }, "get category dropdown list");
     }
 }

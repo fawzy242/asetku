@@ -5,23 +5,33 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using Whitebird.App.Features.Common;
-using Whitebird.App.Features.Reports;
+using Whitebird.App.Features.MasterData;
 using Whitebird.Domain.Features.Reports;
 using Whitebird.Infra.Features.Reports;
 
 namespace Whitebird.App.Features.Reports;
 
+/// <summary>
+/// Service implementation for Reports business logic
+/// </summary>
 public class ReportsService : BaseService, IReportsService
 {
     private readonly IReportsReps _repository;
+    private readonly IMasterDataLookupService _masterDataLookupService;
 
-    public ReportsService(IReportsReps repository, ILogger<ReportsService> logger) : base(logger)
+    public ReportsService(
+        IReportsReps repository,
+        IMasterDataLookupService masterDataLookupService,
+        ILogger<ReportsService> logger) : base(logger)
     {
         _repository = repository;
+        _masterDataLookupService = masterDataLookupService;
         ExcelPackage.LicenseContext = OfficeOpenXml.LicenseContext.NonCommercial;
     }
 
-    public async Task<ServiceResult<IEnumerable<ReportsAssetTransactionViewModel>>> GetAssetTransactionReportsAsync(DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null)
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<ReportsAssetTransactionViewModel>>> GetAssetTransactionReportsAsync(
+        DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
@@ -30,7 +40,9 @@ public class ReportsService : BaseService, IReportsService
         }, "get asset transaction reports");
     }
 
-    public async Task<ServiceResult<IEnumerable<ReportsAssetInventoryViewModel>>> GetAssetInventoryReportsAsync(string? status = null, int? categoryId = null, int? supplierId = null)
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<ReportsAssetInventoryViewModel>>> GetAssetInventoryReportsAsync(
+        string? status = null, int? categoryId = null, int? supplierId = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
@@ -39,7 +51,9 @@ public class ReportsService : BaseService, IReportsService
         }, "get asset inventory reports");
     }
 
-    public async Task<ServiceResult<IEnumerable<ReportsEmployeeAssetViewModel>>> GetEmployeeAssetReportsAsync(int? employeeId = null, string? department = null)
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<ReportsEmployeeAssetViewModel>>> GetEmployeeAssetReportsAsync(
+        int? employeeId = null, string? department = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
@@ -48,7 +62,9 @@ public class ReportsService : BaseService, IReportsService
         }, "get employee asset reports");
     }
 
-    public async Task<ServiceResult<IEnumerable<ReportsMaintenanceViewModel>>> GetMaintenanceReportsAsync(DateTime? startDate = null, DateTime? endDate = null, bool? isUpcoming = null)
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<ReportsMaintenanceViewModel>>> GetMaintenanceReportsAsync(
+        DateTime? startDate = null, DateTime? endDate = null, bool? isUpcoming = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
@@ -57,7 +73,9 @@ public class ReportsService : BaseService, IReportsService
         }, "get maintenance reports");
     }
 
-    public async Task<ServiceResult<IEnumerable<ReportsFinancialViewModel>>> GetFinancialReportsAsync(DateTime? startDate = null, DateTime? endDate = null)
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<ReportsFinancialViewModel>>> GetFinancialReportsAsync(
+        DateTime? startDate = null, DateTime? endDate = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
@@ -66,6 +84,7 @@ public class ReportsService : BaseService, IReportsService
         }, "get financial reports");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult<DashboardStatsViewModel>> GetDashboardStatsAsync()
     {
         return await ExecuteSafelyAsync(async () =>
@@ -75,7 +94,9 @@ public class ReportsService : BaseService, IReportsService
         }, "get dashboard stats");
     }
 
-    public async Task<ServiceResult<byte[]>> GenerateAssetTransactionExcelAsync(DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null)
+    /// <inheritdoc />
+    public async Task<ServiceResult<byte[]>> GenerateAssetTransactionExcelAsync(
+        DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
@@ -86,7 +107,9 @@ public class ReportsService : BaseService, IReportsService
         }, "generate asset transaction excel");
     }
 
-    public async Task<ServiceResult<byte[]>> GenerateAssetInventoryExcelAsync(string? status = null, int? categoryId = null, int? supplierId = null)
+    /// <inheritdoc />
+    public async Task<ServiceResult<byte[]>> GenerateAssetInventoryExcelAsync(
+        string? status = null, int? categoryId = null, int? supplierId = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
@@ -97,7 +120,9 @@ public class ReportsService : BaseService, IReportsService
         }, "generate asset inventory excel");
     }
 
-    public async Task<ServiceResult<byte[]>> GenerateEmployeeAssetExcelAsync(int? employeeId = null, string? department = null)
+    /// <inheritdoc />
+    public async Task<ServiceResult<byte[]>> GenerateEmployeeAssetExcelAsync(
+        int? employeeId = null, string? department = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
@@ -108,7 +133,9 @@ public class ReportsService : BaseService, IReportsService
         }, "generate employee asset excel");
     }
 
-    public async Task<ServiceResult<byte[]>> GenerateMaintenanceExcelAsync(DateTime? startDate = null, DateTime? endDate = null, bool? isUpcoming = null)
+    /// <inheritdoc />
+    public async Task<ServiceResult<byte[]>> GenerateMaintenanceExcelAsync(
+        DateTime? startDate = null, DateTime? endDate = null, bool? isUpcoming = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
@@ -119,7 +146,9 @@ public class ReportsService : BaseService, IReportsService
         }, "generate maintenance excel");
     }
 
-    public async Task<ServiceResult<byte[]>> GenerateFinancialExcelAsync(DateTime? startDate = null, DateTime? endDate = null)
+    /// <inheritdoc />
+    public async Task<ServiceResult<byte[]>> GenerateFinancialExcelAsync(
+        DateTime? startDate = null, DateTime? endDate = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {

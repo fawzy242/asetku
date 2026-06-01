@@ -8,6 +8,7 @@ public class ActivityLogListViewModel
     public string ActivityType { get; set; } = default!;
     public string? Description { get; set; }
     public DateTime CreatedDate { get; set; }
+    public string CreatedBy { get; set; } = default!;
 }
 
 public class ActivityLogDetailViewModel
@@ -17,4 +18,6 @@ public class ActivityLogDetailViewModel
     public int ReferenceId { get; set; }
     public string ActivityType { get; set; } = default!;
     public string? Description { get; set; }
+    public DateTime CreatedDate { get; set; }
+    public string CreatedBy { get; set; } = default!;
 }

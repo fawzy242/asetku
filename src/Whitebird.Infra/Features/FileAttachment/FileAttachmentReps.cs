@@ -4,6 +4,9 @@ using Whitebird.Domain.Features.FileAttachment;
 
 namespace Whitebird.Infra.Features.FileAttachment;
 
+/// <summary>
+/// Repository implementation for File Attachment operations using Dapper
+/// </summary>
 public class FileAttachmentReps : IFileAttachmentReps
 {
     private readonly DapperContext _context;
@@ -13,12 +16,14 @@ public class FileAttachmentReps : IFileAttachmentReps
         _context = context;
     }
 
+    /// <inheritdoc />
     public async Task<FileAttachmentEntity?> GetByIdAsync(int fileAttachmentId)
     {
         const string sql = "SELECT * FROM FileAttachment WHERE FileAttachmentId = @FileAttachmentId AND IsActive = 1";
         return await _context.QueryFirstOrDefaultAsync<FileAttachmentEntity>(sql, new { FileAttachmentId = fileAttachmentId });
     }
 
+    /// <inheritdoc />
     public async Task<IEnumerable<FileAttachmentEntity>> GetByReferenceAsync(string referenceTable, int referenceId)
     {
         const string sql = @"
@@ -28,6 +33,7 @@ public class FileAttachmentReps : IFileAttachmentReps
         return await _context.QueryAsync<FileAttachmentEntity>(sql, new { ReferenceTable = referenceTable, ReferenceId = referenceId });
     }
 
+    /// <inheritdoc />
     public async Task<FileAttachmentEntity?> GetPrimaryByReferenceAsync(string referenceTable, int referenceId)
     {
         const string sql = @"
@@ -36,6 +42,7 @@ public class FileAttachmentReps : IFileAttachmentReps
         return await _context.QueryFirstOrDefaultAsync<FileAttachmentEntity>(sql, new { ReferenceTable = referenceTable, ReferenceId = referenceId });
     }
 
+    /// <inheritdoc />
     public async Task<int> InsertAsync(FileAttachmentEntity entity)
     {
         const string sql = @"
@@ -53,6 +60,7 @@ public class FileAttachmentReps : IFileAttachmentReps
         return await _context.ExecuteScalarAsync<int>(sql, entity);
     }
 
+    /// <inheritdoc />
     public async Task<int> UpdateAsync(FileAttachmentEntity entity)
     {
         const string sql = @"
@@ -66,12 +74,14 @@ public class FileAttachmentReps : IFileAttachmentReps
         return await _context.ExecuteAsync(sql, entity);
     }
 
+    /// <inheritdoc />
     public async Task<int> DeleteAsync(int fileAttachmentId)
     {
         const string sql = "UPDATE FileAttachment SET IsActive = 0, ModifiedDate = GETDATE() WHERE FileAttachmentId = @FileAttachmentId";
         return await _context.ExecuteAsync(sql, new { FileAttachmentId = fileAttachmentId });
     }
 
+    /// <inheritdoc />
     public async Task<int> DeleteByReferenceAsync(string referenceTable, int referenceId)
     {
         const string sql = @"
@@ -81,21 +91,23 @@ public class FileAttachmentReps : IFileAttachmentReps
         return await _context.ExecuteAsync(sql, new { ReferenceTable = referenceTable, ReferenceId = referenceId });
     }
 
+    /// <inheritdoc />
     public async Task<bool> ExistsAsync(int fileAttachmentId)
     {
         const string sql = "SELECT COUNT(1) FROM FileAttachment WHERE FileAttachmentId = @FileAttachmentId AND IsActive = 1";
         return await _context.ExecuteScalarAsync<int>(sql, new { FileAttachmentId = fileAttachmentId }) > 0;
     }
 
+    /// <inheritdoc />
     public async Task<int> GetCountByReferenceAsync(string referenceTable, int referenceId)
     {
         const string sql = "SELECT COUNT(*) FROM FileAttachment WHERE ReferenceTable = @ReferenceTable AND ReferenceId = @ReferenceId AND IsActive = 1";
         return await _context.ExecuteScalarAsync<int>(sql, new { ReferenceTable = referenceTable, ReferenceId = referenceId });
     }
 
+    /// <inheritdoc />
     public async Task<int> SetPrimaryAsync(int fileAttachmentId, string referenceTable, int referenceId)
     {
-        // Clear primary flag for all attachments of this reference
         const string clearSql = @"
             UPDATE FileAttachment 
             SET IsPrimary = 0, ModifiedDate = GETDATE() 
@@ -103,7 +115,6 @@ public class FileAttachmentReps : IFileAttachmentReps
 
         await _context.ExecuteAsync(clearSql, new { ReferenceTable = referenceTable, ReferenceId = referenceId });
 
-        // Set the specified attachment as primary (if id > 0)
         if (fileAttachmentId > 0)
         {
             const string setSql = @"

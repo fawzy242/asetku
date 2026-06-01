@@ -5,6 +5,7 @@ using Whitebird.App.Features.MasterData;
 using Whitebird.Domain.Features.Asset;
 using Whitebird.Domain.Features.AssetTransaction;
 using Whitebird.Domain.Features.Common;
+using Whitebird.Domain.Features.MasterData;
 using Whitebird.Domain.Features.Reports;
 using Whitebird.Infra.Features.Asset;
 using Whitebird.Infra.Features.AssetTransaction;
@@ -16,6 +17,9 @@ using Whitebird.Infra.Features.Supplier;
 
 namespace Whitebird.App.Features.Asset;
 
+/// <summary>
+/// Service implementation for Asset business logic
+/// </summary>
 public class AssetService : BaseService, IAssetService
 {
     private readonly IGenericRepository<AssetEntity> _repository;
@@ -26,6 +30,7 @@ public class AssetService : BaseService, IAssetService
     private readonly IOfficeReps _officeReps;
     private readonly IEmployeeReps _employeeReps;
     private readonly IMasterDataService _masterDataService;
+    private readonly IMasterDataLookupService _masterDataLookupService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
 
@@ -38,6 +43,7 @@ public class AssetService : BaseService, IAssetService
         IOfficeReps officeReps,
         IEmployeeReps employeeReps,
         IMasterDataService masterDataService,
+        IMasterDataLookupService masterDataLookupService,
         ICurrentUserService currentUserService,
         IActivityLogService activityLogService,
         ILogger<AssetService> logger) : base(logger)
@@ -50,79 +56,113 @@ public class AssetService : BaseService, IAssetService
         _officeReps = officeReps;
         _employeeReps = employeeReps;
         _masterDataService = masterDataService;
+        _masterDataLookupService = masterDataLookupService;
         _currentUserService = currentUserService;
         _activityLogService = activityLogService;
     }
 
-    public async Task<ServiceResult<AssetDetailViewModel>> GetByIdAsync(int id)
+    /// <inheritdoc />
+    public async Task<ServiceResult<AssetDetailView>> GetByIdAsync(int id)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var asset = await _assetReps.GetByIdWithRelationsAsync(id);
+            var asset = await _assetReps.GetDetailByIdAsync(id);
             if (asset == null)
-                return ServiceResult<AssetDetailViewModel>.NotFound($"Asset with id {id} not found");
-
-            return ServiceResult<AssetDetailViewModel>.Success(asset.Adapt<AssetDetailViewModel>());
+            {
+                return ServiceResult<AssetDetailView>.NotFound($"Asset with id {id} not found");
+            }
+            return ServiceResult<AssetDetailView>.Success(asset);
         }, "get asset by id");
     }
 
-    public async Task<ServiceResult<IEnumerable<AssetListViewModel>>> GetAllAsync()
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<AssetListView>>> GetAllAsync()
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var assets = await _assetReps.GetAllWithRelationsAsync();
-            return ServiceResult<IEnumerable<AssetListViewModel>>.Success(assets.Adapt<IEnumerable<AssetListViewModel>>());
+            var assets = await _assetReps.GetAllListViewAsync();
+            return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
         }, "get all assets");
     }
 
-    public async Task<ServiceResult<IEnumerable<AssetListViewModel>>> GetByCategoryAsync(int categoryId)
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<AssetListView>>> GetByCategoryAsync(int categoryId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var assets = await _assetReps.GetByCategoryWithRelationsAsync(categoryId);
-            return ServiceResult<IEnumerable<AssetListViewModel>>.Success(assets.Adapt<IEnumerable<AssetListViewModel>>());
+            var category = await _categoryReps.GetByIdRawAsync(categoryId);
+            if (category == null)
+            {
+                return ServiceResult<IEnumerable<AssetListView>>.NotFound($"Category with id {categoryId} not found");
+            }
+            
+            var assets = await _assetReps.GetByCategoryListViewAsync(categoryId);
+            return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
         }, "get assets by category");
     }
 
-    public async Task<ServiceResult<IEnumerable<AssetListViewModel>>> GetByOfficeAsync(int officeId)
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<AssetListView>>> GetByOfficeAsync(int officeId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var assets = await _assetReps.GetByOfficeWithRelationsAsync(officeId);
-            return ServiceResult<IEnumerable<AssetListViewModel>>.Success(assets.Adapt<IEnumerable<AssetListViewModel>>());
+            var office = await _officeReps.GetByIdRawAsync(officeId);
+            if (office == null)
+            {
+                return ServiceResult<IEnumerable<AssetListView>>.NotFound($"Office with id {officeId} not found");
+            }
+            
+            var assets = await _assetReps.GetByOfficeListViewAsync(officeId);
+            return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
         }, "get assets by office");
     }
 
-    public async Task<ServiceResult<AssetDetailViewModel>> CreateAsync(AssetCreateViewModel model)
+    /// <inheritdoc />
+    public async Task<ServiceResult<AssetDetailView>> CreateAsync(AssetCreateViewModel model)
     {
         if (string.IsNullOrWhiteSpace(model.AssetCode))
-            return ServiceResult<AssetDetailViewModel>.BadRequest("Asset code is required");
+        {
+            return ServiceResult<AssetDetailView>.BadRequest("Asset code is required");
+        }
 
         if (string.IsNullOrWhiteSpace(model.AssetName))
-            return ServiceResult<AssetDetailViewModel>.BadRequest("Asset name is required");
+        {
+            return ServiceResult<AssetDetailView>.BadRequest("Asset name is required");
+        }
 
         if (model.CategoryId <= 0)
-            return ServiceResult<AssetDetailViewModel>.BadRequest("Valid category is required");
+        {
+            return ServiceResult<AssetDetailView>.BadRequest("Valid category is required");
+        }
 
-        if (await _assetReps.IsAssetCodeExistsAsync(model.AssetCode))
-            return ServiceResult<AssetDetailViewModel>.Conflict($"Asset code '{model.AssetCode}' already exists");
+        var codeExists = await _assetReps.IsAssetCodeExistsAsync(model.AssetCode);
+        if (codeExists)
+        {
+            return ServiceResult<AssetDetailView>.Conflict($"Asset code '{model.AssetCode}' already exists");
+        }
 
         var category = await _categoryReps.GetByIdRawAsync(model.CategoryId);
         if (category == null)
-            return ServiceResult<AssetDetailViewModel>.BadRequest($"Category with id {model.CategoryId} does not exist");
+        {
+            return ServiceResult<AssetDetailView>.BadRequest($"Category with id {model.CategoryId} does not exist");
+        }
 
         if (model.SupplierId.HasValue && model.SupplierId.Value > 0)
         {
-            var supplier = await _supplierReps.GetByIdAsync(model.SupplierId.Value);
+            var supplier = await _supplierReps.GetByIdRawAsync(model.SupplierId.Value);
             if (supplier == null)
-                return ServiceResult<AssetDetailViewModel>.BadRequest($"Supplier with id {model.SupplierId} does not exist");
+            {
+                return ServiceResult<AssetDetailView>.BadRequest($"Supplier with id {model.SupplierId} does not exist");
+            }
         }
 
         if (model.OfficeId.HasValue && model.OfficeId.Value > 0)
         {
-            var office = await _officeReps.GetByIdAsync(model.OfficeId.Value);
+            var office = await _officeReps.GetByIdRawAsync(model.OfficeId.Value);
             if (office == null)
-                return ServiceResult<AssetDetailViewModel>.BadRequest($"Office with id {model.OfficeId} does not exist");
+            {
+                return ServiceResult<AssetDetailView>.BadRequest($"Office with id {model.OfficeId} does not exist");
+            }
         }
 
         return await ExecuteWithTransactionAsync(async () =>
@@ -133,7 +173,7 @@ public class AssetService : BaseService, IAssetService
             entity.CreatedBy = _currentUserService.GetDisplayName();
 
             var id = await _repository.InsertAsync(entity);
-            var created = await _assetReps.GetByIdWithRelationsAsync(Convert.ToInt32(id));
+            var created = await _assetReps.GetDetailByIdAsync(Convert.ToInt32(id));
 
             if (created != null)
             {
@@ -145,24 +185,30 @@ public class AssetService : BaseService, IAssetService
             }
 
             return created == null
-                ? ServiceResult<AssetDetailViewModel>.Failure("Failed to retrieve created asset")
-                : ServiceResult<AssetDetailViewModel>.Success(created.Adapt<AssetDetailViewModel>(), "Asset created successfully");
+                ? ServiceResult<AssetDetailView>.Failure("Failed to retrieve created asset")
+                : ServiceResult<AssetDetailView>.Success(created, "Asset created successfully");
         }, "create asset", async (ex) =>
         {
             await _activityLogService.LogErrorAsync(TableNames.Asset, 0, "Create Asset", ex, _currentUserService.GetDisplayName());
         });
     }
 
-    public async Task<ServiceResult<AssetDetailViewModel>> UpdateAsync(int id, AssetUpdateViewModel model)
+    /// <inheritdoc />
+    public async Task<ServiceResult<AssetDetailView>> UpdateAsync(int id, AssetUpdateViewModel model)
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _assetReps.GetByIdRawAsync(id);
             if (existing == null)
-                return ServiceResult<AssetDetailViewModel>.NotFound($"Asset with id {id} not found");
+            {
+                return ServiceResult<AssetDetailView>.NotFound($"Asset with id {id} not found");
+            }
 
-            if (await _assetReps.IsAssetCodeExistsAsync(model.AssetCode, id))
-                return ServiceResult<AssetDetailViewModel>.Conflict($"Asset code '{model.AssetCode}' already exists");
+            var codeExists = await _assetReps.IsAssetCodeExistsAsync(model.AssetCode, id);
+            if (codeExists)
+            {
+                return ServiceResult<AssetDetailView>.Conflict($"Asset code '{model.AssetCode}' already exists");
+            }
 
             var oldCode = existing.AssetCode;
             var oldName = existing.AssetName;
@@ -173,9 +219,11 @@ public class AssetService : BaseService, IAssetService
 
             var result = await _repository.UpdateAsync(existing);
             if (result <= 0)
-                return ServiceResult<AssetDetailViewModel>.Failure("Failed to update asset");
+            {
+                return ServiceResult<AssetDetailView>.Failure("Failed to update asset");
+            }
 
-            var updated = await _assetReps.GetByIdWithRelationsAsync(id);
+            var updated = await _assetReps.GetDetailByIdAsync(id);
 
             await _activityLogService.LogUpdateAsync(
                 TableNames.Asset,
@@ -183,24 +231,29 @@ public class AssetService : BaseService, IAssetService
                 $"Asset updated: Code '{oldCode}' -> '{model.AssetCode}', Name '{oldName}' -> '{model.AssetName}'",
                 _currentUserService.GetDisplayName());
 
-            return ServiceResult<AssetDetailViewModel>.Success(updated!.Adapt<AssetDetailViewModel>(), "Asset updated successfully");
+            return ServiceResult<AssetDetailView>.Success(updated!, "Asset updated successfully");
         }, "update asset", async (ex) =>
         {
             await _activityLogService.LogErrorAsync(TableNames.Asset, id, "Update Asset", ex, _currentUserService.GetDisplayName());
         });
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _assetReps.GetByIdRawAsync(id);
             if (existing == null)
+            {
                 return ServiceResult.NotFound($"Asset with id {id} not found");
+            }
 
             var activeTransaction = await _transactionReps.GetActiveTransactionByAssetIdAsync(id);
             if (activeTransaction != null)
+            {
                 return ServiceResult.BadRequest("Cannot delete asset with active transaction");
+            }
 
             var result = await _repository.DeleteAsync(id);
 
@@ -222,13 +275,16 @@ public class AssetService : BaseService, IAssetService
         });
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> SoftDeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _assetReps.GetByIdRawAsync(id);
             if (existing == null)
+            {
                 return ServiceResult.NotFound($"Asset with id {id} not found");
+            }
 
             existing.IsActive = false;
             existing.ModifiedDate = DateTime.Now;
@@ -254,58 +310,54 @@ public class AssetService : BaseService, IAssetService
         });
     }
 
-    public async Task<ServiceResult<PaginatedResult<AssetListViewModel>>> GetGridDataAsync(int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false, Dictionary<string, object>? filters = null)
+    /// <inheritdoc />
+    public async Task<ServiceResult<PaginatedResult<AssetListView>>> GetGridDataAsync(
+        int page, int pageSize, string? search = null, string? sortBy = null,
+        bool sortDescending = false, Dictionary<string, object>? filters = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var result = await _assetReps.GetPagedWithRelationsAsync(page, pageSize, search, sortBy, sortDescending, filters);
-            var viewModels = result.Data.Adapt<List<AssetListViewModel>>();
-
-            return ServiceResult<PaginatedResult<AssetListViewModel>>.Success(new PaginatedResult<AssetListViewModel>
-            {
-                Data = viewModels,
-                TotalCount = result.TotalCount,
-                PageNumber = result.PageNumber,
-                PageSize = result.PageSize,
-                TotalPages = result.TotalPages,
-                Filters = filters,
-                SortBy = sortBy,
-                SortDescending = sortDescending
-            });
+            var result = await _assetReps.GetPagedListAsync(page, pageSize, search, sortBy, sortDescending, filters);
+            return ServiceResult<PaginatedResult<AssetListView>>.Success(result);
         }, "get asset grid data");
     }
 
-    public async Task<ServiceResult<IEnumerable<AssetListViewModel>>> SearchAsync(string keyword)
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<AssetListView>>> SearchAsync(string keyword)
     {
         return await ExecuteSafelyAsync(async () =>
         {
             if (string.IsNullOrWhiteSpace(keyword) || keyword.Length < 2)
-                return ServiceResult<IEnumerable<AssetListViewModel>>.Success(new List<AssetListViewModel>());
+            {
+                return ServiceResult<IEnumerable<AssetListView>>.Success(new List<AssetListView>());
+            }
 
             var assets = await _assetReps.SearchAssetsAsync(keyword, 10);
-
-            return ServiceResult<IEnumerable<AssetListViewModel>>.Success(assets.Adapt<IEnumerable<AssetListViewModel>>());
+            return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
         }, "search assets");
     }
 
-    public async Task<ServiceResult<IEnumerable<AssetListViewModel>>> GetExpiredWarrantyAsync()
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<AssetListView>>> GetExpiredWarrantyAsync()
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var assets = await _assetReps.GetExpiredWarrantyWithRelationsAsync();
-            return ServiceResult<IEnumerable<AssetListViewModel>>.Success(assets.Adapt<IEnumerable<AssetListViewModel>>());
+            var assets = await _assetReps.GetExpiredWarrantyListViewAsync();
+            return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
         }, "get expired warranty");
     }
 
-    public async Task<ServiceResult<IEnumerable<AssetListViewModel>>> GetUpcomingMaintenanceAsync(int daysAhead = 30)
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<AssetListView>>> GetUpcomingMaintenanceAsync(int daysAhead = 30)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var assets = await _assetReps.GetUpcomingMaintenanceWithRelationsAsync(daysAhead);
-            return ServiceResult<IEnumerable<AssetListViewModel>>.Success(assets.Adapt<IEnumerable<AssetListViewModel>>());
+            var assets = await _assetReps.GetUpcomingMaintenanceListViewAsync(daysAhead);
+            return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
         }, "get upcoming maintenance");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult<DashboardStatsViewModel>> GetDashboardStatsAsync()
     {
         return await ExecuteSafelyAsync(async () =>
@@ -320,46 +372,50 @@ public class AssetService : BaseService, IAssetService
                 ExpiredWarrantyCount = await _assetReps.GetExpiredWarrantyCountAsync(),
                 UpcomingMaintenanceCount = await _assetReps.GetUpcomingMaintenanceCountAsync(30),
                 TotalAssetValue = await _assetReps.GetTotalAssetValueAsync(),
-                OverdueLoanCount = (await _transactionReps.GetOverdueLoansWithRelationsAsync()).Count(),
-                PendingApprovals = (await _transactionReps.GetPendingApprovalsWithRelationsAsync()).Count()
+                OverdueLoanCount = (await _transactionReps.GetOverdueLoansListViewAsync()).Count(),
+                PendingApprovals = (await _transactionReps.GetPendingApprovalsListViewAsync()).Count()
             };
-
             return ServiceResult<DashboardStatsViewModel>.Success(stats);
         }, "get dashboard stats");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult<AssetTrackingViewModel>> GetAssetTrackingAsync(int assetId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var asset = await _assetReps.GetByIdWithRelationsAsync(assetId);
+            var asset = await _assetReps.GetDetailByIdAsync(assetId);
             if (asset == null)
+            {
                 return ServiceResult<AssetTrackingViewModel>.NotFound($"Asset with id {assetId} not found");
+            }
 
             var history = await _transactionReps.GetAssetTransactionHistoryAsync(assetId);
             var activeTransaction = await _transactionReps.GetActiveTransactionByAssetIdAsync(assetId);
 
             var currentStatus = DeriveAssetStatus(activeTransaction);
-            var isOnLoan = activeTransaction?.TransactionType == 3;
-            var isInMaintenance = activeTransaction?.TransactionType == 6;
-            var isOverdue = activeTransaction?.TransactionType == 3
+            var isOnLoan = activeTransaction?.TransactionType == TransactionTypeConstants.LOAN;
+            var isInMaintenance = activeTransaction?.TransactionType == TransactionTypeConstants.MAINTENANCE;
+            var isOverdue = activeTransaction?.TransactionType == TransactionTypeConstants.LOAN
                 && activeTransaction.ExpectedReturnDate.HasValue
                 && activeTransaction.ExpectedReturnDate.Value < DateTime.Now;
 
             string? currentHolderName = null;
             if (activeTransaction?.ToEmployeeId.HasValue == true)
             {
-                var employee = await _employeeReps.GetByIdAsync(activeTransaction.ToEmployeeId.Value);
+                var employee = await _employeeReps.GetByIdRawAsync(activeTransaction.ToEmployeeId.Value);
                 currentHolderName = employee?.FullName;
             }
 
             var timeline = new List<AssetTimelineEntry>();
             foreach (var txn in history.OrderByDescending(t => t.TransactionDate))
             {
-                var transactionTypeName = await GetTransactionTypeName(txn.TransactionType);
+                var transactionTypeNameResult = await _masterDataLookupService.GetTransactionTypeNameAsync(txn.TransactionType);
+                var transactionTypeName = transactionTypeNameResult.IsSuccess ? transactionTypeNameResult.Data : txn.TransactionType.ToString();
 
                 timeline.Add(new AssetTimelineEntry
                 {
+                    Id = txn.AssetTransactionId,
                     Date = txn.TransactionDate,
                     ActivityType = transactionTypeName ?? txn.TransactionType.ToString(),
                     Description = txn.Notes ?? $"Transaction: {transactionTypeName}",
@@ -393,13 +449,16 @@ public class AssetService : BaseService, IAssetService
         }, "get asset tracking");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult<AssetCurrentStatusDto>> GetCurrentStatusAsync(int assetId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var asset = await _assetReps.GetByIdRawAsync(assetId);
+            var asset = await _assetReps.GetDetailByIdAsync(assetId);
             if (asset == null)
+            {
                 return ServiceResult<AssetCurrentStatusDto>.NotFound($"Asset with id {assetId} not found");
+            }
 
             var activeTransaction = await _transactionReps.GetActiveTransactionByAssetIdAsync(assetId);
             var currentStatus = DeriveAssetStatus(activeTransaction);
@@ -407,7 +466,7 @@ public class AssetService : BaseService, IAssetService
             string? currentHolderName = null;
             if (activeTransaction?.ToEmployeeId.HasValue == true)
             {
-                var employee = await _employeeReps.GetByIdAsync(activeTransaction.ToEmployeeId.Value);
+                var employee = await _employeeReps.GetByIdRawAsync(activeTransaction.ToEmployeeId.Value);
                 currentHolderName = employee?.FullName;
             }
 
@@ -423,7 +482,7 @@ public class AssetService : BaseService, IAssetService
                 CurrentOfficeName = asset.OfficeName,
                 CurrentOfficeId = asset.OfficeId,
                 ExpectedReturnDate = activeTransaction?.ExpectedReturnDate,
-                IsOverdue = activeTransaction?.TransactionType == 3
+                IsOverdue = activeTransaction?.TransactionType == TransactionTypeConstants.LOAN
                     && activeTransaction.ExpectedReturnDate.HasValue
                     && activeTransaction.ExpectedReturnDate.Value < DateTime.Now,
                 ConditionName = asset.AssetConditionName,
@@ -434,24 +493,27 @@ public class AssetService : BaseService, IAssetService
         }, "get asset current status");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult<IEnumerable<AssetTransactionDto>>> GetAssetTransactionHistoryAsync(int assetId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
             var asset = await _assetReps.GetByIdRawAsync(assetId);
             if (asset == null)
+            {
                 return ServiceResult<IEnumerable<AssetTransactionDto>>.NotFound($"Asset with id {assetId} not found");
+            }
 
             var history = await _transactionReps.GetAssetTransactionHistoryAsync(assetId);
             var dtos = new List<AssetTransactionDto>();
 
-            foreach (var txn in history.OrderByDescending(t => t.TransactionDate))
+            foreach (var txn in history)
             {
                 dtos.Add(new AssetTransactionDto
                 {
                     AssetTransactionId = txn.AssetTransactionId,
                     TransactionType = txn.TransactionType,
-                    TransactionTypeName = await GetTransactionTypeName(txn.TransactionType) ?? txn.TransactionType.ToString(),
+                    TransactionTypeName = txn.TransactionTypeName,
                     FromEmployeeId = txn.FromEmployeeId,
                     FromEmployeeName = txn.FromEmployeeName,
                     ToEmployeeId = txn.ToEmployeeId,
@@ -472,14 +534,17 @@ public class AssetService : BaseService, IAssetService
                 });
             }
 
-            return ServiceResult<IEnumerable<AssetTransactionDto>>.Success(dtos);
+            return ServiceResult<IEnumerable<AssetTransactionDto>>.Success(dtos.OrderByDescending(d => d.TransactionDate));
         }, "get asset transaction history");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request)
     {
         if (request.Ids == null || !request.Ids.Any())
+        {
             return ServiceResult<int>.BadRequest("No asset IDs provided");
+        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
@@ -512,37 +577,49 @@ public class AssetService : BaseService, IAssetService
         });
     }
 
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<AssetDropdownView>>> GetDropdownListAsync()
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var assets = await _assetReps.GetDropdownListAsync();
+            return ServiceResult<IEnumerable<AssetDropdownView>>.Success(assets);
+        }, "get asset dropdown list");
+    }
+
     #region Private Helpers
 
-    private string DeriveAssetStatus(AssetTransactionEntity? activeTransaction)
+    private string DeriveAssetStatus(AssetTransactionListView? activeTransaction)
     {
         if (activeTransaction == null)
+        {
             return "Available";
+        }
 
         if (activeTransaction.ActualReturnDate.HasValue)
+        {
             return "Available";
+        }
 
         if (activeTransaction.Approved == false)
+        {
             return "Rejected";
+        }
 
         if (activeTransaction.Approved == null)
+        {
             return "Pending Approval";
+        }
 
         return activeTransaction.TransactionType switch
         {
-            1 or 2 => "Assigned",
-            3 => "On Loan",
-            6 => "In Maintenance",
-            5 => "Returned",
-            8 => "Disposed",
+            TransactionTypeConstants.HANDOVER or TransactionTypeConstants.TRANSFER => "Assigned",
+            TransactionTypeConstants.LOAN => "On Loan",
+            TransactionTypeConstants.MAINTENANCE => "In Maintenance",
+            TransactionTypeConstants.LOAN_RETURN => "Returned",
+            TransactionTypeConstants.DISPOSAL => "Disposed",
             _ => "Available"
         };
-    }
-
-    private async Task<string?> GetTransactionTypeName(int transactionType)
-    {
-        var result = await _masterDataService.GetValueAsync("TransactionType", transactionType);
-        return result.IsSuccess ? result.Data : null;
     }
 
     #endregion

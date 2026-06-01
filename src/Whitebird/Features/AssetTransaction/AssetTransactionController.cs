@@ -53,6 +53,10 @@ public class AssetTransactionController : ControllerBase
     public async Task<IActionResult> GetOverdueLoans()
         => this.HandleResult(await _transactionService.GetOverdueLoansAsync());
 
+    [HttpGet("paired-transactions/{assetId:int}/{transactionType:int}")]
+    public async Task<IActionResult> GetAvailablePairedTransactions(int assetId, int transactionType)
+        => this.HandleResult(await _transactionService.GetAvailablePairedTransactionsAsync(assetId, transactionType));
+
     [HttpGet("grid")]
     public async Task<IActionResult> GetGridData(
         [FromQuery] int page = 1,

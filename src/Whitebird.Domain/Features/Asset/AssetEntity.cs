@@ -31,20 +31,7 @@ public class AssetEntity : AuditableEntity
     public string? Hostname { get; set; }
     public string? IpAddress { get; set; }
     public bool? OperasionalOffice { get; set; }
-
-    // Navigation properties - marked as NotMapped
-    [NotMapped]
-    public string? CategoryName { get; set; }
-
-    [NotMapped]
-    public string? SupplierName { get; set; }
-
-    [NotMapped]
-    public string? OfficeName { get; set; }
-
-    [NotMapped]
-    public string? AssetConditionName { get; set; }
-
-    [NotMapped]
-    public string? AssetConditionPurchaseName { get; set; }
+    
+    // NOTE: Semua NotMapped properties telah dihapus.
+    // Untuk query dengan JOIN, gunakan AssetListView, AssetDetailView, atau AssetTrackingView.
 }

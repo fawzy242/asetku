@@ -21,31 +21,7 @@ public class AssetTransactionEntity : AuditableEntity
     public int? MaintenanceType { get; set; }
     public decimal? MaintenanceCost { get; set; }
     public int? FromAssetTransactionId { get; set; }
-
-    [NotMapped]
-    public string? AssetCode { get; set; }
-
-    [NotMapped]
-    public string? AssetName { get; set; }
-
-    [NotMapped]
-    public string? FromEmployeeName { get; set; }
-
-    [NotMapped]
-    public string? ToEmployeeName { get; set; }
-
-    [NotMapped]
-    public string? ToLocationName { get; set; }
-
-    [NotMapped]
-    public string? TransactionTypeName { get; set; }
-
-    [NotMapped]
-    public string? ConditionBeforeName { get; set; }
-
-    [NotMapped]
-    public string? ConditionAfterName { get; set; }
-
-    [NotMapped]
-    public string? MaintenanceTypeName { get; set; }
+    
+    // NOTE: Semua NotMapped properties telah dihapus.
+    // Untuk query dengan JOIN, gunakan AssetTransactionListView atau AssetTransactionDetailView.
 }

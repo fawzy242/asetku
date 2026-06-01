@@ -14,15 +14,20 @@ import PageHeader from "../../components/molecules/PageHeader/PageHeader";
 import SearchToolbar from "../../components/molecules/SearchToolbar/SearchToolbar";
 import Tabs from "../../components/molecules/Tabs/Tabs";
 import IconButton from "../../components/atoms/IconButton/IconButton";
+import StatusBadge from "../../components/atoms/StatusBadge/StatusBadge";
 import { useGridData } from "../../hooks/useGridData";
 import { useReferenceData } from "../../hooks/useReferenceData";
 import { useCrudForm } from "../../hooks/useCrudForm";
+import { cleanCategoryFormData } from "../../core/utils/formHelpers";
 import "./Categories.scss";
 
 const categoriesData = new CategoriesData();
+categoriesData.transformFormData = cleanCategoryFormData;
 
 const INITIAL_FORM_DATA = {
-  categoryName: "", description: "", parentCategoryId: "",
+  categoryName: "",
+  description: "",
+  parentCategoryId: "",
 };
 
 const CRUD_OPTIONS = {
@@ -53,6 +58,7 @@ const CategoriesMenu = () => {
     handleClose,
   } = useCrudForm(INITIAL_FORM_DATA, categoriesData, CRUD_OPTIONS);
 
+  // Fetch grid data menggunakan CategoryListView dari backend
   const fetchGridData = useCallback(async (params) => {
     const filters = { 
       page: params.page || 1,
@@ -60,27 +66,15 @@ const CategoriesMenu = () => {
       search: params.search || searchTerm,
       ...params 
     };
-    const result = await categoriesData.fetchGridData(filters);
-    if (result.success) {
-      const rawData = result.data;
-      let dataArray = [];
-
-      if (rawData?.data?.data && Array.isArray(rawData.data.data)) {
-        dataArray = rawData.data.data;
-      } else if (rawData?.data && Array.isArray(rawData.data)) {
-        dataArray = rawData.data;
-      } else if (Array.isArray(rawData)) {
-        dataArray = rawData;
-      }
-
-      if (activeTab === "active") {
-        dataArray = dataArray.filter(c => c.isActive === true);
-      } else if (activeTab === "inactive") {
-        dataArray = dataArray.filter(c => c.isActive === false);
-      }
-
-      return { success: true, data: { data: dataArray, totalCount: dataArray.length } };
+    
+    // Apply tab filter
+    if (activeTab === "active") {
+      filters.isActive = true;
+    } else if (activeTab === "inactive") {
+      filters.isActive = false;
     }
+    
+    const result = await categoriesData.fetchGridData(filters);
     return result;
   }, [activeTab, searchTerm]);
 
@@ -116,7 +110,7 @@ const CategoriesMenu = () => {
 
   const onSubmit = useCallback(async (e) => {
     e.preventDefault();
-    if (!formData.categoryName.trim()) return;
+    if (!formData.categoryName?.trim()) return;
     if (isSubmitting) return;
     
     const data = { ...formData, isActive: editingCategory ? editingCategory.isActive : true };
@@ -143,20 +137,7 @@ const CategoriesMenu = () => {
       field: "isActive",
       headerName: "Status",
       width: 110,
-      renderCell: (p) => (
-        <Chip
-          label={p.value ? 'Active' : 'Inactive'}
-          size="small"
-          sx={{
-            bgcolor: p.value ? 'rgba(16, 185, 129, 0.1)' : 'rgba(107, 114, 128, 0.1)',
-            color: p.value ? '#10b981' : '#6b7280',
-            fontWeight: 500,
-            fontSize: '0.75rem',
-            height: 24,
-            borderRadius: '4px',
-          }}
-        />
-      ),
+      renderCell: (p) => <StatusBadge status={p.value ? 'Active' : 'Inactive'} />,
     },
     {
       field: "actions",
@@ -179,19 +160,24 @@ const CategoriesMenu = () => {
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
     setPage(1);
+    setSearchTerm("");
   }, [setPage]);
 
   if (loading && !categories.length) return <div className="page-loading"><Spinner size="lg" /></div>;
 
   return (
     <div className="categories-menu">
-      <div className="page-header">
-        <h1 className="page-title">Category</h1>
-        <PageHeader title="Category Management" buttonText="Add Category" onButtonClick={handleCreate} buttonIcon={<FiPlus />} />
-      </div>
+      <PageHeader 
+        title="Category Management"
+        actions={
+          <Button variant="primary" onClick={handleCreate} startIcon={<FiPlus />}>
+            Add Category
+          </Button>
+        }
+      />
 
       <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
-      <SearchToolbar onSearch={handleSearch} placeholder="Search by name..." />
+      <SearchToolbar onSearch={handleSearch} placeholder="Search by name, code..." />
       
       <div className="categories-menu__table" style={{ width: '100%', minWidth: 0 }}>
         <DataTable
@@ -219,10 +205,21 @@ const CategoriesMenu = () => {
         <form onSubmit={onSubmit}>
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <Input label="Category Name" value={formData.categoryName} onChange={e => setFormData({ ...formData, categoryName: e.target.value })} required />
+              <Input 
+                label="Category Name" 
+                value={formData.categoryName || ""} 
+                onChange={e => setFormData({ ...formData, categoryName: e.target.value })} 
+                required 
+              />
             </Grid>
             <Grid item xs={12}>
-              <Input label="Description" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} multiline rows={2} />
+              <Input 
+                label="Description" 
+                value={formData.description || ""} 
+                onChange={e => setFormData({ ...formData, description: e.target.value })} 
+                multiline 
+                rows={2} 
+              />
             </Grid>
             <Grid item xs={12}>
               <Select

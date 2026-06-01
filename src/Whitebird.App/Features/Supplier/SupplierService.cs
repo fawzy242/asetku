@@ -1,13 +1,16 @@
 using Mapster;
 using Microsoft.Extensions.Logging;
-using Whitebird.App.Features.Supplier;
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.Supplier;
-using Whitebird.Infra.Features.Supplier;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
+using Whitebird.Infra.Features.Supplier;
 
 namespace Whitebird.App.Features.Supplier;
 
+/// <summary>
+/// Service implementation for Supplier business logic
+/// </summary>
 public class SupplierService : BaseService, ISupplierService
 {
     private readonly IGenericRepository<SupplierEntity> _repository;
@@ -28,45 +31,53 @@ public class SupplierService : BaseService, ISupplierService
         _activityLogService = activityLogService;
     }
 
-    public async Task<ServiceResult<SupplierDetailViewModel>> GetByIdAsync(int id)
+    /// <inheritdoc />
+    public async Task<ServiceResult<SupplierDetailView>> GetByIdAsync(int id)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var supplier = await _supplierReps.GetByIdAsync(id);
+            var supplier = await _supplierReps.GetDetailByIdAsync(id);
             if (supplier == null)
-                return ServiceResult<SupplierDetailViewModel>.NotFound($"Supplier with id {id} not found");
-
-            var viewModel = supplier.Adapt<SupplierDetailViewModel>();
-            viewModel.AssetCount = await _supplierReps.GetAssetCountAsync(id);
-            return ServiceResult<SupplierDetailViewModel>.Success(viewModel);
+            {
+                return ServiceResult<SupplierDetailView>.NotFound($"Supplier with id {id} not found");
+            }
+            return ServiceResult<SupplierDetailView>.Success(supplier);
         }, "get supplier by id");
     }
 
-    public async Task<ServiceResult<IEnumerable<SupplierListViewModel>>> GetAllAsync()
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<SupplierListView>>> GetAllAsync()
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var suppliers = await _supplierReps.GetAllAsync();
-            return ServiceResult<IEnumerable<SupplierListViewModel>>.Success(suppliers.Adapt<IEnumerable<SupplierListViewModel>>());
+            var suppliers = await _supplierReps.GetAllListViewAsync();
+            return ServiceResult<IEnumerable<SupplierListView>>.Success(suppliers);
         }, "get all suppliers");
     }
 
-    public async Task<ServiceResult<IEnumerable<SupplierListViewModel>>> GetActiveOnlyAsync()
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<SupplierListView>>> GetActiveOnlyAsync()
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var suppliers = await _supplierReps.GetActiveOnlyAsync();
-            return ServiceResult<IEnumerable<SupplierListViewModel>>.Success(suppliers.Adapt<IEnumerable<SupplierListViewModel>>());
+            var suppliers = await _supplierReps.GetActiveOnlyListViewAsync();
+            return ServiceResult<IEnumerable<SupplierListView>>.Success(suppliers);
         }, "get active suppliers");
     }
 
-    public async Task<ServiceResult<SupplierDetailViewModel>> CreateAsync(SupplierCreateViewModel model)
+    /// <inheritdoc />
+    public async Task<ServiceResult<SupplierDetailView>> CreateAsync(SupplierCreateViewModel model)
     {
         if (string.IsNullOrWhiteSpace(model.SupplierName))
-            return ServiceResult<SupplierDetailViewModel>.BadRequest("Supplier name is required");
+        {
+            return ServiceResult<SupplierDetailView>.BadRequest("Supplier name is required");
+        }
 
-        if (await _supplierReps.IsSupplierNameExistsAsync(model.SupplierName))
-            return ServiceResult<SupplierDetailViewModel>.Conflict($"Supplier '{model.SupplierName}' already exists");
+        var nameExists = await _supplierReps.IsSupplierNameExistsAsync(model.SupplierName);
+        if (nameExists)
+        {
+            return ServiceResult<SupplierDetailView>.Conflict($"Supplier '{model.SupplierName}' already exists");
+        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
@@ -76,36 +87,42 @@ public class SupplierService : BaseService, ISupplierService
             entity.CreatedBy = _currentUserService.GetDisplayName();
 
             var id = await _repository.InsertAsync(entity);
-            var created = await _supplierReps.GetByIdAsync(Convert.ToInt32(id));
+            var created = await _supplierReps.GetDetailByIdAsync(Convert.ToInt32(id));
 
             if (created != null)
             {
                 await _activityLogService.LogCreateAsync(
-                    "Supplier",
+                    TableNames.Supplier,
                     created.SupplierId,
                     $"Supplier '{created.SupplierName}' created successfully",
                     _currentUserService.GetDisplayName());
             }
 
             return created == null
-                ? ServiceResult<SupplierDetailViewModel>.Failure("Failed to retrieve created supplier")
-                : ServiceResult<SupplierDetailViewModel>.Success(created.Adapt<SupplierDetailViewModel>(), "Supplier created successfully");
+                ? ServiceResult<SupplierDetailView>.Failure("Failed to retrieve created supplier")
+                : ServiceResult<SupplierDetailView>.Success(created, "Supplier created successfully");
         }, "create supplier", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Supplier", 0, "Create Supplier", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Supplier, 0, "Create Supplier", ex, _currentUserService.GetDisplayName());
         });
     }
 
-    public async Task<ServiceResult<SupplierDetailViewModel>> UpdateAsync(int id, SupplierUpdateViewModel model)
+    /// <inheritdoc />
+    public async Task<ServiceResult<SupplierDetailView>> UpdateAsync(int id, SupplierUpdateViewModel model)
     {
-        if (await _supplierReps.IsSupplierNameExistsAsync(model.SupplierName, id))
-            return ServiceResult<SupplierDetailViewModel>.Conflict($"Supplier '{model.SupplierName}' already exists");
+        var nameExists = await _supplierReps.IsSupplierNameExistsAsync(model.SupplierName, id);
+        if (nameExists)
+        {
+            return ServiceResult<SupplierDetailView>.Conflict($"Supplier '{model.SupplierName}' already exists");
+        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var existing = await _repository.GetByIdAsync(id);
+            var existing = await _supplierReps.GetByIdRawAsync(id);
             if (existing == null)
-                return ServiceResult<SupplierDetailViewModel>.NotFound($"Supplier with id {id} not found");
+            {
+                return ServiceResult<SupplierDetailView>.NotFound($"Supplier with id {id} not found");
+            }
 
             var oldName = existing.SupplierName;
             var oldContact = existing.ContactPerson;
@@ -116,40 +133,48 @@ public class SupplierService : BaseService, ISupplierService
 
             var result = await _repository.UpdateAsync(existing);
             if (result <= 0)
-                return ServiceResult<SupplierDetailViewModel>.Failure("Failed to update supplier");
+            {
+                return ServiceResult<SupplierDetailView>.Failure("Failed to update supplier");
+            }
 
-            var updated = await _supplierReps.GetByIdAsync(id);
+            var updated = await _supplierReps.GetDetailByIdAsync(id);
 
             await _activityLogService.LogUpdateAsync(
-                "Supplier",
+                TableNames.Supplier,
                 id,
-                $"Supplier updated: Name '{oldName}' -> '{existing.SupplierName}', Contact '{oldContact}' -> '{existing.ContactPerson}'",
+                $"Supplier updated: Name '{oldName}' -> '{model.SupplierName}', Contact '{oldContact}' -> '{model.ContactPerson}'",
                 _currentUserService.GetDisplayName());
 
-            return ServiceResult<SupplierDetailViewModel>.Success(updated!.Adapt<SupplierDetailViewModel>(), "Supplier updated successfully");
+            return ServiceResult<SupplierDetailView>.Success(updated!, "Supplier updated successfully");
         }, "update supplier", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Supplier", id, "Update Supplier", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Supplier, id, "Update Supplier", ex, _currentUserService.GetDisplayName());
         });
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var existing = await _repository.GetByIdAsync(id);
+            var existing = await _supplierReps.GetByIdRawAsync(id);
             if (existing == null)
+            {
                 return ServiceResult.NotFound($"Supplier with id {id} not found");
+            }
 
-            if (await _supplierReps.GetAssetCountAsync(id) > 0)
-                return ServiceResult.BadRequest("Cannot delete supplier with associated assets");
+            var assetCount = await _supplierReps.GetAssetCountAsync(id);
+            if (assetCount > 0)
+            {
+                return ServiceResult.BadRequest($"Cannot delete supplier with {assetCount} associated assets");
+            }
 
             var result = await _repository.DeleteAsync(id);
 
             if (result > 0)
             {
                 await _activityLogService.LogDeleteAsync(
-                    "Supplier",
+                    TableNames.Supplier,
                     id,
                     $"Supplier '{existing.SupplierName}' deleted permanently",
                     _currentUserService.GetDisplayName());
@@ -160,17 +185,20 @@ public class SupplierService : BaseService, ISupplierService
                 : ServiceResult.Success("Supplier deleted successfully");
         }, "delete supplier", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Supplier", id, "Delete Supplier", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Supplier, id, "Delete Supplier", ex, _currentUserService.GetDisplayName());
         });
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> SoftDeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var existing = await _repository.GetByIdAsync(id);
+            var existing = await _supplierReps.GetByIdRawAsync(id);
             if (existing == null)
+            {
                 return ServiceResult.NotFound($"Supplier with id {id} not found");
+            }
 
             existing.IsActive = false;
             existing.ModifiedDate = DateTime.Now;
@@ -181,7 +209,7 @@ public class SupplierService : BaseService, ISupplierService
             if (result > 0)
             {
                 await _activityLogService.LogSoftDeleteAsync(
-                    "Supplier",
+                    TableNames.Supplier,
                     id,
                     $"Supplier '{existing.SupplierName}' soft deleted",
                     _currentUserService.GetDisplayName());
@@ -192,38 +220,33 @@ public class SupplierService : BaseService, ISupplierService
                 : ServiceResult.Success("Supplier soft deleted successfully");
         }, "soft delete supplier", async (ex) =>
         {
-            await _activityLogService.LogErrorAsync("Supplier", id, "Soft Delete Supplier", ex, _currentUserService.GetDisplayName());
+            await _activityLogService.LogErrorAsync(TableNames.Supplier, id, "Soft Delete Supplier", ex, _currentUserService.GetDisplayName());
         });
     }
 
-    public async Task<ServiceResult<PaginatedResult<SupplierListViewModel>>> GetGridDataAsync(int page, int pageSize, string? search = null)
+    /// <inheritdoc />
+    public async Task<ServiceResult<PaginatedResult<SupplierListView>>> GetGridDataAsync(int page, int pageSize, string? search = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var suppliers = await _supplierReps.GetAllAsync();
-            var query = suppliers.AsQueryable();
-
+            var filters = new Dictionary<string, object>();
             if (!string.IsNullOrWhiteSpace(search))
             {
-                query = query.Where(s =>
-                    s.SupplierName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                    (s.ContactPerson != null && s.ContactPerson.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
-                    (s.Email != null && s.Email.Contains(search, StringComparison.OrdinalIgnoreCase))
-                );
+                filters["search"] = search;
             }
 
-            var totalCount = query.Count();
-            var pagedData = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-            var viewModels = pagedData.Adapt<List<SupplierListViewModel>>();
-
-            return ServiceResult<PaginatedResult<SupplierListViewModel>>.Success(new PaginatedResult<SupplierListViewModel>
-            {
-                Data = viewModels,
-                TotalCount = totalCount,
-                PageNumber = page,
-                PageSize = pageSize,
-                TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
-            });
+            var result = await _supplierReps.GetPagedListAsync(page, pageSize, search, "SupplierName", false, filters);
+            return ServiceResult<PaginatedResult<SupplierListView>>.Success(result);
         }, "get supplier grid data");
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<SupplierDropdownView>>> GetDropdownListAsync()
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var suppliers = await _supplierReps.GetDropdownListAsync();
+            return ServiceResult<IEnumerable<SupplierDropdownView>>.Success(suppliers);
+        }, "get supplier dropdown list");
     }
 }

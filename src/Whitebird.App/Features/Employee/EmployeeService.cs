@@ -4,16 +4,20 @@ using Whitebird.App.Features.Common;
 using Whitebird.App.Features.MasterData;
 using Whitebird.Domain.Features.Employee;
 using Whitebird.Domain.Features.AssetTransaction;
+using Whitebird.Domain.Features.Common;
+using Whitebird.Domain.Features.MasterData;
 using Whitebird.Infra.Features.Common;
 using Whitebird.Infra.Features.Department;
 using Whitebird.Infra.Features.Employee;
 using Whitebird.Infra.Features.Office;
 using Whitebird.Infra.Features.Asset;
 using Whitebird.Infra.Features.AssetTransaction;
-using Whitebird.Domain.Features.Common;
 
 namespace Whitebird.App.Features.Employee;
 
+/// <summary>
+/// Service implementation for Employee business logic
+/// </summary>
 public class EmployeeService : BaseService, IEmployeeService
 {
     private readonly IGenericRepository<EmployeeEntity> _repository;
@@ -23,6 +27,7 @@ public class EmployeeService : BaseService, IEmployeeService
     private readonly IAssetReps _assetReps;
     private readonly IAssetTransactionReps _transactionReps;
     private readonly IMasterDataService _masterDataService;
+    private readonly IMasterDataLookupService _masterDataLookupService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
 
@@ -34,6 +39,7 @@ public class EmployeeService : BaseService, IEmployeeService
         IAssetReps assetReps,
         IAssetTransactionReps transactionReps,
         IMasterDataService masterDataService,
+        IMasterDataLookupService masterDataLookupService,
         ICurrentUserService currentUserService,
         IActivityLogService activityLogService,
         ILogger<EmployeeService> logger) : base(logger)
@@ -45,91 +51,122 @@ public class EmployeeService : BaseService, IEmployeeService
         _assetReps = assetReps;
         _transactionReps = transactionReps;
         _masterDataService = masterDataService;
+        _masterDataLookupService = masterDataLookupService;
         _currentUserService = currentUserService;
         _activityLogService = activityLogService;
     }
 
-    public async Task<ServiceResult<EmployeeDetailViewModel>> GetByIdAsync(int id)
+    /// <inheritdoc />
+    public async Task<ServiceResult<EmployeeDetailView>> GetByIdAsync(int id)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var employee = await _employeeReps.GetByIdWithRelationsAsync(id);
+            var employee = await _employeeReps.GetDetailByIdAsync(id);
             if (employee == null)
-                return ServiceResult<EmployeeDetailViewModel>.NotFound($"Employee with id {id} not found");
+            {
+                return ServiceResult<EmployeeDetailView>.NotFound($"Employee with id {id} not found");
+            }
 
-            var viewModel = MapToDetailViewModel(employee);
-            viewModel.ActiveAssetsCount = await _employeeReps.GetActiveAssetsCountAsync(id);
-            return ServiceResult<EmployeeDetailViewModel>.Success(viewModel);
+            employee.ActiveAssetsCount = await _employeeReps.GetActiveAssetsCountAsync(id);
+            return ServiceResult<EmployeeDetailView>.Success(employee);
         }, "get employee by id");
     }
 
-    public async Task<ServiceResult<IEnumerable<EmployeeListViewModel>>> GetAllAsync()
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<EmployeeListView>>> GetAllAsync()
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var employees = await _employeeReps.GetAllAsync();
-            var viewModels = MapToViewModels(employees);
-            return ServiceResult<IEnumerable<EmployeeListViewModel>>.Success(viewModels);
+            var employees = await _employeeReps.GetAllListViewAsync();
+            return ServiceResult<IEnumerable<EmployeeListView>>.Success(employees);
         }, "get all employees");
     }
 
-    public async Task<ServiceResult<IEnumerable<EmployeeListViewModel>>> GetByDepartmentAsync(int departmentId)
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<EmployeeListView>>> GetByDepartmentAsync(int departmentId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var employees = await _employeeReps.GetByDepartmentIdAsync(departmentId);
-            var viewModels = MapToViewModels(employees);
-            return ServiceResult<IEnumerable<EmployeeListViewModel>>.Success(viewModels);
+            var department = await _departmentReps.GetByIdRawAsync(departmentId);
+            if (department == null)
+            {
+                return ServiceResult<IEnumerable<EmployeeListView>>.NotFound($"Department with id {departmentId} not found");
+            }
+
+            var employees = await _employeeReps.GetByDepartmentIdListViewAsync(departmentId);
+            return ServiceResult<IEnumerable<EmployeeListView>>.Success(employees);
         }, "get employees by department");
     }
 
-    public async Task<ServiceResult<IEnumerable<EmployeeListViewModel>>> GetByStatusAsync(int employmentStatus)
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<EmployeeListView>>> GetByStatusAsync(int employmentStatus)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var employees = await _employeeReps.GetByEmploymentStatusAsync(employmentStatus);
-            var viewModels = MapToViewModels(employees);
-            return ServiceResult<IEnumerable<EmployeeListViewModel>>.Success(viewModels);
+            var statusExists = await _masterDataLookupService.GetEmployeeStatusNameAsync(employmentStatus);
+            if (!statusExists.IsSuccess || statusExists.Data == null)
+            {
+                return ServiceResult<IEnumerable<EmployeeListView>>.BadRequest($"Invalid employment status: {employmentStatus}");
+            }
+
+            var employees = await _employeeReps.GetByEmploymentStatusListViewAsync(employmentStatus);
+            return ServiceResult<IEnumerable<EmployeeListView>>.Success(employees);
         }, "get employees by status");
     }
 
-    public async Task<ServiceResult<EmployeeDetailViewModel>> CreateAsync(EmployeeCreateViewModel model)
+    /// <inheritdoc />
+    public async Task<ServiceResult<EmployeeDetailView>> CreateAsync(EmployeeCreateViewModel model)
     {
         if (string.IsNullOrWhiteSpace(model.FullName))
-            return ServiceResult<EmployeeDetailViewModel>.BadRequest("Full name is required");
+        {
+            return ServiceResult<EmployeeDetailView>.BadRequest("Full name is required");
+        }
 
         if (string.IsNullOrWhiteSpace(model.EmployeeCode))
-            return ServiceResult<EmployeeDetailViewModel>.BadRequest("Employee code is required");
+        {
+            return ServiceResult<EmployeeDetailView>.BadRequest("Employee code is required");
+        }
 
-        if (await _employeeReps.IsEmployeeCodeExistsAsync(model.EmployeeCode))
-            return ServiceResult<EmployeeDetailViewModel>.Conflict($"Employee code '{model.EmployeeCode}' already exists");
+        var codeExists = await _employeeReps.IsEmployeeCodeExistsAsync(model.EmployeeCode);
+        if (codeExists)
+        {
+            return ServiceResult<EmployeeDetailView>.Conflict($"Employee code '{model.EmployeeCode}' already exists");
+        }
 
         if (model.DepartmentId.HasValue && model.DepartmentId.Value > 0)
         {
-            var department = await _departmentReps.GetByIdAsync(model.DepartmentId.Value);
+            var department = await _departmentReps.GetByIdRawAsync(model.DepartmentId.Value);
             if (department == null)
-                return ServiceResult<EmployeeDetailViewModel>.BadRequest($"Department with id {model.DepartmentId} does not exist");
+            {
+                return ServiceResult<EmployeeDetailView>.BadRequest($"Department with id {model.DepartmentId} does not exist");
+            }
         }
 
         if (model.OfficeId.HasValue && model.OfficeId.Value > 0)
         {
-            var office = await _officeReps.GetByIdAsync(model.OfficeId.Value);
+            var office = await _officeReps.GetByIdRawAsync(model.OfficeId.Value);
             if (office == null)
-                return ServiceResult<EmployeeDetailViewModel>.BadRequest($"Office with id {model.OfficeId} does not exist");
+            {
+                return ServiceResult<EmployeeDetailView>.BadRequest($"Office with id {model.OfficeId} does not exist");
+            }
         }
 
         if (model.Position.HasValue)
         {
-            var positionExists = await _masterDataService.GetValueAsync("Position", model.Position.Value);
+            var positionExists = await _masterDataLookupService.GetPositionNameAsync(model.Position.Value);
             if (!positionExists.IsSuccess || positionExists.Data == null)
-                return ServiceResult<EmployeeDetailViewModel>.BadRequest($"Invalid Position value: {model.Position}");
+            {
+                return ServiceResult<EmployeeDetailView>.BadRequest($"Invalid Position value: {model.Position}");
+            }
         }
 
         if (model.EmploymentStatus.HasValue)
         {
-            var statusExists = await _masterDataService.GetValueAsync("EmployeeStatus", model.EmploymentStatus.Value);
+            var statusExists = await _masterDataLookupService.GetEmployeeStatusNameAsync(model.EmploymentStatus.Value);
             if (!statusExists.IsSuccess || statusExists.Data == null)
-                return ServiceResult<EmployeeDetailViewModel>.BadRequest($"Invalid EmploymentStatus value: {model.EmploymentStatus}");
+            {
+                return ServiceResult<EmployeeDetailView>.BadRequest($"Invalid EmploymentStatus value: {model.EmploymentStatus}");
+            }
         }
 
         return await ExecuteWithTransactionAsync(async () =>
@@ -140,7 +177,7 @@ public class EmployeeService : BaseService, IEmployeeService
             entity.CreatedBy = _currentUserService.GetDisplayName();
 
             var id = await _repository.InsertAsync(entity);
-            var created = await _employeeReps.GetByIdWithRelationsAsync(Convert.ToInt32(id));
+            var created = await _employeeReps.GetDetailByIdAsync(Convert.ToInt32(id));
 
             if (created != null)
             {
@@ -152,24 +189,30 @@ public class EmployeeService : BaseService, IEmployeeService
             }
 
             return created == null
-                ? ServiceResult<EmployeeDetailViewModel>.Failure("Failed to retrieve created employee")
-                : ServiceResult<EmployeeDetailViewModel>.Success(MapToDetailViewModel(created), "Employee created successfully");
+                ? ServiceResult<EmployeeDetailView>.Failure("Failed to retrieve created employee")
+                : ServiceResult<EmployeeDetailView>.Success(created, "Employee created successfully");
         }, "create employee", async (ex) =>
         {
             await _activityLogService.LogErrorAsync(TableNames.Employee, 0, "Create Employee", ex, _currentUserService.GetDisplayName());
         });
     }
 
-    public async Task<ServiceResult<EmployeeDetailViewModel>> UpdateAsync(int id, EmployeeUpdateViewModel model)
+    /// <inheritdoc />
+    public async Task<ServiceResult<EmployeeDetailView>> UpdateAsync(int id, EmployeeUpdateViewModel model)
     {
-        if (await _employeeReps.IsEmployeeCodeExistsAsync(model.EmployeeCode, id))
-            return ServiceResult<EmployeeDetailViewModel>.Conflict($"Employee code '{model.EmployeeCode}' already exists");
+        var codeExists = await _employeeReps.IsEmployeeCodeExistsAsync(model.EmployeeCode, id);
+        if (codeExists)
+        {
+            return ServiceResult<EmployeeDetailView>.Conflict($"Employee code '{model.EmployeeCode}' already exists");
+        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var existing = await _employeeReps.GetByIdAsync(id);
+            var existing = await _employeeReps.GetByIdRawAsync(id);
             if (existing == null)
-                return ServiceResult<EmployeeDetailViewModel>.NotFound($"Employee with id {id} not found");
+            {
+                return ServiceResult<EmployeeDetailView>.NotFound($"Employee with id {id} not found");
+            }
 
             var oldCode = existing.EmployeeCode;
             var oldName = existing.FullName;
@@ -181,9 +224,11 @@ public class EmployeeService : BaseService, IEmployeeService
 
             var result = await _repository.UpdateAsync(existing);
             if (result <= 0)
-                return ServiceResult<EmployeeDetailViewModel>.Failure("Failed to update employee");
+            {
+                return ServiceResult<EmployeeDetailView>.Failure("Failed to update employee");
+            }
 
-            var updated = await _employeeReps.GetByIdWithRelationsAsync(id);
+            var updated = await _employeeReps.GetDetailByIdAsync(id);
 
             await _activityLogService.LogUpdateAsync(
                 TableNames.Employee,
@@ -191,24 +236,29 @@ public class EmployeeService : BaseService, IEmployeeService
                 $"Employee updated: Code '{oldCode}', Name '{oldName}' -> '{model.FullName}', Status '{oldStatus}' -> '{model.EmploymentStatus}'",
                 _currentUserService.GetDisplayName());
 
-            return ServiceResult<EmployeeDetailViewModel>.Success(MapToDetailViewModel(updated!), "Employee updated successfully");
+            return ServiceResult<EmployeeDetailView>.Success(updated!, "Employee updated successfully");
         }, "update employee", async (ex) =>
         {
             await _activityLogService.LogErrorAsync(TableNames.Employee, id, "Update Employee", ex, _currentUserService.GetDisplayName());
         });
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var existing = await _employeeReps.GetByIdAsync(id);
+            var existing = await _employeeReps.GetByIdRawAsync(id);
             if (existing == null)
+            {
                 return ServiceResult.NotFound($"Employee with id {id} not found");
+            }
 
             var activeAssets = await _employeeReps.GetActiveAssetsCountAsync(id);
             if (activeAssets > 0)
+            {
                 return ServiceResult.BadRequest($"Cannot delete employee with {activeAssets} active assets assigned");
+            }
 
             var result = await _repository.DeleteAsync(id);
 
@@ -230,13 +280,16 @@ public class EmployeeService : BaseService, IEmployeeService
         });
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult> SoftDeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var existing = await _employeeReps.GetByIdAsync(id);
+            var existing = await _employeeReps.GetByIdRawAsync(id);
             if (existing == null)
+            {
                 return ServiceResult.NotFound($"Employee with id {id} not found");
+            }
 
             existing.IsActive = false;
             existing.ModifiedDate = DateTime.Now;
@@ -262,103 +315,41 @@ public class EmployeeService : BaseService, IEmployeeService
         });
     }
 
-    // FIXED: Update GetGridDataAsync to use repository pagination
-    public async Task<ServiceResult<PaginatedResult<EmployeeListViewModel>>> GetGridDataAsync(
+    /// <inheritdoc />
+    public async Task<ServiceResult<PaginatedResult<EmployeeListView>>> GetGridDataAsync(
         int page, int pageSize, string? search = null, string? sortBy = null,
         bool sortDescending = false, Dictionary<string, object>? filters = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var result = await _employeeReps.GetPagedWithRelationsAsync(page, pageSize, search, sortBy, sortDescending, filters);
-            var viewModels = result.Data.Adapt<List<EmployeeListViewModel>>();
-
-            return ServiceResult<PaginatedResult<EmployeeListViewModel>>.Success(new PaginatedResult<EmployeeListViewModel>
-            {
-                Data = viewModels,
-                TotalCount = result.TotalCount,
-                PageNumber = result.PageNumber,
-                PageSize = result.PageSize,
-                TotalPages = result.TotalPages,
-                Filters = filters,
-                SortBy = sortBy,
-                SortDescending = sortDescending
-            });
+            var result = await _employeeReps.GetPagedListAsync(page, pageSize, search, sortBy, sortDescending, filters);
+            return ServiceResult<PaginatedResult<EmployeeListView>>.Success(result);
         }, "get employee grid data");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult<EmployeeAssetSummaryViewModel>> GetAssetSummaryAsync(int employeeId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var employee = await _employeeReps.GetByIdWithRelationsAsync(employeeId);
-            if (employee == null)
+            var summary = await _employeeReps.GetAssetSummaryByEmployeeIdAsync(employeeId);
+            if (summary == null)
+            {
                 return ServiceResult<EmployeeAssetSummaryViewModel>.NotFound($"Employee with id {employeeId} not found");
-
-            var currentAssets = await _assetReps.GetByHolderWithRelationsAsync(employeeId);
-            var allTransactions = await _transactionReps.GetEmployeeTransactionHistoryAsync(employeeId);
-
-            var summary = new EmployeeAssetSummaryViewModel
-            {
-                EmployeeId = employee.EmployeeId,
-                EmployeeCode = employee.EmployeeCode,
-                FullName = employee.FullName,
-                DepartmentName = employee.DepartmentName,
-                EmploymentStatusName = employee.EmploymentStatusName,
-                CurrentlyHeldAssets = currentAssets.Count(),
-                AssetsOnLoan = await _employeeReps.GetAssetsOnLoanCountAsync(employeeId),
-                OverdueLoans = await _employeeReps.GetOverdueLoansCountAsync(employeeId),
-                TotalHistoricalAssets = await _employeeReps.GetTotalHistoricalAssetsAsync(employeeId),
-                ReturnedAssets = await _employeeReps.GetReturnedAssetsCountAsync(employeeId),
-                DamagedReturns = await _employeeReps.GetDamagedReturnsCountAsync(employeeId)
-            };
-
-            foreach (var asset in currentAssets)
-            {
-                var lastTxn = allTransactions
-                    .Where(t => t.AssetId == asset.AssetId)
-                    .OrderByDescending(t => t.TransactionDate)
-                    .FirstOrDefault();
-
-                summary.CurrentAssets.Add(new EmployeeAssetDetail
-                {
-                    AssetId = asset.AssetId,
-                    AssetCode = asset.AssetCode,
-                    AssetName = asset.AssetName,
-                    CategoryName = asset.CategoryName ?? "Unknown",
-                    Status = DeriveAssetStatusFromTransaction(lastTxn),
-                    AssociationType = lastTxn?.TransactionType == 3 ? "On Loan" : "Assigned",
-                    SinceDate = lastTxn?.TransactionDate ?? asset.CreatedDate,
-                    ExpectedReturnDate = lastTxn?.ExpectedReturnDate,
-                    IsOverdue = lastTxn?.TransactionType == 3 && lastTxn.ExpectedReturnDate.HasValue && lastTxn.ExpectedReturnDate.Value < DateTime.Now,
-                    ConditionName = asset.AssetConditionName
-                });
             }
 
-            foreach (var txn in allTransactions.OrderByDescending(t => t.TransactionDate))
-            {
-                summary.AssetHistory.Add(new EmployeeAssetHistory
-                {
-                    AssetTransactionId = txn.AssetTransactionId,
-                    AssetId = txn.AssetId,
-                    AssetCode = txn.AssetCode ?? "Unknown",
-                    AssetName = txn.AssetName ?? "Unknown",
-                    TransactionTypeName = txn.TransactionTypeName ?? txn.TransactionType.ToString(),
-                    TransactionDate = txn.TransactionDate,
-                    FromEmployeeName = txn.FromEmployeeName,
-                    ToEmployeeName = txn.ToEmployeeName,
-                    ConditionAfterName = txn.ConditionAfterName,
-                    Notes = txn.Notes
-                });
-            }
-
-            return ServiceResult<EmployeeAssetSummaryViewModel>.Success(summary);
+            var result = summary.Adapt<EmployeeAssetSummaryViewModel>();
+            return ServiceResult<EmployeeAssetSummaryViewModel>.Success(result);
         }, "get employee asset summary");
     }
 
+    /// <inheritdoc />
     public async Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request)
     {
         if (request.Ids == null || !request.Ids.Any())
+        {
             return ServiceResult<int>.BadRequest("No employee IDs provided");
+        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
@@ -366,7 +357,7 @@ public class EmployeeService : BaseService, IEmployeeService
 
             foreach (var id in request.Ids)
             {
-                var employee = await _employeeReps.GetByIdAsync(id);
+                var employee = await _employeeReps.GetByIdRawAsync(id);
                 if (employee != null && employee.IsActive != request.Activate)
                 {
                     employee.IsActive = request.Activate;
@@ -391,52 +382,13 @@ public class EmployeeService : BaseService, IEmployeeService
         });
     }
 
-    #region Private Helpers
-
-    private EmployeeDetailViewModel MapToDetailViewModel(EmployeeEntity entity)
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<EmployeeDropdownView>>> GetDropdownListAsync()
     {
-        var viewModel = entity.Adapt<EmployeeDetailViewModel>();
-
-        viewModel.DepartmentName = entity.DepartmentName;
-        viewModel.OfficeName = entity.OfficeName;
-        viewModel.PositionName = entity.PositionName;
-        viewModel.EmploymentStatusName = entity.EmploymentStatusName;
-
-        return viewModel;
-    }
-
-    private IEnumerable<EmployeeListViewModel> MapToViewModels(IEnumerable<EmployeeEntity> entities)
-    {
-        var viewModels = entities.Adapt<List<EmployeeListViewModel>>();
-
-        foreach (var vm in viewModels)
+        return await ExecuteSafelyAsync(async () =>
         {
-            var entity = entities.FirstOrDefault(e => e.EmployeeId == vm.EmployeeId);
-            if (entity != null)
-            {
-                vm.DepartmentName = entity.DepartmentName;
-                vm.OfficeName = entity.OfficeName;
-                vm.PositionName = entity.PositionName;
-                vm.EmploymentStatusName = entity.EmploymentStatusName;
-            }
-        }
-
-        return viewModels;
+            var employees = await _employeeReps.GetDropdownListAsync();
+            return ServiceResult<IEnumerable<EmployeeDropdownView>>.Success(employees);
+        }, "get employee dropdown list");
     }
-
-    private string DeriveAssetStatusFromTransaction(AssetTransactionEntity? transaction)
-    {
-        if (transaction == null)
-            return "Available";
-
-        return transaction.TransactionType switch
-        {
-            1 or 2 => "Assigned",
-            3 => "On Loan",
-            6 => "In Maintenance",
-            _ => "Available"
-        };
-    }
-
-    #endregion
 }

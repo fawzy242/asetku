@@ -4,6 +4,9 @@ using Whitebird.Domain.Features.MasterData;
 
 namespace Whitebird.Infra.Features.MasterData;
 
+/// <summary>
+/// Repository implementation for Master Data operations using Dapper
+/// </summary>
 public class MasterDataReps : IMasterDataReps
 {
     private readonly DapperContext _context;
@@ -13,18 +16,21 @@ public class MasterDataReps : IMasterDataReps
         _context = context;
     }
 
+    /// <inheritdoc />
     public async Task<MasterDataEntity?> GetByIdAsync(int id)
     {
         const string sql = "SELECT * FROM MasterData WHERE MasterDataId = @Id AND IsActive = 1";
         return await _context.QueryFirstOrDefaultAsync<MasterDataEntity>(sql, new { Id = id });
     }
 
+    /// <inheritdoc />
     public async Task<IEnumerable<MasterDataEntity>> GetAllAsync()
     {
         const string sql = "SELECT * FROM MasterData WHERE IsActive = 1 ORDER BY ReferenceName, ReferenceCode";
         return await _context.QueryAsync<MasterDataEntity>(sql);
     }
 
+    /// <inheritdoc />
     public async Task<IEnumerable<MasterDataEntity>> GetByReferenceNameAsync(string referenceName)
     {
         const string sql = @"
@@ -34,6 +40,7 @@ public class MasterDataReps : IMasterDataReps
         return await _context.QueryAsync<MasterDataEntity>(sql, new { ReferenceName = referenceName });
     }
 
+    /// <inheritdoc />
     public async Task<MasterDataEntity?> GetByReferenceNameAndCodeAsync(string referenceName, int code)
     {
         const string sql = @"
@@ -42,6 +49,7 @@ public class MasterDataReps : IMasterDataReps
         return await _context.QueryFirstOrDefaultAsync<MasterDataEntity>(sql, new { ReferenceName = referenceName, Code = code });
     }
 
+    /// <inheritdoc />
     public async Task<bool> IsExistsAsync(string referenceName, int code)
     {
         const string sql = @"
@@ -50,6 +58,7 @@ public class MasterDataReps : IMasterDataReps
         return await _context.ExecuteScalarAsync<int>(sql, new { ReferenceName = referenceName, Code = code }) > 0;
     }
 
+    /// <inheritdoc />
     public async Task<IEnumerable<string>> GetDistinctReferenceNamesAsync()
     {
         const string sql = "SELECT DISTINCT ReferenceName FROM MasterData WHERE IsActive = 1 ORDER BY ReferenceName";

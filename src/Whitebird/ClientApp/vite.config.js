@@ -7,7 +7,10 @@ export default defineConfig(({ mode }) => {
   const isDev = mode === "development";
   const isProd = mode === "production";
 
-  const backendUrl = env.VITE_API_BASE_URL || "https://localhost:5001";
+  // Ambil dari environment variable, fallback ke https://localhost:5001
+  const backendUrl = env.VITE_API_BASE_URL || "https://localhost:5001/api";
+  // Hapus /api dari URL untuk proxy (karena proxy sudah pakai /api path)
+  const proxyTarget = backendUrl.replace(/\/api$/, "");
 
   return {
     plugins: [react()],
@@ -21,17 +24,18 @@ export default defineConfig(({ mode }) => {
       open: isDev,
       proxy: {
         "/api": {
-          target: backendUrl,
+          target: proxyTarget,
           changeOrigin: true,
-          secure: false,
+          secure: false,  // Untuk self-signed certificate
+          // rewrite: (path) => path, // Tidak perlu rewrite karena path /api sudah benar
         },
         "/health": {
-          target: backendUrl,
+          target: proxyTarget,
           changeOrigin: true,
           secure: false,
         },
         "/swagger": {
-          target: backendUrl,
+          target: proxyTarget,
           changeOrigin: true,
           secure: false,
         },

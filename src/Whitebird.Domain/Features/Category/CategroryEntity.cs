@@ -9,10 +9,7 @@ public class CategoryEntity : AuditableEntity
     public string CategoryName { get; set; } = default!;
     public string? Description { get; set; }
     public int? ParentCategoryId { get; set; }
-
-    [NotMapped]
-    public string? ParentCategoryName { get; set; }
-
-    [NotMapped]
-    public int ChildCount { get; set; }
+    
+    // NOTE: Semua NotMapped properties telah dihapus.
+    // Untuk query dengan JOIN, gunakan CategoryListView.
 }
