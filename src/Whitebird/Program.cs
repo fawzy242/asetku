@@ -106,7 +106,7 @@ builder.Services.AddCors(options =>
                   .AllowAnyHeader();
         });
     }
-    
+
     // Production: Hanya origins yang diizinkan
     options.AddPolicy("AllowFrontend", policy =>
     {
@@ -209,9 +209,39 @@ if (app.Environment.IsDevelopment())
 }
 
 // ========== SERVE STATIC FILES (Frontend) ==========
-app.UseDefaultFiles();
-app.UseStaticFiles();
-app.MapFallbackToFile("/index.html");
+// 🔥 PRODUCTION SAJA yang pakai konfigurasi wwwroot 🔥
+// 🔥 DEVELOPMENT tetap normal (pakai Vite dev server atau static files) 🔥
+
+if (app.Environment.IsProduction())
+{
+    // ========== PRODUCTION: Frontend di folder wwwroot ==========
+    var webRootPath = Path.Combine(AppContext.BaseDirectory, "wwwroot");
+    if (!Directory.Exists(webRootPath))
+    {
+        Directory.CreateDirectory(webRootPath);
+    }
+
+    app.UseDefaultFiles(new DefaultFilesOptions
+    {
+        DefaultFileNames = new List<string> { "index.html" },
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(webRootPath)
+    });
+
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(webRootPath)
+    });
+
+    // SPA fallback - semua request non-API ke index.html di folder wwwroot
+    app.MapFallbackToFile("wwwroot/index.html");
+}
+else
+{
+    // ========== DEVELOPMENT: Normal (bisa pakai Vite proxy atau static files) ==========
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+    app.MapFallbackToFile("/index.html");
+}
 
 // ========== PRODUCTION SECURITY ==========
 if (!app.Environment.IsDevelopment())
