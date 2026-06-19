@@ -125,4 +125,23 @@ public class AssetTransactionController : ControllerBase
 
         return File(result.Data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Transaction_Import_Template.xlsx");
     }
+        // ============================================================
+    // NEW: SHORTCUT ENDPOINTS
+    // ============================================================
+
+    [HttpPost("{id:int}/return-shortcut")]
+    public async Task<IActionResult> CreateReturnTransaction(int id, [FromBody] AssetReturnViewModel model)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _transactionService.CreateReturnTransactionAsync(id, model));
+    }
+
+    [HttpPost("{id:int}/post-maintenance")]
+    public async Task<IActionResult> CreatePostMaintenanceTransaction(int id, [FromBody] PostMaintenanceViewModel model)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _transactionService.CreatePostMaintenanceTransactionAsync(id, model));
+    }
 }

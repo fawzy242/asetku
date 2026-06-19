@@ -4,13 +4,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import DepartmentsData from "./Departments.data";
 import GridView from "../../components/organisms/GridView/GridView";
 import CrudModal from "../../components/molecules/CrudModal/CrudModal";
+import FormSection from "../../components/atoms/FormSection/FormSection";
 import Input from "../../components/atoms/Input/Input";
 import Spinner from "../../components/atoms/Spinner/Spinner";
-import IconButton from "../../components/atoms/IconButton/IconButton";
-import Button from "../../components/atoms/Button/Button";
 import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
-import { FiEdit2, FiTrash2, FiCheckSquare } from "react-icons/fi";
+import { ACTION_TYPES, useGridActions } from "../../hooks/useGridActions";
+import { useBulkSelection } from "../../hooks/useBulkSelection";
+import { useSweetAlert } from "../../hooks/useSweetAlert";
 import { useGridData } from "../../hooks/useGridData";
 import { useCrudFormBase } from "../../hooks/useCrudFormBase";
 import { cleanDepartmentFormData } from "../../core/utils/formHelpers";
@@ -34,9 +35,9 @@ const TABS = [
 const DepartmentsMenu = () => {
   const [activeTab, setActiveTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedRows, setSelectedRows] = useState([]);
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const queryClient = useQueryClient();
+  const { toast, confirmDelete, confirm } = useSweetAlert();
 
   const {
     showModal,
@@ -54,6 +55,8 @@ const DepartmentsMenu = () => {
       queryClient.invalidateQueries({ queryKey: ['reference', 'departments'] });
     },
   });
+
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } = useBulkSelection({ idField: 'departmentId' });
 
   const showCheckbox = activeTab === "active" || activeTab === "inactive";
 
@@ -78,7 +81,6 @@ const DepartmentsMenu = () => {
       ...filters,
       ...params,
     };
-    
     const result = await departmentsData.fetchGridData(requestParams);
     return result;
   }, [buildFilters]);
@@ -96,24 +98,36 @@ const DepartmentsMenu = () => {
 
   useEffect(() => {
     reload();
-    setSelectedRows([]);
-  }, [activeTab, reload]);
+    clearSelection();
+  }, [activeTab, reload, clearSelection]);
 
   const handleSearch = useCallback((search) => {
     setSearchTerm(search);
     setPage(1);
-    setSelectedRows([]);
-  }, [setPage]);
+    clearSelection();
+  }, [setPage, clearSelection]);
 
   const handleDelete = useCallback(async (dept) => {
+    const confirmed = await confirmDelete('Delete Department', `Are you sure you want to delete "${dept.departmentName}"? This may affect employees assigned to it.`);
+    if (!confirmed) return;
     const r = await departmentsData.delete(dept.departmentId);
     if (r.success) {
+      toast.success('Department deleted successfully');
       queryClient.invalidateQueries({ queryKey: ['reference', 'departments'] });
       reload();
+      clearSelection();
     }
-  }, [reload, queryClient]);
+  }, [reload, queryClient, toast, confirmDelete, clearSelection]);
 
   const handleBulkActivate = useCallback(async (ids, activate) => {
+    const actionText = activate ? 'activate' : 'deactivate';
+    const confirmed = await confirm({
+      title: activate ? 'Activate Departments' : 'Deactivate Departments',
+      text: `Are you sure you want to ${actionText} ${ids.length} department(s)?`,
+      confirmButtonText: activate ? 'Yes, Activate' : 'Yes, Deactivate',
+    });
+    if (!confirmed) return;
+    
     let successCount = 0;
     for (const id of ids) {
       const result = await departmentsData.fetchById(id);
@@ -124,36 +138,60 @@ const DepartmentsMenu = () => {
       }
     }
     if (successCount > 0) {
+      toast.success(`${successCount} department(s) ${actionText}d successfully`);
       queryClient.invalidateQueries({ queryKey: ['reference', 'departments'] });
       reload();
-      setSelectedRows([]);
+      clearSelection();
     }
-    return successCount;
-  }, [reload, queryClient]);
+  }, [reload, queryClient, toast, confirm, clearSelection]);
 
   const onSubmit = useCallback(async () => {
     const submitData = { 
       ...formData, 
       isActive: editingDepartment ? editingDepartment.isActive : true 
     };
-    
     Object.keys(submitData).forEach(key => {
       setFormField(key)(submitData[key]);
     });
-    
     const success = await crudHandleSubmit();
     if (success) {
+      toast.success(editingDepartment ? 'Department updated successfully' : 'Department created successfully');
       reload();
+      clearSelection();
     }
     return success;
-  }, [formData, editingDepartment, crudHandleSubmit, setFormField, reload]);
+  }, [formData, editingDepartment, crudHandleSubmit, setFormField, reload, toast, clearSelection]);
 
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
     setPage(1);
     setSearchTerm("");
-    setSelectedRows([]);
-  }, [setPage]);
+    clearSelection();
+  }, [setPage, clearSelection]);
+
+  const handleGridAction = useCallback((actionType, row) => {
+    switch (actionType) {
+      case ACTION_TYPES.EDIT:
+        handleEdit(row);
+        break;
+      case ACTION_TYPES.DELETE:
+        handleDelete(row);
+        break;
+      default:
+        break;
+    }
+  }, [handleEdit, handleDelete]);
+
+  const getConditionalActions = useCallback(() => {
+    return [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE];
+  }, []);
+
+  const { actionColumn } = useGridActions({
+    actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
+    onAction: handleGridAction,
+    getConditionalActions,
+    rowIdField: 'departmentId',
+  });
 
   const columns = useMemo(() => [
     { field: "departmentCode", headerName: "Code", width: 150 },
@@ -169,30 +207,15 @@ const DepartmentsMenu = () => {
         return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
       },
     },
-    {
-      field: "actions",
-      headerName: "Actions",
-      width: 100,
-      sortable: false,
-      renderCell: (p) => (
-        <div className="table-actions">
-          <IconButton onClick={() => handleEdit(p.row)} title="Edit department" size="lg">
-            <FiEdit2 size={18} />
-          </IconButton>
-          <IconButton onClick={() => handleDelete(p.row)} title="Delete department" variant="danger" size="lg">
-            <FiTrash2 size={18} />
-          </IconButton>
-        </div>
-      )
-    },
-  ], [handleEdit, handleDelete]);
+    actionColumn,
+  ], [actionColumn]);
 
   const extraActions = (
     <>
-      {selectedRows.length > 0 && showCheckbox && (
-        <Button variant="primary" onClick={() => setShowBulkActivateModal(true)} startIcon={<FiCheckSquare />}>
-          {activeTab === "active" ? "Deactivate" : "Activate"} ({selectedRows.length})
-        </Button>
+      {hasSelection && showCheckbox && (
+        <button className="btn btn--primary btn--sm" onClick={() => setShowBulkActivateModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          {activeTab === "active" ? "Deactivate" : "Activate"} ({selectionCount})
+        </button>
       )}
     </>
   );
@@ -201,6 +224,8 @@ const DepartmentsMenu = () => {
 
   const bulkActivateValue = activeTab === "active" ? false : true;
   const bulkButtonText = activeTab === "active" ? "Deactivate" : "Activate";
+  const bulkTitle = bulkButtonText === "Activate" ? "Activate Departments" : "Deactivate Departments";
+  const bulkDescription = `This action will ${bulkButtonText.toLowerCase()} the selected departments.`;
 
   return (
     <div className="departments-menu">
@@ -213,16 +238,15 @@ const DepartmentsMenu = () => {
         columns={columns}
         data={departments}
         loading={loading}
+        totalCount={totalCount}
         page={page}
-        totalPages={Math.ceil(totalCount / pageSize) || 1}
         pageSize={pageSize}
-        totalItems={totalCount}
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
         onSearch={handleSearch}
         showCheckbox={showCheckbox}
-        selectedRows={selectedRows}
-        onSelectionChange={setSelectedRows}
+        selectedRows={selectedRowIds}
+        onSelectionChange={handleSelectionChange}
         createButtonText="Add Department"
         ariaLabel="Departments data table"
         extraActions={extraActions}
@@ -237,43 +261,45 @@ const DepartmentsMenu = () => {
         submitText={editingDepartment ? "Update" : "Create"}
         size="md"
       >
-        <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <Input 
-              label="Department Code" 
-              value={formData.departmentCode || ""} 
-              onChange={(e) => setFormField('departmentCode')(e.target.value)} 
-              placeholder="Optional (max 100 chars)"
-            />
+        <FormSection title="Basic Information" description="Department code and name">
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <Input 
+                label="Department Code" 
+                value={formData.departmentCode || ""} 
+                onChange={(e) => setFormField('departmentCode')(e.target.value)} 
+                placeholder="Optional (max 100 chars)"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Input 
+                label="Department Name" 
+                value={formData.departmentName || ""} 
+                onChange={(e) => setFormField('departmentName')(e.target.value)} 
+                required 
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Input 
+                label="Description" 
+                value={formData.description || ""} 
+                onChange={(e) => setFormField('description')(e.target.value)} 
+                multiline 
+                rows={2} 
+              />
+            </Grid>
           </Grid>
-          <Grid item xs={12}>
-            <Input 
-              label="Department Name" 
-              value={formData.departmentName || ""} 
-              onChange={(e) => setFormField('departmentName')(e.target.value)} 
-              required 
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <Input 
-              label="Description" 
-              value={formData.description || ""} 
-              onChange={(e) => setFormField('description')(e.target.value)} 
-              multiline 
-              rows={2} 
-            />
-          </Grid>
-        </Grid>
+        </FormSection>
       </CrudModal>
 
       <BulkActivateModal
         isOpen={showBulkActivateModal}
         onClose={() => setShowBulkActivateModal(false)}
         onConfirm={(ids) => handleBulkActivate(ids, bulkActivateValue)}
-        selectedIds={selectedRows}
+        selectedIds={getSelectedIds(departments)}
         itemName="departments"
-        title={bulkButtonText === "Activate" ? "Activate Departments" : "Deactivate Departments"}
-        description={`This action will ${bulkButtonText.toLowerCase()} the selected departments.`}
+        title={bulkTitle}
+        description={bulkDescription}
       />
     </div>
   );

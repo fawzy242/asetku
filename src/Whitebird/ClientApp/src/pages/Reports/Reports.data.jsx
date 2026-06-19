@@ -1,8 +1,7 @@
 import ReportsApi from './Reports.api';
 import BaseData from '../../core/services/BaseData';
-import * as XLSX from 'xlsx';
-import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
 import utilsHelper from '../../core/utils/utils.helper';
+import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
 
 class ReportsData extends BaseData {
   constructor() {
@@ -85,74 +84,71 @@ class ReportsData extends BaseData {
     }
   }
 
-  async exportToExcel(data, filename, sheetName = 'Report') {
+  // Excel Export Methods - Using server-side export
+  async exportTransaction(params) {
     try {
-      if (!data || data.length === 0) {
-        ConfirmDialog.toast.error('No data to export');
-        return { success: false };
-      }
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
-      XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      const blob = await this.api.exportAssetTransactionExcel(params);
+      utilsHelper.downloadFile(blob, `Transaction_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
       ConfirmDialog.toast.success('Report exported successfully');
       return { success: true };
-    } catch {
+    } catch (error) {
+      console.error('Export failed:', error);
       ConfirmDialog.toast.error('Failed to export report');
       return { success: false };
     }
   }
 
-  async exportFromServer(endpointFn, params, filename) {
+  async exportInventory(params) {
     try {
-      const blob = await endpointFn(params);
-      utilsHelper.downloadFile(blob, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      const blob = await this.api.exportAssetInventoryExcel(params);
+      utilsHelper.downloadFile(blob, `Inventory_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
       ConfirmDialog.toast.success('Report exported successfully');
       return { success: true };
-    } catch {
-      ConfirmDialog.toast.info('Server export unavailable. Using client-side export.');
+    } catch (error) {
+      console.error('Export failed:', error);
+      ConfirmDialog.toast.error('Failed to export report');
       return { success: false };
     }
   }
 
-  async exportTransaction(params, data) {
-    const serverResult = await this.exportFromServer(this.api.exportAssetTransactionExcel, params, 'Transaction_Report');
-    if (!serverResult.success && data && data.length > 0) {
-      return this.exportToExcel(data, 'Transaction_Report');
+  async exportEmployee(params) {
+    try {
+      const blob = await this.api.exportEmployeeAssetExcel(params);
+      utilsHelper.downloadFile(blob, `Employee_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+      ConfirmDialog.toast.success('Report exported successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('Export failed:', error);
+      ConfirmDialog.toast.error('Failed to export report');
+      return { success: false };
     }
-    return serverResult;
   }
 
-  async exportInventory(params, data) {
-    const serverResult = await this.exportFromServer(this.api.exportAssetInventoryExcel, params, 'Inventory_Report');
-    if (!serverResult.success && data && data.length > 0) {
-      return this.exportToExcel(data, 'Inventory_Report');
+  async exportMaintenance(params) {
+    try {
+      const blob = await this.api.exportMaintenanceExcel(params);
+      const reportType = params.isUpcoming ? 'Upcoming_Maintenance' : 'Maintenance_History';
+      utilsHelper.downloadFile(blob, `${reportType}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      ConfirmDialog.toast.success('Report exported successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('Export failed:', error);
+      ConfirmDialog.toast.error('Failed to export report');
+      return { success: false };
     }
-    return serverResult;
   }
 
-  async exportEmployee(params, data) {
-    const serverResult = await this.exportFromServer(this.api.exportEmployeeAssetExcel, params, 'Employee_Report');
-    if (!serverResult.success && data && data.length > 0) {
-      return this.exportToExcel(data, 'Employee_Report');
+  async exportFinancial(params) {
+    try {
+      const blob = await this.api.exportFinancialExcel(params);
+      utilsHelper.downloadFile(blob, `Financial_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+      ConfirmDialog.toast.success('Report exported successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('Export failed:', error);
+      ConfirmDialog.toast.error('Failed to export report');
+      return { success: false };
     }
-    return serverResult;
-  }
-
-  async exportMaintenance(params, data) {
-    const serverResult = await this.exportFromServer(this.api.exportMaintenanceExcel, params, 'Maintenance_Report');
-    if (!serverResult.success && data && data.length > 0) {
-      return this.exportToExcel(data, 'Maintenance_Report');
-    }
-    return serverResult;
-  }
-
-  async exportFinancial(params, data) {
-    const serverResult = await this.exportFromServer(this.api.exportFinancialExcel, params, 'Financial_Report');
-    if (!serverResult.success && data && data.length > 0) {
-      return this.exportToExcel(data, 'Financial_Report');
-    }
-    return serverResult;
   }
 }
 

@@ -4,18 +4,19 @@ import { useQueryClient } from "@tanstack/react-query";
 import EmployeesData from "./Employees.data";
 import GridView from "../../components/organisms/GridView/GridView";
 import CrudModal from "../../components/molecules/CrudModal/CrudModal";
-import GridFilterPanel from "../../components/molecules/GridFilterPanel/GridFilterPanel";
+import FormSection from "../../components/atoms/FormSection/FormSection";
 import Input from "../../components/atoms/Input/Input";
 import Select from "../../components/atoms/Select/Select";
 import DatePickerInput from "../../components/atoms/Input/DatePickerInput";
 import Spinner from "../../components/atoms/Spinner/Spinner";
-import IconButton from "../../components/atoms/IconButton/IconButton";
-import Button from "../../components/atoms/Button/Button";
 import FileUploader from "../../components/molecules/FileUploader/FileUploader";
 import ImportModal from "../../components/molecules/ImportModal/ImportModal";
 import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
-import { FiEdit2, FiTrash2, FiUpload, FiCheckSquare } from "react-icons/fi";
+import { FiUpload, FiCheckSquare } from "react-icons/fi";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
+import { ACTION_TYPES, useGridActions } from "../../hooks/useGridActions";
+import { useBulkSelection } from "../../hooks/useBulkSelection";
+import { useSweetAlert } from "../../hooks/useSweetAlert";
 import { useGridData } from "../../hooks/useGridData";
 import { useReferenceData } from "../../hooks/useReferenceData";
 import { useCrudFormBase } from "../../hooks/useCrudFormBase";
@@ -39,17 +40,14 @@ const EMPLOYEE_TABS = [
 
 const EmployeesMenu = () => {
   const [activeTab, setActiveTab] = useState("all");
-  const [showFilters, setShowFilters] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("");
-  const [departmentFilter, setDepartmentFilter] = useState("");
-  const [selectedRows, setSelectedRows] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [showImportModal, setShowImportModal] = useState(false);
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
   const isMountedRef = useRef(true);
   const queryClient = useQueryClient();
+  const { toast, confirmDelete, confirm } = useSweetAlert();
 
   const { departments, offices, employeePositions, employeeStatuses } = useReferenceData();
 
@@ -70,37 +68,36 @@ const EmployeesMenu = () => {
     },
   });
 
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } = useBulkSelection({ idField: 'employeeId' });
+
   const showCheckbox = useMemo(() => {
     return activeTab === "Active" || activeTab === "Inactive";
   }, [activeTab]);
 
-  const fetchGridData = useCallback(async (params) => {
-    const filters = { 
-      page: params.page || 1,
-      pageSize: params.pageSize || 10,
-      search: params.search || searchTerm,
-      ...params 
-    };
-    
+  const buildFilters = useCallback(() => {
+    const filters = {};
     if (activeTab === "Active") {
       filters.isActive = true;
     } else if (activeTab === "Inactive") {
       filters.isActive = false;
     }
-    
-    if (statusFilter === "active") {
-      filters.isActive = true;
-    } else if (statusFilter === "inactive") {
-      filters.isActive = false;
+    if (searchTerm) {
+      filters.search = searchTerm;
     }
-    
-    if (departmentFilter) {
-      filters.departmentId = departmentFilter;
-    }
-    
-    const result = await employeesData.fetchGridData(filters);
+    return filters;
+  }, [activeTab, searchTerm]);
+
+  const fetchGridData = useCallback(async (params) => {
+    const filters = buildFilters();
+    const requestParams = {
+      page: params.page || 1,
+      pageSize: params.pageSize || 10,
+      ...filters,
+      ...params,
+    };
+    const result = await employeesData.fetchGridData(requestParams);
     return result;
-  }, [activeTab, statusFilter, departmentFilter, searchTerm]);
+  }, [buildFilters]);
 
   const {
     data: employees,
@@ -111,58 +108,70 @@ const EmployeesMenu = () => {
     pageSize,
     setPageSize,
     reload
-  } = useGridData(['employees', activeTab, statusFilter, departmentFilter, searchTerm], fetchGridData);
+  } = useGridData(['employees', activeTab, searchTerm], fetchGridData);
 
   useEffect(() => {
     isMountedRef.current = true;
     setPage(1);
-    setSelectedRows([]);
+    clearSelection();
     reload();
     return () => {
       isMountedRef.current = false;
     };
-  }, [activeTab, reload, setPage]);
+  }, [activeTab, reload, setPage, clearSelection]);
 
   const handleSearch = useCallback((search) => {
     setSearchTerm(search);
     setPage(1);
-  }, [setPage]);
+    clearSelection();
+  }, [setPage, clearSelection]);
 
   const handleDelete = useCallback(async (emp) => {
+    const confirmed = await confirmDelete('Delete Employee', `Are you sure you want to delete "${emp.fullName}"?`);
+    if (!confirmed) return;
     const r = await employeesData.delete(emp.employeeId);
     if (r.success && isMountedRef.current) {
+      toast.success('Employee deleted successfully');
       queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
       reload();
+      clearSelection();
     }
-  }, [reload, queryClient]);
+  }, [reload, queryClient, toast, confirmDelete, clearSelection]);
 
   const onSubmit = useCallback(async () => {
     const success = await crudHandleSubmit();
     if (success && isMountedRef.current) {
+      toast.success(editingEmployee ? 'Employee updated successfully' : 'Employee created successfully');
       queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
       reload();
+      clearSelection();
     }
     return success;
-  }, [crudHandleSubmit, reload, queryClient]);
+  }, [crudHandleSubmit, reload, queryClient, toast, editingEmployee, clearSelection]);
 
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
     setPage(1);
-    setStatusFilter("");
-    setDepartmentFilter("");
     setSearchTerm("");
-    setSelectedRows([]);
-    setShowFilters(false);
-  }, [setPage]);
+    clearSelection();
+  }, [setPage, clearSelection]);
 
   const handleBulkActivate = useCallback(async (ids, activate) => {
+    const actionText = activate ? 'activate' : 'deactivate';
+    const confirmed = await confirm({
+      title: activate ? 'Activate Employees' : 'Deactivate Employees',
+      text: `Are you sure you want to ${actionText} ${ids.length} employee(s)?`,
+      confirmButtonText: activate ? 'Yes, Activate' : 'Yes, Deactivate',
+    });
+    if (!confirmed) return;
     const r = await employeesData.bulkActivate(ids, activate);
     if (r.success && isMountedRef.current) {
-      setSelectedRows([]);
+      toast.success(`${r.data || ids.length} employee(s) ${actionText}d successfully`);
+      clearSelection();
       queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
       reload();
     }
-  }, [reload, queryClient]);
+  }, [reload, queryClient, toast, confirm, clearSelection]);
 
   const handleImport = useCallback(async (file) => {
     setIsImporting(true);
@@ -170,24 +179,47 @@ const EmployeesMenu = () => {
     setIsImporting(false);
     if (r.success && isMountedRef.current) {
       setImportResult(r.data);
+      if (r.data.errorCount === 0) {
+        toast.success(`Import completed: ${r.data.successCount} employees imported`);
+      } else {
+        toast.warning(`Import completed: ${r.data.successCount} success, ${r.data.errorCount} errors`);
+      }
       queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
       reload();
+      clearSelection();
     }
-  }, [reload, queryClient]);
+  }, [reload, queryClient, toast, clearSelection]);
 
   const handleDownloadTemplate = useCallback(async () => {
     await employeesData.downloadTemplate();
   }, []);
 
-  const handleResetFilters = useCallback(() => {
-    setStatusFilter("");
-    setDepartmentFilter("");
-    setSearchTerm("");
-    setPage(1);
-  }, [setPage]);
+  const handleGridAction = useCallback((actionType, row) => {
+    switch (actionType) {
+      case ACTION_TYPES.EDIT:
+        handleEdit(row);
+        break;
+      case ACTION_TYPES.DELETE:
+        handleDelete(row);
+        break;
+      default:
+        break;
+    }
+  }, [handleEdit, handleDelete]);
+
+  const getConditionalActions = useCallback(() => {
+    return [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE];
+  }, []);
+
+  const { actionColumn } = useGridActions({
+    actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
+    onAction: handleGridAction,
+    getConditionalActions,
+    rowIdField: 'employeeId',
+  });
 
   const departmentOptions = useMemo(() => [
-    { value: "", label: "All Departments" },
+    { value: "", label: "Select Department" },
     ...departments.map(d => ({ value: d.value, label: d.label }))
   ], [departments]);
 
@@ -202,15 +234,9 @@ const EmployeesMenu = () => {
   ], [employeeStatuses]);
 
   const officeOptions = useMemo(() => [
-    { value: "", label: "None" },
+    { value: "", label: "Select Office" },
     ...offices.map(o => ({ value: o.value, label: o.label }))
   ], [offices]);
-
-  const filterStatusOptions = useMemo(() => [
-    { value: "", label: "All Status" },
-    { value: "active", label: "Active" },
-    { value: "inactive", label: "Inactive" },
-  ], []);
 
   const columns = useMemo(() => [
     { field: "employeeCode", headerName: "Code", width: 120 },
@@ -225,51 +251,27 @@ const EmployeesMenu = () => {
       width: 120, 
       renderCell: (p) => <Chip label={p?.value || '-'} size="small" sx={getStatusChipStyles(p?.value)} /> 
     },
-    { 
-      field: "actions", 
-      headerName: "Actions", 
-      width: 100, 
-      sortable: false, 
-      renderCell: (p) => (
-        <div className="table-actions">
-          <IconButton onClick={() => handleEdit(p?.row)} title="Edit employee" size="lg"><FiEdit2 size={18} /></IconButton>
-          <IconButton onClick={() => handleDelete(p?.row)} title="Delete employee" variant="danger" size="lg"><FiTrash2 size={18} /></IconButton>
-        </div>
-      )
-    },
-  ], [handleEdit, handleDelete]);
-
-  const filterContent = (
-    <>
-      <Select 
-        label="Status" 
-        value={statusFilter} 
-        onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} 
-        options={filterStatusOptions} 
-      />
-      <Select 
-        label="Department" 
-        value={departmentFilter} 
-        onChange={(e) => { setDepartmentFilter(e.target.value); setPage(1); }} 
-        options={departmentOptions} 
-      />
-    </>
-  );
+    actionColumn,
+  ], [actionColumn]);
 
   const extraActions = (
     <>
-      <Button variant="outline" onClick={() => setShowImportModal(true)} startIcon={<FiUpload />}>
-        Import
-      </Button>
-      {selectedRows.length > 0 && showCheckbox && (
-        <Button variant="primary" onClick={() => setShowBulkActivateModal(true)} startIcon={<FiCheckSquare />}>
-          {activeTab === "Active" ? "Deactivate" : "Activate"} ({selectedRows.length})
-        </Button>
+      <button className="btn btn--outline btn--sm" onClick={() => setShowImportModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+        <FiUpload size={16} /> Import
+      </button>
+      {hasSelection && showCheckbox && (
+        <button className="btn btn--primary btn--sm" onClick={() => setShowBulkActivateModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          <FiCheckSquare size={16} /> {activeTab === "Active" ? "Deactivate" : "Activate"} ({selectionCount})
+        </button>
       )}
     </>
   );
 
   if (loading && !employees.length) return <div className="page-loading"><Spinner size="lg" /></div>;
+
+  const bulkActivateValue = activeTab === "Active" ? false : true;
+  const bulkTitle = bulkActivateValue ? "Activate Employees" : "Deactivate Employees";
+  const bulkDescription = `This action will ${bulkActivateValue ? "activate" : "deactivate"} the selected employees.`;
 
   return (
     <div className="employees-menu">
@@ -282,23 +284,18 @@ const EmployeesMenu = () => {
         columns={columns}
         data={employees}
         loading={loading}
+        totalCount={totalCount}
         page={page}
-        totalPages={Math.ceil(totalCount / pageSize) || 1}
         pageSize={pageSize}
-        totalItems={totalCount}
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
         onSearch={handleSearch}
         showCheckbox={showCheckbox}
-        selectedRows={selectedRows}
-        onSelectionChange={setSelectedRows}
+        selectedRows={selectedRowIds}
+        onSelectionChange={handleSelectionChange}
         createButtonText="Add Employee"
         ariaLabel="Employees data table"
         extraActions={extraActions}
-        filterChildren={filterContent}
-        showFilters={showFilters}
-        onFilterToggle={() => setShowFilters(!showFilters)}
-        onResetFilters={handleResetFilters}
       />
 
       <CrudModal
@@ -310,48 +307,66 @@ const EmployeesMenu = () => {
         submitText={editingEmployee ? "Update" : "Create"}
         size="lg"
       >
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
-            <Input label="Employee Code" value={formData.employeeCode || ""} onChange={(e) => setFormField('employeeCode')(e.target.value)} required />
+        <FormSection title="Basic Information" description="Employee code and full name">
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <Input label="Employee Code" value={formData.employeeCode || ""} onChange={(e) => setFormField('employeeCode')(e.target.value)} required />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Input label="Full Name" value={formData.fullName || ""} onChange={(e) => setFormField('fullName')(e.target.value)} required />
+            </Grid>
           </Grid>
-          <Grid item xs={12} sm={6}>
-            <Input label="Full Name" value={formData.fullName || ""} onChange={(e) => setFormField('fullName')(e.target.value)} required />
+        </FormSection>
+
+        <FormSection title="Contact Information" description="Address, phone, and email">
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <Input label="Address" value={formData.address || ""} onChange={(e) => setFormField('address')(e.target.value)} multiline rows={2} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Input label="Phone Number" value={formData.phoneNumber || ""} onChange={(e) => setFormField('phoneNumber')(e.target.value)} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Input label="Email" type="email" value={formData.email || ""} onChange={(e) => setFormField('email')(e.target.value)} />
+            </Grid>
           </Grid>
-          <Grid item xs={12}>
-            <Input label="Address" value={formData.address || ""} onChange={(e) => setFormField('address')(e.target.value)} multiline rows={2} />
+        </FormSection>
+
+        <FormSection title="Employment Details" description="Department, position, status, and office">
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <Select label="Department" value={formData.departmentId || ""} onChange={(e) => setFormField('departmentId')(e.target.value)} options={departmentOptions} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Select label="Position" value={formData.position || ""} onChange={(e) => setFormField('position')(e.target.value)} options={positionOptions} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Select label="Employment Status" value={formData.employmentStatus || ""} onChange={(e) => setFormField('employmentStatus')(e.target.value)} options={statusOptions} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Select label="Office" value={formData.officeId || ""} onChange={(e) => setFormField('officeId')(e.target.value)} options={officeOptions} />
+            </Grid>
           </Grid>
-          <Grid item xs={12} sm={6}>
-            <Select label="Department" value={formData.departmentId || ""} onChange={(e) => setFormField('departmentId')(e.target.value)} options={departmentOptions} />
+        </FormSection>
+
+        <FormSection title="Dates" description="Join and resignation dates">
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <DatePickerInput label="Join Date" value={formData.joinDate || ""} onChange={(e) => setFormField('joinDate')(e.target.value)} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <DatePickerInput label="Resign Date" value={formData.resignDate || ""} onChange={(e) => setFormField('resignDate')(e.target.value)} />
+            </Grid>
           </Grid>
-          <Grid item xs={12} sm={6}>
-            <Select label="Position" value={formData.position || ""} onChange={(e) => setFormField('position')(e.target.value)} options={positionOptions} />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <Select label="Employment Status" value={formData.employmentStatus || ""} onChange={(e) => setFormField('employmentStatus')(e.target.value)} options={statusOptions} />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <Select label="Office" value={formData.officeId || ""} onChange={(e) => setFormField('officeId')(e.target.value)} options={officeOptions} />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <Input label="Phone Number" value={formData.phoneNumber || ""} onChange={(e) => setFormField('phoneNumber')(e.target.value)} />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <Input label="Email" type="email" value={formData.email || ""} onChange={(e) => setFormField('email')(e.target.value)} />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <DatePickerInput label="Join Date" value={formData.joinDate || ""} onChange={(e) => setFormField('joinDate')(e.target.value)} />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <DatePickerInput label="Resign Date" value={formData.resignDate || ""} onChange={(e) => setFormField('resignDate')(e.target.value)} />
-          </Grid>
-          <Grid item xs={12}>
-            <FileUploader 
-              referenceTable="Employee"
-              referenceId={editingEmployee?.employeeId}
-              onUploadComplete={reload}
-            />
-          </Grid>
-        </Grid>
+        </FormSection>
+
+        <FormSection title="Attachments" description="Supporting documents">
+          <FileUploader 
+            referenceTable="Employee"
+            referenceId={editingEmployee?.employeeId}
+            onUploadComplete={reload}
+          />
+        </FormSection>
       </CrudModal>
 
       <ImportModal
@@ -368,11 +383,11 @@ const EmployeesMenu = () => {
       <BulkActivateModal
         isOpen={showBulkActivateModal}
         onClose={() => setShowBulkActivateModal(false)}
-        onConfirm={(ids) => handleBulkActivate(ids, activeTab === "Active" ? false : true)}
-        selectedIds={selectedRows}
+        onConfirm={(ids) => handleBulkActivate(ids, bulkActivateValue)}
+        selectedIds={getSelectedIds(employees)}
         itemName="employees"
-        title={activeTab === "Active" ? "Deactivate Employees" : "Activate Employees"}
-        description={`This action will ${activeTab === "Active" ? "deactivate" : "activate"} the selected employees.`}
+        title={bulkTitle}
+        description={bulkDescription}
       />
     </div>
   );

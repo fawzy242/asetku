@@ -5,7 +5,6 @@ import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
 import ErrorBoundary from './components/atoms/ErrorBoundary/ErrorBoundary';
 import { ConfirmDialogProvider } from './components/molecules/ConfirmDialog';
-import ConfirmDialogBridge from './components/molecules/ConfirmDialog/ConfirmDialogBridge';
 import './app.scss';
 
 // Layouts
@@ -37,7 +36,6 @@ const PageLoader = () => (
   </div>
 );
 
-// Wrapper with ErrorBoundary per page
 const LazyPage = ({ children }) => (
   <ErrorBoundary>
     <Suspense fallback={<PageLoader />}>
@@ -102,7 +100,6 @@ const App = () => (
         <AuthProvider>
           <ConfirmDialogProvider>
             <BrowserRouter>
-              <ConfirmDialogBridge />
               <div className="app">
                 <AppRoutes />
               </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { FiUser, FiMail, FiShield, FiLock, FiSave, FiX, FiBriefcase, FiCalendar, FiEdit2, FiCheck, FiCamera, FiTrash2, FiUpload } from "react-icons/fi";
+import { FiUser, FiMail, FiShield, FiLock, FiSave, FiX, FiBriefcase, FiCalendar, FiEdit2, FiCheck, FiCamera, FiTrash2 } from "react-icons/fi";
 import { Grid, Box, Avatar, Typography, IconButton, CircularProgress } from "@mui/material";
 import { useAuth } from "../../context/AuthContext";
 import ProfileData from "./Profile.data";
@@ -7,12 +7,39 @@ import Card from "../../components/atoms/Card/Card";
 import Button from "../../components/atoms/Button/Button";
 import Input from "../../components/atoms/Input/Input";
 import Spinner from "../../components/atoms/Spinner/Spinner";
-import ConfirmDialog from "../../components/molecules/ConfirmDialog/ConfirmDialog";
+import FormSection from "../../components/atoms/FormSection/FormSection";
+import { useSweetAlert } from "../../hooks/useSweetAlert";
 import apiService from "../../core/services/api.service";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./Profile.scss";
 
 const profileData = new ProfileData();
+
+// Info row component
+const InfoRow = ({ icon: Icon, label, value }) => (
+  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1, borderBottom: '1px solid var(--border)' }}>
+    <Box sx={{ 
+      width: 40, 
+      height: 40, 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      bgcolor: 'var(--surface)', 
+      borderRadius: 2, 
+      color: 'var(--primary)' 
+    }}>
+      <Icon size={20} />
+    </Box>
+    <Box sx={{ flex: 1 }}>
+      <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        {label}
+      </Typography>
+      <Typography variant="body1" fontWeight={500}>
+        {value || '-'}
+      </Typography>
+    </Box>
+  </Box>
+);
 
 const ProfileMenu = () => {
   const [loading, setLoading] = useState(true);
@@ -25,7 +52,8 @@ const ProfileMenu = () => {
   const [passwordData, setPasswordData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const [formData, setFormData] = useState({ fullName: '', email: '', phoneNumber: '', username: '' });
   const [errors, setErrors] = useState({});
-  const { refreshUser } = useAuth();
+  const { refreshUser, toast } = useSweetAlert();
+  const { refreshUser: refreshAuthUser } = useAuth();
 
   useEffect(() => { 
     loadProfile(); 
@@ -43,6 +71,8 @@ const ProfileMenu = () => {
         username: r.data.username || '',
       });
       loadProfilePhoto(r.data.userId);
+    } else {
+      toast.error(r.error || 'Failed to load profile');
     }
     setLoading(false);
   };
@@ -55,103 +85,102 @@ const ProfileMenu = () => {
         const url = URL.createObjectURL(response.data);
         setProfilePhotoUrl(url);
       }
-    } catch (error) {
+    } catch {
       setProfilePhotoUrl(null);
     }
   };
 
-  // FIXED: Refresh user after photo upload
   const handlePhotoUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      ConfirmDialog.toast.error('Please select an image file (JPEG, PNG, GIF, WEBP)');
+      toast.error('Please select an image file (JPEG, PNG, GIF, WEBP)');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      ConfirmDialog.toast.error('Image size must be less than 5MB');
+      toast.error('Image size must be less than 5MB');
       return;
     }
 
     setUploadingPhoto(true);
-    const formData = new FormData();
-    formData.append('file', file);
+    const formDataUpload = new FormData();
+    formDataUpload.append('file', file);
 
     try {
-      const response = await apiService.post('/Auth/profile-photo', formData, {
+      const response = await apiService.post('/Auth/profile-photo', formDataUpload, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       if (response.data?.isSuccess) {
-        ConfirmDialog.toast.success('Profile photo updated');
-        // Refresh user data to update topbar
-        await refreshUser();
-        // Reload photo
+        toast.success('Profile photo updated');
+        await refreshAuthUser();
         loadProfilePhoto(profile?.userId);
       } else {
-        ConfirmDialog.toast.error(response.data?.message || 'Failed to upload photo');
+        toast.error(response.data?.message || 'Failed to upload photo');
       }
-    } catch (error) {
-      ConfirmDialog.toast.error('Failed to upload photo');
+    } catch {
+      toast.error('Failed to upload photo');
     } finally {
       setUploadingPhoto(false);
     }
   };
 
-  // FIXED: Refresh user after photo delete
   const handleDeletePhoto = async () => {
-    const confirmed = await ConfirmDialog.show({
-      title: 'Delete Profile Photo',
-      text: 'Are you sure you want to delete your profile photo?',
-      icon: 'warning',
-      confirmButtonText: 'Delete',
-    });
+    const confirmed = await refreshAuthUser.confirmDelete?.() || window.confirm('Delete profile photo?');
     if (!confirmed) return;
 
     try {
       const response = await apiService.delete('/Auth/profile-photo');
       if (response.data?.isSuccess) {
-        ConfirmDialog.toast.success('Profile photo deleted');
+        toast.success('Profile photo deleted');
         setProfilePhotoUrl(null);
-        // Refresh user data to update topbar
-        await refreshUser();
+        await refreshAuthUser();
       } else {
-        ConfirmDialog.toast.error(response.data?.message || 'Failed to delete photo');
+        toast.error(response.data?.message || 'Failed to delete photo');
       }
-    } catch (error) {
-      ConfirmDialog.toast.error('Failed to delete photo');
+    } catch {
+      toast.error('Failed to delete photo');
     }
   };
 
   const validatePassword = () => {
     const err = {};
-    if (!passwordData.oldPassword) err.oldPassword = 'Required';
-    if (!passwordData.newPassword) err.newPassword = 'Required';
-    else if (passwordData.newPassword.length < 4) err.newPassword = 'Min 4 chars';
-    if (passwordData.newPassword !== passwordData.confirmPassword) err.confirmPassword = 'Not match';
+    if (!passwordData.oldPassword) err.oldPassword = 'Current password is required';
+    if (!passwordData.newPassword) err.newPassword = 'New password is required';
+    else if (passwordData.newPassword.length < 4) err.newPassword = 'Password must be at least 4 characters';
+    if (passwordData.newPassword !== passwordData.confirmPassword) err.confirmPassword = 'Passwords do not match';
     setErrors(err);
-    return !Object.keys(err).length;
+    return Object.keys(err).length === 0;
   };
 
   const validateProfile = () => {
     const err = {};
-    if (!formData.fullName?.trim()) err.fullName = 'Required';
-    if (!formData.email?.trim()) err.email = 'Required';
-    else if (!utilsHelper.validateEmail(formData.email)) err.email = 'Invalid';
+    if (!formData.fullName?.trim()) err.fullName = 'Full name is required';
+    if (!formData.email?.trim()) err.email = 'Email is required';
+    else if (!utilsHelper.validateEmail(formData.email)) err.email = 'Please enter a valid email address';
     setErrors(err);
-    return !Object.keys(err).length;
+    return Object.keys(err).length === 0;
   };
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
     if (!validatePassword()) return;
-    const confirmed = await ConfirmDialog.show({ title: 'Change Password', text: 'Are you sure?', confirmButtonText: 'Yes' });
+    
+    const confirmed = await refreshAuthUser.confirm?.({
+      title: 'Change Password',
+      text: 'Are you sure you want to change your password?',
+      confirmButtonText: 'Yes, Change',
+    }) || window.confirm('Change password?');
+    
     if (!confirmed) return;
+    
     setSaving(true);
     const r = await profileData.changePassword(passwordData.oldPassword, passwordData.newPassword, passwordData.confirmPassword);
     setSaving(false);
+    
     if (r.success) {
+      toast.success('Password changed successfully');
       setShowPasswordForm(false);
       setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
       setErrors({});
@@ -161,18 +190,20 @@ const ProfileMenu = () => {
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
     if (!validateProfile()) return;
+    
     setSaving(true);
     await new Promise(resolve => setTimeout(resolve, 500));
     setSaving(false);
     setEditMode(false);
     setProfile(prev => ({ ...prev, ...formData }));
-    // Update local storage user data
+    
     const storedUser = utilsHelper.getLocalStorage("user");
     if (storedUser) {
       const updatedUser = { ...storedUser, ...formData };
       utilsHelper.setLocalStorage("user", updatedUser);
     }
-    ConfirmDialog.toast.success('Profile updated');
+    
+    toast.success('Profile updated successfully');
   };
 
   const handleCancelEdit = () => {
@@ -201,14 +232,18 @@ const ProfileMenu = () => {
       <div className="page-header">
         <h1 className="page-title">My Profile</h1>
       </div>
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="body2" color="text.secondary">Manage your account settings and preferences</Typography>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="body2" color="text.secondary">
+          Manage your account settings and preferences
+        </Typography>
       </Box>
 
-      <Grid container spacing={3}>
+      <Grid container spacing={4}>
+        {/* Profile Information Card */}
         <Grid item xs={12} md={7}>
           <Card>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 3, mb: 3, pb: 3, borderBottom: '1px solid var(--border)' }}>
+            {/* Profile Photo Section */}
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 3, mb: 4, pb: 3, borderBottom: '1px solid var(--border)' }}>
               <Box sx={{ position: 'relative' }}>
                 <Avatar 
                   src={profilePhotoUrl || undefined} 
@@ -217,7 +252,18 @@ const ProfileMenu = () => {
                   {!profilePhotoUrl && userInitial}
                 </Avatar>
                 {uploadingPhoto && (
-                  <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', bgcolor: 'rgba(0,0,0,0.5)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Box sx={{ 
+                    position: 'absolute', 
+                    top: 0, 
+                    left: 0, 
+                    width: '100%', 
+                    height: '100%', 
+                    bgcolor: 'rgba(0,0,0,0.5)', 
+                    borderRadius: '50%', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center' 
+                  }}>
                     <CircularProgress size={30} sx={{ color: 'white' }} />
                   </Box>
                 )}
@@ -234,7 +280,7 @@ const ProfileMenu = () => {
                     <IconButton
                       size="small"
                       onClick={handleDeletePhoto}
-                      sx={{ bgcolor: 'var(--error)', color: 'white', '&:hover': { bgcolor: 'var(--error-dark)', opacity: 0.9 } }}
+                      sx={{ bgcolor: 'var(--error)', color: 'white', '&:hover': { opacity: 0.9 } }}
                     >
                       <FiTrash2 size={14} />
                     </IconButton>
@@ -249,79 +295,63 @@ const ProfileMenu = () => {
                 </Typography>
               </Box>
               {!editMode && (
-                <Button variant="outline" size="sm" onClick={() => setEditMode(true)} startIcon={<FiEdit2 />}>Edit</Button>
+                <Button variant="outline" size="sm" onClick={() => setEditMode(true)} startIcon={<FiEdit2 />}>
+                  Edit
+                </Button>
               )}
             </Box>
 
+            {/* Profile Details */}
             {!editMode ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'var(--surface)', borderRadius: 2, color: 'var(--primary)' }}>
-                    <FiUser size={20} />
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Full Name</Typography>
-                    <Typography variant="body1" fontWeight={500}>{profile?.fullName}</Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'var(--surface)', borderRadius: 2, color: 'var(--primary)' }}>
-                    <FiMail size={20} />
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Email</Typography>
-                    <Typography variant="body1" fontWeight={500}>{profile?.email}</Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'var(--surface)', borderRadius: 2, color: 'var(--primary)' }}>
-                    <FiBriefcase size={20} />
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Username</Typography>
-                    <Typography variant="body1" fontWeight={500}>@{profile?.username}</Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'var(--surface)', borderRadius: 2, color: 'var(--primary)' }}>
-                    <FiShield size={20} />
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Role</Typography>
-                    <Typography variant="body1" fontWeight={500}>{profile?.roleId || 'User'}</Typography>
-                  </Box>
-                </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <InfoRow icon={FiUser} label="Full Name" value={profile?.fullName} />
+                <InfoRow icon={FiMail} label="Email" value={profile?.email} />
+                <InfoRow icon={FiBriefcase} label="Username" value={`@${profile?.username}`} />
+                <InfoRow icon={FiShield} label="Role" value={profile?.roleId || 'User'} />
                 {profile?.phoneNumber && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'var(--surface)', borderRadius: 2, color: 'var(--primary)' }}>
-                      <FiBriefcase size={20} />
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Phone</Typography>
-                      <Typography variant="body1" fontWeight={500}>{profile?.phoneNumber}</Typography>
-                    </Box>
-                  </Box>
+                  <InfoRow icon={FiBriefcase} label="Phone" value={profile?.phoneNumber} />
                 )}
               </Box>
             ) : (
               <form onSubmit={handleProfileUpdate}>
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
-                    <Input label="Full Name" value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} error={errors.fullName} required />
+                    <Input 
+                      label="Full Name" 
+                      value={formData.fullName} 
+                      onChange={e => setFormData({ ...formData, fullName: e.target.value })} 
+                      error={errors.fullName} 
+                      required 
+                    />
                   </Grid>
                   <Grid item xs={12}>
-                    <Input label="Email" type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} error={errors.email} required />
+                    <Input 
+                      label="Email" 
+                      type="email" 
+                      value={formData.email} 
+                      onChange={e => setFormData({ ...formData, email: e.target.value })} 
+                      error={errors.email} 
+                      required 
+                    />
                   </Grid>
                   <Grid item xs={12}>
-                    <Input label="Phone (Optional)" value={formData.phoneNumber} onChange={e => setFormData({ ...formData, phoneNumber: e.target.value })} />
+                    <Input 
+                      label="Phone (Optional)" 
+                      value={formData.phoneNumber} 
+                      onChange={e => setFormData({ ...formData, phoneNumber: e.target.value })} 
+                    />
                   </Grid>
                   <Grid item xs={12}>
                     <Input label="Username" value={formData.username} disabled />
                   </Grid>
                   <Grid item xs={12}>
-                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                      <Button type="button" variant="outline" onClick={handleCancelEdit} startIcon={<FiX />}>Cancel</Button>
-                      <Button type="submit" variant="primary" loading={saving} startIcon={<FiCheck />}>Save Changes</Button>
+                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
+                      <Button type="button" variant="outline" onClick={handleCancelEdit} startIcon={<FiX />}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" variant="primary" loading={saving} startIcon={<FiCheck />}>
+                        Save Changes
+                      </Button>
                     </Box>
                   </Grid>
                 </Grid>
@@ -330,10 +360,20 @@ const ProfileMenu = () => {
           </Card>
         </Grid>
 
+        {/* Security Card */}
         <Grid item xs={12} md={5}>
           <Card>
             <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-              <Box sx={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(220,38,38,0.1)', borderRadius: 2, color: 'var(--primary)' }}>
+              <Box sx={{ 
+                width: 48, 
+                height: 48, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                bgcolor: 'rgba(220,38,38,0.1)', 
+                borderRadius: 2, 
+                color: 'var(--primary)' 
+              }}>
                 <FiLock size={24} />
               </Box>
               <Box>
@@ -341,24 +381,49 @@ const ProfileMenu = () => {
                 <Typography variant="body2" color="text.secondary">Update your password</Typography>
               </Box>
             </Box>
+
             {!showPasswordForm ? (
-              <Button variant="outline" onClick={() => setShowPasswordForm(true)} startIcon={<FiLock />} fullWidth>Change Password</Button>
+              <Button variant="outline" onClick={() => setShowPasswordForm(true)} startIcon={<FiLock />} fullWidth>
+                Change Password
+              </Button>
             ) : (
               <form onSubmit={handlePasswordChange}>
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
-                    <Input label="Current Password" type="password" value={passwordData.oldPassword} onChange={e => setPasswordData({ ...passwordData, oldPassword: e.target.value })} error={errors.oldPassword} />
+                    <Input 
+                      label="Current Password" 
+                      type="password" 
+                      value={passwordData.oldPassword} 
+                      onChange={e => setPasswordData({ ...passwordData, oldPassword: e.target.value })} 
+                      error={errors.oldPassword} 
+                    />
                   </Grid>
                   <Grid item xs={12}>
-                    <Input label="New Password" type="password" value={passwordData.newPassword} onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })} error={errors.newPassword} />
+                    <Input 
+                      label="New Password" 
+                      type="password" 
+                      value={passwordData.newPassword} 
+                      onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })} 
+                      error={errors.newPassword} 
+                    />
                   </Grid>
                   <Grid item xs={12}>
-                    <Input label="Confirm New Password" type="password" value={passwordData.confirmPassword} onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })} error={errors.confirmPassword} />
+                    <Input 
+                      label="Confirm New Password" 
+                      type="password" 
+                      value={passwordData.confirmPassword} 
+                      onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })} 
+                      error={errors.confirmPassword} 
+                    />
                   </Grid>
                   <Grid item xs={12}>
-                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                      <Button type="button" variant="outline" onClick={handleCancelPassword} startIcon={<FiX />}>Cancel</Button>
-                      <Button type="submit" variant="primary" loading={saving} startIcon={<FiSave />}>Update Password</Button>
+                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
+                      <Button type="button" variant="outline" onClick={handleCancelPassword} startIcon={<FiX />}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" variant="primary" loading={saving} startIcon={<FiSave />}>
+                        Update Password
+                      </Button>
                     </Box>
                   </Grid>
                 </Grid>

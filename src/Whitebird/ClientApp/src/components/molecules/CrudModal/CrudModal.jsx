@@ -1,10 +1,10 @@
 import React from 'react';
+import { Box } from '@mui/material';
 import Modal from '../Modal/Modal';
 import ModalActions from '../ModalActions/ModalActions';
-import { Box } from '@mui/material';
 
 /**
- * Standardized CRUD modal component
+ * Standardized CRUD modal component with proper spacing
  * @param {Object} props
  * @param {boolean} props.isOpen - Modal visibility
  * @param {Function} props.onClose - Close handler
@@ -41,7 +41,7 @@ const CrudModal = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size={size}>
       <form onSubmit={handleSubmit}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           {children}
         </Box>
         <ModalActions

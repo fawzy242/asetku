@@ -35,21 +35,21 @@ const MasterDataMenu = () => {
   const getDataForTab = () => {
     switch (activeTab) {
       case "transaction-types":
-        return { data: transactionTypes, title: "Transaction Types", icon: <FiRefreshCw /> };
+        return { data: transactionTypes, title: "Transaction Types", icon: <FiRefreshCw />, color: "#3b82f6" };
       case "asset-conditions":
-        return { data: assetConditions, title: "Asset Conditions", icon: <FiPackage /> };
+        return { data: assetConditions, title: "Asset Conditions", icon: <FiPackage />, color: "#10b981" };
       case "employee-positions":
-        return { data: employeePositions, title: "Employee Positions", icon: <FiBriefcase /> };
+        return { data: employeePositions, title: "Employee Positions", icon: <FiBriefcase />, color: "#f59e0b" };
       case "employee-statuses":
-        return { data: employeeStatuses, title: "Employee Statuses", icon: <FiUsers /> };
+        return { data: employeeStatuses, title: "Employee Statuses", icon: <FiUsers />, color: "#8b5cf6" };
       case "office-types":
-        return { data: officeTypes, title: "Office Types", icon: <FiMapPin /> };
+        return { data: officeTypes, title: "Office Types", icon: <FiMapPin />, color: "#06b6d4" };
       case "maintenance-types":
-        return { data: maintenanceTypes, title: "Maintenance Types", icon: <FiTool /> };
+        return { data: maintenanceTypes, title: "Maintenance Types", icon: <FiTool />, color: "#ef4444" };
       case "asset-condition-purchases":
-        return { data: assetConditionPurchases, title: "Purchase Conditions", icon: <FiTag /> };
+        return { data: assetConditionPurchases, title: "Purchase Conditions", icon: <FiTag />, color: "#dc2626" };
       default:
-        return { data: [], title: "Unknown", icon: null };
+        return { data: [], title: "Unknown", icon: null, color: "#6b7280" };
     }
   };
 
@@ -75,20 +75,22 @@ const MasterDataMenu = () => {
           <h1 className="page-title">Master Data</h1>
         </div>
         <Card>
-          <Box sx={{ textAlign: 'center', py: 4, color: 'var(--error)' }}>
-            <FiDatabase size={48} />
-            <Typography variant="h6" sx={{ mt: 2 }}>Failed to load master data</Typography>
-            <Typography variant="body2" color="text.secondary">Please try again later.</Typography>
+          <Box sx={{ textAlign: 'center', py: 6, color: 'var(--error)' }}>
+            <FiDatabase size={48} style={{ marginBottom: 16 }} />
+            <Typography variant="h6" sx={{ mb: 1 }}>Failed to load master data</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Please refresh the page or contact support if the problem persists.
+            </Typography>
           </Box>
         </Card>
       </div>
     );
   }
 
-  const { data, title, icon } = getDataForTab();
+  const { data, title, icon, color } = getDataForTab();
 
   return (
-    <div className="master-data">
+    <div className="master-data fade-transition">
       <div className="page-header">
         <h1 className="page-title">Master Data</h1>
       </div>
@@ -97,29 +99,34 @@ const MasterDataMenu = () => {
 
       <Card>
         <div className="master-data__header">
-          <div className="master-data__header-icon">
+          <div className="master-data__header-icon" style={{ backgroundColor: `${color}15`, color }}>
             {icon}
           </div>
           <h2 className="master-data__header-title">{title}</h2>
           <div className="master-data__header-count">
             <Chip 
-              label={`${data.length} items`} 
+              label={`${data.length} item${data.length !== 1 ? 's' : ''}`} 
               size="small" 
-              sx={{ bgcolor: 'rgba(220, 38, 38, 0.1)', color: '#dc2626' }} 
+              sx={{ bgcolor: `${color}15`, color }} 
             />
           </div>
         </div>
 
         {data.length === 0 ? (
-          <Box sx={{ textAlign: 'center', py: 4, color: 'var(--text-secondary)' }}>
-            <FiDatabase size={40} />
-            <Typography sx={{ mt: 2 }}>No data available</Typography>
+          <Box sx={{ textAlign: 'center', py: 6, color: 'var(--text-secondary)' }}>
+            <FiDatabase size={48} style={{ marginBottom: 16, opacity: 0.5 }} />
+            <Typography variant="h6" gutterBottom>No Data Available</Typography>
+            <Typography variant="body2">
+              No reference data found for {title.toLowerCase()}.
+            </Typography>
           </Box>
         ) : (
           <div className="master-data__grid">
             {data.map((item) => (
               <div key={item.code} className="master-data__item">
-                <div className="master-data__item-code">{item.code}</div>
+                <div className="master-data__item-code" style={{ backgroundColor: `${color}15`, color }}>
+                  {item.code}
+                </div>
                 <div className="master-data__item-name">{item.name}</div>
               </div>
             ))}

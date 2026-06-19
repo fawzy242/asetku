@@ -5,6 +5,14 @@
 .dashboard {
     color: var(--text-primary);
 
+    .page-description {
+        margin-bottom: $spacing-lg;
+    }
+
+    &__tab-content {
+        margin-top: $spacing-lg;
+    }
+
     // Stats Cards Grid - 4 columns on desktop
     &__stats {
         display: grid;
@@ -79,7 +87,7 @@
     }
 
     // Charts Row
-    &__charts {
+    &__charts-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: $spacing-lg;
@@ -190,5 +198,28 @@
     &__alert-name {
         font-size: $font-size-sm;
         color: var(--text-secondary);
+    }
+
+    &__alert-chip--expired {
+        background-color: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        font-weight: 500;
+        font-size: 0.75rem;
+        height: 24px;
+        border-radius: 4px;
+    }
+
+    &__alert-chip--upcoming {
+        border-color: #f59e0b;
+        color: #f59e0b;
+        font-weight: 500;
+        font-size: 0.75rem;
+        height: 24px;
+        border-radius: 4px;
+    }
+
+    &__table-wrapper {
+        width: 100%;
+        overflow-x: auto;
     }
 }

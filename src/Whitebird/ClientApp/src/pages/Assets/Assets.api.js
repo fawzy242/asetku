@@ -65,12 +65,12 @@ class AssetsApi {
     return (await apiService.get(`/Asset/history/${id}`)).data; 
   }
   
-  // NEW: Bulk Operations
+  // Bulk Operations
   async bulkActivate(ids, activate) { 
     return (await apiService.post('/Asset/activate', { ids, activate })).data; 
   }
   
-  // NEW: Import
+  // Import
   async import(file) {
     const formData = new FormData();
     formData.append('file', file);
@@ -82,6 +82,24 @@ class AssetsApi {
   async downloadImportTemplate() {
     const response = await apiService.get('/Asset/import/template', { responseType: 'blob' });
     return response.data;
+  }
+  
+  // NEW: Available Assets for Transaction
+  async getAvailableAssetsForTransaction() {
+    return (await apiService.get('/Asset/available-for-transaction')).data;
+  }
+  
+  async isAssetAvailableForTransaction(id) {
+    return (await apiService.get(`/Asset/${id}/available`)).data;
+  }
+  
+  // NEW: Asset Status Lists
+  async getDamagedAssets() {
+    return (await apiService.get('/Asset/damaged')).data;
+  }
+  
+  async getInactiveAssets() {
+    return (await apiService.get('/Asset/inactive')).data;
   }
   
   // Reference Data (kept for backward compatibility)
@@ -100,8 +118,6 @@ class AssetsApi {
   async getOffices() { 
     return (await apiService.get('/Office/active')).data; 
   }
-  
-  // REMOVED: getByStatus, getByHolder (obsolete)
 }
 
 export default new AssetsApi();

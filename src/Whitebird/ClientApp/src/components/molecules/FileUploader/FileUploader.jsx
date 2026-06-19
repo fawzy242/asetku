@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { FiUpload, FiX, FiImage, FiFile, FiTrash2, FiStar } from 'react-icons/fi';
-import { Box, Chip, LinearProgress, IconButton, Typography } from '@mui/material';
+import { FiUpload, FiX, FiImage, FiFile, FiTrash2, FiStar, FiEye } from 'react-icons/fi';
+import { Box, Chip, LinearProgress, IconButton, Typography, Dialog, DialogContent, IconButton as MuiIconButton } from '@mui/material';
 import apiService from '../../../core/services/api.service';
 import ConfirmDialog from '../ConfirmDialog/ConfirmDialog';
 import './FileUploader.scss';
@@ -18,6 +18,9 @@ const FileUploader = ({
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
 
   const fetchFiles = useCallback(async () => {
     if (!referenceId) return;
@@ -126,15 +129,68 @@ const FileUploader = ({
     }
   }, [fetchFiles]);
 
+  // NEW: Handle preview
+  const handlePreview = useCallback(async (file) => {
+    setPreviewFile(file);
+    setPreviewOpen(true);
+    
+    try {
+      const response = await apiService.get(`/FileAttachment/download/${file.fileAttachmentId}`, {
+        responseType: 'blob'
+      });
+      const blob = response.data;
+      const url = URL.createObjectURL(blob);
+      setPreviewUrl(url);
+    } catch (error) {
+      console.error('Failed to load file preview:', error);
+      ConfirmDialog.toast.error('Failed to load file preview');
+    }
+  }, []);
+
+  const handleClosePreview = useCallback(() => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewOpen(false);
+    setPreviewFile(null);
+    setPreviewUrl(null);
+  }, [previewUrl]);
+
   const isImage = (mimeType) => mimeType?.startsWith('image/');
-  const getFileIcon = (mimeType) => {
+  const isPdf = (mimeType) => mimeType === 'application/pdf';
+  
+  const getFileIcon = (mimeType, fileName) => {
     if (isImage(mimeType)) return <FiImage size={24} />;
-    return <FiFile size={24} />;
+    if (isPdf(mimeType)) return <FiFile size={24} />;
+    const extension = fileName?.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'doc':
+      case 'docx':
+        return <FiFile size={24} />;
+      case 'xls':
+      case 'xlsx':
+        return <FiFile size={24} />;
+      default:
+        return <FiFile size={24} />;
+    }
   };
 
-  const getPreviewUrl = (fileId, isImageFile) => {
-    if (isImageFile) return `/api/FileAttachment/preview/${fileId}`;
-    return null;
+  const getFileTypeLabel = (mimeType, fileName) => {
+    if (isImage(mimeType)) return 'Image';
+    if (isPdf(mimeType)) return 'PDF';
+    const extension = fileName?.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'doc':
+      case 'docx':
+        return 'Word Document';
+      case 'xls':
+      case 'xlsx':
+        return 'Excel Spreadsheet';
+      case 'txt':
+        return 'Text File';
+      default:
+        return 'Document';
+    }
   };
 
   if (!referenceId) {
@@ -184,23 +240,19 @@ const FileUploader = ({
         <div className="file-uploader__list">
           {files.map((file) => (
             <div key={file.fileAttachmentId} className={`file-uploader__item ${file.isPrimary ? 'file-uploader__item--primary' : ''}`}>
-              {getPreviewUrl(file.fileAttachmentId, isImage(file.fileMimeType)) ? (
-                <img 
-                  src={getPreviewUrl(file.fileAttachmentId, isImage(file.fileMimeType))} 
-                  alt={file.originalFileName}
-                  className="file-uploader__preview"
-                />
-              ) : (
-                <div className="file-uploader__icon">{getFileIcon(file.fileMimeType)}</div>
-              )}
+              <div className="file-uploader__icon">{getFileIcon(file.fileMimeType, file.originalFileName)}</div>
               <div className="file-uploader__info">
                 <div className="file-uploader__name">{file.originalFileName}</div>
                 <div className="file-uploader__meta">
                   {file.fileSize && <span>{Math.round(file.fileSize / 1024)} KB</span>}
+                  <span className="file-uploader__type">{getFileTypeLabel(file.fileMimeType, file.originalFileName)}</span>
                   {file.isPrimary && <Chip label="Primary" size="small" color="primary" />}
                 </div>
               </div>
               <div className="file-uploader__actions">
+                <IconButton size="small" onClick={() => handlePreview(file)} title="Preview">
+                  <FiEye size={16} />
+                </IconButton>
                 {!file.isPrimary && isImage(file.fileMimeType) && (
                   <IconButton size="small" onClick={() => handleSetPrimary(file.fileAttachmentId)} title="Set as primary">
                     <FiStar size={16} />
@@ -214,6 +266,75 @@ const FileUploader = ({
           ))}
         </div>
       )}
+
+      {/* Preview Modal */}
+      <Dialog
+        open={previewOpen}
+        onClose={handleClosePreview}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: {
+            backgroundColor: 'var(--card-bg)',
+            borderRadius: '12px',
+          }
+        }}
+      >
+        <DialogContent sx={{ p: 0, position: 'relative', minHeight: 400 }}>
+          <MuiIconButton
+            onClick={handleClosePreview}
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              zIndex: 1,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              color: 'white',
+              '&:hover': { backgroundColor: 'rgba(0,0,0,0.7)' }
+            }}
+          >
+            <FiX size={20} />
+          </MuiIconButton>
+          
+          {previewFile && previewUrl && (
+            <Box sx={{ width: '100%', height: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {isImage(previewFile.fileMimeType) ? (
+                <img 
+                  src={previewUrl} 
+                  alt={previewFile.originalFileName}
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                />
+              ) : isPdf(previewFile.fileMimeType) ? (
+                <iframe
+                  src={previewUrl}
+                  title={previewFile.originalFileName}
+                  style={{ width: '100%', height: '100%', border: 'none' }}
+                />
+              ) : (
+                <Box sx={{ textAlign: 'center' }}>
+                  <FiFile size={64} style={{ color: 'var(--text-secondary)', marginBottom: 16 }} />
+                  <Typography variant="h6">{previewFile.originalFileName}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Preview not available for this file type
+                  </Typography>
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = previewUrl;
+                      link.download = previewFile.originalFileName;
+                      link.click();
+                    }}
+                    sx={{ mt: 2 }}
+                  >
+                    Download File
+                  </Button>
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

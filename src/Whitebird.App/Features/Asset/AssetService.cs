@@ -587,6 +587,50 @@ public class AssetService : BaseService, IAssetService
         }, "get asset dropdown list");
     }
 
+        // ============================================================
+    // NEW: AVAILABLE ASSETS FOR TRANSACTION
+    // ============================================================
+
+    public async Task<ServiceResult<IEnumerable<AssetDropdownView>>> GetAvailableAssetsForTransactionAsync()
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var assets = await _assetReps.GetAvailableAssetsForTransactionAsync();
+            return ServiceResult<IEnumerable<AssetDropdownView>>.Success(assets);
+        }, "get available assets for transaction");
+    }
+    
+    public async Task<ServiceResult<bool>> IsAssetAvailableForTransactionAsync(int assetId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var isAvailable = await _assetReps.IsAssetAvailableForTransactionAsync(assetId);
+            return ServiceResult<bool>.Success(isAvailable);
+        }, "check asset availability");
+    }
+    
+    // ============================================================
+    // NEW: ASSET STATUS LISTS
+    // ============================================================
+
+    public async Task<ServiceResult<IEnumerable<AssetListView>>> GetDamagedAssetsAsync()
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var assets = await _assetReps.GetDamagedAssetsListViewAsync();
+            return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
+        }, "get damaged assets");
+    }
+    
+    public async Task<ServiceResult<IEnumerable<AssetListView>>> GetInactiveAssetsAsync()
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var assets = await _assetReps.GetInactiveAssetsListViewAsync();
+            return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
+        }, "get inactive assets");
+    }
+
     #region Private Helpers
 
     private string DeriveAssetStatus(AssetTransactionListView? activeTransaction)

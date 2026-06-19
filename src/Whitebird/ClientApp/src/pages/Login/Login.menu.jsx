@@ -3,12 +3,12 @@ import { Box } from '@mui/material';
 import { useAuth } from '../../context/AuthContext';
 import Input from '../../components/atoms/Input/Input';
 import Button from '../../components/atoms/Button/Button';
-import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
-import utilsHelper from '../../core/utils/utils.helper';
+import { useSweetAlert } from '../../hooks/useSweetAlert';
+import './Login.scss';
 
 const LoginMenu = ({ onLoginSuccess }) => {
   const { login } = useAuth();
-  // UPDATED: email field changed to username
+  const { toast } = useSweetAlert();
   const [formData, setFormData] = useState({ username: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -32,14 +32,16 @@ const LoginMenu = ({ onLoginSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
+    
     setLoading(true);
-    // UPDATED: pass username instead of email
     const r = await login(formData.username, formData.password);
     setLoading(false);
+    
     if (r.success) {
+      toast.success(`Welcome back, ${formData.username}!`);
       onLoginSuccess?.();
     } else {
-      ConfirmDialog.toast.error(r.error || 'Login failed');
+      toast.error(r.error || 'Login failed. Please check your username and password.');
     }
   };
 
@@ -54,7 +56,7 @@ const LoginMenu = ({ onLoginSuccess }) => {
     <Box
       component="form"
       onSubmit={handleSubmit}
-      sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+      sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}
     >
       <Input
         label="Username"

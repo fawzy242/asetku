@@ -2,19 +2,9 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DEBOUNCE_CONFIG } from '../core/constants/appConstants';
 import { useDebounce } from './useDebounce';
-import apiService from '../core/services/api.service';
 
 /**
- * Custom hook untuk grid data dengan React Query caching.
- * 
- * PERBAIKAN:
- * - queryKey menggunakan array of values instead of JSON.stringify
- * - debounce untuk filter changes
- * - abort controller untuk cancel in-flight requests
- * 
- * @param {Array|string} queryKey - Unique query key (array dianjurkan)
- * @param {Function} fetchFn - Async function untuk fetch data
- * @param {Object} [options] - Additional options
+ * Custom hook untuk grid data dengan React Query caching dan server-side pagination
  */
 export const useGridData = (queryKey, fetchFn, options = {}) => {
   const [page, setPage] = useState(options.initialPage || 1);
@@ -22,15 +12,15 @@ export const useGridData = (queryKey, fetchFn, options = {}) => {
   const [filters, setFilters] = useState({});
   const abortControllerRef = useRef(null);
   
-  // Debounce filter changes to prevent excessive API calls
+  // Debounce filter changes
   const debouncedFilters = useDebounce(filters, DEBOUNCE_CONFIG.SEARCH_DELAY);
 
-  // Build query key as array (more efficient than JSON.stringify)
+  // Build query key
   const fullQueryKey = Array.isArray(queryKey)
     ? [...queryKey, page, pageSize, ...Object.entries(debouncedFilters).flat()]
     : [queryKey, page, pageSize, ...Object.entries(debouncedFilters).flat()];
 
-  // Cancel previous request when query key changes
+  // Cancel previous request
   useEffect(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -47,13 +37,16 @@ export const useGridData = (queryKey, fetchFn, options = {}) => {
   const queryResult = useQuery({
     queryKey: fullQueryKey,
     queryFn: () => {
-      // Cancel previous request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
       abortControllerRef.current = new AbortController();
       
-      return fetchFn({ page, pageSize, ...debouncedFilters }, {
+      return fetchFn({ 
+        page, 
+        pageSize, 
+        ...debouncedFilters 
+      }, {
         signal: abortControllerRef.current.signal
       });
     },
@@ -63,7 +56,16 @@ export const useGridData = (queryKey, fetchFn, options = {}) => {
 
   const updateFilters = useCallback((newFilters) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
-    setPage(1);
+    setPage(1); // Reset to first page when filters change
+  }, []);
+
+  const handlePageChange = useCallback((newPage) => {
+    setPage(newPage);
+  }, []);
+
+  const handlePageSizeChange = useCallback((newPageSize) => {
+    setPageSize(newPageSize);
+    setPage(1); // Reset to first page when page size changes
   }, []);
 
   const extractData = (source) => {
@@ -94,9 +96,9 @@ export const useGridData = (queryKey, fetchFn, options = {}) => {
     loading: queryResult.isLoading || queryResult.isFetching,
     error: queryResult.error,
     page,
-    setPage,
+    setPage: handlePageChange,
     pageSize,
-    setPageSize,
+    setPageSize: handlePageSizeChange,
     filters,
     updateFilters,
     reload: queryResult.refetch,

@@ -158,4 +158,27 @@ public class AssetController : ControllerBase
 
         return File(result.Data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Asset_Import_Template.xlsx");
     }
+        // ============================================================
+    // NEW: AVAILABLE ASSETS FOR TRANSACTION
+    // ============================================================
+
+    [HttpGet("available-for-transaction")]
+    public async Task<IActionResult> GetAvailableAssetsForTransaction()
+        => this.HandleResult(await _assetService.GetAvailableAssetsForTransactionAsync());
+    
+    [HttpGet("{id:int}/available")]
+    public async Task<IActionResult> IsAssetAvailableForTransaction(int id)
+        => this.HandleResult(await _assetService.IsAssetAvailableForTransactionAsync(id));
+    
+    // ============================================================
+    // NEW: ASSET STATUS LISTS
+    // ============================================================
+
+    [HttpGet("damaged")]
+    public async Task<IActionResult> GetDamagedAssets()
+        => this.HandleResult(await _assetService.GetDamagedAssetsAsync());
+    
+    [HttpGet("inactive")]
+    public async Task<IActionResult> GetInactiveAssets()
+        => this.HandleResult(await _assetService.GetInactiveAssetsAsync());
 }

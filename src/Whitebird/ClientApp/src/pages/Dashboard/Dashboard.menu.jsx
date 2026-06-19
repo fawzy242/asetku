@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler } from 'chart.js';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
-import { FiPackage, FiCheckCircle, FiUser, FiTool, FiDollarSign, FiClock, FiAlertTriangle, FiCalendar, FiLayers, FiShield, FiTrendingUp, FiBarChart2 } from "react-icons/fi";
-import { Chip, Box, Typography, Paper } from "@mui/material";
+import { FiPackage, FiCheckCircle, FiUser, FiTool, FiDollarSign, FiClock, FiAlertTriangle, FiCalendar, FiLayers, FiShield, FiTrendingUp, FiBarChart2, FiGrid, FiPieChart, FiList } from "react-icons/fi";
+import { Chip, Box, Typography } from "@mui/material";
 import DashboardData from "./Dashboard.data";
 import Card from "../../components/atoms/Card/Card";
 import DataTable from "../../components/molecules/DataTable/DataTable";
 import Spinner from "../../components/atoms/Spinner/Spinner";
+import Tabs from "../../components/molecules/Tabs/Tabs";
 import DrilldownModal from "../../components/molecules/DrilldownModal/DrilldownModal";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
 import { ASSET_STATUS_CHART_COLORS } from "../../core/constants/assetStatuses";
@@ -14,32 +15,38 @@ import { useUIStore } from "../../stores/uiStore";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./Dashboard.scss";
 
-// Register Chart.js components
-ChartJS.register(
-  CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, 
-  ArcElement, PointElement, LineElement, Filler
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler);
 
 const dashboardData = new DashboardData();
 
+const DASHBOARD_TABS = [
+  { id: "summary", label: "Summary", icon: <FiGrid size={16} /> },
+  { id: "charts", label: "Charts & Analytics", icon: <FiPieChart size={16} /> },
+  { id: "recent", label: "Recent Activity", icon: <FiList size={16} /> },
+];
+
+const StatCard = ({ icon: Icon, label, value, color, bgColor, onClick, clickable }) => (
+  <div className={`dashboard__stat-card ${clickable ? 'dashboard__stat-card--clickable' : ''}`} onClick={onClick}>
+    <div className="dashboard__stat-icon" style={{ backgroundColor: bgColor, color }}>
+      <Icon size={24} />
+    </div>
+    <div className="dashboard__stat-info">
+      <h3>{label}</h3>
+      <p>{value}</p>
+    </div>
+  </div>
+);
+
 const DashboardMenu = () => {
+  const [activeTab, setActiveTab] = useState("summary");
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({});
   const [expiredWarranty, setExpiredWarranty] = useState([]);
   const [upcomingMaintenance, setUpcomingMaintenance] = useState([]);
   const [recentTransactions, setRecentTransactions] = useState({ data: [] });
-  const [drilldown, setDrilldown] = useState({
-    isOpen: false,
-    title: '',
-    endpoint: '',
-    params: {},
-    columns: null,
-  });
-
+  const [drilldown, setDrilldown] = useState({ isOpen: false, title: '', endpoint: '', params: {}, columns: null });
   const theme = useUIStore((s) => s.theme);
   const isDark = theme === 'dark';
-
-  // Chart text color based on theme
   const textColor = isDark ? '#f9fafb' : '#111827';
   const gridColor = isDark ? '#374151' : '#e5e7eb';
   const borderColor = isDark ? '#4b5563' : '#d1d5db';
@@ -58,7 +65,7 @@ const DashboardMenu = () => {
     setLoading(false);
   };
 
-  // Asset Status Distribution Data for Doughnut Chart
+  // Chart Data
   const statusLabels = ['Available', 'Assigned', 'On Loan', 'In Maintenance', 'Damaged', 'Retired'];
   const statusDataValues = [
     stats.availableAssets || 0,
@@ -70,194 +77,140 @@ const DashboardMenu = () => {
   ];
   const statusBackgroundColors = statusLabels.map(s => ASSET_STATUS_CHART_COLORS[s] || '#6b7280');
 
-  const doughnutChartData = {
-    labels: statusLabels,
-    datasets: [{
-      data: statusDataValues,
-      backgroundColor: statusBackgroundColors,
-      borderWidth: 0,
-      hoverOffset: 10,
-      borderRadius: 8,
-      spacing: 2,
-    }],
-  };
-
-  const doughnutChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    cutout: '65%',
-    plugins: {
-      legend: {
-        position: 'bottom',
-        labels: {
-          color: textColor,
-          padding: 16,
-          usePointStyle: true,
-          pointStyleWidth: 12,
-          pointStyleHeight: 12,
-          font: { size: 12, family: "'Inter', sans-serif" },
-          boxWidth: 12,
-          boxHeight: 12,
-        },
-      },
-      tooltip: {
-        backgroundColor: isDark ? '#1f2937' : '#ffffff',
-        titleColor: textColor,
-        bodyColor: textColor,
-        borderColor: borderColor,
-        borderWidth: 1,
-        padding: 10,
-        cornerRadius: 8,
-        callbacks: {
-          label: (context) => {
-            const label = context.label || '';
-            const value = context.raw || 0;
-            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-            return `${label}: ${value} (${percentage}%)`;
-          }
-        }
-      },
-    },
-  };
-
-  // Monthly Transaction Trend Data for Line Chart
   const monthlyLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const monthlyData = stats.monthlyTransactions || [65, 59, 80, 81, 56, 55, 40, 45, 60, 70, 75, 80];
 
-  const lineChartData = {
-    labels: monthlyLabels,
-    datasets: [{
-      label: 'Transactions',
-      data: monthlyData,
-      borderColor: '#dc2626',
-      backgroundColor: 'rgba(220, 38, 38, 0.1)',
-      fill: true,
-      tension: 0.4,
-      pointBackgroundColor: '#dc2626',
-      pointBorderColor: '#ffffff',
-      pointBorderWidth: 2,
-      pointRadius: 4,
-      pointHoverRadius: 6,
-      borderWidth: 2,
-    }],
-  };
-
-  const lineChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: false,
-      },
-      tooltip: {
-        backgroundColor: isDark ? '#1f2937' : '#ffffff',
-        titleColor: textColor,
-        bodyColor: textColor,
-        borderColor: borderColor,
-        borderWidth: 1,
-        padding: 10,
-        cornerRadius: 8,
-        callbacks: {
-          label: (context) => {
-            return `Transactions: ${context.raw}`;
-          }
-        }
-      },
-    },
-    scales: {
-      y: {
-        grid: { color: gridColor },
-        ticks: { color: textColor, stepSize: 20 },
-        title: { display: true, text: 'Number of Transactions', color: textColor, font: { size: 12 } },
-      },
-      x: {
-        grid: { display: false },
-        ticks: { color: textColor },
-      },
-    },
-  };
-
-  // Asset Value by Category Data for Bar Chart
   const categoryLabels = stats.categoryLabels || ['Electronics', 'Furniture', 'Vehicles', 'Office Equipment', 'IT Hardware', 'Others'];
   const categoryValues = stats.categoryValues || [45000000, 25000000, 180000000, 12000000, 35000000, 8000000];
 
-  const barChartData = {
-    labels: categoryLabels,
-    datasets: [{
-      label: 'Asset Value (IDR)',
-      data: categoryValues,
-      backgroundColor: 'rgba(220, 38, 38, 0.7)',
-      borderRadius: 8,
-      barPercentage: 0.7,
-      categoryPercentage: 0.8,
-      hoverBackgroundColor: '#dc2626',
-    }],
+  const doughnutChartData = { 
+    labels: statusLabels, 
+    datasets: [{ 
+      data: statusDataValues, 
+      backgroundColor: statusBackgroundColors, 
+      borderWidth: 0, 
+      hoverOffset: 10, 
+      borderRadius: 8, 
+      spacing: 2 
+    }] 
+  };
+  
+  const doughnutChartOptions = { 
+    responsive: true, 
+    maintainAspectRatio: false, 
+    cutout: '65%', 
+    plugins: { 
+      legend: { 
+        position: 'bottom', 
+        labels: { color: textColor, padding: 16, usePointStyle: true, pointStyleWidth: 12, pointStyleHeight: 12, font: { size: 12, family: "'Inter', sans-serif" }, boxWidth: 12, boxHeight: 12 } 
+      }, 
+      tooltip: { 
+        backgroundColor: isDark ? '#1f2937' : '#ffffff', 
+        titleColor: textColor, 
+        bodyColor: textColor, 
+        borderColor, 
+        borderWidth: 1, 
+        padding: 10, 
+        cornerRadius: 8, 
+        callbacks: { 
+          label: (context) => { 
+            const label = context.label || ''; 
+            const value = context.raw || 0; 
+            const total = context.dataset.data.reduce((a, b) => a + b, 0); 
+            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0; 
+            return `${label}: ${value} (${percentage}%)`; 
+          } 
+        } 
+      } 
+    } 
   };
 
-  const barChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: false,
-      },
-      tooltip: {
-        backgroundColor: isDark ? '#1f2937' : '#ffffff',
-        titleColor: textColor,
-        bodyColor: textColor,
-        borderColor: borderColor,
-        borderWidth: 1,
-        padding: 10,
-        cornerRadius: 8,
-        callbacks: {
-          label: (context) => {
-            let value = context.raw;
-            return `Value: ${utilsHelper.formatCurrency(value)}`;
-          }
-        }
-      },
-    },
-    scales: {
-      y: {
-        grid: { color: gridColor },
-        ticks: { 
-          color: textColor, 
-          callback: (value) => utilsHelper.formatCurrency(value),
-        },
-        title: { display: true, text: 'Total Value (IDR)', color: textColor, font: { size: 12 } },
-      },
-      x: {
-        grid: { display: false },
-        ticks: { color: textColor, font: { size: 11 } },
-      },
-    },
+  const lineChartData = { 
+    labels: monthlyLabels, 
+    datasets: [{ 
+      label: 'Transactions', 
+      data: monthlyData, 
+      borderColor: '#dc2626', 
+      backgroundColor: 'rgba(220, 38, 38, 0.1)', 
+      fill: true, 
+      tension: 0.4, 
+      pointBackgroundColor: '#dc2626', 
+      pointBorderColor: '#ffffff', 
+      pointBorderWidth: 2, 
+      pointRadius: 4, 
+      pointHoverRadius: 6, 
+      borderWidth: 2 
+    }] 
+  };
+  
+  const lineChartOptions = { 
+    responsive: true, 
+    maintainAspectRatio: false, 
+    plugins: { 
+      legend: { display: false }, 
+      tooltip: { 
+        backgroundColor: isDark ? '#1f2937' : '#ffffff', 
+        titleColor: textColor, 
+        bodyColor: textColor, 
+        borderColor, 
+        borderWidth: 1, 
+        padding: 10, 
+        cornerRadius: 8, 
+        callbacks: { label: (context) => `Transactions: ${context.raw}` } 
+      } 
+    }, 
+    scales: { 
+      y: { grid: { color: gridColor }, ticks: { color: textColor, stepSize: 20 }, title: { display: true, text: 'Number of Transactions', color: textColor, font: { size: 12 } } }, 
+      x: { grid: { display: false }, ticks: { color: textColor } } 
+    } 
+  };
+
+  const barChartData = { 
+    labels: categoryLabels, 
+    datasets: [{ 
+      label: 'Asset Value (IDR)', 
+      data: categoryValues, 
+      backgroundColor: 'rgba(220, 38, 38, 0.7)', 
+      borderRadius: 8, 
+      barPercentage: 0.7, 
+      categoryPercentage: 0.8, 
+      hoverBackgroundColor: '#dc2626' 
+    }] 
+  };
+  
+  const barChartOptions = { 
+    responsive: true, 
+    maintainAspectRatio: false, 
+    plugins: { 
+      legend: { display: false }, 
+      tooltip: { 
+        backgroundColor: isDark ? '#1f2937' : '#ffffff', 
+        titleColor: textColor, 
+        bodyColor: textColor, 
+        borderColor, 
+        borderWidth: 1, 
+        padding: 10, 
+        cornerRadius: 8, 
+        callbacks: { label: (context) => `Value: ${utilsHelper.formatCurrency(context.raw)}` } 
+      } 
+    }, 
+    scales: { 
+      y: { grid: { color: gridColor }, ticks: { color: textColor, callback: (value) => utilsHelper.formatCurrency(value) }, title: { display: true, text: 'Total Value (IDR)', color: textColor, font: { size: 12 } } }, 
+      x: { grid: { display: false }, ticks: { color: textColor, font: { size: 11 } } } 
+    } 
   };
 
   const transactionColumns = [
     { field: "assetCode", headerName: "Asset Code", width: 120 },
     { field: "assetName", headerName: "Asset Name", flex: 1, minWidth: 180 },
     { field: "transactionTypeName", headerName: "Type", width: 150 },
-    {
-      field: "approved",
-      headerName: "Status",
-      width: 120,
-      renderCell: (p) => {
-        let status = 'Pending';
-        if (p?.value === true) status = 'Approved';
-        if (p?.value === false) status = 'Rejected';
-        return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
-      },
-    },
-    {
-      field: "transactionDate",
-      headerName: "Date",
-      width: 160,
-      valueFormatter: (p) => {
-        if (!p || !p.value) return '-';
-        return utilsHelper.formatDateTime(p.value);
-      },
-    },
+    { field: "approved", headerName: "Status", width: 120, renderCell: (p) => { 
+      let status = 'Pending'; 
+      if (p?.value === true) status = 'Approved'; 
+      if (p?.value === false) status = 'Rejected'; 
+      return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />; 
+    } },
+    { field: "transactionDate", headerName: "Date", width: 160, valueFormatter: (p) => p?.value ? utilsHelper.formatDateTime(p.value) : '-' },
   ];
 
   const statCardsConfig = [
@@ -276,12 +229,12 @@ const DashboardMenu = () => {
 
   const handleCardClick = (card) => {
     if (card.noDrilldown) return;
-    setDrilldown({
-      isOpen: true,
-      title: `${card.label} Details`,
-      endpoint: card.endpoint,
-      params: card.params,
-      columns: card.label.includes('Transaction') || card.label.includes('Pending') ? transactionColumns : null,
+    setDrilldown({ 
+      isOpen: true, 
+      title: `${card.label} Details`, 
+      endpoint: card.endpoint, 
+      params: card.params, 
+      columns: card.label.includes('Transaction') || card.label.includes('Pending') ? transactionColumns : null 
     });
   };
 
@@ -291,135 +244,125 @@ const DashboardMenu = () => {
     <div className="dashboard fade-transition">
       <div className="page-header">
         <h1 className="page-title">Dashboard</h1>
+        <p className="page-description">Overview of asset management system performance</p>
       </div>
 
-      {/* Stats Cards Grid */}
-      <div className="dashboard__stats">
-        {statCardsConfig.map((card) => (
-          <div 
-            key={card.label} 
-            className={`dashboard__stat-card ${!card.noDrilldown ? 'dashboard__stat-card--clickable' : ''}`}
-            onClick={() => handleCardClick(card)}
-            style={{ cursor: !card.noDrilldown ? 'pointer' : 'default' }}
-          >
-            <div className="dashboard__stat-icon" style={{ backgroundColor: card.bg, color: card.color }}>
-              <card.icon size={24} />
-            </div>
-            <div className="dashboard__stat-info">
-              <h3>{card.label}</h3>
-              <p>{card.value}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+      <Tabs tabs={DASHBOARD_TABS} activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* Charts Row */}
-      <div className="dashboard__charts">
-        {/* Asset Distribution Doughnut Chart */}
-        <Card title="Asset Distribution" className="dashboard__chart-card">
-          <div className="dashboard__chart-container">
-            <Doughnut data={doughnutChartData} options={doughnutChartOptions} />
+      {/* Summary Tab */}
+      {activeTab === "summary" && (
+        <div className="dashboard__tab-content">
+          <div className="dashboard__stats">
+            {statCardsConfig.map((card) => (
+              <StatCard 
+                key={card.label} 
+                icon={card.icon} 
+                label={card.label} 
+                value={card.value} 
+                color={card.color} 
+                bgColor={card.bg} 
+                onClick={() => handleCardClick(card)} 
+                clickable={!card.noDrilldown} 
+              />
+            ))}
           </div>
-        </Card>
 
-        {/* Monthly Transaction Trend */}
-        <Card title="Transaction Trend" className="dashboard__chart-card">
-          <div className="dashboard__chart-container">
-            <Line data={lineChartData} options={lineChartOptions} />
-          </div>
-          <div className="dashboard__chart-insight">
-            <Typography variant="caption" color="text.secondary">
-              <FiTrendingUp size={14} style={{ marginRight: 4 }} />
-              {monthlyData[monthlyData.length - 1] > monthlyData[monthlyData.length - 2] 
-                ? '↑ Increasing trend compared to last month' 
-                : '↓ Decreasing trend compared to last month'}
-            </Typography>
-          </div>
-        </Card>
-      </div>
-
-      {/* Asset Value by Category Bar Chart */}
-      <div className="dashboard__full-width">
-        <Card title="Asset Value by Category" className="dashboard__chart-card">
-          <div className="dashboard__chart-container--large">
-            <Bar data={barChartData} options={barChartOptions} />
-          </div>
-        </Card>
-      </div>
-
-      {/* Alerts Section */}
-      <div className="dashboard__alerts">
-        {expiredWarranty.length > 0 && (
-          <Card title={
-            <span className="dashboard__alert-title">
-              <FiAlertTriangle style={{ marginRight: 8, color: '#ef4444' }} />
-              Expired Warranty ({expiredWarranty.length})
-            </span>
-          }>
-            <div className="dashboard__alert-list">
-              {expiredWarranty.slice(0, 5).map(item => (
-                <div key={item.assetId} className="dashboard__alert-item">
-                  <div className="dashboard__alert-info">
-                    <span className="dashboard__alert-code">{item.assetCode}</span>
-                    <span className="dashboard__alert-name">{item.assetName}</span>
-                  </div>
-                  <Chip label="Expired" size="small" sx={{ bgcolor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }} />
+          <div className="dashboard__alerts">
+            {expiredWarranty.length > 0 && (
+              <Card title={<span className="dashboard__alert-title"><FiAlertTriangle style={{ marginRight: 8, color: '#ef4444' }} /> Expired Warranty ({expiredWarranty.length})</span>}>
+                <div className="dashboard__alert-list">
+                  {expiredWarranty.slice(0, 5).map(item => (
+                    <div key={item.assetId} className="dashboard__alert-item">
+                      <div className="dashboard__alert-info">
+                        <span className="dashboard__alert-code">{item.assetCode}</span>
+                        <span className="dashboard__alert-name">{item.assetName}</span>
+                      </div>
+                      <Chip label="Expired" size="small" className="dashboard__alert-chip--expired" />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </Card>
-        )}
-        
-        {upcomingMaintenance.length > 0 && (
-          <Card title={
-            <span className="dashboard__alert-title">
-              <FiCalendar style={{ marginRight: 8, color: '#f59e0b' }} />
-              Upcoming Maintenance ({upcomingMaintenance.length})
-            </span>
-          }>
-            <div className="dashboard__alert-list">
-              {upcomingMaintenance.slice(0, 5).map(item => (
-                <div key={item.assetId} className="dashboard__alert-item">
-                  <div className="dashboard__alert-info">
-                    <span className="dashboard__alert-code">{item.assetCode}</span>
-                    <span className="dashboard__alert-name">{item.assetName}</span>
-                  </div>
-                  <Chip 
-                    label={utilsHelper.formatDate(item.nextMaintenanceDate)} 
-                    size="small" 
-                    variant="outlined"
-                    sx={{ borderColor: '#f59e0b', color: '#f59e0b' }}
-                  />
+              </Card>
+            )}
+            
+            {upcomingMaintenance.length > 0 && (
+              <Card title={<span className="dashboard__alert-title"><FiCalendar style={{ marginRight: 8, color: '#f59e0b' }} /> Upcoming Maintenance ({upcomingMaintenance.length})</span>}>
+                <div className="dashboard__alert-list">
+                  {upcomingMaintenance.slice(0, 5).map(item => (
+                    <div key={item.assetId} className="dashboard__alert-item">
+                      <div className="dashboard__alert-info">
+                        <span className="dashboard__alert-code">{item.assetCode}</span>
+                        <span className="dashboard__alert-name">{item.assetName}</span>
+                      </div>
+                      <Chip label={utilsHelper.formatDate(item.nextMaintenanceDate)} size="small" className="dashboard__alert-chip--upcoming" />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </Card>
-        )}
-      </div>
-
-      {/* Recent Transactions Table */}
-      <Card title="Recent Transactions">
-        <div style={{ width: '100%', overflowX: 'auto' }}>
-          <DataTable
-            rows={recentTransactions.data || []}
-            columns={transactionColumns}
-            pageSize={5}
-            getRowId={(row) => row?.assetTransactionId || `txn-${Math.random()}`}
-            hideFooter={true}
-            autoHeight={true}
-            ariaLabel="Recent transactions table"
-          />
+              </Card>
+            )}
+          </div>
         </div>
-      </Card>
+      )}
 
-      {/* Drilldown Modal */}
-      <DrilldownModal
-        isOpen={drilldown.isOpen}
-        onClose={() => setDrilldown(prev => ({ ...prev, isOpen: false }))}
-        title={drilldown.title}
-        endpoint={drilldown.endpoint}
-        params={drilldown.params}
-        columns={drilldown.columns}
+      {/* Charts Tab */}
+      {activeTab === "charts" && (
+        <div className="dashboard__tab-content">
+          <div className="dashboard__charts-row">
+            <Card title="Asset Distribution" className="dashboard__chart-card">
+              <div className="dashboard__chart-container">
+                <Doughnut data={doughnutChartData} options={doughnutChartOptions} />
+              </div>
+            </Card>
+
+            <Card title="Transaction Trend" className="dashboard__chart-card">
+              <div className="dashboard__chart-container">
+                <Line data={lineChartData} options={lineChartOptions} />
+              </div>
+              <div className="dashboard__chart-insight">
+                <Typography variant="caption" color="text.secondary">
+                  <FiTrendingUp size={14} style={{ marginRight: 4 }} />
+                  {monthlyData[monthlyData.length - 1] > monthlyData[monthlyData.length - 2] 
+                    ? '↑ Increasing trend compared to last month' 
+                    : '↓ Decreasing trend compared to last month'}
+                </Typography>
+              </div>
+            </Card>
+          </div>
+
+          <div className="dashboard__full-width">
+            <Card title="Asset Value by Category" className="dashboard__chart-card">
+              <div className="dashboard__chart-container--large">
+                <Bar data={barChartData} options={barChartOptions} />
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Tab */}
+      {activeTab === "recent" && (
+        <div className="dashboard__tab-content">
+          <Card title="Recent Transactions">
+            <div className="dashboard__table-wrapper">
+              <DataTable 
+                rows={recentTransactions.data || []} 
+                columns={transactionColumns} 
+                pageSize={10} 
+                getRowId={(row) => row?.assetTransactionId || `txn-${Math.random()}`} 
+                hideFooter={false} 
+                ariaLabel="Recent transactions table"
+              />
+            </div>
+          </Card>
+        </div>
+      )}
+
+      <DrilldownModal 
+        isOpen={drilldown.isOpen} 
+        onClose={() => setDrilldown(prev => ({ ...prev, isOpen: false }))} 
+        title={drilldown.title} 
+        endpoint={drilldown.endpoint} 
+        params={drilldown.params} 
+        columns={drilldown.columns} 
       />
     </div>
   );

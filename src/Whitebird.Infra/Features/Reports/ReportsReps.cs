@@ -1,6 +1,7 @@
 using Dapper;
 using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.Reports;
+using Whitebird.Domain.Features.MasterData;
 
 namespace Whitebird.Infra.Features.Reports;
 
@@ -56,13 +57,13 @@ public class ReportsReps : IReportsReps
                 a.PurchasePrice, t.Notes, t.ExpectedReturnDate, t.ActualReturnDate,
                 o.OfficeName
             FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId
-            LEFT JOIN Employee e ON t.ToEmployeeId = e.EmployeeId
-            LEFT JOIN Department d ON e.DepartmentId = d.DepartmentId
-            LEFT JOIN Category c ON a.CategoryId = c.CategoryId
-            LEFT JOIN Office o ON a.OfficeId = o.OfficeId
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
-            LEFT JOIN MasterData md2 ON a.AssetCondition = md2.ReferenceCode AND md2.ReferenceName = 'AssetCondition'
+            LEFT JOIN Asset a ON t.AssetId = a.AssetId AND a.IsActive = 1
+            LEFT JOIN Employee e ON t.ToEmployeeId = e.EmployeeId AND e.IsActive = 1
+            LEFT JOIN Department d ON e.DepartmentId = d.DepartmentId AND d.IsActive = 1
+            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+            LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
+            LEFT JOIN MasterData md2 ON a.AssetCondition = md2.ReferenceCode AND md2.ReferenceName = 'AssetCondition' AND md2.IsActive = 1
             WHERE t.IsActive = 1
             {whereClause}
             ORDER BY t.TransactionDate DESC";
@@ -74,20 +75,78 @@ public class ReportsReps : IReportsReps
     public async Task<IEnumerable<ReportsAssetInventoryViewModel>> GetAssetInventoryReportsAsync(
         string? status = null, int? categoryId = null, int? supplierId = null)
     {
-        var conditions = new List<string> { "a.IsActive = 1" };
+        var conditions = new List<string>();
         var parameters = new DynamicParameters();
 
+        // Status filter: Available, Assigned, Damaged
         if (!string.IsNullOrEmpty(status))
         {
             if (status == "Available")
-                conditions.Add("NOT EXISTS (SELECT 1 FROM AssetTransaction at WHERE at.AssetId = a.AssetId AND at.Approved = 1 AND at.FromAssetTransactionId IS NULL AND at.IsActive = 1)");
-            else if (status == "On Loan")
-                conditions.Add("EXISTS (SELECT 1 FROM AssetTransaction at WHERE at.AssetId = a.AssetId AND at.TransactionType = 3 AND at.Approved = 1 AND at.FromAssetTransactionId IS NULL AND at.IsActive = 1)");
+            {
+                conditions.Add(@"
+                    NOT EXISTS (
+                        SELECT 1 FROM AssetTransaction at 
+                        WHERE at.AssetId = a.AssetId 
+                          AND at.Approved = 1 
+                          AND at.FromAssetTransactionId IS NULL 
+                          AND at.IsActive = 1
+                    )");
+            }
             else if (status == "Assigned")
-                conditions.Add("EXISTS (SELECT 1 FROM AssetTransaction at WHERE at.AssetId = a.AssetId AND at.TransactionType IN (1,2) AND at.Approved = 1 AND at.FromAssetTransactionId IS NULL AND at.IsActive = 1)");
+            {
+                conditions.Add(@"
+                    EXISTS (
+                        SELECT 1 FROM AssetTransaction at 
+                        WHERE at.AssetId = a.AssetId 
+                          AND at.TransactionType IN (@HandoverType, @TransferType)
+                          AND at.Approved = 1 
+                          AND at.FromAssetTransactionId IS NULL 
+                          AND at.IsActive = 1
+                    )");
+                parameters.Add("@HandoverType", TransactionTypeConstants.HANDOVER);
+                parameters.Add("@TransferType", TransactionTypeConstants.TRANSFER);
+            }
+            else if (status == "Damaged")
+            {
+                conditions.Add("a.AssetCondition = @DamagedCondition");
+                parameters.Add("@DamagedCondition", AssetConditionConstants.DAMAGED);
+            }
+            else if (status == "On Loan")
+            {
+                conditions.Add(@"
+                    EXISTS (
+                        SELECT 1 FROM AssetTransaction at 
+                        WHERE at.AssetId = a.AssetId 
+                          AND at.TransactionType = @LoanType
+                          AND at.Approved = 1 
+                          AND at.FromAssetTransactionId IS NULL 
+                          AND at.IsActive = 1
+                    )");
+                parameters.Add("@LoanType", TransactionTypeConstants.LOAN);
+            }
             else if (status == "In Maintenance")
-                conditions.Add("EXISTS (SELECT 1 FROM AssetTransaction at WHERE at.AssetId = a.AssetId AND at.TransactionType = 6 AND at.Approved = 1 AND at.FromAssetTransactionId IS NULL AND at.IsActive = 1)");
+            {
+                conditions.Add(@"
+                    EXISTS (
+                        SELECT 1 FROM AssetTransaction at 
+                        WHERE at.AssetId = a.AssetId 
+                          AND at.TransactionType = @MaintenanceType
+                          AND at.Approved = 1 
+                          AND at.FromAssetTransactionId IS NULL 
+                          AND at.IsActive = 1
+                    )");
+                parameters.Add("@MaintenanceType", TransactionTypeConstants.MAINTENANCE);
+            }
+            else if (status == "Active")
+            {
+                conditions.Add("a.IsActive = 1");
+            }
+            else if (status == "Inactive")
+            {
+                conditions.Add("a.IsActive = 0");
+            }
         }
+
         if (categoryId.HasValue)
         {
             conditions.Add("a.CategoryId = @CategoryId");
@@ -99,17 +158,17 @@ public class ReportsReps : IReportsReps
             parameters.Add("@SupplierId", supplierId.Value);
         }
 
-        var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
+        var whereClause = conditions.Any() ? $"WHERE {string.Join(" AND ", conditions)}" : "";
 
         var sql = $@"
             SELECT 
                 a.AssetId, a.AssetCode, a.AssetName, a.SerialNumber, a.Brand, a.Model,
                 CASE 
                     WHEN at2.AssetId IS NULL THEN 'Available'
-                    WHEN at2.TransactionType = 3 THEN 'On Loan'
-                    WHEN at2.TransactionType IN (1,2) THEN 'Assigned'
-                    WHEN at2.TransactionType = 6 THEN 'In Maintenance'
-                    ELSE 'Unknown'
+                    WHEN at2.TransactionType = @LoanType THEN 'On Loan'
+                    WHEN at2.TransactionType IN (@HandoverType, @TransferType) THEN 'Assigned'
+                    WHEN at2.TransactionType = @MaintenanceType THEN 'In Maintenance'
+                    ELSE 'Available'
                 END as CurrentStatus,
                 md1.MasterDataName as AssetConditionName,
                 md2.MasterDataName as AssetConditionPurchaseName,
@@ -121,12 +180,12 @@ public class ReportsReps : IReportsReps
                 CASE WHEN a.OperasionalOffice = 1 THEN 'Yes' ELSE 'No' END as OperasionalOffice,
                 a.ResidualValue, a.UsefulLife, a.Notes
             FROM Asset a
-            LEFT JOIN Category c ON a.CategoryId = c.CategoryId
-            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId
-            LEFT JOIN Office o ON a.OfficeId = o.OfficeId
-            LEFT JOIN Employee e ON at2.ToEmployeeId = e.EmployeeId
-            LEFT JOIN MasterData md1 ON a.AssetCondition = md1.ReferenceCode AND md1.ReferenceName = 'AssetCondition'
-            LEFT JOIN MasterData md2 ON a.AssetConditionPurchase = md2.ReferenceCode AND md2.ReferenceName = 'AssetConditionPurchase'
+            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
+            LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN Employee e ON at2.ToEmployeeId = e.EmployeeId AND e.IsActive = 1
+            LEFT JOIN MasterData md1 ON a.AssetCondition = md1.ReferenceCode AND md1.ReferenceName = 'AssetCondition' AND md1.IsActive = 1
+            LEFT JOIN MasterData md2 ON a.AssetConditionPurchase = md2.ReferenceCode AND md2.ReferenceName = 'AssetConditionPurchase' AND md2.IsActive = 1
             LEFT JOIN (
                 SELECT AssetId, TransactionType, ToEmployeeId,
                        ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
@@ -136,25 +195,31 @@ public class ReportsReps : IReportsReps
             {whereClause}
             ORDER BY a.AssetCode";
 
-        return await _context.QueryAsync<ReportsAssetInventoryViewModel>(sql, parameters);
+        var sqlParams = new DynamicParameters(parameters);
+        sqlParams.Add("@LoanType", TransactionTypeConstants.LOAN);
+        sqlParams.Add("@HandoverType", TransactionTypeConstants.HANDOVER);
+        sqlParams.Add("@TransferType", TransactionTypeConstants.TRANSFER);
+        sqlParams.Add("@MaintenanceType", TransactionTypeConstants.MAINTENANCE);
+
+        return await _context.QueryAsync<ReportsAssetInventoryViewModel>(sql, sqlParams);
     }
 
     /// <inheritdoc />
     public async Task<IEnumerable<ReportsEmployeeAssetViewModel>> GetEmployeeAssetReportsAsync(
-        int? employeeId = null, string? department = null)
+        int? employeeId = null)
     {
-        var conditions = new List<string> { "e.IsActive = 1", "at.Approved = 1", "at.FromAssetTransactionId IS NULL" };
+        var conditions = new List<string> { 
+            "e.IsActive = 1", 
+            "at.Approved = 1", 
+            "at.FromAssetTransactionId IS NULL" 
+        };
         var parameters = new DynamicParameters();
 
+        // ONLY employeeId parameter, NO department filter
         if (employeeId.HasValue)
         {
             conditions.Add("e.EmployeeId = @EmployeeId");
             parameters.Add("@EmployeeId", employeeId.Value);
-        }
-        if (!string.IsNullOrEmpty(department))
-        {
-            conditions.Add("d.DepartmentName = @Department");
-            parameters.Add("@Department", department);
         }
 
         var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
@@ -168,22 +233,24 @@ public class ReportsReps : IReportsReps
                 md3.MasterDataName as AssetConditionName, c.CategoryName,
                 at.TransactionDate as AssignmentDate, at.ExpectedReturnDate,
                 CASE 
-                    WHEN at.TransactionType = 3 THEN 'On Loan'
+                    WHEN at.TransactionType = @LoanType THEN 'On Loan'
                     ELSE 'Assigned'
                 END as AssociationType,
                 CASE WHEN at.ExpectedReturnDate < GETDATE() THEN 'Yes' ELSE 'No' END as IsOverdue,
                 a.LastMaintenanceDate, a.NextMaintenanceDate, a.Notes
             FROM Employee e
             INNER JOIN AssetTransaction at ON e.EmployeeId = at.ToEmployeeId
-            INNER JOIN Asset a ON at.AssetId = a.AssetId
-            LEFT JOIN Department d ON e.DepartmentId = d.DepartmentId
-            LEFT JOIN Office o ON e.OfficeId = o.OfficeId
-            LEFT JOIN Category c ON a.CategoryId = c.CategoryId
-            LEFT JOIN MasterData md1 ON e.Position = md1.ReferenceCode AND md1.ReferenceName = 'Position'
-            LEFT JOIN MasterData md2 ON e.EmploymentStatus = md2.ReferenceCode AND md2.ReferenceName = 'EmployeeStatus'
-            LEFT JOIN MasterData md3 ON a.AssetCondition = md3.ReferenceCode AND md3.ReferenceName = 'AssetCondition'
+            INNER JOIN Asset a ON at.AssetId = a.AssetId AND a.IsActive = 1
+            LEFT JOIN Department d ON e.DepartmentId = d.DepartmentId AND d.IsActive = 1
+            LEFT JOIN Office o ON e.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+            LEFT JOIN MasterData md1 ON e.Position = md1.ReferenceCode AND md1.ReferenceName = 'Position' AND md1.IsActive = 1
+            LEFT JOIN MasterData md2 ON e.EmploymentStatus = md2.ReferenceCode AND md2.ReferenceName = 'EmployeeStatus' AND md2.IsActive = 1
+            LEFT JOIN MasterData md3 ON a.AssetCondition = md3.ReferenceCode AND md3.ReferenceName = 'AssetCondition' AND md3.IsActive = 1
             {whereClause}
-            ORDER BY e.DepartmentName, e.FullName, a.AssetCode";
+            ORDER BY e.FullName, a.AssetCode";
+
+        parameters.Add("@LoanType", TransactionTypeConstants.LOAN);
 
         return await _context.QueryAsync<ReportsEmployeeAssetViewModel>(sql, parameters);
     }
@@ -192,7 +259,7 @@ public class ReportsReps : IReportsReps
     public async Task<IEnumerable<ReportsMaintenanceViewModel>> GetMaintenanceReportsAsync(
         DateTime? startDate = null, DateTime? endDate = null, bool? isUpcoming = null)
     {
-        var conditions = new List<string> { "a.IsActive = 1" };
+        var conditions = new List<string>();
         var parameters = new DynamicParameters();
 
         if (isUpcoming == true)
@@ -209,8 +276,12 @@ public class ReportsReps : IReportsReps
                 parameters.Add("@EndDate", endDate.Value);
             }
         }
+        else
+        {
+            conditions.Add("a.IsActive = 1");
+        }
 
-        var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
+        var whereClause = conditions.Any() ? $"WHERE {string.Join(" AND ", conditions)}" : "";
 
         var sql = $@"
             SELECT 
@@ -220,23 +291,22 @@ public class ReportsReps : IReportsReps
                 e.FullName as CurrentHolderName, o.OfficeName,
                 CASE 
                     WHEN at2.AssetId IS NULL THEN 'Available'
-                    WHEN at2.TransactionType = 3 THEN 'On Loan'
-                    WHEN at2.TransactionType IN (1,2) THEN 'Assigned'
-                    WHEN at2.TransactionType = 6 THEN 'In Maintenance'
+                    WHEN at2.TransactionType = @LoanType THEN 'On Loan'
+                    WHEN at2.TransactionType IN (@HandoverType, @TransferType) THEN 'Assigned'
+                    WHEN at2.TransactionType = @MaintenanceType THEN 'In Maintenance'
                     ELSE 'Available'
                 END as CurrentStatus,
                 (SELECT COUNT(*) FROM AssetTransaction WHERE AssetId = a.AssetId AND MaintenanceType IS NOT NULL AND IsActive = 1) as MaintenanceCount,
                 md2.MasterDataName as LastMaintenanceTypeName,
                 (SELECT TOP 1 MaintenanceCost FROM AssetTransaction WHERE AssetId = a.AssetId AND MaintenanceCost IS NOT NULL ORDER BY TransactionDate DESC) as LastMaintenanceCost,
-                (SELECT TOP 1 VendorName FROM AssetTransaction WHERE AssetId = a.AssetId AND VendorName IS NOT NULL ORDER BY TransactionDate DESC) as LastMaintenanceVendor,
                 (SELECT TOP 1 Notes FROM AssetTransaction WHERE AssetId = a.AssetId AND MaintenanceType IS NOT NULL ORDER BY TransactionDate DESC) as LastMaintenanceNotes,
                 (SELECT SUM(MaintenanceCost) FROM AssetTransaction WHERE AssetId = a.AssetId AND MaintenanceCost IS NOT NULL AND IsActive = 1) as TotalMaintenanceCost
             FROM Asset a
-            LEFT JOIN Category c ON a.CategoryId = c.CategoryId
-            LEFT JOIN Office o ON a.OfficeId = o.OfficeId
-            LEFT JOIN Employee e ON at2.ToEmployeeId = e.EmployeeId
-            LEFT JOIN MasterData md1 ON a.AssetCondition = md1.ReferenceCode AND md1.ReferenceName = 'AssetCondition'
-            LEFT JOIN MasterData md2 ON lastMaint.MaintenanceType = md2.ReferenceCode AND md2.ReferenceName = 'MaintenanceType'
+            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+            LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN Employee e ON at2.ToEmployeeId = e.EmployeeId AND e.IsActive = 1
+            LEFT JOIN MasterData md1 ON a.AssetCondition = md1.ReferenceCode AND md1.ReferenceName = 'AssetCondition' AND md1.IsActive = 1
+            LEFT JOIN MasterData md2 ON lastMaint.MaintenanceType = md2.ReferenceCode AND md2.ReferenceName = 'MaintenanceType' AND md2.IsActive = 1
             LEFT JOIN (
                 SELECT AssetId, TransactionType, ToEmployeeId,
                        ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
@@ -252,15 +322,23 @@ public class ReportsReps : IReportsReps
             {whereClause}
             ORDER BY a.NextMaintenanceDate, a.AssetCode";
 
-        return await _context.QueryAsync<ReportsMaintenanceViewModel>(sql, parameters);
+        var sqlParams = new DynamicParameters(parameters);
+        sqlParams.Add("@LoanType", TransactionTypeConstants.LOAN);
+        sqlParams.Add("@HandoverType", TransactionTypeConstants.HANDOVER);
+        sqlParams.Add("@TransferType", TransactionTypeConstants.TRANSFER);
+        sqlParams.Add("@MaintenanceType", TransactionTypeConstants.MAINTENANCE);
+
+        return await _context.QueryAsync<ReportsMaintenanceViewModel>(sql, sqlParams);
     }
 
     /// <inheritdoc />
     public async Task<IEnumerable<ReportsFinancialViewModel>> GetFinancialReportsAsync(
         DateTime? startDate = null, DateTime? endDate = null)
     {
-        var conditions = new List<string> { "a.IsActive = 1" };
+        var conditions = new List<string>();
         var parameters = new DynamicParameters();
+
+        conditions.Add("a.IsActive = 1");
 
         if (startDate.HasValue)
         {
@@ -283,12 +361,12 @@ public class ReportsReps : IReportsReps
                 md1.MasterDataName as AssetConditionPurchaseName,
                 CASE WHEN a.WarrantyExpiryDate < GETDATE() THEN 'Yes' ELSE 'No' END as IsWarrantyExpired,
                 CASE 
-                    WHEN a.UsefulLife > 0 AND a.PurchasePrice IS NOT NULL AND a.DepreciationStartDate IS NOT NULL
+                    WHEN a.UsefulLife > 0 AND a.PurchasePrice IS NOT NULL AND a.PurchasePrice > 0 AND a.DepreciationStartDate IS NOT NULL
                     THEN a.PurchasePrice / a.UsefulLife
                     ELSE NULL
                 END as AnnualDepreciation,
                 CASE 
-                    WHEN a.UsefulLife > 0 AND a.PurchasePrice IS NOT NULL AND a.DepreciationStartDate IS NOT NULL
+                    WHEN a.UsefulLife > 0 AND a.PurchasePrice IS NOT NULL AND a.PurchasePrice > 0 AND a.DepreciationStartDate IS NOT NULL
                     THEN a.PurchasePrice - ((DATEDIFF(YEAR, a.DepreciationStartDate, GETDATE()) * (a.PurchasePrice / a.UsefulLife)))
                     ELSE a.PurchasePrice
                 END as CurrentBookValue,
@@ -296,10 +374,10 @@ public class ReportsReps : IReportsReps
                 (SELECT SUM(MaintenanceCost) FROM AssetTransaction WHERE AssetId = a.AssetId AND MaintenanceCost IS NOT NULL AND IsActive = 1) as TotalMaintenanceCost,
                 ISNULL(a.PurchasePrice, 0) + ISNULL((SELECT SUM(MaintenanceCost) FROM AssetTransaction WHERE AssetId = a.AssetId AND MaintenanceCost IS NOT NULL AND IsActive = 1), 0) as TotalCostOfOwnership
             FROM Asset a
-            LEFT JOIN Category c ON a.CategoryId = c.CategoryId
-            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId
-            LEFT JOIN Office o ON a.OfficeId = o.OfficeId
-            LEFT JOIN MasterData md1 ON a.AssetConditionPurchase = md1.ReferenceCode AND md1.ReferenceName = 'AssetConditionPurchase'
+            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
+            LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN MasterData md1 ON a.AssetConditionPurchase = md1.ReferenceCode AND md1.ReferenceName = 'AssetConditionPurchase' AND md1.IsActive = 1
             {whereClause}
             ORDER BY a.PurchaseDate DESC, a.AssetCode";
 
@@ -327,16 +405,16 @@ public class ReportsReps : IReportsReps
                 (SELECT COUNT(*) FROM Asset a WHERE a.IsActive = 1 AND NOT EXISTS (
                     SELECT 1 FROM ActiveTransactions at WHERE at.AssetId = a.AssetId AND at.rn = 1
                 )) AS AvailableAssets,
-                (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType IN (1, 2) AND at.rn = 1) AS AssignedAssets,
-                (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType = 3 AND at.rn = 1) AS AssetsOnLoan,
-                (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType = 6 AND at.rn = 1) AS AssetsInMaintenance,
-                (SELECT COUNT(DISTINCT AssetId) FROM AssetTransaction WHERE TransactionType = 8 AND Approved = 1 AND IsActive = 1) AS DisposedAssets,
+                (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType IN (@HandoverType, @TransferType) AND at.rn = 1) AS AssignedAssets,
+                (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType = @LoanType AND at.rn = 1) AS AssetsOnLoan,
+                (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType = @MaintenanceType AND at.rn = 1) AS AssetsInMaintenance,
+                (SELECT COUNT(DISTINCT AssetId) FROM AssetTransaction WHERE TransactionType = @DisposalType AND Approved = 1 AND IsActive = 1) AS DisposedAssets,
                 (SELECT COUNT(*) FROM Asset WHERE WarrantyExpiryDate < GETDATE() AND WarrantyExpiryDate IS NOT NULL AND IsActive = 1) AS ExpiredWarrantyCount,
                 (SELECT COUNT(*) FROM Asset WHERE NextMaintenanceDate BETWEEN GETDATE() AND DATEADD(DAY, 30, GETDATE()) AND IsActive = 1) AS UpcomingMaintenanceCount,
-                (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType = 3 AND at.ExpectedReturnDate < GETDATE() AND at.rn = 1) AS OverdueLoanCount,
+                (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType = @LoanType AND at.ExpectedReturnDate < GETDATE() AND at.rn = 1) AS OverdueLoanCount,
                 ISNULL((SELECT SUM(PurchasePrice) FROM Asset WHERE IsActive = 1), 0) AS TotalAssetValue,
                 (SELECT COUNT(*) FROM Employee WHERE IsActive = 1) AS TotalEmployees,
-                (SELECT COUNT(*) FROM Employee WHERE IsActive = 1 AND EmploymentStatus = 4) AS ActiveEmployees,
+                (SELECT COUNT(*) FROM Employee WHERE IsActive = 1 AND EmploymentStatus = @PermanentStatus) AS ActiveEmployees,
                 (SELECT COUNT(*) FROM AssetTransaction WHERE Approved IS NULL AND IsActive = 1) AS PendingApprovals,
                 (SELECT COUNT(*) FROM AssetTransaction WHERE Approved = 1 AND TransactionDate >= DATEADD(DAY, -30, GETDATE()) AND IsActive = 1) AS ApprovedTransactions,
                 (SELECT COUNT(*) FROM AssetTransaction WHERE Approved = 0 AND TransactionDate >= DATEADD(DAY, -30, GETDATE()) AND IsActive = 1) AS RejectedTransactions,
@@ -344,7 +422,18 @@ public class ReportsReps : IReportsReps
                 (SELECT COUNT(*) FROM Office WHERE IsActive = 1) AS TotalOffices,
                 (SELECT COUNT(*) FROM Department WHERE IsActive = 1) AS TotalDepartments";
 
-        return await _context.QueryFirstOrDefaultAsync<DashboardStatsViewModel>(sql) ?? new DashboardStatsViewModel();
+        var parameters = new
+        {
+            HandoverType = TransactionTypeConstants.HANDOVER,
+            TransferType = TransactionTypeConstants.TRANSFER,
+            LoanType = TransactionTypeConstants.LOAN,
+            MaintenanceType = TransactionTypeConstants.MAINTENANCE,
+            DisposalType = TransactionTypeConstants.DISPOSAL,
+            PermanentStatus = EmployeeStatusConstants.PERMANENT
+        };
+
+        var result = await _context.QueryFirstOrDefaultAsync<DashboardStatsViewModel>(sql, parameters);
+        return result ?? new DashboardStatsViewModel();
     }
 
     /// <inheritdoc />
@@ -357,8 +446,8 @@ public class ReportsReps : IReportsReps
     /// <inheritdoc />
     public async Task<int> GetActiveEmployeesCountAsync()
     {
-        const string sql = "SELECT COUNT(*) FROM Employee WHERE IsActive = 1 AND EmploymentStatus = 4";
-        return await _context.ExecuteScalarAsync<int>(sql);
+        const string sql = "SELECT COUNT(*) FROM Employee WHERE IsActive = 1 AND EmploymentStatus = @PermanentStatus";
+        return await _context.ExecuteScalarAsync<int>(sql, new { PermanentStatus = EmployeeStatusConstants.PERMANENT });
     }
 
     /// <inheritdoc />
@@ -373,5 +462,39 @@ public class ReportsReps : IReportsReps
     {
         const string sql = "SELECT COUNT(*) FROM Department WHERE IsActive = 1";
         return await _context.ExecuteScalarAsync<int>(sql);
+    }
+
+    // ============================================================
+    // EXPORT METHODS - Return same data for Excel export
+    // ============================================================
+
+    public async Task<IEnumerable<ReportsAssetTransactionViewModel>> ExportAssetTransactionReportsAsync(
+        DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null)
+    {
+        return await GetAssetTransactionReportsAsync(startDate, endDate, transactionType);
+    }
+
+    public async Task<IEnumerable<ReportsAssetInventoryViewModel>> ExportAssetInventoryReportsAsync(
+        string? status = null, int? categoryId = null, int? supplierId = null)
+    {
+        return await GetAssetInventoryReportsAsync(status, categoryId, supplierId);
+    }
+
+    public async Task<IEnumerable<ReportsEmployeeAssetViewModel>> ExportEmployeeAssetReportsAsync(
+        int? employeeId = null)
+    {
+        return await GetEmployeeAssetReportsAsync(employeeId);
+    }
+
+    public async Task<IEnumerable<ReportsMaintenanceViewModel>> ExportMaintenanceReportsAsync(
+        DateTime? startDate = null, DateTime? endDate = null, bool? isUpcoming = null)
+    {
+        return await GetMaintenanceReportsAsync(startDate, endDate, isUpcoming);
+    }
+
+    public async Task<IEnumerable<ReportsFinancialViewModel>> ExportFinancialReportsAsync(
+        DateTime? startDate = null, DateTime? endDate = null)
+    {
+        return await GetFinancialReportsAsync(startDate, endDate);
     }
 }

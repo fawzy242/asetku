@@ -475,6 +475,169 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         }, "get available paired transactions");
     }
 
+    // ============================================================
+    // NEW: SHORTCUT METHODS
+    // ============================================================
+
+    /// <inheritdoc />
+    public async Task<ServiceResult<AssetTransactionDetailView>> CreateReturnTransactionAsync(int sourceTransactionId, AssetReturnViewModel model)
+    {
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            // Get source transaction
+            var sourceTransaction = await _transactionReps.GetByIdRawAsync(sourceTransactionId);
+            if (sourceTransaction == null)
+            {
+                return ServiceResult<AssetTransactionDetailView>.NotFound($"Source transaction with id {sourceTransactionId} not found");
+            }
+
+            // Validate source transaction type (only HANDOVER, LOAN, MAINTENANCE can be returned)
+            if (sourceTransaction.TransactionType != TransactionTypeConstants.HANDOVER &&
+                sourceTransaction.TransactionType != TransactionTypeConstants.LOAN &&
+                sourceTransaction.TransactionType != TransactionTypeConstants.MAINTENANCE)
+            {
+                return ServiceResult<AssetTransactionDetailView>.BadRequest(
+                    $"Transaction type '{sourceTransaction.TransactionType}' cannot be returned. Only HANDOVER, LOAN, and MAINTENANCE can be returned.");
+            }
+
+            // Check if already returned
+            if (sourceTransaction.ActualReturnDate.HasValue)
+            {
+                return ServiceResult<AssetTransactionDetailView>.BadRequest("Asset already returned");
+            }
+
+            // Check if transaction is approved
+            if (sourceTransaction.Approved != true)
+            {
+                return ServiceResult<AssetTransactionDetailView>.BadRequest("Cannot return unapproved transaction");
+            }
+
+            var asset = await _assetReps.GetByIdRawAsync(sourceTransaction.AssetId);
+            if (asset == null)
+            {
+                return ServiceResult<AssetTransactionDetailView>.NotFound($"Asset with id {sourceTransaction.AssetId} not found");
+            }
+
+            // Create RETURN transaction
+            var returnTransaction = new AssetTransactionEntity
+            {
+                AssetId = sourceTransaction.AssetId,
+                TransactionType = TransactionTypeConstants.RETURN,
+                FromEmployeeId = sourceTransaction.ToEmployeeId,
+                ToEmployeeId = null,
+                TransactionDate = model.ActualReturnDate,
+                Notes = model.Notes,
+                ConditionBefore = sourceTransaction.ConditionAfter,
+                ConditionAfter = model.ConditionAfter,
+                Approved = null, // Pending approval
+                IsActive = true,
+                CreatedDate = DateTime.Now,
+                CreatedBy = _currentUserService.GetDisplayName(),
+                FromAssetTransactionId = sourceTransactionId
+            };
+
+            var id = await _repository.InsertAsync(returnTransaction);
+
+            // Update source transaction with return date
+            sourceTransaction.ActualReturnDate = model.ActualReturnDate;
+            sourceTransaction.ModifiedDate = DateTime.Now;
+            sourceTransaction.ModifiedBy = _currentUserService.GetDisplayName();
+            await _repository.UpdateAsync(sourceTransaction);
+
+            var created = await _transactionReps.GetDetailByIdAsync(Convert.ToInt32(id));
+
+            if (created != null)
+            {
+                await _activityLogService.LogCreateAsync(
+                    TableNames.AssetTransaction,
+                    created.AssetTransactionId,
+                    $"RETURN transaction created as shortcut from transaction ID {sourceTransactionId} for Asset ID {created.AssetId}",
+                    _currentUserService.GetDisplayName());
+            }
+
+            return created == null
+                ? ServiceResult<AssetTransactionDetailView>.Failure("Failed to retrieve created return transaction")
+                : ServiceResult<AssetTransactionDetailView>.Success(created, "Return transaction created successfully (Pending approval)");
+        }, "create return transaction", async (ex) =>
+        {
+            await _activityLogService.LogErrorAsync(TableNames.AssetTransaction, 0, "Create Return Transaction", ex, _currentUserService.GetDisplayName());
+        });
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResult<AssetTransactionDetailView>> CreatePostMaintenanceTransactionAsync(int sourceTransactionId, PostMaintenanceViewModel model)
+    {
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            // Get source transaction
+            var sourceTransaction = await _transactionReps.GetByIdRawAsync(sourceTransactionId);
+            if (sourceTransaction == null)
+            {
+                return ServiceResult<AssetTransactionDetailView>.NotFound($"Source transaction with id {sourceTransactionId} not found");
+            }
+
+            // Validate source transaction type (only MAINTENANCE)
+            if (sourceTransaction.TransactionType != TransactionTypeConstants.MAINTENANCE)
+            {
+                return ServiceResult<AssetTransactionDetailView>.BadRequest(
+                    $"Transaction type '{sourceTransaction.TransactionType}' cannot create POST_MAINTENANCE. Only MAINTENANCE can.");
+            }
+
+            // Check if already has paired transaction
+            if (sourceTransaction.FromAssetTransactionId != null)
+            {
+                return ServiceResult<AssetTransactionDetailView>.BadRequest("Maintenance transaction already has a paired POST_MAINTENANCE");
+            }
+
+            var asset = await _assetReps.GetByIdRawAsync(sourceTransaction.AssetId);
+            if (asset == null)
+            {
+                return ServiceResult<AssetTransactionDetailView>.NotFound($"Asset with id {sourceTransaction.AssetId} not found");
+            }
+
+            // Create POST_MAINTENANCE transaction
+            var postMaintenanceTransaction = new AssetTransactionEntity
+            {
+                AssetId = sourceTransaction.AssetId,
+                TransactionType = TransactionTypeConstants.POST_MAINTENANCE,
+                FromAssetTransactionId = sourceTransactionId,
+                TransactionDate = model.CompletionDate,
+                ConditionAfter = model.ConditionAfter,
+                Notes = model.Notes,
+                Approved = null, // Pending approval
+                IsActive = true,
+                CreatedDate = DateTime.Now,
+                CreatedBy = _currentUserService.GetDisplayName()
+            };
+
+            var id = await _repository.InsertAsync(postMaintenanceTransaction);
+
+            // Update source transaction with pairing
+            sourceTransaction.FromAssetTransactionId = Convert.ToInt32(id);
+            sourceTransaction.ModifiedDate = DateTime.Now;
+            sourceTransaction.ModifiedBy = _currentUserService.GetDisplayName();
+            await _repository.UpdateAsync(sourceTransaction);
+
+            var created = await _transactionReps.GetDetailByIdAsync(Convert.ToInt32(id));
+
+            if (created != null)
+            {
+                await _activityLogService.LogCreateAsync(
+                    TableNames.AssetTransaction,
+                    created.AssetTransactionId,
+                    $"POST_MAINTENANCE transaction created as shortcut from transaction ID {sourceTransactionId} for Asset ID {created.AssetId}",
+                    _currentUserService.GetDisplayName());
+            }
+
+            return created == null
+                ? ServiceResult<AssetTransactionDetailView>.Failure("Failed to retrieve created post-maintenance transaction")
+                : ServiceResult<AssetTransactionDetailView>.Success(created, "Post-maintenance transaction created successfully (Pending approval)");
+        }, "create post-maintenance transaction", async (ex) =>
+        {
+            await _activityLogService.LogErrorAsync(TableNames.AssetTransaction, 0, "Create Post-Maintenance Transaction", ex, _currentUserService.GetDisplayName());
+        });
+    }
+    
     #region Private Helpers
 
     private async Task<ServiceResult<AssetTransactionDetailView>?> ValidateTransactionRulesAsync(AssetTransactionCreateViewModel model, AssetEntity asset)

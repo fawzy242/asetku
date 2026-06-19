@@ -3,16 +3,199 @@
 @use '../../styles/shared';
 
 // ============================================================
-// AssetTracking styles
-// NOTE: .summary-stat-card is defined in _shared.scss
+// AssetTracking Styles
 // ============================================================
 
 .asset-tracking {
     color: var(--text-primary);
 
-    // HAPUS duplikasi .summary-stat-card — gunakan dari _shared.scss
-    // Jika perlu override, tambahkan di sini:
-    .summary-stat-card {
-        // Override specific to AssetTracking if needed
+    .page-description {
+        color: var(--text-secondary);
+        font-size: $font-size-sm;
+        margin-top: $spacing-xs;
+    }
+
+    // Selection Card
+    &__selection-card {
+        .MuiCard__body {
+            padding: $spacing-md;
+        }
+    }
+
+    &__selection-content {
+        display: flex;
+        align-items: center;
+        gap: $spacing-md;
+        flex-wrap: wrap;
+    }
+
+    &__selection-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 48px;
+        height: 48px;
+        background-color: rgba(220, 38, 38, 0.1);
+        border-radius: $radius-lg;
+        color: var(--primary);
+    }
+
+    &__selection-select {
+        flex: 1;
+        min-width: 250px;
+    }
+
+    &__refresh-btn {
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        
+        &:hover {
+            background-color: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+    }
+
+    // Profile Card
+    &__profile-card {
+        .MuiCard__body {
+            padding: $spacing-lg;
+        }
+    }
+
+    &__profile-avatar {
+        width: 80px;
+        height: 80px;
+        background-color: var(--primary);
+        color: white;
+        font-size: 32px;
+    }
+
+    &__profile-name {
+        margin-bottom: $spacing-sm;
+    }
+
+    &__profile-tags {
+        display: flex;
+        gap: $spacing-sm;
+        flex-wrap: wrap;
+        margin-top: $spacing-sm;
+        margin-bottom: $spacing-md;
+    }
+
+    // Info Row
+    &__info-row {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        margin-bottom: $spacing-sm;
+    }
+
+    &__info-icon {
+        color: var(--text-secondary);
+        min-width: 18px;
+    }
+
+    &__info-label {
+        min-width: 110px;
+        font-size: $font-size-sm;
+        color: var(--text-secondary);
+    }
+
+    &__info-value {
+        font-size: $font-size-sm;
+        font-weight: 500;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: $spacing-xs;
+        flex-wrap: wrap;
+    }
+
+    // Stat Card
+    &__stat-card {
+        padding: $spacing-lg;
+        text-align: center;
+        background-color: var(--card-bg);
+        border-radius: $radius-lg;
+        border: 1px solid var(--border);
+        height: 100%;
+        transition: all $transition-fast;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: $spacing-sm;
+
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: $shadow-md;
+        }
+    }
+
+    &__stat-icon {
+        margin-bottom: $spacing-xs;
+    }
+
+    &__stat-value {
+        word-break: break-word;
+        text-align: center;
+        max-width: 100%;
+    }
+
+    &__overdue-chip {
+        margin-left: $spacing-sm;
+        background-color: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        height: 22px;
+        font-size: 11px;
+    }
+
+    // Empty State
+    &__empty-state {
+        text-align: center;
+        padding: $spacing-3xl;
+        color: var(--text-secondary);
+        
+        svg {
+            margin-bottom: $spacing-lg;
+            opacity: 0.5;
+        }
+    }
+
+    &__loading-container {
+        padding: $spacing-3xl;
+        display: flex;
+        justify-content: center;
+    }
+}
+
+// Dark mode specific
+[data-theme='dark'] {
+    .asset-tracking {
+        &__selection-icon {
+            background-color: rgba(239, 68, 68, 0.15);
+        }
+        
+        &__refresh-btn {
+            background-color: #374151;
+            border-color: #4b5563;
+            
+            &:hover {
+                background-color: #ef4444;
+            }
+        }
+        
+        &__profile-avatar {
+            background-color: #ef4444;
+        }
+        
+        &__stat-card {
+            background-color: #1f2937;
+            border-color: #374151;
+            
+            &:hover {
+                border-color: #ef4444;
+            }
+        }
     }
 }

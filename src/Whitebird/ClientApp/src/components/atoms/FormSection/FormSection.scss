@@ -1,0 +1,26 @@
+@use '../../../styles/variables' as *;
+
+.form-section {
+    &__header {
+        margin-bottom: $spacing-sm;
+    }
+
+    &__title {
+        color: var(--text-primary);
+        margin-bottom: $spacing-xs;
+    }
+
+    &__description {
+        color: var(--text-secondary);
+    }
+
+    &__divider {
+        margin: $spacing-sm 0 $spacing-md;
+        border-color: var(--border);
+    }
+
+    &__content {
+        display: flex;
+        flex-direction: column;
+    }
+}

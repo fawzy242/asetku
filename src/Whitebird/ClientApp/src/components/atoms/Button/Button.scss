@@ -15,6 +15,7 @@
     cursor: pointer;
     border: 1px solid transparent;
     white-space: nowrap;
+    height: 38px;
 
     &:disabled {
         opacity: 0.6;
@@ -46,19 +47,19 @@
     &--outline {
         background-color: transparent;
         border-color: var(--border);
-        color: var(--text-primary) !important;
+        color: var(--text-primary);
 
         &:hover:not(:disabled) {
             background-color: var(--surface);
             border-color: var(--primary);
-            color: var(--primary) !important;
+            color: var(--primary);
         }
     }
 
     &--text {
         background-color: transparent;
         border-color: transparent;
-        color: var(--text-primary) !important;
+        color: var(--text-primary);
 
         &:hover:not(:disabled) {
             background-color: var(--surface);
@@ -85,21 +86,21 @@
         }
     }
 
-    // Size variants
+    // Size variants - all consistent height
     &--sm {
-        padding: 6px 12px;
+        padding: 0 $spacing-md;
         font-size: $font-size-xs;
         height: 32px;
     }
 
     &--md {
-        padding: 8px 20px;
+        padding: 0 $spacing-lg;
         font-size: $font-size-sm;
         height: 38px;
     }
 
     &--lg {
-        padding: 10px 24px;
+        padding: 0 $spacing-xl;
         font-size: $font-size-base;
         height: 44px;
     }
@@ -145,16 +146,16 @@
 // Dark mode specific fixes
 [data-theme='dark'] {
     .btn--outline {
-        color: #f9fafb !important;
+        color: #f9fafb;
         border-color: #4b5563;
 
         &:hover {
-            color: var(--primary) !important;
+            color: var(--primary);
         }
     }
 
     .btn--text {
-        color: #f9fafb !important;
+        color: #f9fafb;
     }
 }
 

@@ -10,7 +10,7 @@ public interface IReportsReps
     // Report data
     Task<IEnumerable<ReportsAssetTransactionViewModel>> GetAssetTransactionReportsAsync(DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null);
     Task<IEnumerable<ReportsAssetInventoryViewModel>> GetAssetInventoryReportsAsync(string? status = null, int? categoryId = null, int? supplierId = null);
-    Task<IEnumerable<ReportsEmployeeAssetViewModel>> GetEmployeeAssetReportsAsync(int? employeeId = null, string? department = null);
+    Task<IEnumerable<ReportsEmployeeAssetViewModel>> GetEmployeeAssetReportsAsync(int? employeeId = null);
     Task<IEnumerable<ReportsMaintenanceViewModel>> GetMaintenanceReportsAsync(DateTime? startDate = null, DateTime? endDate = null, bool? isUpcoming = null);
     Task<IEnumerable<ReportsFinancialViewModel>> GetFinancialReportsAsync(DateTime? startDate = null, DateTime? endDate = null);
 
@@ -20,4 +20,11 @@ public interface IReportsReps
     Task<int> GetActiveEmployeesCountAsync();
     Task<int> GetTotalOfficesCountAsync();
     Task<int> GetTotalDepartmentsCountAsync();
+    
+    // Excel export (return raw data for client-side export)
+    Task<IEnumerable<ReportsAssetTransactionViewModel>> ExportAssetTransactionReportsAsync(DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null);
+    Task<IEnumerable<ReportsAssetInventoryViewModel>> ExportAssetInventoryReportsAsync(string? status = null, int? categoryId = null, int? supplierId = null);
+    Task<IEnumerable<ReportsEmployeeAssetViewModel>> ExportEmployeeAssetReportsAsync(int? employeeId = null);
+    Task<IEnumerable<ReportsMaintenanceViewModel>> ExportMaintenanceReportsAsync(DateTime? startDate = null, DateTime? endDate = null, bool? isUpcoming = null);
+    Task<IEnumerable<ReportsFinancialViewModel>> ExportFinancialReportsAsync(DateTime? startDate = null, DateTime? endDate = null);
 }

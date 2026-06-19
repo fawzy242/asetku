@@ -23,7 +23,6 @@ class AssetTransactionsApi {
     return (await apiService.get(`/AssetTransaction/employee/${employeeId}`)).data; 
   }
   
-  // NEW: Get by approval status (replaces getByStatus)
   async getByApprovalStatus(approved) { 
     return (await apiService.get(`/AssetTransaction/approval-status?approved=${approved}`)).data; 
   }
@@ -60,7 +59,16 @@ class AssetTransactionsApi {
     return (await apiService.post(`/AssetTransaction/${id}/cancel`)).data; 
   }
   
-  // NEW: Import
+  // NEW: Shortcut endpoints
+  async createReturnTransaction(id, data) {
+    return (await apiService.post(`/AssetTransaction/${id}/return-shortcut`, data)).data;
+  }
+  
+  async createPostMaintenanceTransaction(id, data) {
+    return (await apiService.post(`/AssetTransaction/${id}/post-maintenance`, data)).data;
+  }
+  
+  // Import
   async import(file) {
     const formData = new FormData();
     formData.append('file', file);
@@ -86,8 +94,6 @@ class AssetTransactionsApi {
   async getOffices() { 
     return (await apiService.get('/Office/active')).data; 
   }
-  
-  // REMOVED: getByStatus, getLocations (replaced by getByApprovalStatus and getOffices)
 }
 
 export default new AssetTransactionsApi();

@@ -4,14 +4,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import CategoriesData from "./Categories.data";
 import GridView from "../../components/organisms/GridView/GridView";
 import CrudModal from "../../components/molecules/CrudModal/CrudModal";
+import FormSection from "../../components/atoms/FormSection/FormSection";
 import Input from "../../components/atoms/Input/Input";
 import Select from "../../components/atoms/Select/Select";
 import Spinner from "../../components/atoms/Spinner/Spinner";
-import IconButton from "../../components/atoms/IconButton/IconButton";
-import Button from "../../components/atoms/Button/Button";
 import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
-import { FiEdit2, FiTrash2, FiCheckSquare } from "react-icons/fi";
+import { ACTION_TYPES, useGridActions } from "../../hooks/useGridActions";
+import { useBulkSelection } from "../../hooks/useBulkSelection";
+import { useSweetAlert } from "../../hooks/useSweetAlert";
 import { useGridData } from "../../hooks/useGridData";
 import { useReferenceData } from "../../hooks/useReferenceData";
 import { useCrudFormBase } from "../../hooks/useCrudFormBase";
@@ -36,9 +37,9 @@ const TABS = [
 const CategoriesMenu = () => {
   const [activeTab, setActiveTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedRows, setSelectedRows] = useState([]);
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const queryClient = useQueryClient();
+  const { toast, confirmDelete, confirm } = useSweetAlert();
   const { categories: parentCategories } = useReferenceData();
 
   const {
@@ -58,7 +59,8 @@ const CategoriesMenu = () => {
     },
   });
 
-  // Show checkbox only for Active and Inactive tabs
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } = useBulkSelection({ idField: 'categoryId' });
+
   const showCheckbox = activeTab === "active" || activeTab === "inactive";
 
   const buildFilters = useCallback(() => {
@@ -82,7 +84,6 @@ const CategoriesMenu = () => {
       ...filters,
       ...params,
     };
-    
     const result = await categoriesData.fetchGridData(requestParams);
     return result;
   }, [buildFilters]);
@@ -100,27 +101,38 @@ const CategoriesMenu = () => {
 
   useEffect(() => {
     reload();
-    setSelectedRows([]);
-  }, [activeTab, reload]);
+    clearSelection();
+  }, [activeTab, reload, clearSelection]);
 
   const handleSearch = useCallback((search) => {
     setSearchTerm(search);
     setPage(1);
-    setSelectedRows([]);
-  }, [setPage]);
+    clearSelection();
+  }, [setPage, clearSelection]);
 
   const handleDelete = useCallback(async (cat) => {
+    const confirmed = await confirmDelete('Delete Category', `Are you sure you want to delete "${cat.categoryName}"?`);
+    if (!confirmed) return;
     const r = await categoriesData.delete(cat.categoryId);
     if (r.success) {
+      toast.success('Category deleted successfully');
       queryClient.invalidateQueries({ queryKey: ['reference', 'categories'] });
       reload();
+      clearSelection();
     }
-  }, [reload, queryClient]);
+  }, [reload, queryClient, toast, confirmDelete, clearSelection]);
 
   const handleBulkActivate = useCallback(async (ids, activate) => {
+    const actionText = activate ? 'activate' : 'deactivate';
+    const confirmed = await confirm({
+      title: activate ? 'Activate Categories' : 'Deactivate Categories',
+      text: `Are you sure you want to ${actionText} ${ids.length} categor(ies)?`,
+      confirmButtonText: activate ? 'Yes, Activate' : 'Yes, Deactivate',
+    });
+    if (!confirmed) return;
+    
     let successCount = 0;
     for (const id of ids) {
-      // Fetch current category
       const result = await categoriesData.fetchById(id);
       if (result.success && result.data) {
         const updateData = { ...result.data, isActive: activate };
@@ -129,40 +141,63 @@ const CategoriesMenu = () => {
       }
     }
     if (successCount > 0) {
+      toast.success(`${successCount} categor(ies) ${actionText}d successfully`);
       queryClient.invalidateQueries({ queryKey: ['reference', 'categories'] });
       reload();
-      setSelectedRows([]);
+      clearSelection();
     }
-    return successCount;
-  }, [reload, queryClient]);
+  }, [reload, queryClient, toast, confirm, clearSelection]);
 
   const onSubmit = useCallback(async () => {
     const submitData = { 
       ...formData, 
       isActive: editingCategory ? editingCategory.isActive : true 
     };
-    
     if (submitData.parentCategoryId === "" || submitData.parentCategoryId === null || submitData.parentCategoryId === undefined) {
       submitData.parentCategoryId = null;
     }
-    
     Object.keys(submitData).forEach(key => {
       setFormField(key)(submitData[key]);
     });
-    
     const success = await crudHandleSubmit();
     if (success) {
+      toast.success(editingCategory ? 'Category updated successfully' : 'Category created successfully');
       reload();
+      clearSelection();
     }
     return success;
-  }, [formData, editingCategory, crudHandleSubmit, setFormField, reload]);
+  }, [formData, editingCategory, crudHandleSubmit, setFormField, reload, toast, clearSelection]);
 
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
     setPage(1);
     setSearchTerm("");
-    setSelectedRows([]);
-  }, [setPage]);
+    clearSelection();
+  }, [setPage, clearSelection]);
+
+  const handleGridAction = useCallback((actionType, row) => {
+    switch (actionType) {
+      case ACTION_TYPES.EDIT:
+        handleEdit(row);
+        break;
+      case ACTION_TYPES.DELETE:
+        handleDelete(row);
+        break;
+      default:
+        break;
+    }
+  }, [handleEdit, handleDelete]);
+
+  const getConditionalActions = useCallback(() => {
+    return [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE];
+  }, []);
+
+  const { actionColumn } = useGridActions({
+    actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
+    onAction: handleGridAction,
+    getConditionalActions,
+    rowIdField: 'categoryId',
+  });
 
   const parentCategoryOptions = useMemo(() => [
     { value: "", label: "None (Top Level)" },
@@ -185,30 +220,15 @@ const CategoriesMenu = () => {
         return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
       },
     },
-    {
-      field: "actions",
-      headerName: "Actions",
-      width: 100,
-      sortable: false,
-      renderCell: (p) => (
-        <div className="table-actions">
-          <IconButton onClick={() => handleEdit(p.row)} title="Edit category" size="lg">
-            <FiEdit2 size={18} />
-          </IconButton>
-          <IconButton onClick={() => handleDelete(p.row)} title="Delete category" variant="danger" size="lg">
-            <FiTrash2 size={18} />
-          </IconButton>
-        </div>
-      )
-    },
-  ], [handleEdit, handleDelete]);
+    actionColumn,
+  ], [actionColumn]);
 
   const extraActions = (
     <>
-      {selectedRows.length > 0 && showCheckbox && (
-        <Button variant="primary" onClick={() => setShowBulkActivateModal(true)} startIcon={<FiCheckSquare />}>
-          {activeTab === "active" ? "Deactivate" : "Activate"} ({selectedRows.length})
-        </Button>
+      {hasSelection && showCheckbox && (
+        <button className="btn btn--primary btn--sm" onClick={() => setShowBulkActivateModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          {activeTab === "active" ? "Deactivate" : "Activate"} ({selectionCount})
+        </button>
       )}
     </>
   );
@@ -217,6 +237,8 @@ const CategoriesMenu = () => {
 
   const bulkActivateValue = activeTab === "active" ? false : true;
   const bulkButtonText = activeTab === "active" ? "Deactivate" : "Activate";
+  const bulkTitle = bulkButtonText === "Activate" ? "Activate Categories" : "Deactivate Categories";
+  const bulkDescription = `This action will ${bulkButtonText.toLowerCase()} the selected categories.`;
 
   return (
     <div className="categories-menu">
@@ -229,16 +251,15 @@ const CategoriesMenu = () => {
         columns={columns}
         data={categories}
         loading={loading}
+        totalCount={totalCount}
         page={page}
-        totalPages={Math.ceil(totalCount / pageSize) || 1}
         pageSize={pageSize}
-        totalItems={totalCount}
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
         onSearch={handleSearch}
         showCheckbox={showCheckbox}
-        selectedRows={selectedRows}
-        onSelectionChange={setSelectedRows}
+        selectedRows={selectedRowIds}
+        onSelectionChange={handleSelectionChange}
         createButtonText="Add Category"
         ariaLabel="Categories data table"
         extraActions={extraActions}
@@ -253,43 +274,45 @@ const CategoriesMenu = () => {
         submitText={editingCategory ? "Update" : "Create"}
         size="md"
       >
-        <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <Input 
-              label="Category Name" 
-              value={formData.categoryName || ""} 
-              onChange={(e) => setFormField('categoryName')(e.target.value)} 
-              required 
-            />
+        <FormSection title="Basic Information" description="Category name and description">
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <Input 
+                label="Category Name" 
+                value={formData.categoryName || ""} 
+                onChange={(e) => setFormField('categoryName')(e.target.value)} 
+                required 
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Input 
+                label="Description" 
+                value={formData.description || ""} 
+                onChange={(e) => setFormField('description')(e.target.value)} 
+                multiline 
+                rows={2} 
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Select
+                label="Parent Category"
+                value={formData.parentCategoryId || ""}
+                onChange={(e) => setFormField('parentCategoryId')(e.target.value || null)}
+                options={parentCategoryOptions}
+              />
+            </Grid>
           </Grid>
-          <Grid item xs={12}>
-            <Input 
-              label="Description" 
-              value={formData.description || ""} 
-              onChange={(e) => setFormField('description')(e.target.value)} 
-              multiline 
-              rows={2} 
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <Select
-              label="Parent Category"
-              value={formData.parentCategoryId || ""}
-              onChange={(e) => setFormField('parentCategoryId')(e.target.value || null)}
-              options={parentCategoryOptions}
-            />
-          </Grid>
-        </Grid>
+        </FormSection>
       </CrudModal>
 
       <BulkActivateModal
         isOpen={showBulkActivateModal}
         onClose={() => setShowBulkActivateModal(false)}
         onConfirm={(ids) => handleBulkActivate(ids, bulkActivateValue)}
-        selectedIds={selectedRows}
+        selectedIds={getSelectedIds(categories)}
         itemName="categories"
-        title={bulkButtonText === "Activate" ? "Activate Categories" : "Deactivate Categories"}
-        description={`This action will ${bulkButtonText.toLowerCase()} the selected categories.`}
+        title={bulkTitle}
+        description={bulkDescription}
       />
     </div>
   );

@@ -1,5 +1,5 @@
-import React, { forwardRef, memo } from "react";
-import { FormControl, InputLabel, Select as MuiSelect, MenuItem, FormHelperText } from "@mui/material";
+import React, { forwardRef, memo, useMemo } from "react";
+import { Autocomplete, TextField } from "@mui/material";
 import { useUIStore } from "../../../stores/uiStore";
 import "./Select.scss";
 
@@ -18,30 +18,42 @@ const Select = memo(forwardRef(({
   fullWidth = true,
   size = "small",
   variant = "outlined",
+  placeholder = "",
+  freeSolo = false,
   register = null,
   registerOptions = {},
 }, ref) => {
   const theme = useUIStore((s) => s.theme);
   const isDark = theme === 'dark';
 
-  const safeOptions = Array.isArray(options)
-    ? options.filter(opt =>
-        opt !== null && opt !== undefined && typeof opt === 'object' &&
-        opt.value !== undefined && opt.value !== null
-      )
-    : [];
+  const safeOptions = useMemo(() => {
+    if (!Array.isArray(options)) return [];
+    return options.filter(opt =>
+      opt !== null && opt !== undefined && typeof opt === 'object' &&
+      opt.value !== undefined && opt.value !== null
+    );
+  }, [options]);
 
-  const safeValue = (value === null || value === undefined) ? "" : value;
+  const safeValue = useMemo(() => {
+    if (value === null || value === undefined || value === "") return null;
+    const found = safeOptions.find(opt => opt.value === value);
+    return found || null;
+  }, [value, safeOptions]);
+
   const registerProps = register ? register(name, registerOptions) : {};
+  const finalError = error || helperText;
+  const errorId = finalError ? `${name}-error` : undefined;
+  const labelId = `${name}-label`;
 
-  const finalOnChange = (e) => {
-    registerProps.onChange?.(e);
-    onChange?.(e);
+  const handleChange = (event, newValue) => {
+    const newVal = newValue ? newValue.value : "";
+    registerProps.onChange?.({ target: { value: newVal, name } });
+    onChange?.({ target: { value: newVal, name } });
   };
 
-  const finalOnBlur = (e) => {
-    registerProps.onBlur?.(e);
-    onBlur?.(e);
+  const handleBlur = () => {
+    registerProps.onBlur?.();
+    onBlur?.();
   };
 
   const finalRef = (el) => {
@@ -50,80 +62,74 @@ const Select = memo(forwardRef(({
     else if (ref) ref.current = el;
   };
 
-  const finalError = error || helperText;
-  const errorId = finalError ? `${name}-error` : undefined;
-  const labelId = `${name}-label`;
-
   return (
     <div className={`select-wrapper ${className}`}>
-      <FormControl
-        fullWidth={fullWidth}
-        size={size}
-        variant={variant}
-        error={!!finalError}
+      <Autocomplete
+        options={safeOptions}
+        getOptionLabel={(option) => option?.label || ""}
+        isOptionEqualToValue={(option, val) => option?.value === val?.value}
+        value={safeValue}
+        onChange={handleChange}
+        onBlur={handleBlur}
         disabled={disabled}
-        required={required}
-      >
-        <InputLabel id={labelId}>{label}</InputLabel>
-        <MuiSelect
-          inputRef={finalRef}
-          value={safeValue}
-          onChange={finalOnChange}
-          onBlur={finalOnBlur}
-          name={name}
-          labelId={labelId}
-          label={label}
-          aria-describedby={errorId}
-          MenuProps={{
-            PaperProps: {
-              sx: {
-                maxHeight: '300px',
-                backgroundColor: isDark ? '#1f2937' : '#ffffff',
-                color: isDark ? '#f9fafb' : '#111827',
-                '&::-webkit-scrollbar': {
-                  width: '6px',
-                },
-                '&::-webkit-scrollbar-track': {
-                  background: isDark ? '#111827' : '#f3f4f6',
-                },
-                '&::-webkit-scrollbar-thumb': {
-                  background: isDark ? '#4b5563' : '#d1d5db',
-                  borderRadius: '3px',
-                },
-                '&::-webkit-scrollbar-thumb:hover': {
-                  background: isDark ? '#6b7280' : '#9ca3af',
-                },
-              },
+        freeSolo={freeSolo}
+        disableClearable={!freeSolo && required}
+        loading={safeOptions.length === 0}
+        loadingText="Loading..."
+        noOptionsText="No options"
+        sx={{
+          '& .MuiOutlinedInput-root': {
+            borderRadius: '8px',
+            backgroundColor: isDark ? '#374151' : '#ffffff',
+            '& fieldset': {
+              borderColor: isDark ? '#4b5563' : '#d1d5db',
             },
-          }}
-        >
-          {safeOptions.map((option, index) => (
-            <MenuItem
-              key={`opt-${index}-${option.value}`}
-              value={option.value}
-              sx={{
-                fontSize: '14px',
-                borderRadius: '6px',
-                margin: '2px 4px',
-                color: isDark ? '#f9fafb' : '#111827',
-                '&:hover': {
-                  backgroundColor: isDark ? '#374151' : '#f3f4f6',
-                },
-                '&.Mui-selected': {
-                  backgroundColor: isDark ? 'rgba(220, 38, 38, 0.25)' : 'rgba(220, 38, 38, 0.1)',
-                },
-              }}
-            >
-              {option.label ?? String(option.value)}
-            </MenuItem>
-          ))}
-        </MuiSelect>
-        {finalError && (
-          <FormHelperText id={errorId}>
-            {finalError}
-          </FormHelperText>
+            '&:hover fieldset': {
+              borderColor: 'var(--primary)',
+            },
+            '&.Mui-focused fieldset': {
+              borderColor: 'var(--primary)',
+            },
+            '& .MuiAutocomplete-input': {
+              color: isDark ? '#f9fafb' : '#111827',
+            },
+          },
+          '& .MuiInputLabel-root': {
+            color: isDark ? '#9ca3af' : '#6b7280',
+            '&.Mui-focused': {
+              color: 'var(--primary)',
+            },
+            '&.Mui-error': {
+              color: 'var(--error)',
+            },
+          },
+          '& .MuiFormHelperText-root': {
+            color: 'var(--error)',
+            margin: '4px 0 0 0',
+            fontSize: '12px',
+          },
+        }}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            inputRef={finalRef}
+            label={label}
+            name={name}
+            required={required}
+            error={!!finalError}
+            helperText={finalError}
+            placeholder={placeholder}
+            size={size}
+            fullWidth={fullWidth}
+            variant={variant}
+            InputLabelProps={{
+              shrink: true,
+              id: labelId,
+            }}
+            aria-describedby={errorId}
+          />
         )}
-      </FormControl>
+      />
     </div>
   );
 }));

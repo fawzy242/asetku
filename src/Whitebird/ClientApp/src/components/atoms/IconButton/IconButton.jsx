@@ -7,6 +7,7 @@ const IconButton = memo(({
   variant = 'default',
   size = 'md',
   title = '',
+  ariaLabel = '',
   className = '',
   disabled = false,
   type = 'button'
@@ -20,7 +21,7 @@ const IconButton = memo(({
       className={classes}
       onClick={onClick}
       title={title}
-      aria-label={title || 'Action button'}
+      aria-label={ariaLabel || title || 'Action button'}
       type={type}
       disabled={disabled}
     >

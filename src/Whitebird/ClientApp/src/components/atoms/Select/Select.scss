@@ -3,3 +3,36 @@
 .select-wrapper {
     width: 100%;
 }
+
+// Dark mode specific fixes for Autocomplete dropdown
+[data-theme='dark'] {
+    .MuiAutocomplete-paper {
+        background-color: #1f2937 !important;
+        color: #f9fafb !important;
+        border: 1px solid #4b5563 !important;
+    }
+    
+    .MuiAutocomplete-option {
+        color: #f9fafb !important;
+        
+        &:hover {
+            background-color: #374151 !important;
+        }
+        
+        &[aria-selected="true"] {
+            background-color: rgba(220, 38, 38, 0.25) !important;
+        }
+    }
+    
+    .MuiAutocomplete-loading,
+    .MuiAutocomplete-noOptions {
+        color: #9ca3af !important;
+    }
+}
+
+// Light mode fixes
+[data-theme='light'] {
+    .MuiAutocomplete-option[aria-selected="true"] {
+        background-color: rgba(220, 38, 38, 0.1) !important;
+    }
+}

@@ -1,17 +1,12 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Box } from '@mui/material';
 import DataTable from '../../molecules/DataTable/DataTable';
-import Pagination from '../../molecules/Pagination/Pagination';
 import SearchToolbar from '../../molecules/SearchToolbar/SearchToolbar';
 import Tabs from '../../molecules/Tabs/Tabs';
-import GridFilterPanel from '../../molecules/GridFilterPanel/GridFilterPanel';
-import Spinner from '../../atoms/Spinner/Spinner';
 import Button from '../../atoms/Button/Button';
+import Spinner from '../../atoms/Spinner/Spinner';
 import { FiPlus } from 'react-icons/fi';
 
-/**
- * Standardized Grid View component
- */
 const GridView = ({
   title,
   tabs,
@@ -21,10 +16,9 @@ const GridView = ({
   columns,
   data,
   loading,
+  totalCount,
   page,
-  totalPages,
   pageSize,
-  totalItems,
   onPageChange,
   onPageSizeChange,
   onSearch,
@@ -34,12 +28,9 @@ const GridView = ({
   createButtonText = 'Add New',
   ariaLabel = 'Data table',
   extraActions = null,
-  filterChildren,
-  showFilters = false,
-  onFilterToggle,
-  onResetFilters,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const handleSearch = useCallback((search) => {
     setSearchTerm(search);
@@ -53,7 +44,33 @@ const GridView = ({
     return `row-${Math.random().toString(36).substr(2, 9)}`;
   }, []);
 
-  const displayLoading = loading && (!data || data.length === 0);
+  // Show spinner only on initial load
+  const showSpinner = loading && (!data || data.length === 0) && isInitialLoad;
+  
+  useEffect(() => {
+    if (!loading && data && data.length > 0) {
+      setIsInitialLoad(false);
+    }
+  }, [loading, data]);
+
+  useEffect(() => {
+    setIsInitialLoad(true);
+    const timer = setTimeout(() => {
+      setIsInitialLoad(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [activeTab]);
+
+  if (showSpinner) {
+    return (
+      <Box className="grid-view">
+        <div className="page-header">
+          <h1 className="page-title" style={{ margin: 0 }}>{title}</h1>
+        </div>
+        <div className="page-loading"><Spinner size="lg" /></div>
+      </Box>
+    );
+  }
 
   return (
     <Box className="grid-view">
@@ -83,25 +100,9 @@ const GridView = ({
       )}
 
       {/* Search Toolbar */}
-      <SearchToolbar
-        onSearch={handleSearch}
-        onFilterToggle={onFilterToggle}
-        showFilters={showFilters}
-        placeholder="Search..."
-      />
+      <SearchToolbar onSearch={handleSearch} placeholder="Search..." />
 
-      {/* Filter Panel */}
-      {filterChildren && (
-        <GridFilterPanel
-          visible={showFilters}
-          onToggle={onFilterToggle}
-          onReset={onResetFilters}
-        >
-          {filterChildren}
-        </GridFilterPanel>
-      )}
-
-      {/* Data Table */}
+      {/* Data Table with server-side pagination */}
       <Box
         sx={{
           backgroundColor: 'var(--card-bg)',
@@ -116,26 +117,23 @@ const GridView = ({
         <DataTable
           rows={data || []}
           columns={columns}
-          loading={displayLoading}
+          loading={loading}
           pageSize={pageSize}
+          page={page}
+          totalRowCount={totalCount}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
           getRowId={getRowId}
-          hideFooter={true}
+          hideFooter={false}
           autoHeight={false}
           checkboxSelection={showCheckbox}
-          onSelectionChange={onSelectionChange}
+          onRowSelectionModelChange={onSelectionChange}
           ariaLabel={ariaLabel}
+          disableColumnFilter={false}
+          disableColumnMenu={false}
+          paginationMode="server"
         />
       </Box>
-
-      {/* Pagination */}
-      <Pagination
-        currentPage={page}
-        totalPages={totalPages || 1}
-        pageSize={pageSize}
-        totalItems={totalItems || 0}
-        onPageChange={onPageChange}
-        onPageSizeChange={onPageSizeChange}
-      />
     </Box>
   );
 };

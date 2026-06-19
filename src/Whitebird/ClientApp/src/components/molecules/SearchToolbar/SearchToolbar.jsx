@@ -1,9 +1,9 @@
 import React, { useState, useCallback } from "react";
-import { FiSearch, FiX, FiFilter } from "react-icons/fi";
+import { FiSearch, FiX } from "react-icons/fi";
 import Button from "../../atoms/Button/Button";
 import "./SearchToolbar.scss";
 
-const SearchToolbar = ({ onSearch, onFilterToggle, showFilters, placeholder = "Search...", className = "" }) => {
+const SearchToolbar = ({ onSearch, placeholder = "Search...", className = "" }) => {
   const [searchInput, setSearchInput] = useState("");
 
   const handleSubmit = (e) => {
@@ -42,11 +42,6 @@ const SearchToolbar = ({ onSearch, onFilterToggle, showFilters, placeholder = "S
         )}
         <Button type="submit" variant="primary" size="sm">Search</Button>
       </form>
-      {onFilterToggle && (
-        <Button variant="outline" size="sm" onClick={onFilterToggle} startIcon={<FiFilter />}>
-          {showFilters ? "Hide" : "Filter"}
-        </Button>
-      )}
     </div>
   );
 };

@@ -913,4 +913,171 @@ public class AssetReps : IAssetReps
 
         return await _context.QueryAsync<AssetDropdownView>(sql);
     }
+
+        // ============================================================
+    // NEW: AVAILABLE ASSETS FOR TRANSACTION
+    // ============================================================
+
+    public async Task<IEnumerable<AssetDropdownView>> GetAvailableAssetsForTransactionAsync()
+    {
+        const string sql = @"
+            SELECT a.AssetId, a.AssetCode, a.AssetName
+            FROM Asset a
+            WHERE a.IsActive = 1
+              AND NOT EXISTS (
+                  SELECT 1 FROM AssetTransaction at 
+                  WHERE at.AssetId = a.AssetId 
+                    AND at.Approved = 1 
+                    AND at.FromAssetTransactionId IS NULL 
+                    AND at.IsActive = 1
+                    AND at.TransactionType IN (@HandoverType, @TransferType, @LoanType, @MaintenanceType)
+                    AND at.ActualReturnDate IS NULL
+              )
+            ORDER BY a.AssetCode";
+        
+        var parameters = new
+        {
+            HandoverType = TransactionTypeConstants.HANDOVER,
+            TransferType = TransactionTypeConstants.TRANSFER,
+            LoanType = TransactionTypeConstants.LOAN,
+            MaintenanceType = TransactionTypeConstants.MAINTENANCE
+        };
+        
+        return await _context.QueryAsync<AssetDropdownView>(sql, parameters);
+    }
+
+    public async Task<bool> IsAssetAvailableForTransactionAsync(int assetId)
+    {
+        const string sql = @"
+            SELECT CASE 
+                WHEN EXISTS (
+                    SELECT 1 FROM AssetTransaction at 
+                    WHERE at.AssetId = @AssetId 
+                      AND at.Approved = 1 
+                      AND at.FromAssetTransactionId IS NULL 
+                      AND at.IsActive = 1
+                      AND at.TransactionType IN (@HandoverType, @TransferType, @LoanType, @MaintenanceType)
+                      AND at.ActualReturnDate IS NULL
+                ) THEN 0 ELSE 1 END";
+        
+        var parameters = new
+        {
+            AssetId = assetId,
+            HandoverType = TransactionTypeConstants.HANDOVER,
+            TransferType = TransactionTypeConstants.TRANSFER,
+            LoanType = TransactionTypeConstants.LOAN,
+            MaintenanceType = TransactionTypeConstants.MAINTENANCE
+        };
+        
+        return await _context.ExecuteScalarAsync<int>(sql, parameters) == 1;
+    }
+
+    // ============================================================
+    // NEW: ASSET STATUS BY DAMAGED/INACTIVE
+    // ============================================================
+
+    public async Task<IEnumerable<AssetListView>> GetDamagedAssetsListViewAsync()
+    {
+        const string sql = @"
+            SELECT 
+                a.AssetId, a.AssetCode, a.AssetName, a.CategoryId, c.CategoryName,
+                a.Brand, a.Model, a.SerialNumber, a.Imei, a.MacAddress,
+                a.Hostname, a.IpAddress,
+                a.PurchaseDate, a.PurchasePrice, a.InvoiceNumber,
+                a.SupplierId, s.SupplierName,
+                a.WarrantyPeriod, a.WarrantyExpiryDate,
+                a.AssetCondition, md1.MasterDataName as AssetConditionName,
+                a.AssetConditionPurchase, md2.MasterDataName as AssetConditionPurchaseName,
+                a.ResidualValue, a.UsefulLife, a.DepreciationStartDate,
+                a.Notes, a.OfficeId, o.OfficeName, a.OperasionalOffice,
+                a.LastMaintenanceDate, a.NextMaintenanceDate,
+                a.IsActive, a.CreatedDate, a.CreatedBy, a.ModifiedDate, a.ModifiedBy,
+                CASE 
+                    WHEN at2.AssetId IS NULL THEN 'Available'
+                    WHEN at2.TransactionType = @LoanType THEN 'On Loan'
+                    WHEN at2.TransactionType IN (@HandoverType, @TransferType) THEN 'Assigned'
+                    WHEN at2.TransactionType = @MaintenanceType THEN 'In Maintenance'
+                    ELSE 'Available'
+                END as CurrentStatus
+            FROM Asset a
+            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
+            LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN MasterData md1 ON a.AssetCondition = md1.ReferenceCode AND md1.ReferenceName = 'AssetCondition' AND md1.IsActive = 1
+            LEFT JOIN MasterData md2 ON a.AssetConditionPurchase = md2.ReferenceCode AND md2.ReferenceName = 'AssetConditionPurchase' AND md2.IsActive = 1
+            LEFT JOIN (
+                SELECT AssetId, TransactionType,
+                       ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
+                FROM AssetTransaction
+                WHERE Approved = 1 AND FromAssetTransactionId IS NULL AND IsActive = 1
+            ) at2 ON a.AssetId = at2.AssetId AND at2.rn = 1
+            WHERE a.AssetCondition = @DamagedCondition
+            ORDER BY a.AssetCode";
+        
+        var parameters = new
+        {
+            DamagedCondition = AssetConditionConstants.DAMAGED,
+            LoanType = TransactionTypeConstants.LOAN,
+            HandoverType = TransactionTypeConstants.HANDOVER,
+            TransferType = TransactionTypeConstants.TRANSFER,
+            MaintenanceType = TransactionTypeConstants.MAINTENANCE
+        };
+        
+        return await _context.QueryAsync<AssetListView>(sql, parameters);
+    }
+
+    public async Task<IEnumerable<AssetListView>> GetInactiveAssetsListViewAsync()
+    {
+        const string sql = @"
+            SELECT 
+                a.AssetId, a.AssetCode, a.AssetName, a.CategoryId, c.CategoryName,
+                a.Brand, a.Model, a.SerialNumber, a.Imei, a.MacAddress,
+                a.Hostname, a.IpAddress,
+                a.PurchaseDate, a.PurchasePrice, a.InvoiceNumber,
+                a.SupplierId, s.SupplierName,
+                a.WarrantyPeriod, a.WarrantyExpiryDate,
+                a.AssetCondition, md1.MasterDataName as AssetConditionName,
+                a.AssetConditionPurchase, md2.MasterDataName as AssetConditionPurchaseName,
+                a.ResidualValue, a.UsefulLife, a.DepreciationStartDate,
+                a.Notes, a.OfficeId, o.OfficeName, a.OperasionalOffice,
+                a.LastMaintenanceDate, a.NextMaintenanceDate,
+                a.IsActive, a.CreatedDate, a.CreatedBy, a.ModifiedDate, a.ModifiedBy,
+                CASE 
+                    WHEN at2.AssetId IS NULL THEN 'Available'
+                    WHEN at2.TransactionType = @LoanType THEN 'On Loan'
+                    WHEN at2.TransactionType IN (@HandoverType, @TransferType) THEN 'Assigned'
+                    WHEN at2.TransactionType = @MaintenanceType THEN 'In Maintenance'
+                    ELSE 'Available'
+                END as CurrentStatus
+            FROM Asset a
+            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
+            LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
+            LEFT JOIN MasterData md1 ON a.AssetCondition = md1.ReferenceCode AND md1.ReferenceName = 'AssetCondition' AND md1.IsActive = 1
+            LEFT JOIN MasterData md2 ON a.AssetConditionPurchase = md2.ReferenceCode AND md2.ReferenceName = 'AssetConditionPurchase' AND md2.IsActive = 1
+            LEFT JOIN (
+                SELECT AssetId, TransactionType,
+                       ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
+                FROM AssetTransaction
+                WHERE Approved = 1 AND FromAssetTransactionId IS NULL AND IsActive = 1
+            ) at2 ON a.AssetId = at2.AssetId AND at2.rn = 1
+            WHERE a.IsActive = 0
+            ORDER BY a.AssetCode";
+        
+        var parameters = new
+        {
+            LoanType = TransactionTypeConstants.LOAN,
+            HandoverType = TransactionTypeConstants.HANDOVER,
+            TransferType = TransactionTypeConstants.TRANSFER,
+            MaintenanceType = TransactionTypeConstants.MAINTENANCE
+        };
+        
+        return await _context.QueryAsync<AssetListView>(sql, parameters);
+    }
+
+    public async Task<int> GetDamagedAssetsCountAsync()
+    {
+        const string sql = "SELECT COUNT(*) FROM Asset WHERE AssetCondition = @DamagedCondition AND IsActive = 1";
+        return await _context.ExecuteScalarAsync<int>(sql, new { DamagedCondition = AssetConditionConstants.DAMAGED });
+    }
 }

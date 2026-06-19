@@ -1,42 +1,63 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { FiSearch, FiBox, FiUser, FiMapPin, FiRefreshCw, FiInfo, FiCalendar, FiClock, FiAlertTriangle, FiDollarSign, FiActivity } from "react-icons/fi";
-import { Grid, Box, Typography, Avatar, Chip, Paper } from "@mui/material";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { 
+  FiSearch, FiBox, FiUser, FiMapPin, FiRefreshCw, 
+  FiCalendar, FiClock, FiAlertTriangle, FiActivity
+} from "react-icons/fi";
+import { 
+  Grid, Box, Typography, Avatar, Chip, Paper, 
+  Card as MuiCard, CardContent, IconButton, Tooltip 
+} from "@mui/material";
 import { useLocation } from "react-router-dom";
 import AssetTrackingData from "./AssetTracking.data";
 import DataTable from "../../components/molecules/DataTable/DataTable";
 import Card from "../../components/atoms/Card/Card";
 import Select from "../../components/atoms/Select/Select";
 import Spinner from "../../components/atoms/Spinner/Spinner";
+import Skeleton from "../../components/atoms/Skeleton/Skeleton";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
+import { useSweetAlert } from "../../hooks/useSweetAlert";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./AssetTracking.scss";
 
 const trackingData = new AssetTrackingData();
 
+const timelineColumns = [
+  { 
+    field: "date", 
+    headerName: "Date & Time", 
+    width: 180,
+    valueFormatter: (p) => p?.value ? utilsHelper.formatDateTime(p.value) : '-'
+  },
+  { field: "transactionTypeName", headerName: "Activity", width: 160, flex: 0.5 },
+  { field: "fromEmployeeName", headerName: "From", width: 150, valueFormatter: (p) => p?.value || '-' },
+  { field: "toEmployeeName", headerName: "To", width: 150, valueFormatter: (p) => p?.value || '-' },
+  { field: "conditionAfterName", headerName: "Condition", width: 120, valueFormatter: (p) => p?.value || '-' },
+  { field: "notes", headerName: "Notes", flex: 1, minWidth: 200, valueFormatter: (p) => p?.value || '-' },
+];
+
 const AssetTrackingMenu = () => {
   const [loading, setLoading] = useState(true);
   const [assets, setAssets] = useState([]);
-  const [selectedAsset, setSelectedAsset] = useState(null);
+  const [selectedAssetId, setSelectedAssetId] = useState(null);
   const [trackingData_, setTrackingData_] = useState(null);
   const [loadingData, setLoadingData] = useState(false);
   const isMountedRef = useRef(true);
   const location = useLocation();
+  const { toast } = useSweetAlert();
 
   useEffect(() => {
     isMountedRef.current = true;
-    loadInitialData();
+    loadAssets();
     return () => {
       isMountedRef.current = false;
     };
   }, []);
 
-  const loadInitialData = async () => {
+  const loadAssets = async () => {
     setLoading(true);
     const assetsRes = await trackingData.fetchAssets();
     if (isMountedRef.current && assetsRes.success) {
       setAssets(assetsRes.data);
-      
-      // Check URL parameter for assetId after assets are loaded
       const params = new URLSearchParams(location.search);
       const assetIdParam = params.get('assetId');
       if (assetIdParam) {
@@ -54,26 +75,32 @@ const AssetTrackingMenu = () => {
 
   const handleAssetSelect = useCallback(async (assetId) => {
     if (!assetId) { 
-      setSelectedAsset(null); 
+      setSelectedAssetId(null); 
       setTrackingData_(null); 
       return; 
     }
-    setSelectedAsset(assetId);
+    setSelectedAssetId(assetId);
     setLoadingData(true);
-    
     const trackingRes = await trackingData.fetchAssetTracking(assetId);
-    
     if (isMountedRef.current) {
-      if (trackingRes.success) {
+      if (trackingRes.success && trackingRes.data) {
         setTrackingData_(trackingRes.data);
       } else {
-        // Fallback: build tracking data from detail + transactions
         const [detailRes, transRes] = await Promise.all([
           trackingData.fetchAssetDetail(assetId),
           trackingData.fetchTransactions(assetId)
         ]);
-        
         if (isMountedRef.current) {
+          const transactions = transRes.data || [];
+          const timeline = transactions.map(tx => ({
+            id: tx.assetTransactionId || `tx-${Date.now()}-${Math.random()}`,
+            date: tx.transactionDate,
+            transactionTypeName: tx.transactionTypeName,
+            fromEmployeeName: tx.fromEmployeeName,
+            toEmployeeName: tx.toEmployeeName,
+            conditionAfterName: tx.conditionAfterName,
+            notes: tx.notes
+          }));
           setTrackingData_({
             assetId: detailRes.data?.assetId,
             assetCode: detailRes.data?.assetCode,
@@ -87,18 +114,8 @@ const AssetTrackingMenu = () => {
             isInMaintenance: detailRes.data?.currentStatus === 'In Maintenance',
             isOverdue: detailRes.data?.isOverdue || false,
             loanDueDate: detailRes.data?.expectedReturnDate,
-            totalTransactions: (transRes.data || []).length,
-            timeline: (transRes.data || []).map(tx => ({
-              id: tx.assetTransactionId || `tx-${Date.now()}-${Math.random()}`,
-              date: tx.transactionDate,
-              activityType: tx.transactionTypeName,
-              description: tx.notes || `Transaction: ${tx.transactionTypeName}`,
-              previousHolder: tx.fromEmployeeName,
-              newHolder: tx.toEmployeeName,
-              previousStatus: tx.conditionBeforeName,
-              newStatus: tx.conditionAfterName,
-              notes: tx.notes
-            }))
+            totalTransactions: transactions.length,
+            timeline: timeline
           });
         }
       }
@@ -106,7 +123,6 @@ const AssetTrackingMenu = () => {
     }
   }, []);
 
-  // Handle URL parameter changes after component is mounted
   useEffect(() => {
     if (assets.length > 0) {
       const params = new URLSearchParams(location.search);
@@ -114,207 +130,226 @@ const AssetTrackingMenu = () => {
       if (assetIdParam) {
         const assetId = parseInt(assetIdParam, 10);
         const assetExists = assets.some(a => a.assetId === assetId);
-        if (assetExists && selectedAsset !== assetId) {
+        if (assetExists && selectedAssetId !== assetId) {
           handleAssetSelect(assetId);
         }
       }
     }
-  }, [location.search, assets, selectedAsset, handleAssetSelect]);
+  }, [location.search, assets, selectedAssetId, handleAssetSelect]);
 
   const getStatusChip = (status) => (
-    <Chip 
-      label={status || '-'} 
-      size="small" 
-      sx={getStatusChipStyles(status)} 
-    />
+    <Chip label={status || '-'} size="small" sx={getStatusChipStyles(status)} />
   );
 
-  const timelineColumns = [
-    { 
-      field: "date", 
-      headerName: "Date", 
-      width: 180, 
-      valueFormatter: (p) => p?.value ? utilsHelper.formatDateTime(p.value) : '-' 
-    },
-    { field: "activityType", headerName: "Activity", width: 160 },
-    { field: "description", headerName: "Description", flex: 1, minWidth: 200 },
-    { field: "previousHolder", headerName: "Previous Holder", width: 150 },
-    { field: "newHolder", headerName: "New Holder", width: 150 },
-    { field: "newStatus", headerName: "Status", width: 120 },
-  ];
-
-  if (loading) return <div className="page-loading"><Spinner size="lg" /></div>;
+  const assetOptions = useMemo(() => [
+    { value: "", label: "Choose an asset to track..." },
+    ...assets.map(a => ({ value: a.assetId, label: `${a.assetCode} - ${a.assetName}` }))
+  ], [assets]);
 
   const timeline = trackingData_?.timeline || [];
-  const assetOptions = assets.map(a => ({ 
-    value: a.assetId, 
-    label: `${a.assetCode} - ${a.assetName}` 
-  }));
+  const currentAsset = trackingData_;
+
+  if (loading) {
+    return (
+      <div className="asset-tracking">
+        <div className="page-header">
+          <h1 className="page-title">Asset Tracking</h1>
+          <p className="page-description">Track asset location, status, and transaction history</p>
+        </div>
+        <div className="page-loading"><Spinner size="lg" /></div>
+      </div>
+    );
+  }
 
   return (
     <div className="asset-tracking">
       <div className="page-header">
         <h1 className="page-title">Asset Tracking</h1>
+        <p className="page-description">Track asset location, status, and transaction history</p>
       </div>
       
       <Grid container spacing={3}>
         {/* Asset Selection Card */}
         <Grid item xs={12}>
-          <Card>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-              <FiSearch size={20} style={{ color: 'var(--primary)' }} />
-              <Box sx={{ flex: 1, minWidth: 250 }}>
+          <Card className="asset-tracking__selection-card">
+            <div className="asset-tracking__selection-content">
+              <div className="asset-tracking__selection-icon">
+                <FiSearch size={24} />
+              </div>
+              <div className="asset-tracking__selection-select">
                 <Select 
                   label="Select Asset" 
-                  value={selectedAsset || ""} 
+                  value={selectedAssetId || ""} 
                   onChange={e => handleAssetSelect(e.target.value)}
-                  options={[{ value: "", label: "Choose an asset to track..." }, ...assetOptions]} 
+                  options={assetOptions} 
                 />
-              </Box>
-            </Box>
+              </div>
+              {selectedAssetId && (
+                <Tooltip title="Refresh">
+                  <IconButton 
+                    onClick={() => handleAssetSelect(selectedAssetId)} 
+                    size="small" 
+                    className="asset-tracking__refresh-btn"
+                  >
+                    <FiRefreshCw size={18} />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </div>
           </Card>
         </Grid>
         
-        {selectedAsset && !loadingData && trackingData_ && (
+        {selectedAssetId && !loadingData && currentAsset && (
           <>
-            {/* Asset Summary Card */}
+            {/* Asset Profile Card */}
             <Grid item xs={12}>
-              <Card>
+              <Card className="asset-tracking__profile-card">
                 <Grid container spacing={3} alignItems="center">
                   <Grid item>
-                    <Avatar sx={{ width: 64, height: 64, bgcolor: 'var(--primary)', fontSize: 28 }}>
-                      <FiBox size={32} color="white" />
+                    <Avatar className="asset-tracking__profile-avatar">
+                      <FiBox size={36} />
                     </Avatar>
                   </Grid>
                   <Grid item xs>
-                    <Typography variant="h5" fontWeight={700}>
-                      {trackingData_?.assetName || '-'}
+                    <Typography variant="h5" fontWeight={700} className="asset-tracking__profile-name">
+                      {currentAsset.assetName || '-'}
                     </Typography>
-                    <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
-                      <Chip label={`Code: ${trackingData_?.assetCode || '-'}`} size="small" variant="outlined" />
-                      <Chip label={`Category: ${trackingData_?.categoryName || '-'}`} size="small" variant="outlined" />
-                      <Chip 
-                        icon={<FiUser />} 
-                        label={`Holder: ${trackingData_?.currentHolderName || 'None'}`} 
-                        size="small" 
-                        variant="outlined" 
-                      />
-                      <Chip 
-                        icon={<FiMapPin />} 
-                        label={`Office: ${trackingData_?.currentLocation || '-'}`} 
-                        size="small" 
-                        variant="outlined" 
-                      />
-                      {getStatusChip(trackingData_?.currentStatus)}
-                      {trackingData_?.isOnLoan && (
-                        <Chip icon={<FiClock />} label="On Loan" size="small" color="warning" variant="outlined" />
-                      )}
-                      {trackingData_?.isInMaintenance && (
-                        <Chip icon={<FiActivity />} label="In Maintenance" size="small" color="info" variant="outlined" />
-                      )}
-                      {trackingData_?.isOverdue && (
-                        <Chip icon={<FiAlertTriangle />} label="Overdue" size="small" color="error" />
-                      )}
-                    </Box>
+                    <div className="asset-tracking__profile-tags">
+                      <Chip label={`Code: ${currentAsset.assetCode || '-'}`} size="small" variant="outlined" />
+                      <Chip label={`Category: ${currentAsset.categoryName || '-'}`} size="small" variant="outlined" />
+                      {getStatusChip(currentAsset.currentStatus)}
+                      {currentAsset.isOnLoan && <Chip icon={<FiClock />} label="On Loan" size="small" color="warning" variant="outlined" />}
+                      {currentAsset.isInMaintenance && <Chip icon={<FiActivity />} label="In Maintenance" size="small" color="info" variant="outlined" />}
+                      {currentAsset.isOverdue && <Chip icon={<FiAlertTriangle />} label="Overdue" size="small" color="error" />}
+                    </div>
+                    <div className="asset-tracking__info-row">
+                      <FiUser size={16} className="asset-tracking__info-icon" />
+                      <span className="asset-tracking__info-label">Current Holder:</span>
+                      <span className="asset-tracking__info-value">{currentAsset.currentHolderName || '-'}</span>
+                    </div>
+                    <div className="asset-tracking__info-row">
+                      <FiMapPin size={16} className="asset-tracking__info-icon" />
+                      <span className="asset-tracking__info-label">Office Location:</span>
+                      <span className="asset-tracking__info-value">{currentAsset.currentLocation || '-'}</span>
+                    </div>
+                    <div className="asset-tracking__info-row">
+                      <FiActivity size={16} className="asset-tracking__info-icon" />
+                      <span className="asset-tracking__info-label">Condition:</span>
+                      <span className="asset-tracking__info-value">{currentAsset.condition || '-'}</span>
+                    </div>
+                    {currentAsset.loanDueDate && (
+                      <div className="asset-tracking__info-row">
+                        <FiCalendar size={16} className="asset-tracking__info-icon" />
+                        <span className="asset-tracking__info-label">Loan Due Date:</span>
+                        <span className="asset-tracking__info-value" style={{ color: currentAsset.isOverdue ? '#ef4444' : 'inherit' }}>
+                          {utilsHelper.formatDate(currentAsset.loanDueDate)}
+                          {currentAsset.isOverdue && <Chip label="Overdue" size="small" className="asset-tracking__overdue-chip" />}
+                        </span>
+                      </div>
+                    )}
                   </Grid>
                   <Grid item>
-                    <Box sx={{ textAlign: 'right' }}>
-                      <Typography variant="body2" color="text.secondary">Condition</Typography>
-                      <Typography variant="body1" fontWeight={600}>
-                        {trackingData_?.condition || '-'}
-                      </Typography>
-                      {trackingData_?.loanDueDate && (
-                        <>
-                          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Loan Due</Typography>
-                          <Typography 
-                            variant="body1" 
-                            fontWeight={600} 
-                            color={trackingData_?.isOverdue ? 'var(--error)' : 'var(--text-primary)'}
-                          >
-                            {utilsHelper.formatDate(trackingData_?.loanDueDate)}
-                          </Typography>
-                        </>
-                      )}
-                    </Box>
+                    <div className="asset-tracking__info-row">
+                      <FiCalendar size={16} className="asset-tracking__info-icon" />
+                      <span className="asset-tracking__info-label">Last Transaction:</span>
+                      <span className="asset-tracking__info-value">
+                        {timeline.length > 0 ? utilsHelper.formatDate(timeline[0]?.date) : '-'}
+                      </span>
+                    </div>
                   </Grid>
                 </Grid>
               </Card>
             </Grid>
 
-            {/* Statistics Cards */}
+            {/* Statistics Cards Row */}
             <Grid item xs={12}>
               <Grid container spacing={2}>
-                <Grid item xs={6} sm={3} md={3}>
-                  <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'var(--card-bg)', borderRadius: 2, border: '1px solid var(--border)', height: '100%' }}>
-                    <FiRefreshCw size={24} style={{ color: 'var(--primary)', marginBottom: 8 }} />
-                    <Typography variant="h4" fontWeight={700}>{trackingData_?.totalTransactions || 0}</Typography>
-                    <Typography variant="caption" color="text.secondary">Transactions</Typography>
+                <Grid item xs={6} sm={3}>
+                  <Paper elevation={0} className="asset-tracking__stat-card">
+                    <FiRefreshCw size={28} className="asset-tracking__stat-icon" style={{ color: '#dc2626' }} />
+                    <Typography variant="h4" fontWeight={700}>{currentAsset.totalTransactions || 0}</Typography>
+                    <Typography variant="caption" color="text.secondary">Total Transactions</Typography>
                   </Paper>
                 </Grid>
-                <Grid item xs={6} sm={3} md={3}>
-                  <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'var(--card-bg)', borderRadius: 2, border: '1px solid var(--border)', height: '100%' }}>
-                    <FiUser size={24} style={{ color: trackingData_?.isOnLoan ? '#8b5cf6' : 'var(--success)', marginBottom: 8 }} />
-                    <Typography variant="body2" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
-                      {trackingData_?.currentHolderName || 'None'}
+                <Grid item xs={6} sm={3}>
+                  <Paper elevation={0} className="asset-tracking__stat-card">
+                    <FiUser size={28} className="asset-tracking__stat-icon" style={{ color: '#8b5cf6' }} />
+                    <Typography variant="body2" fontWeight={600} className="asset-tracking__stat-value">
+                      {currentAsset.currentHolderName || 'None'}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">Holder</Typography>
+                    <Typography variant="caption" color="text.secondary">Current Holder</Typography>
                   </Paper>
                 </Grid>
-                <Grid item xs={6} sm={3} md={3}>
-                  <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'var(--card-bg)', borderRadius: 2, border: '1px solid var(--border)', height: '100%' }}>
-                    <FiMapPin size={24} style={{ color: 'var(--info)', marginBottom: 8 }} />
-                    <Typography variant="body2" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
-                      {trackingData_?.currentLocation || '-'}
+                <Grid item xs={6} sm={3}>
+                  <Paper elevation={0} className="asset-tracking__stat-card">
+                    <FiMapPin size={28} className="asset-tracking__stat-icon" style={{ color: '#3b82f6' }} />
+                    <Typography variant="body2" fontWeight={600} className="asset-tracking__stat-value">
+                      {currentAsset.currentLocation || '-'}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">Office</Typography>
+                    <Typography variant="caption" color="text.secondary">Office Location</Typography>
                   </Paper>
                 </Grid>
-                <Grid item xs={6} sm={3} md={3}>
-                  <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'var(--card-bg)', borderRadius: 2, border: '1px solid var(--border)', height: '100%' }}>
-                    <FiActivity size={24} style={{ color: 'var(--warning)', marginBottom: 8 }} />
-                    {getStatusChip(trackingData_?.currentStatus)}
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>Status</Typography>
+                <Grid item xs={6} sm={3}>
+                  <Paper elevation={0} className="asset-tracking__stat-card">
+                    <FiActivity size={28} className="asset-tracking__stat-icon" style={{ color: currentAsset.currentStatus === 'Available' ? '#10b981' : '#f59e0b' }} />
+                    {getStatusChip(currentAsset.currentStatus)}
+                    <Typography variant="caption" color="text.secondary">Current Status</Typography>
                   </Paper>
                 </Grid>
               </Grid>
             </Grid>
 
-            {/* Timeline Table */}
+            {/* Timeline Section */}
             <Grid item xs={12}>
-              <Card title={`Transaction Timeline (${timeline.length})`}>
+              <Card 
+                title="Transaction Timeline"
+                subtitle={`${timeline.length} record(s) found`}
+              >
                 {loadingData ? (
-                  <div className="page-loading"><Spinner size="lg" /></div>
-                ) : timeline.length === 0 ? (
-                  <Box sx={{ textAlign: 'center', py: 4, color: 'var(--text-secondary)' }}>
-                    <FiRefreshCw size={40} style={{ marginBottom: 8 }} />
-                    <Typography>No transaction history found</Typography>
+                  <Box sx={{ py: 4 }}>
+                    <Skeleton variant="rect" height={400} />
                   </Box>
-                ) : (
-                  <div style={{ width: '100%', minWidth: 0 }}>
-                    <DataTable 
-                      rows={timeline} 
-                      columns={timelineColumns} 
-                      pageSize={15} 
-                      getRowId={(row, index) => {
-                        if (row.id) return `timeline-${row.id}`;
-                        if (row.assetTransactionId) return `timeline-${row.assetTransactionId}`;
-                        return `timeline-${row.date}-${row.activityType}-${index}`;
-                      }} 
-                      hideFooter={true} 
-                      autoHeight={true}
-                      ariaLabel="Asset timeline table" 
-                    />
+                ) : timeline.length === 0 ? (
+                  <div className="asset-tracking__empty-state">
+                    <FiRefreshCw size={48} />
+                    <Typography variant="h6" gutterBottom>No Transaction History</Typography>
+                    <Typography variant="body2">This asset has no transaction records yet.</Typography>
                   </div>
+                ) : (
+                  <DataTable 
+                    rows={timeline} 
+                    columns={timelineColumns} 
+                    pageSize={10}
+                    getRowId={(row, index) => row.id || row.assetTransactionId || `timeline-${row.date}-${row.transactionTypeName}-${index}`}
+                    hideFooter={false}
+                    ariaLabel="Asset timeline table"
+                  />
                 )}
               </Card>
             </Grid>
           </>
         )}
         
-        {selectedAsset && loadingData && (
+        {selectedAssetId && loadingData && (
           <Grid item xs={12}>
             <Card>
-              <div className="page-loading"><Spinner size="lg" /></div>
+              <div className="asset-tracking__loading-container">
+                <Spinner size="lg" />
+              </div>
+            </Card>
+          </Grid>
+        )}
+
+        {!selectedAssetId && !loading && (
+          <Grid item xs={12}>
+            <Card>
+              <div className="asset-tracking__empty-state">
+                <FiSearch size={64} />
+                <Typography variant="h6" gutterBottom>Select an Asset to Track</Typography>
+                <Typography variant="body2">
+                  Choose an asset from the dropdown above to view its tracking history and current status.
+                </Typography>
+              </div>
             </Card>
           </Grid>
         )}

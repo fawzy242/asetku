@@ -4,14 +4,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import SuppliersData from "./Suppliers.data";
 import GridView from "../../components/organisms/GridView/GridView";
 import CrudModal from "../../components/molecules/CrudModal/CrudModal";
+import FormSection from "../../components/atoms/FormSection/FormSection";
 import Input from "../../components/atoms/Input/Input";
 import Spinner from "../../components/atoms/Spinner/Spinner";
-import IconButton from "../../components/atoms/IconButton/IconButton";
-import Button from "../../components/atoms/Button/Button";
 import FileUploader from "../../components/molecules/FileUploader/FileUploader";
 import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
-import { FiEdit2, FiTrash2, FiCheckSquare } from "react-icons/fi";
+import { ACTION_TYPES, useGridActions } from "../../hooks/useGridActions";
+import { useBulkSelection } from "../../hooks/useBulkSelection";
+import { useSweetAlert } from "../../hooks/useSweetAlert";
 import { useGridData } from "../../hooks/useGridData";
 import { useCrudFormBase } from "../../hooks/useCrudFormBase";
 import { cleanSupplierFormData } from "../../core/utils/formHelpers";
@@ -37,9 +38,9 @@ const TABS = [
 const SuppliersMenu = () => {
   const [activeTab, setActiveTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedRows, setSelectedRows] = useState([]);
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const queryClient = useQueryClient();
+  const { toast, confirmDelete, confirm } = useSweetAlert();
 
   const {
     showModal,
@@ -57,6 +58,8 @@ const SuppliersMenu = () => {
       queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] });
     },
   });
+
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } = useBulkSelection({ idField: 'supplierId' });
 
   const showCheckbox = activeTab === "active" || activeTab === "inactive";
 
@@ -81,7 +84,6 @@ const SuppliersMenu = () => {
       ...filters,
       ...params,
     };
-    
     const result = await suppliersData.fetchGridData(requestParams);
     return result;
   }, [buildFilters]);
@@ -99,24 +101,36 @@ const SuppliersMenu = () => {
 
   useEffect(() => {
     reload();
-    setSelectedRows([]);
-  }, [activeTab, reload]);
+    clearSelection();
+  }, [activeTab, reload, clearSelection]);
 
   const handleSearch = useCallback((search) => {
     setSearchTerm(search);
     setPage(1);
-    setSelectedRows([]);
-  }, [setPage]);
+    clearSelection();
+  }, [setPage, clearSelection]);
 
-  const handleDelete = useCallback(async (sup) => { 
-    const r = await suppliersData.delete(sup.supplierId); 
-    if (r.success) { 
-      queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] }); 
-      reload(); 
-    } 
-  }, [reload, queryClient]);
+  const handleDelete = useCallback(async (sup) => {
+    const confirmed = await confirmDelete('Delete Supplier', `Are you sure you want to delete "${sup.supplierName}"?`);
+    if (!confirmed) return;
+    const r = await suppliersData.delete(sup.supplierId);
+    if (r.success) {
+      toast.success('Supplier deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] });
+      reload();
+      clearSelection();
+    }
+  }, [reload, queryClient, toast, confirmDelete, clearSelection]);
 
   const handleBulkActivate = useCallback(async (ids, activate) => {
+    const actionText = activate ? 'activate' : 'deactivate';
+    const confirmed = await confirm({
+      title: activate ? 'Activate Suppliers' : 'Deactivate Suppliers',
+      text: `Are you sure you want to ${actionText} ${ids.length} supplier(s)?`,
+      confirmButtonText: activate ? 'Yes, Activate' : 'Yes, Deactivate',
+    });
+    if (!confirmed) return;
+    
     let successCount = 0;
     for (const id of ids) {
       const result = await suppliersData.fetchById(id);
@@ -127,41 +141,64 @@ const SuppliersMenu = () => {
       }
     }
     if (successCount > 0) {
+      toast.success(`${successCount} supplier(s) ${actionText}d successfully`);
       queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] });
       reload();
-      setSelectedRows([]);
+      clearSelection();
     }
-    return successCount;
-  }, [reload, queryClient]);
+  }, [reload, queryClient, toast, confirm, clearSelection]);
 
   const onSubmit = useCallback(async () => {
     const submitData = { 
       ...formData, 
       isActive: editingSupplier ? editingSupplier.isActive : true 
     };
-    
     if (submitData.contactPerson === '') submitData.contactPerson = null;
     if (submitData.phoneNumber === '') submitData.phoneNumber = null;
     if (submitData.email === '') submitData.email = null;
     if (submitData.address === '') submitData.address = null;
-    
     Object.keys(submitData).forEach(key => {
       setFormField(key)(submitData[key]);
     });
-    
     const success = await crudHandleSubmit();
     if (success) {
+      toast.success(editingSupplier ? 'Supplier updated successfully' : 'Supplier created successfully');
       reload();
+      clearSelection();
     }
     return success;
-  }, [formData, editingSupplier, crudHandleSubmit, setFormField, reload]);
+  }, [formData, editingSupplier, crudHandleSubmit, setFormField, reload, toast, clearSelection]);
 
-  const handleTabChange = useCallback((tab) => { 
-    setActiveTab(tab); 
+  const handleTabChange = useCallback((tab) => {
+    setActiveTab(tab);
     setPage(1);
     setSearchTerm("");
-    setSelectedRows([]);
-  }, [setPage]);
+    clearSelection();
+  }, [setPage, clearSelection]);
+
+  const handleGridAction = useCallback((actionType, row) => {
+    switch (actionType) {
+      case ACTION_TYPES.EDIT:
+        handleEdit(row);
+        break;
+      case ACTION_TYPES.DELETE:
+        handleDelete(row);
+        break;
+      default:
+        break;
+    }
+  }, [handleEdit, handleDelete]);
+
+  const getConditionalActions = useCallback(() => {
+    return [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE];
+  }, []);
+
+  const { actionColumn } = useGridActions({
+    actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
+    onAction: handleGridAction,
+    getConditionalActions,
+    rowIdField: 'supplierId',
+  });
 
   const columns = useMemo(() => [
     { field: "supplierName", headerName: "Name", flex: 1, minWidth: 180 },
@@ -178,26 +215,15 @@ const SuppliersMenu = () => {
         return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
       },
     },
-    { 
-      field: "actions", 
-      headerName: "Actions", 
-      width: 100, 
-      sortable: false, 
-      renderCell: (p) => (
-        <div className="table-actions">
-          <IconButton onClick={() => handleEdit(p?.row)} title="Edit supplier" size="lg"><FiEdit2 size={18} /></IconButton>
-          <IconButton onClick={() => handleDelete(p?.row)} title="Delete supplier" variant="danger" size="lg"><FiTrash2 size={18} /></IconButton>
-        </div>
-      ) 
-    },
-  ], [handleEdit, handleDelete]);
+    actionColumn,
+  ], [actionColumn]);
 
   const extraActions = (
     <>
-      {selectedRows.length > 0 && showCheckbox && (
-        <Button variant="primary" onClick={() => setShowBulkActivateModal(true)} startIcon={<FiCheckSquare />}>
-          {activeTab === "active" ? "Deactivate" : "Activate"} ({selectedRows.length})
-        </Button>
+      {hasSelection && showCheckbox && (
+        <button className="btn btn--primary btn--sm" onClick={() => setShowBulkActivateModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          {activeTab === "active" ? "Deactivate" : "Activate"} ({selectionCount})
+        </button>
       )}
     </>
   );
@@ -206,6 +232,8 @@ const SuppliersMenu = () => {
 
   const bulkActivateValue = activeTab === "active" ? false : true;
   const bulkButtonText = activeTab === "active" ? "Deactivate" : "Activate";
+  const bulkTitle = bulkButtonText === "Activate" ? "Activate Suppliers" : "Deactivate Suppliers";
+  const bulkDescription = `This action will ${bulkButtonText.toLowerCase()} the selected suppliers.`;
 
   return (
     <div className="suppliers-menu">
@@ -218,16 +246,15 @@ const SuppliersMenu = () => {
         columns={columns}
         data={suppliers}
         loading={loading}
+        totalCount={totalCount}
         page={page}
-        totalPages={Math.ceil(totalCount / pageSize) || 1}
         pageSize={pageSize}
-        totalItems={totalCount}
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
         onSearch={handleSearch}
         showCheckbox={showCheckbox}
-        selectedRows={selectedRows}
-        onSelectionChange={setSelectedRows}
+        selectedRows={selectedRowIds}
+        onSelectionChange={handleSelectionChange}
         createButtonText="Add Supplier"
         ariaLabel="Suppliers data table"
         extraActions={extraActions}
@@ -242,64 +269,72 @@ const SuppliersMenu = () => {
         submitText={editingSupplier ? "Update" : "Create"}
         size="lg"
       >
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
-            <Input 
-              label="Supplier Name" 
-              value={formData.supplierName || ""} 
-              onChange={(e) => setFormField('supplierName')(e.target.value)} 
-              required 
-            />
+        <FormSection title="Basic Information" description="Supplier name and contact person">
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <Input 
+                label="Supplier Name" 
+                value={formData.supplierName || ""} 
+                onChange={(e) => setFormField('supplierName')(e.target.value)} 
+                required 
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Input 
+                label="Contact Person" 
+                value={formData.contactPerson || ""} 
+                onChange={(e) => setFormField('contactPerson')(e.target.value)} 
+              />
+            </Grid>
           </Grid>
-          <Grid item xs={12} sm={6}>
-            <Input 
-              label="Contact Person" 
-              value={formData.contactPerson || ""} 
-              onChange={(e) => setFormField('contactPerson')(e.target.value)} 
-            />
+        </FormSection>
+
+        <FormSection title="Contact Information" description="Phone, email, and address">
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <Input 
+                label="Phone Number" 
+                value={formData.phoneNumber || ""} 
+                onChange={(e) => setFormField('phoneNumber')(e.target.value)} 
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Input 
+                label="Email" 
+                type="email" 
+                value={formData.email || ""} 
+                onChange={(e) => setFormField('email')(e.target.value)} 
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Input 
+                label="Address" 
+                value={formData.address || ""} 
+                onChange={(e) => setFormField('address')(e.target.value)} 
+                multiline 
+                rows={2} 
+              />
+            </Grid>
           </Grid>
-          <Grid item xs={12} sm={6}>
-            <Input 
-              label="Phone Number" 
-              value={formData.phoneNumber || ""} 
-              onChange={(e) => setFormField('phoneNumber')(e.target.value)} 
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <Input 
-              label="Email" 
-              type="email" 
-              value={formData.email || ""} 
-              onChange={(e) => setFormField('email')(e.target.value)} 
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <Input 
-              label="Address" 
-              value={formData.address || ""} 
-              onChange={(e) => setFormField('address')(e.target.value)} 
-              multiline 
-              rows={2} 
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <FileUploader 
-              referenceTable="Supplier"
-              referenceId={editingSupplier?.supplierId}
-              onUploadComplete={reload}
-            />
-          </Grid>
-        </Grid>
+        </FormSection>
+
+        <FormSection title="Attachments" description="Supporting documents">
+          <FileUploader 
+            referenceTable="Supplier"
+            referenceId={editingSupplier?.supplierId}
+            onUploadComplete={reload}
+          />
+        </FormSection>
       </CrudModal>
 
       <BulkActivateModal
         isOpen={showBulkActivateModal}
         onClose={() => setShowBulkActivateModal(false)}
         onConfirm={(ids) => handleBulkActivate(ids, bulkActivateValue)}
-        selectedIds={selectedRows}
+        selectedIds={getSelectedIds(suppliers)}
         itemName="suppliers"
-        title={bulkButtonText === "Activate" ? "Activate Suppliers" : "Deactivate Suppliers"}
-        description={`This action will ${bulkButtonText.toLowerCase()} the selected suppliers.`}
+        title={bulkTitle}
+        description={bulkDescription}
       />
     </div>
   );

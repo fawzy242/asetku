@@ -12,6 +12,7 @@ import Button from '../../atoms/Button/Button';
  * @param {string} props.cancelText - Cancel button text (default: 'Cancel')
  * @param {boolean} props.showCancel - Show cancel button (default: true)
  * @param {string} props.submitVariant - Submit button variant (default: 'primary')
+ * @param {boolean} props.disabledSubmit - Disable submit button
  */
 const ModalActions = ({
   onCancel,
@@ -21,9 +22,17 @@ const ModalActions = ({
   cancelText = 'Cancel',
   showCancel = true,
   submitVariant = 'primary',
+  disabledSubmit = false,
 }) => {
   return (
-    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 3 }}>
+    <Box sx={{ 
+      display: 'flex', 
+      gap: 2, 
+      justifyContent: 'flex-end', 
+      mt: 4,
+      pt: 2,
+      borderTop: '1px solid var(--border)'
+    }}>
       {showCancel && (
         <Button variant="outline" onClick={onCancel} type="button">
           {cancelText}
@@ -34,6 +43,7 @@ const ModalActions = ({
         variant={submitVariant} 
         loading={isSubmitting}
         onClick={onSubmit}
+        disabled={disabledSubmit}
       >
         {submitText}
       </Button>

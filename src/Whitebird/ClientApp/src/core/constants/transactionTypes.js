@@ -20,23 +20,22 @@ export const TRANSACTION_TYPES = {
 };
 
 /**
- * Full transaction type options untuk dropdown/select.
- * Label menggunakan format human-readable.
+ * UPDATED: Transaction type options untuk dropdown/select.
+ * REMOVED: RETURN and LOAN_RETURN (these are created via shortcuts only)
  */
 export const TRANSACTION_TYPE_OPTIONS = [
   { value: "", label: "Select Type" },
   { value: TRANSACTION_TYPES.HANDOVER, label: "HANDOVER (Company → Employee)" },
   { value: TRANSACTION_TYPES.TRANSFER, label: "TRANSFER (Employee → Employee)" },
   { value: TRANSACTION_TYPES.LOAN, label: "LOAN (Company → Employee)" },
-  { value: TRANSACTION_TYPES.RETURN, label: "RETURN (Employee → Company)" },
-  { value: TRANSACTION_TYPES.LOAN_RETURN, label: "LOAN RETURN (Paired)" },
+  // RETURN and LOAN_RETURN are REMOVED - use shortcut buttons instead
   { value: TRANSACTION_TYPES.MAINTENANCE, label: "MAINTENANCE" },
-  { value: TRANSACTION_TYPES.POST_MAINTENANCE, label: "POST-MAINTENANCE (Paired)" },
+  // POST_MAINTENANCE is REMOVED - use shortcut button instead
   { value: TRANSACTION_TYPES.DISPOSAL, label: "DISPOSAL" },
 ];
 
 /**
- * Compact transaction type options untuk filter dropdown.
+ * Transaction type options untuk filter dropdown (include all for filtering)
  */
 export const TRANSACTION_TYPE_FILTER_OPTIONS = [
   { value: "", label: "All Types" },
@@ -82,6 +81,15 @@ export const TRANSACTION_TYPES_REQUIRING_FROM_EMPLOYEE = [
   TRANSACTION_TYPES.TRANSFER,
   TRANSACTION_TYPES.RETURN,
   TRANSACTION_TYPES.LOAN_RETURN,
+];
+
+/**
+ * Transaction types that can be returned via shortcut
+ */
+export const TRANSACTION_TYPES_RETURNABLE = [
+  TRANSACTION_TYPES.HANDOVER,
+  TRANSACTION_TYPES.LOAN,
+  TRANSACTION_TYPES.MAINTENANCE,
 ];
 
 /**

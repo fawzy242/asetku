@@ -101,29 +101,117 @@ $sidebar-text-active-dark: #ef4444;
 $sidebar-hover-dark: #1e293b;
 
 // ============================================================
-// DEFAULT: Light mode (fallback jika data-theme tidak diset)
+// CSS Variables (Light Mode Default)
 // ============================================================
 :root {
+    // Primary Colors
     --primary: #{$primary-light};
     --primary-hover: #{$primary-dark};
     --secondary: #{$secondary-light};
     --secondary-hover: #{$secondary-dark};
+    
+    // Background Colors
     --background: #{$background-light};
     --surface: #{$surface-light};
+    --card-bg: #ffffff;
+    
+    // Text Colors
     --text-primary: #{$text-primary-light};
     --text-secondary: #{$text-secondary-light};
+    
+    // Border Colors
     --border: #{$border-light};
+    --input-border: #d1d5db;
+    
+    // Status Colors
     --success: #{$success-light};
     --warning: #{$warning-light};
     --error: #{$error-light};
     --info: #{$info-light};
+    
+    // Scrollbar
     --scrollbar-thumb: #d1d5db;
     --scrollbar-thumb-hover: #9ca3af;
-    --card-bg: #ffffff;
+    
+    // Input
     --input-bg: #ffffff;
-    --input-border: #d1d5db;
+    
+    // Table
+    --table-header-bg: #f9fafb;
+    --table-row-hover: #f3f4f6;
+    
+    // Disabled
+    --disabled-bg: #f3f4f6;
+    --disabled-text: #9ca3af;
+    --placeholder: #9ca3af;
+    
+    // Sidebar
     --sidebar-bg: #{$sidebar-bg-light};
     --sidebar-text: #{$sidebar-text-light};
     --sidebar-text-active: #{$sidebar-text-active-light};
     --sidebar-hover: #{$sidebar-hover-light};
+    
+    // Layout
+    --sidebar-width: #{$sidebar-width};
+}
+
+// ============================================================
+// Dark Mode Theme
+// ============================================================
+[data-theme='dark'] {
+    // Primary Colors
+    --primary: #{$primary-dark-mode};
+    --primary-hover: #{$primary-dark-mode-dark};
+    --secondary: #{$secondary-dark-mode};
+    --secondary-hover: #{$secondary-dark-mode-dark};
+    
+    // Background Colors
+    --background: #{$background-dark};
+    --surface: #{$surface-dark};
+    --card-bg: #1f2937;
+    
+    // Text Colors
+    --text-primary: #{$text-primary-dark};
+    --text-secondary: #{$text-secondary-dark};
+    
+    // Border Colors
+    --border: #{$border-dark};
+    --input-border: #4b5563;
+    
+    // Status Colors
+    --success: #{$success-dark};
+    --warning: #{$warning-dark};
+    --error: #{$error-dark};
+    --info: #{$info-dark};
+    
+    // Scrollbar
+    --scrollbar-thumb: #4b5563;
+    --scrollbar-thumb-hover: #6b7280;
+    
+    // Input
+    --input-bg: #374151;
+    
+    // Table
+    --table-header-bg: #374151;
+    --table-row-hover: #2d3748;
+    
+    // Disabled
+    --disabled-bg: #374151;
+    --disabled-text: #6b7280;
+    --placeholder: #6b7280;
+    
+    // Sidebar
+    --sidebar-bg: #{$sidebar-bg-dark};
+    --sidebar-text: #{$sidebar-text-dark};
+    --sidebar-text-active: #{$sidebar-text-active-dark};
+    --sidebar-hover: #{$sidebar-hover-dark};
+}
+
+// ============================================================
+// Responsive Variables (can be used in components)
+// ============================================================
+:root {
+    --sidebar-width-expanded: #{$sidebar-width};
+    --sidebar-width-collapsed: #{$sidebar-collapsed-width};
+    --topbar-height: #{$topbar-height};
 }

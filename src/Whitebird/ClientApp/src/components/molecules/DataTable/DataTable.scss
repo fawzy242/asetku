@@ -2,77 +2,78 @@
 @use '../../../styles/mixins' as *;
 
 .data-table {
-    width: 100% !important;
-    min-width: 100% !important;
-    max-width: 100% !important;
+    width: 100%;
+    min-width: 0;
     background-color: transparent;
     border-radius: $radius-lg;
-    overflow-x: auto;
     display: flex;
     flex-direction: column;
     position: relative;
 
-    // FIX: Pastikan semua elemen DataGrid memiliki lebar penuh
     .MuiDataGrid-root {
-        width: 100% !important;
-        min-width: 100% !important;
-        max-width: 100% !important;
-        flex: 1;
-
-        @include respond-to('sm') {
-            font-size: 12px;
-        }
+        border: none;
+        background-color: transparent;
     }
 
     .MuiDataGrid-main {
-        width: 100% !important;
-        min-width: 100% !important;
+        width: 100%;
+    }
+
+    // Action menu button styles
+    .table-actions {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        
+        .icon-btn {
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+            
+            &:hover {
+                color: var(--primary);
+                background-color: rgba(220, 38, 38, 0.1);
+            }
+        }
     }
 
     .MuiDataGrid-virtualScroller {
-        width: 100% !important;
-        min-width: 100% !important;
-
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        
         &::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
+            width: 8px;
+            height: 8px;
         }
 
         &::-webkit-scrollbar-track {
             background: var(--surface);
-            border-radius: 3px;
+            border-radius: 4px;
         }
 
         &::-webkit-scrollbar-thumb {
             background: var(--scrollbar-thumb);
-            border-radius: 3px;
+            border-radius: 4px;
 
             &:hover {
                 background: var(--scrollbar-thumb-hover);
             }
         }
-
-        &::-webkit-scrollbar-corner {
-            background: var(--surface);
-        }
     }
 
     .MuiDataGrid-columnHeaders {
-        width: 100% !important;
-
-        @include respond-to('sm') {
-            .MuiDataGrid-columnHeaderTitle {
-                font-size: 11px;
-                white-space: normal;
-                word-break: break-word;
-            }
+        overflow-x: hidden !important;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        
+        &::-webkit-scrollbar {
+            display: none;
         }
     }
 
     .MuiDataGrid-cell {
-        @include respond-to('sm') {
-            font-size: 11px;
-            padding: 4px 8px;
+        &:focus, &:focus-within {
+            outline: none !important;
         }
     }
 
@@ -84,30 +85,22 @@
     .MuiDataGrid-iconSeparator {
         cursor: col-resize !important;
     }
-
-    @include respond-to('md') {
-        .MuiDataGrid-columnHeaderTitle {
-            font-size: 0.75rem;
-        }
-
-        .MuiDataGrid-cell {
-            font-size: 0.75rem;
+    
+    .MuiDataGrid-menuIcon {
+        opacity: 0.5;
+        transition: opacity 0.2s;
+        
+        &:hover {
+            opacity: 1;
         }
     }
 }
 
-// FIX: Global fix untuk MUI DataGrid width issue
-.MuiDataGrid-root {
-    width: 100% !important;
-    min-width: 100% !important;
-}
-
-.MuiDataGrid-virtualScroller {
-    width: 100% !important;
-    min-width: 100% !important;
-}
-
-.MuiDataGrid-main {
-    width: 100% !important;
-    min-width: 100% !important;
+// Dark mode specific
+[data-theme='dark'] {
+    .data-table {
+        .table-actions .icon-btn {
+            color: #9ca3af;
+        }
+    }
 }

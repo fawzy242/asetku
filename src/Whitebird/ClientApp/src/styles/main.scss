@@ -17,7 +17,6 @@
 
 html {
     font-size: $font-size-base;
-    @include scrollbar;
     scroll-behavior: smooth;
 }
 
@@ -58,6 +57,12 @@ img {
     max-width: 100%;
     height: auto;
 }
+
+// ============================================================
+// SCROLLBAR STYLES (Global)
+// ============================================================
+
+@include scrollbar;
 
 // ============================================================
 // UTILITY CLASSES
@@ -162,63 +167,9 @@ img {
 }
 
 // ============================================================
-// MUI SCROLLBAR
+// CONTAINER & GRID RESPONSIVE
 // ============================================================
 
-.MuiDataGrid-virtualScroller {
-    &::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-        background: transparent;
-    }
-
-    &::-webkit-scrollbar-thumb {
-        background: var(--scrollbar-thumb);
-        border-radius: 3px;
-
-        &:hover {
-            background: var(--scrollbar-thumb-hover);
-        }
-    }
-}
-
-// ============================================================
-// FIX: Global scrollbar untuk semua MUI dropdown/menu/list
-// ============================================================
-
-.MuiPaper-root,
-.MuiMenu-paper,
-.MuiList-root,
-.MuiAutocomplete-listbox,
-.MuiSelect-selectMenu {
-    &::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-        background: var(--surface);
-        border-radius: 3px;
-    }
-
-    &::-webkit-scrollbar-thumb {
-        background: var(--scrollbar-thumb);
-        border-radius: 3px;
-
-        &:hover {
-            background: var(--scrollbar-thumb-hover);
-        }
-    }
-}
-
-// ============================================================
-// RESPONSIVE UTILITIES
-// ============================================================
-
-// Container responsive
 .container {
     width: 100%;
     max-width: 1280px;
@@ -234,7 +185,6 @@ img {
     }
 }
 
-// Grid responsive
 .responsive-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -254,7 +204,10 @@ img {
     }
 }
 
-// Page header responsive
+// ============================================================
+// PAGE HEADER
+// ============================================================
+
 .page-header {
     display: flex;
     justify-content: space-between;
@@ -277,4 +230,169 @@ img {
     @include respond-to('sm') {
         font-size: $font-size-xl;
     }
+}
+
+.page-description {
+    font-size: $font-size-sm;
+    color: var(--text-secondary);
+    margin-top: $spacing-xs;
+    width: 100%;
+    
+    @include respond-to('sm') {
+        font-size: $font-size-xs;
+    }
+}
+
+// ============================================================
+// BUTTON STYLES (Global fallback)
+// ============================================================
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: $spacing-sm;
+    padding: $spacing-sm $spacing-lg;
+    font-size: $font-size-sm;
+    font-weight: 500;
+    border-radius: $radius-md;
+    transition: all $transition-fast;
+    cursor: pointer;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    
+    &--primary {
+        background-color: var(--primary);
+        color: white;
+        
+        &:hover:not(:disabled) {
+            background-color: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: $shadow-md;
+        }
+    }
+    
+    &--outline {
+        background-color: transparent;
+        border-color: var(--border);
+        color: var(--text-primary);
+        
+        &:hover:not(:disabled) {
+            background-color: var(--surface);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+    }
+    
+    &--sm {
+        padding: 6px 12px;
+        font-size: $font-size-xs;
+        height: 32px;
+    }
+    
+    &--md {
+        padding: 8px 20px;
+        font-size: $font-size-sm;
+        height: 38px;
+    }
+    
+    &--lg {
+        padding: 10px 24px;
+        font-size: $font-size-base;
+        height: 44px;
+    }
+    
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+}
+
+// ============================================================
+// SWEETALERT2 OVERRIDES
+// ============================================================
+
+.swal-container {
+  z-index: $z-index-modal !important;
+}
+
+.swal-popup {
+  border-radius: $radius-xl !important;
+  background-color: var(--card-bg) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: $shadow-xl !important;
+  padding: $spacing-xl !important;
+  width: 420px !important;
+  max-width: 90vw !important;
+}
+
+.swal-title {
+  color: var(--text-primary) !important;
+  font-size: $font-size-xl !important;
+  font-weight: 700 !important;
+  margin-bottom: $spacing-md !important;
+}
+
+.swal-text {
+  color: var(--text-secondary) !important;
+  font-size: $font-size-sm !important;
+  text-align: center !important;
+}
+
+.swal-footer {
+  border-top: none !important;
+  padding: $spacing-md 0 0 0 !important;
+  display: flex !important;
+  justify-content: center !important;
+  gap: $spacing-md !important;
+}
+
+.swal-icon {
+  margin-bottom: $spacing-md !important;
+}
+
+.swal-icon--success__ring {
+  border-color: var(--success) !important;
+}
+
+.swal-icon--success__line {
+  background-color: var(--success) !important;
+}
+
+.swal-icon--warning {
+  border-color: var(--warning) !important;
+  color: var(--warning) !important;
+}
+
+.swal-icon--error {
+  border-color: var(--error) !important;
+  color: var(--error) !important;
+}
+
+.swal-icon--info {
+  border-color: var(--info) !important;
+  color: var(--info) !important;
+}
+
+// Dark mode SweetAlert2 fixes
+[data-theme='dark'] {
+  .swal-popup {
+    background-color: #1f2937 !important;
+    border-color: #374151 !important;
+  }
+  
+  .swal-title {
+    color: #f9fafb !important;
+  }
+  
+  .swal-text {
+    color: #9ca3af !important;
+  }
+  
+  .swal-footer {
+    button {
+      background-color: transparent !important;
+    }
+  }
 }

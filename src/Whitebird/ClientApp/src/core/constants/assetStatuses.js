@@ -17,6 +17,7 @@ export const ASSET_STATUSES = {
   DAMAGED: 'Damaged',
   RETIRED: 'Retired',
   DISPOSED: 'Disposed',
+  INACTIVE: 'Inactive',
 };
 
 /**
@@ -42,7 +43,7 @@ export const ASSET_STATUS_FILTER_OPTIONS = [
 ];
 
 /**
- * Asset status options untuk tab navigation.
+ * UPDATED: Asset status tabs untuk navigation (Inactive diganti Damaged)
  */
 export const ASSET_STATUS_TABS = [
   { id: 'all', label: 'All Assets' },
@@ -51,6 +52,18 @@ export const ASSET_STATUS_TABS = [
   { id: 'On Loan', label: 'On Loan' },
   { id: 'In Maintenance', label: 'In Maintenance' },
   { id: 'Under Repair', label: 'Under Repair' },
+  { id: 'Damaged', label: 'Damaged' },  // Changed from Inactive to Damaged
+];
+
+/**
+ * Asset status options untuk tab navigation (untuk grid filter)
+ */
+export const ASSET_GRID_TABS = [
+  { id: 'all', label: 'All Assets' },
+  { id: 'Available', label: 'Available' },
+  { id: 'Assigned', label: 'Assigned' },
+  { id: 'On Loan', label: 'On Loan' },
+  { id: 'In Maintenance', label: 'In Maintenance' },
   { id: 'Damaged', label: 'Damaged' },
 ];
 
@@ -67,10 +80,9 @@ export const TRANSACTION_STATUS_FILTER_OPTIONS = [
 ];
 
 /**
- * Transaction tabs untuk halaman AssetTransaction.
+ * UPDATED: Transaction tabs tanpa pending/approved dihapus approve button di action column
  */
 export const TRANSACTION_TABS = [
-  { id: 'all', label: 'All' },
   { id: 'pending', label: 'Pending' },
   { id: 'approved', label: 'Approved' },
   { id: 'rejected', label: 'Rejected' },
@@ -116,5 +128,24 @@ export const ASSET_CONDITION_PURCHASE_OPTIONS = [
  * Condition options untuk dropdown (deprecated, use ASSET_CONDITION_OPTIONS)
  */
 export const CONDITION_OPTIONS = ASSET_CONDITION_OPTIONS;
+
+/**
+ * Get asset status from transaction type
+ */
+export const getAssetStatusFromTransactionType = (transactionType) => {
+  switch (transactionType) {
+    case 1: // HANDOVER
+    case 2: // TRANSFER
+      return ASSET_STATUSES.ASSIGNED;
+    case 3: // LOAN
+      return ASSET_STATUSES.ON_LOAN;
+    case 6: // MAINTENANCE
+      return ASSET_STATUSES.IN_MAINTENANCE;
+    case 8: // DISPOSAL
+      return ASSET_STATUSES.DISPOSED;
+    default:
+      return ASSET_STATUSES.AVAILABLE;
+  }
+};
 
 export default ASSET_STATUSES;
