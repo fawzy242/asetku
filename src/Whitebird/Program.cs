@@ -8,19 +8,12 @@ using Whitebird.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ========== BASIC SERVICES ==========
+// ========== SERVICES ==========
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHttpContextAccessor();
-
-// ========== AUTHENTICATION ==========
-builder.Services.AddAuthentication("Session")
-    .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>("Session", null);
-
-// ========== INFRASTRUCTURE SERVICES ==========
+builder.Services.AddAuthentication("Session").AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>("Session", null);
 builder.Services.AddInfrastructureServices(builder.Configuration);
-
-// ========== APPLICATION SERVICES ==========
 builder.Services.AddApplicationServices();
 builder.Services.AddMapsterConfiguration();
 
@@ -29,101 +22,40 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v2", new OpenApiInfo
     {
-        Title = "Asetku - Asset Management System API",
+        Title = "Asetku API",
         Version = "v2.0.0",
-        Description = @"Complete API for managing assets, tracking transactions, employees, offices, departments, and file attachments.
-
-## Key Features:
-- **Asset Management**: CRUD, tracking, warranty, maintenance
-- **Transaction Management**: HANDOVER, TRANSFER, LOAN, RETURN, LOAN_RETURN, MAINTENANCE, POST_MAINTENANCE, DISPOSAL
-- **Employee Management**: CRUD, asset summary, import
-- **Master Data**: Centralized lookup for positions, statuses, types
-- **File Attachments**: Single/multiple upload, preview for images
-- **Reports**: 5 report types with Excel export
-- **Import**: Bulk import for Assets and Employees (Excel)
-
-## Authentication:
-Use session token from /api/Auth/login
-",
-        Contact = new OpenApiContact
-        {
-            Name = "Asetku Support",
-            Email = "support@asetku.local"
-        }
+        Description = "Asset Management System API"
     });
-
     c.AddSecurityDefinition("SessionToken", new OpenApiSecurityScheme
     {
         Name = "X-Session-Token",
         Type = SecuritySchemeType.ApiKey,
-        Scheme = "ApiKey",
         In = ParameterLocation.Header,
-        Description = "Session token for authentication (get from /api/Auth/login)"
+        Description = "Session token from /api/Auth/login"
     });
-
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "SessionToken"
-                }
-            },
-            Array.Empty<string>()
-        }
+        { new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "SessionToken" } }, Array.Empty<string>() }
     });
-
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    if (File.Exists(xmlPath))
-    {
-        c.IncludeXmlComments(xmlPath);
-    }
+    if (File.Exists(xmlPath)) c.IncludeXmlComments(xmlPath);
 });
 
 // ========== CORS ==========
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? new[] { "http://localhost:3000", "http://localhost:4200", "http://localhost:8080" };
-
-var productionOrigins = Environment.GetEnvironmentVariable("CORS__ALLOWED_ORIGINS");
-if (!string.IsNullOrEmpty(productionOrigins))
-{
-    allowedOrigins = productionOrigins.Split(';');
-}
-
+// DISABLE CORS - Allow all origins untuk kemudahan akses
 builder.Services.AddCors(options =>
 {
-    // Development: Allow any origin (lebih simpel)
-    if (builder.Environment.IsDevelopment())
+    options.AddDefaultPolicy(policy =>
     {
-        options.AddDefaultPolicy(policy =>
-        {
-            policy.AllowAnyOrigin()
-                  .AllowAnyMethod()
-                  .AllowAnyHeader();
-        });
-    }
-
-    // Production: Hanya origins yang diizinkan
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.WithOrigins(allowedOrigins)
+        policy.AllowAnyOrigin()
               .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials();
+              .AllowAnyHeader();
     });
 });
 
-// ========== RESPONSE COMPRESSION ==========
-builder.Services.AddResponseCompression(options =>
-{
-    options.EnableForHttps = true;
-});
-
-// ========== RATE LIMITING ==========
+// ========== OTHER SERVICES ==========
+builder.Services.AddResponseCompression(options => options.EnableForHttps = false);
 builder.Services.AddRateLimiter(options =>
 {
     options.GlobalLimiter = System.Threading.RateLimiting.PartitionedRateLimiter.Create<HttpContext, string>(
@@ -137,139 +69,50 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1)
             }));
 });
-
-// ========== LOGGING ==========
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
 var app = builder.Build();
 
-// ========== AUTO DATABASE MIGRATION ==========
+// ========== DATABASE MIGRATION ==========
 using (var scope = app.Services.CreateScope())
 {
-    var logger = scope.ServiceProvider
-        .GetRequiredService<ILoggerFactory>()
-        .CreateLogger("FluentMigrator");
-
-    try
-    {
-        var runner = scope.ServiceProvider.GetRequiredService<IMigrationRunner>();
-
-        if (runner.HasMigrationsToApplyUp())
-        {
-            logger.LogInformation("Applying pending migrations...");
-            runner.MigrateUp();
-            logger.LogInformation("Database migration completed successfully.");
-        }
-        else
-        {
-            logger.LogInformation("No pending migrations.");
-        }
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Migration failed during startup.");
-        throw;
-    }
+    var runner = scope.ServiceProvider.GetRequiredService<IMigrationRunner>();
+    if (runner.HasMigrationsToApplyUp()) runner.MigrateUp();
 }
 
-// ========== MIDDLEWARE (URUTAN PENTING!) ==========
-// CORS HARUS PALING ATAS
-if (app.Environment.IsDevelopment())
-{
-    app.UseCors(); // Pakai default policy (AllowAnyOrigin)
-}
-else
-{
-    app.UseCors("AllowFrontend");
-}
-
+// ========== MIDDLEWARE ==========
+app.UseCors();
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseMiddleware<AuthRateLimitingMiddleware>();
 
-// ========== HTTPS REDIRECTION ==========
-// HANYA AKTIF DI PRODUCTION (supaya tidak redirect di development)
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection();
-}
-
 // ========== SWAGGER ==========
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v2/swagger.json", "Asetku API V2");
-        c.RoutePrefix = "swagger";
-        c.DocumentTitle = "Asetku Asset Management API";
-    });
-}
+    c.SwaggerEndpoint("/swagger/v2/swagger.json", "Asetku API V2");
+    c.RoutePrefix = "swagger";
+});
 
-// ========== SERVE STATIC FILES (Frontend) ==========
-// 🔥 PRODUCTION SAJA yang pakai konfigurasi wwwroot 🔥
-// 🔥 DEVELOPMENT tetap normal (pakai Vite dev server atau static files) 🔥
-
-if (app.Environment.IsProduction())
+// ========== STATIC FILES & SPA ==========
+app.UseDefaultFiles();
+app.UseStaticFiles();
+app.MapWhen(ctx => !ctx.Request.Path.StartsWithSegments("/api") &&
+                   !ctx.Request.Path.StartsWithSegments("/swagger") &&
+                   !ctx.Request.Path.StartsWithSegments("/health"), appBuilder =>
 {
-    // ========== PRODUCTION: Frontend di folder wwwroot ==========
-    var webRootPath = Path.Combine(AppContext.BaseDirectory, "wwwroot");
-    if (!Directory.Exists(webRootPath))
-    {
-        Directory.CreateDirectory(webRootPath);
-    }
+    appBuilder.Use(async (context, next) => { context.Request.Path = "/index.html"; await next(); });
+    appBuilder.UseStaticFiles();
+});
 
-    app.UseDefaultFiles(new DefaultFilesOptions
-    {
-        DefaultFileNames = new List<string> { "index.html" },
-        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(webRootPath)
-    });
-
-    app.UseStaticFiles(new StaticFileOptions
-    {
-        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(webRootPath)
-    });
-
-    // SPA fallback - semua request non-API ke index.html di folder wwwroot
-    app.MapFallbackToFile("wwwroot/index.html");
-}
-else
-{
-    // ========== DEVELOPMENT: Normal (bisa pakai Vite proxy atau static files) ==========
-    app.UseDefaultFiles();
-    app.UseStaticFiles();
-    app.MapFallbackToFile("/index.html");
-}
-
-// ========== PRODUCTION SECURITY ==========
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHsts();
-}
-
+// ========== ENDPOINTS ==========
 app.UseResponseCompression();
 app.UseRateLimiter();
-
-// ========== AUTHENTICATION & AUTHORIZATION ==========
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
-
-// ========== HEALTH CHECK ==========
-app.MapGet("/health", () => Results.Ok(new
-{
-    status = "Healthy",
-    timestamp = DateTime.UtcNow,
-    environment = app.Environment.EnvironmentName,
-    version = "2.0.0",
-    modules = new[]
-    {
-        "Asset", "AssetTransaction", "Auth", "Category", "Department",
-        "Employee", "FileAttachment", "MasterData", "Office", "Reports", "Supplier"
-    }
-}));
+app.MapGet("/health", () => Results.Ok(new { status = "Healthy", timestamp = DateTime.UtcNow, environment = app.Environment.EnvironmentName }));
 
 app.Run();
