@@ -18,4 +18,41 @@
         margin-bottom: $spacing-lg;
         border: 1px solid var(--border);
     }
+
+    &__view-toggle {
+        display: inline-flex;
+        border-radius: $radius-md;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        background-color: var(--surface);
+    }
+
+    &__view-btn {
+        padding: $spacing-sm $spacing-md;
+        font-size: $font-size-sm;
+        font-weight: 500;
+        color: var(--text-secondary);
+        background: transparent;
+        border: none;
+        display: flex;
+        align-items: center;
+        gap: $spacing-xs;
+        transition: all $transition-fast;
+        cursor: pointer;
+
+        &:hover {
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        &--active {
+            background-color: var(--primary);
+            color: white;
+
+            &:hover {
+                background-color: var(--primary-hover);
+                color: white;
+            }
+        }
+    }
 }

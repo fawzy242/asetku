@@ -87,8 +87,10 @@ const Input = memo(forwardRef(({
         multiline={multiline}
         rows={multiline ? rows : undefined}
         autoComplete={autoComplete}
+        // FIX: Always set shrink to true when value exists or focused
+        // This fixes the autofill issue where label doesn't float up
         InputLabelProps={{
-          shrink: focused || hasValue,
+          shrink: focused || hasValue || true,
           ...InputLabelProps,
         }}
         InputProps={{

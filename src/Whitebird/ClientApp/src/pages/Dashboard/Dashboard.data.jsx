@@ -9,26 +9,31 @@ class DashboardData extends BaseData {
 
   async fetchDashboardData() {
     try {
-      const [stats, expiredWarranty, upcomingMaintenance, pendingApprovals, recentTransactions, monthlyStats] = await Promise.all([
+      const currentYear = new Date().getFullYear();
+      const [stats, monthlyStats, categoryBreakdown, expiredWarranty, upcomingMaintenance, pendingApprovals, recentTransactions] = await Promise.all([
         this.api.getStats(),
+        this.api.getMonthlyStats(currentYear),
+        this.api.getCategoryBreakdown(),
         this.api.getExpiredWarranty(),
         this.api.getUpcomingMaintenance(),
         this.api.getPendingApprovals(),
         this.api.getRecentTransactions(),
-        this.api.getMonthlyStats().catch(() => ({ data: null })),
       ]);
+      
       return {
         success: true,
         data: {
           stats: stats.data || {},
+          monthlyStats: monthlyStats.data || [],
+          categoryBreakdown: categoryBreakdown.data || [],
           expiredWarranty: expiredWarranty.data || [],
           upcomingMaintenance: upcomingMaintenance.data || [],
           pendingApprovals: pendingApprovals.data || [],
           recentTransactions: recentTransactions.data || {},
-          monthlyStats: monthlyStats.data || null,
         }
       };
-    } catch {
+    } catch (error) {
+      console.error('Dashboard data fetch error:', error);
       return { success: false, error: 'Failed to load dashboard data' };
     }
   }

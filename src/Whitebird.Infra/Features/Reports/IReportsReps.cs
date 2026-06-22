@@ -20,7 +20,11 @@ public interface IReportsReps
     Task<int> GetActiveEmployeesCountAsync();
     Task<int> GetTotalOfficesCountAsync();
     Task<int> GetTotalDepartmentsCountAsync();
-    
+
+    // NEW: Monthly stats for dashboard
+    Task<IEnumerable<MonthlyStatDto>> GetMonthlyStatsAsync(int year);
+    Task<IEnumerable<CategoryBreakdownDto>> GetCategoryBreakdownAsync();
+
     // Excel export (return raw data for client-side export)
     Task<IEnumerable<ReportsAssetTransactionViewModel>> ExportAssetTransactionReportsAsync(DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null);
     Task<IEnumerable<ReportsAssetInventoryViewModel>> ExportAssetInventoryReportsAsync(string? status = null, int? categoryId = null, int? supplierId = null);

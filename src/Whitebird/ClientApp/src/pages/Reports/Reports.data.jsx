@@ -84,13 +84,18 @@ class ReportsData extends BaseData {
     }
   }
 
-  // Excel Export Methods - Using server-side export
+  // Excel Export Methods - Using server-side export with blob response
   async exportTransaction(params) {
     try {
       const blob = await this.api.exportAssetTransactionExcel(params);
-      utilsHelper.downloadFile(blob, `Transaction_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
-      ConfirmDialog.toast.success('Report exported successfully');
-      return { success: true };
+      // Ensure blob is actually a Blob
+      if (blob instanceof Blob) {
+        utilsHelper.downloadFile(blob, `Transaction_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+        ConfirmDialog.toast.success('Report exported successfully');
+        return { success: true };
+      } else {
+        throw new Error('Invalid response format');
+      }
     } catch (error) {
       console.error('Export failed:', error);
       ConfirmDialog.toast.error('Failed to export report');
@@ -101,9 +106,13 @@ class ReportsData extends BaseData {
   async exportInventory(params) {
     try {
       const blob = await this.api.exportAssetInventoryExcel(params);
-      utilsHelper.downloadFile(blob, `Inventory_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
-      ConfirmDialog.toast.success('Report exported successfully');
-      return { success: true };
+      if (blob instanceof Blob) {
+        utilsHelper.downloadFile(blob, `Inventory_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+        ConfirmDialog.toast.success('Report exported successfully');
+        return { success: true };
+      } else {
+        throw new Error('Invalid response format');
+      }
     } catch (error) {
       console.error('Export failed:', error);
       ConfirmDialog.toast.error('Failed to export report');
@@ -114,9 +123,13 @@ class ReportsData extends BaseData {
   async exportEmployee(params) {
     try {
       const blob = await this.api.exportEmployeeAssetExcel(params);
-      utilsHelper.downloadFile(blob, `Employee_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
-      ConfirmDialog.toast.success('Report exported successfully');
-      return { success: true };
+      if (blob instanceof Blob) {
+        utilsHelper.downloadFile(blob, `Employee_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+        ConfirmDialog.toast.success('Report exported successfully');
+        return { success: true };
+      } else {
+        throw new Error('Invalid response format');
+      }
     } catch (error) {
       console.error('Export failed:', error);
       ConfirmDialog.toast.error('Failed to export report');
@@ -127,10 +140,14 @@ class ReportsData extends BaseData {
   async exportMaintenance(params) {
     try {
       const blob = await this.api.exportMaintenanceExcel(params);
-      const reportType = params.isUpcoming ? 'Upcoming_Maintenance' : 'Maintenance_History';
-      utilsHelper.downloadFile(blob, `${reportType}_${new Date().toISOString().split('T')[0]}.xlsx`);
-      ConfirmDialog.toast.success('Report exported successfully');
-      return { success: true };
+      if (blob instanceof Blob) {
+        const reportType = params.isUpcoming ? 'Upcoming_Maintenance' : 'Maintenance_History';
+        utilsHelper.downloadFile(blob, `${reportType}_${new Date().toISOString().split('T')[0]}.xlsx`);
+        ConfirmDialog.toast.success('Report exported successfully');
+        return { success: true };
+      } else {
+        throw new Error('Invalid response format');
+      }
     } catch (error) {
       console.error('Export failed:', error);
       ConfirmDialog.toast.error('Failed to export report');
@@ -141,9 +158,13 @@ class ReportsData extends BaseData {
   async exportFinancial(params) {
     try {
       const blob = await this.api.exportFinancialExcel(params);
-      utilsHelper.downloadFile(blob, `Financial_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
-      ConfirmDialog.toast.success('Report exported successfully');
-      return { success: true };
+      if (blob instanceof Blob) {
+        utilsHelper.downloadFile(blob, `Financial_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+        ConfirmDialog.toast.success('Report exported successfully');
+        return { success: true };
+      } else {
+        throw new Error('Invalid response format');
+      }
     } catch (error) {
       console.error('Export failed:', error);
       ConfirmDialog.toast.error('Failed to export report');

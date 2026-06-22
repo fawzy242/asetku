@@ -130,22 +130,14 @@ public class AssetController : ControllerBase
 
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
 
+        // Only accept Excel files
+        if (extension != ".xlsx" && extension != ".xls")
+        {
+            return BadRequest("Unsupported file format. Please upload Excel file (.xlsx or .xls).");
+        }
+
         using var stream = file.OpenReadStream();
-        ServiceResult<ImportResult> result;
-
-        if (extension == ".txt" || extension == ".csv")
-        {
-            result = await _assetImportService.ImportFromTxtAsync(stream);
-        }
-        else if (extension == ".xlsx" || extension == ".xls")
-        {
-            result = await _assetImportService.ImportFromExcelAsync(stream);
-        }
-        else
-        {
-            return BadRequest($"Unsupported file format: {extension}. Supported: .xlsx, .xls, .csv, .txt");
-        }
-
+        var result = await _assetImportService.ImportFromExcelAsync(stream);
         return this.HandleResult(result);
     }
 
@@ -158,18 +150,19 @@ public class AssetController : ControllerBase
 
         return File(result.Data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Asset_Import_Template.xlsx");
     }
-        // ============================================================
+
+    // ============================================================
     // NEW: AVAILABLE ASSETS FOR TRANSACTION
     // ============================================================
 
     [HttpGet("available-for-transaction")]
     public async Task<IActionResult> GetAvailableAssetsForTransaction()
         => this.HandleResult(await _assetService.GetAvailableAssetsForTransactionAsync());
-    
+
     [HttpGet("{id:int}/available")]
     public async Task<IActionResult> IsAssetAvailableForTransaction(int id)
         => this.HandleResult(await _assetService.IsAssetAvailableForTransactionAsync(id));
-    
+
     // ============================================================
     // NEW: ASSET STATUS LISTS
     // ============================================================
@@ -177,7 +170,7 @@ public class AssetController : ControllerBase
     [HttpGet("damaged")]
     public async Task<IActionResult> GetDamagedAssets()
         => this.HandleResult(await _assetService.GetDamagedAssetsAsync());
-    
+
     [HttpGet("inactive")]
     public async Task<IActionResult> GetInactiveAssets()
         => this.HandleResult(await _assetService.GetInactiveAssetsAsync());

@@ -83,7 +83,7 @@ public class AssetTransactionReps : IAssetTransactionReps
             LEFT JOIN MasterData md3 ON t.ConditionAfter = md3.ReferenceCode AND md3.ReferenceName = 'AssetCondition'
             LEFT JOIN MasterData md4 ON t.MaintenanceType = md4.ReferenceCode AND md4.ReferenceName = 'MaintenanceType'
             WHERE t.AssetTransactionId = @TransactionId AND t.IsActive = 1";
-        
+
         return await _context.QueryFirstOrDefaultAsync<AssetTransactionDetailView>(sql, new { TransactionId = transactionId });
     }
 
@@ -116,7 +116,7 @@ public class AssetTransactionReps : IAssetTransactionReps
             LEFT JOIN MasterData md4 ON t.MaintenanceType = md4.ReferenceCode AND md4.ReferenceName = 'MaintenanceType'
             WHERE t.IsActive = 1
             ORDER BY t.TransactionDate DESC";
-        
+
         return await _context.QueryAsync<AssetTransactionListView>(sql);
     }
 
@@ -149,7 +149,7 @@ public class AssetTransactionReps : IAssetTransactionReps
             LEFT JOIN MasterData md4 ON t.MaintenanceType = md4.ReferenceCode AND md4.ReferenceName = 'MaintenanceType'
             WHERE t.AssetId = @AssetId AND t.IsActive = 1
             ORDER BY t.TransactionDate DESC";
-        
+
         return await _context.QueryAsync<AssetTransactionListView>(sql, new { AssetId = assetId });
     }
 
@@ -182,7 +182,7 @@ public class AssetTransactionReps : IAssetTransactionReps
             LEFT JOIN MasterData md4 ON t.MaintenanceType = md4.ReferenceCode AND md4.ReferenceName = 'MaintenanceType'
             WHERE (t.FromEmployeeId = @EmployeeId OR t.ToEmployeeId = @EmployeeId) AND t.IsActive = 1
             ORDER BY t.TransactionDate DESC";
-        
+
         return await _context.QueryAsync<AssetTransactionListView>(sql, new { EmployeeId = employeeId });
     }
 
@@ -223,6 +223,10 @@ public class AssetTransactionReps : IAssetTransactionReps
         {
             sql += " AND t.Approved = 0";
         }
+        else
+        {
+            sql += " AND t.Approved IS NULL";
+        }
 
         sql += " ORDER BY t.TransactionDate DESC";
 
@@ -258,7 +262,7 @@ public class AssetTransactionReps : IAssetTransactionReps
             LEFT JOIN MasterData md4 ON t.MaintenanceType = md4.ReferenceCode AND md4.ReferenceName = 'MaintenanceType'
             WHERE t.Approved IS NULL AND t.IsActive = 1
             ORDER BY t.TransactionDate ASC";
-        
+
         return await _context.QueryAsync<AssetTransactionListView>(sql);
     }
 
@@ -291,10 +295,11 @@ public class AssetTransactionReps : IAssetTransactionReps
             LEFT JOIN MasterData md4 ON t.MaintenanceType = md4.ReferenceCode AND md4.ReferenceName = 'MaintenanceType'
             WHERE t.Approved = 1 AND t.IsActive = 1
             ORDER BY t.TransactionDate DESC";
-        
+
         return await _context.QueryAsync<AssetTransactionListView>(sql);
     }
 
+    // FIXED: Rejected Tab - IsActive = 0 AND Approved = 0
     public async Task<IEnumerable<AssetTransactionListView>> GetRejectedListViewAsync()
     {
         const string sql = @"
@@ -322,9 +327,9 @@ public class AssetTransactionReps : IAssetTransactionReps
             LEFT JOIN MasterData md2 ON t.ConditionBefore = md2.ReferenceCode AND md2.ReferenceName = 'AssetCondition'
             LEFT JOIN MasterData md3 ON t.ConditionAfter = md3.ReferenceCode AND md3.ReferenceName = 'AssetCondition'
             LEFT JOIN MasterData md4 ON t.MaintenanceType = md4.ReferenceCode AND md4.ReferenceName = 'MaintenanceType'
-            WHERE t.Approved = 0 AND t.IsActive = 1
+            WHERE t.Approved = 0 AND t.IsActive = 0
             ORDER BY t.TransactionDate DESC";
-        
+
         return await _context.QueryAsync<AssetTransactionListView>(sql);
     }
 
@@ -361,7 +366,7 @@ public class AssetTransactionReps : IAssetTransactionReps
               AND t.ActualReturnDate IS NULL
               AND t.IsActive = 1
             ORDER BY t.ExpectedReturnDate";
-        
+
         return await _context.QueryAsync<AssetTransactionListView>(sql, new { LoanType = TransactionTypeConstants.LOAN });
     }
 
@@ -399,7 +404,7 @@ public class AssetTransactionReps : IAssetTransactionReps
               AND t.ActualReturnDate IS NULL
               AND t.IsActive = 1
             ORDER BY t.ExpectedReturnDate";
-        
+
         return await _context.QueryAsync<AssetTransactionListView>(sql, new { LoanType = TransactionTypeConstants.LOAN });
     }
 
@@ -432,7 +437,7 @@ public class AssetTransactionReps : IAssetTransactionReps
             LEFT JOIN MasterData md4 ON t.MaintenanceType = md4.ReferenceCode AND md4.ReferenceName = 'MaintenanceType'
             WHERE t.TransactionDate BETWEEN @StartDate AND @EndDate AND t.IsActive = 1
             ORDER BY t.TransactionDate DESC";
-        
+
         return await _context.QueryAsync<AssetTransactionListView>(sql, new { StartDate = startDate, EndDate = endDate });
     }
 
@@ -469,7 +474,7 @@ public class AssetTransactionReps : IAssetTransactionReps
               AND t.TransactionType IN (@HandoverType, @TransferType, @LoanType, @MaintenanceType)
               AND t.IsActive = 1
             ORDER BY t.TransactionDate DESC";
-        
+
         var parameters = new
         {
             AssetId = assetId,
@@ -478,7 +483,7 @@ public class AssetTransactionReps : IAssetTransactionReps
             LoanType = TransactionTypeConstants.LOAN,
             MaintenanceType = TransactionTypeConstants.MAINTENANCE
         };
-        
+
         return await _context.QueryFirstOrDefaultAsync<AssetTransactionListView>(sql, parameters);
     }
 
@@ -494,7 +499,7 @@ public class AssetTransactionReps : IAssetTransactionReps
             LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
             LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
             WHERE t.FromAssetTransactionId = @TransactionId AND t.IsActive = 1";
-        
+
         return await _context.QueryFirstOrDefaultAsync<AssetTransactionEntity>(sql, new { TransactionId = transactionId });
     }
 
@@ -643,7 +648,7 @@ public class AssetTransactionReps : IAssetTransactionReps
             LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
             LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
             {whereClause}";
-        
+
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
         var selectClause = BuildTransactionListViewSelectClause();
@@ -692,7 +697,7 @@ public class AssetTransactionReps : IAssetTransactionReps
             LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
             LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
             {whereClause}";
-        
+
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
         var selectClause = BuildTransactionListViewSelectClause();

@@ -95,6 +95,26 @@ public class ReportsService : BaseService, IReportsService
     }
 
     /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<MonthlyStatDto>>> GetMonthlyStatsAsync(int year)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var data = await _repository.GetMonthlyStatsAsync(year);
+            return ServiceResult<IEnumerable<MonthlyStatDto>>.Success(data);
+        }, "get monthly stats");
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<CategoryBreakdownDto>>> GetCategoryBreakdownAsync()
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var data = await _repository.GetCategoryBreakdownAsync();
+            return ServiceResult<IEnumerable<CategoryBreakdownDto>>.Success(data);
+        }, "get category breakdown");
+    }
+
+    /// <inheritdoc />
     public async Task<ServiceResult<byte[]>> GenerateAssetTransactionExcelAsync(
         DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null)
     {
@@ -194,14 +214,14 @@ public class ReportsService : BaseService, IReportsService
 
         // Headers
         AddHeaders(worksheet, 4, typeof(T));
-        
+
         // Data
         AddData(worksheet, data, 5);
 
         if (worksheet.Dimension != null)
         {
             worksheet.Cells[worksheet.Dimension.Address].AutoFitColumns();
-            
+
             var dataRange = worksheet.Cells[worksheet.Dimension.Start.Row, worksheet.Dimension.Start.Column,
                                              worksheet.Dimension.End.Row, worksheet.Dimension.End.Column];
             dataRange.Style.Border.Top.Style = ExcelBorderStyle.Thin;
@@ -291,16 +311,16 @@ public class ReportsService : BaseService, IReportsService
     private string GetSubtitle(DateTime? startDate, DateTime? endDate, string? transactionType = null)
     {
         var parts = new List<string>();
-        if (startDate.HasValue && endDate.HasValue) 
+        if (startDate.HasValue && endDate.HasValue)
             parts.Add($"Period: {startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}");
-        else if (startDate.HasValue) 
+        else if (startDate.HasValue)
             parts.Add($"From: {startDate:yyyy-MM-dd}");
-        else if (endDate.HasValue) 
+        else if (endDate.HasValue)
             parts.Add($"Until: {endDate:yyyy-MM-dd}");
-        
+
         if (!string.IsNullOrEmpty(transactionType))
             parts.Add($"Type: {transactionType}");
-        
+
         return parts.Any() ? string.Join(" | ", parts) : "All Records";
     }
 
@@ -321,7 +341,7 @@ public class ReportsService : BaseService, IReportsService
     private string GetSubtitle(DateTime? startDate, DateTime? endDate, bool? isUpcoming)
     {
         var parts = new List<string>();
-        if (startDate.HasValue && endDate.HasValue) 
+        if (startDate.HasValue && endDate.HasValue)
             parts.Add($"Period: {startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}");
         if (isUpcoming == true) parts.Add("Upcoming Only");
         return parts.Any() ? string.Join(" | ", parts) : "All Maintenance Records";
@@ -329,11 +349,11 @@ public class ReportsService : BaseService, IReportsService
 
     private string GetSubtitle(DateTime? startDate, DateTime? endDate)
     {
-        if (startDate.HasValue && endDate.HasValue) 
+        if (startDate.HasValue && endDate.HasValue)
             return $"Period: {startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}";
-        if (startDate.HasValue) 
+        if (startDate.HasValue)
             return $"From: {startDate:yyyy-MM-dd}";
-        if (endDate.HasValue) 
+        if (endDate.HasValue)
             return $"Until: {endDate:yyyy-MM-dd}";
         return "All Records";
     }

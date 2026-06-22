@@ -37,10 +37,55 @@ const StatCard = ({ icon: Icon, label, value, color, bgColor, onClick, clickable
   </div>
 );
 
+// ============================================================
+// DRILLDOWN COLUMNS - Enhanced dengan informasi lengkap
+// ============================================================
+const drilldownColumns = [
+  { field: "assetCode", headerName: "Asset Code", width: 120 },
+  { field: "assetName", headerName: "Asset Name", flex: 1, minWidth: 180 },
+  { field: "categoryName", headerName: "Category", width: 150 },
+  { field: "officeName", headerName: "Office", width: 150 },
+  { field: "employeeName", headerName: "Employee", width: 150 },
+  { field: "departmentName", headerName: "Department", width: 150 },
+  { 
+    field: "currentStatus", 
+    headerName: "Status", 
+    width: 140, 
+    renderCell: (p) => {
+      const status = p?.value || '-';
+      return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
+    }
+  },
+  { 
+    field: "lastTransactionDate", 
+    headerName: "Last Transaction", 
+    width: 180, 
+    valueFormatter: (p) => p?.value ? utilsHelper.formatDateTime(p.value) : '-' 
+  },
+];
+
+// Transaction columns untuk report
+const transactionColumns = [
+  { field: "assetCode", headerName: "Asset Code", width: 120 },
+  { field: "assetName", headerName: "Asset Name", flex: 1, minWidth: 180 },
+  { field: "transactionTypeName", headerName: "Type", width: 150 },
+  { field: "fromEmployeeName", headerName: "From", width: 150 },
+  { field: "toEmployeeName", headerName: "To", width: 150 },
+  { field: "approved", headerName: "Status", width: 120, renderCell: (p) => { 
+    let status = 'Pending'; 
+    if (p?.value === true) status = 'Approved'; 
+    if (p?.value === false) status = 'Rejected'; 
+    return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
+  } },
+  { field: "transactionDate", headerName: "Date", width: 160, valueFormatter: (p) => p?.value ? utilsHelper.formatDateTime(p.value) : '-' },
+];
+
 const DashboardMenu = () => {
   const [activeTab, setActiveTab] = useState("summary");
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({});
+  const [monthlyStats, setMonthlyStats] = useState([]);
+  const [categoryBreakdown, setCategoryBreakdown] = useState([]);
   const [expiredWarranty, setExpiredWarranty] = useState([]);
   const [upcomingMaintenance, setUpcomingMaintenance] = useState([]);
   const [recentTransactions, setRecentTransactions] = useState({ data: [] });
@@ -58,12 +103,27 @@ const DashboardMenu = () => {
     const result = await dashboardData.fetchDashboardData();
     if (result.success) {
       setStats(result.data.stats);
+      setMonthlyStats(result.data.monthlyStats || []);
+      setCategoryBreakdown(result.data.categoryBreakdown || []);
       setExpiredWarranty(result.data.expiredWarranty || []);
       setUpcomingMaintenance(result.data.upcomingMaintenance || []);
       setRecentTransactions(result.data.recentTransactions || { data: [] });
     }
     setLoading(false);
   };
+
+  // Prepare monthly chart data
+  const monthlyLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthlyDataMap = {};
+  monthlyStats.forEach(item => {
+    monthlyDataMap[item.month - 1] = item.transactionCount;
+  });
+  const monthlyChartData = monthlyLabels.map((_, idx) => monthlyDataMap[idx] || 0);
+
+  // Prepare category breakdown for bar chart
+  const categoryLabels = categoryBreakdown.map(item => item.category || 'Uncategorized');
+  const categoryValues = categoryBreakdown.map(item => item.totalValue);
+  const categoryColors = ['#dc2626', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ef4444', '#6b7280'];
 
   // Chart Data
   const statusLabels = ['Available', 'Assigned', 'On Loan', 'In Maintenance', 'Damaged', 'Retired'];
@@ -76,12 +136,6 @@ const DashboardMenu = () => {
     stats.retiredAssets || 0,
   ];
   const statusBackgroundColors = statusLabels.map(s => ASSET_STATUS_CHART_COLORS[s] || '#6b7280');
-
-  const monthlyLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const monthlyData = stats.monthlyTransactions || [65, 59, 80, 81, 56, 55, 40, 45, 60, 70, 75, 80];
-
-  const categoryLabels = stats.categoryLabels || ['Electronics', 'Furniture', 'Vehicles', 'Office Equipment', 'IT Hardware', 'Others'];
-  const categoryValues = stats.categoryValues || [45000000, 25000000, 180000000, 12000000, 35000000, 8000000];
 
   const doughnutChartData = { 
     labels: statusLabels, 
@@ -129,7 +183,7 @@ const DashboardMenu = () => {
     labels: monthlyLabels, 
     datasets: [{ 
       label: 'Transactions', 
-      data: monthlyData, 
+      data: monthlyChartData, 
       borderColor: '#dc2626', 
       backgroundColor: 'rgba(220, 38, 38, 0.1)', 
       fill: true, 
@@ -160,7 +214,7 @@ const DashboardMenu = () => {
       } 
     }, 
     scales: { 
-      y: { grid: { color: gridColor }, ticks: { color: textColor, stepSize: 20 }, title: { display: true, text: 'Number of Transactions', color: textColor, font: { size: 12 } } }, 
+      y: { grid: { color: gridColor }, ticks: { color: textColor, stepSize: Math.max(1, Math.ceil(Math.max(...monthlyChartData, 10) / 5)) }, title: { display: true, text: 'Number of Transactions', color: textColor, font: { size: 12 } } }, 
       x: { grid: { display: false }, ticks: { color: textColor } } 
     } 
   };
@@ -170,10 +224,10 @@ const DashboardMenu = () => {
     datasets: [{ 
       label: 'Asset Value (IDR)', 
       data: categoryValues, 
-      backgroundColor: 'rgba(220, 38, 38, 0.7)', 
+      backgroundColor: categoryColors.slice(0, categoryLabels.length), 
       borderRadius: 8, 
       barPercentage: 0.7, 
-      categoryPercentage: 0.8, 
+      categoryPercentage: 0.8,
       hoverBackgroundColor: '#dc2626' 
     }] 
   };
@@ -200,18 +254,10 @@ const DashboardMenu = () => {
     } 
   };
 
-  const transactionColumns = [
-    { field: "assetCode", headerName: "Asset Code", width: 120 },
-    { field: "assetName", headerName: "Asset Name", flex: 1, minWidth: 180 },
-    { field: "transactionTypeName", headerName: "Type", width: 150 },
-    { field: "approved", headerName: "Status", width: 120, renderCell: (p) => { 
-      let status = 'Pending'; 
-      if (p?.value === true) status = 'Approved'; 
-      if (p?.value === false) status = 'Rejected'; 
-      return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />; 
-    } },
-    { field: "transactionDate", headerName: "Date", width: 160, valueFormatter: (p) => p?.value ? utilsHelper.formatDateTime(p.value) : '-' },
-  ];
+  // Calculate This Month stats
+  const currentMonth = new Date().getMonth();
+  const thisMonthTransactions = monthlyStats.find(item => item.month === currentMonth + 1);
+  const thisMonthCount = thisMonthTransactions?.transactionCount || 0;
 
   const statCardsConfig = [
     { icon: FiPackage, label: 'Total Assets', value: stats.totalAssets || 0, endpoint: '/Asset/grid', params: {}, color: '#dc2626', bg: 'rgba(220, 38, 38, 0.1)' },
@@ -224,17 +270,25 @@ const DashboardMenu = () => {
     { icon: FiAlertTriangle, label: 'Overdue Loans', value: stats.overdueLoanCount || 0, endpoint: '/AssetTransaction/overdue-loans', params: {}, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
     { icon: FiDollarSign, label: 'Total Value', value: utilsHelper.formatCurrency(stats.totalAssetValue), noDrilldown: true, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
     { icon: FiTrendingUp, label: 'Monthly Avg', value: utilsHelper.formatCurrency((stats.totalAssetValue || 0) / 12), noDrilldown: true, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },
-    { icon: FiBarChart2, label: 'This Month', value: stats.monthlyTotal || 0, endpoint: '/AssetTransaction/grid', params: {}, color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)' },
+    { icon: FiBarChart2, label: 'This Month', value: thisMonthCount, endpoint: '/AssetTransaction/grid', params: {}, color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)' },
   ];
 
   const handleCardClick = (card) => {
     if (card.noDrilldown) return;
+    
+    let columns = null;
+    if (card.label.includes('Transaction') || card.label.includes('Pending') || card.label.includes('Approvals')) {
+      columns = transactionColumns;
+    } else {
+      columns = drilldownColumns;
+    }
+    
     setDrilldown({ 
       isOpen: true, 
       title: `${card.label} Details`, 
       endpoint: card.endpoint, 
       params: card.params, 
-      columns: card.label.includes('Transaction') || card.label.includes('Pending') ? transactionColumns : null 
+      columns: columns 
     });
   };
 
@@ -320,7 +374,7 @@ const DashboardMenu = () => {
               <div className="dashboard__chart-insight">
                 <Typography variant="caption" color="text.secondary">
                   <FiTrendingUp size={14} style={{ marginRight: 4 }} />
-                  {monthlyData[monthlyData.length - 1] > monthlyData[monthlyData.length - 2] 
+                  {monthlyChartData.length > 1 && monthlyChartData[monthlyChartData.length - 1] > monthlyChartData[monthlyChartData.length - 2] 
                     ? '↑ Increasing trend compared to last month' 
                     : '↓ Decreasing trend compared to last month'}
                 </Typography>

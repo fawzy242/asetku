@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { Grid, Chip, Box } from "@mui/material";
+import { Grid, Chip, Box, Typography } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
 import AssetTransactionsData from "./AssetTransactions.data";
 import GridView from "../../components/organisms/GridView/GridView";
@@ -15,7 +15,7 @@ import ImportModal from "../../components/molecules/ImportModal/ImportModal";
 import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
 import Modal from "../../components/molecules/Modal/Modal";
 import Button from "../../components/atoms/Button/Button";
-import { FiUpload, FiCheckSquare, FiRotateCcw, FiTool } from "react-icons/fi";
+import { FiUpload, FiCheckSquare, FiRotateCcw, FiTool, FiList, FiPlus } from "react-icons/fi";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
 import { 
   TRANSACTION_TYPE_OPTIONS, 
@@ -25,7 +25,11 @@ import {
   TRANSACTION_TYPES_REQUIRING_FROM_EMPLOYEE, 
   TRANSACTION_TYPES, 
   getTransactionTypeName, 
-  TRANSACTION_TYPES_RETURNABLE 
+  TRANSACTION_TYPES_RETURNABLE,
+  TRANSACTION_TYPES_PRIMARY,
+  TRANSACTION_TYPES_SECONDARY,
+  isPrimaryTransactionType,
+  isSecondaryTransactionType
 } from "../../core/constants/transactionTypes";
 import { ACTION_TYPES, useGridActions } from "../../hooks/useGridActions";
 import { useBulkSelection } from "../../hooks/useBulkSelection";
@@ -89,6 +93,7 @@ const AssetTransactionsMenu = () => {
   });
   const [pairedTransactionOptions, setPairedTransactionOptions] = useState([]);
   const [loadingPairedOptions, setLoadingPairedOptions] = useState(false);
+  const [viewMode, setViewMode] = useState("primary"); // "primary" or "secondary"
   const isMountedRef = useRef(true);
   const queryClient = useQueryClient();
   const { toast, confirm, confirmDelete } = useSweetAlert();
@@ -398,6 +403,17 @@ const AssetTransactionsMenu = () => {
     await transactionsData.downloadTemplate();
   }, []);
 
+  // Filter data based on view mode (primary vs secondary)
+  const filteredData = useMemo(() => {
+    if (!transactions || transactions.length === 0) return [];
+    
+    if (viewMode === "primary") {
+      return transactions.filter(t => isPrimaryTransactionType(t.transactionType));
+    } else {
+      return transactions.filter(t => isSecondaryTransactionType(t.transactionType));
+    }
+  }, [transactions, viewMode]);
+
   const handleGridAction = useCallback((actionType, row) => {
     switch (actionType) {
       case ACTION_TYPES.EDIT:
@@ -426,27 +442,40 @@ const AssetTransactionsMenu = () => {
   const getConditionalActions = useCallback((row) => {
     const isPending = row.approved === null;
     const isApproved = row.approved === true;
+    const isRejected = row.approved === false;
+    const isPrimary = isPrimaryTransactionType(row.transactionType);
     const canReturn = isApproved && !row.actualReturnDate && !row.fromAssetTransactionId && 
                       TRANSACTION_TYPES_RETURNABLE.includes(row.transactionType);
     const canPostMaintenance = isApproved && !row.fromAssetTransactionId && 
                                row.transactionType === TRANSACTION_TYPES.MAINTENANCE;
     
-    const actions = [ACTION_TYPES.EDIT];
+    const actions = [];
     
-    if (isPending) {
-      actions.unshift(ACTION_TYPES.APPROVE);
-      actions.unshift(ACTION_TYPES.REJECT);
+    // Only primary transactions can be edited
+    if (isPrimary && isPending) {
+      actions.push(ACTION_TYPES.EDIT);
     }
     
-    if (canReturn) {
+    // Approve/Reject only for pending transactions
+    if (isPending) {
+      actions.push(ACTION_TYPES.APPROVE);
+      actions.push(ACTION_TYPES.REJECT);
+    }
+    
+    // Return only for approved primary transactions (HANDOVER, LOAN, MAINTENANCE)
+    if (isPrimary && canReturn) {
       actions.push(ACTION_TYPES.RETURN);
     }
     
-    if (canPostMaintenance) {
+    // Post-Maintenance only for approved MAINTENANCE
+    if (isPrimary && canPostMaintenance) {
       actions.push(ACTION_TYPES.POST_MAINTENANCE);
     }
     
-    actions.push(ACTION_TYPES.DELETE);
+    // Cancel only for pending transactions
+    if (isPending) {
+      actions.push(ACTION_TYPES.DELETE);
+    }
     
     return actions;
   }, []);
@@ -522,8 +551,27 @@ const AssetTransactionsMenu = () => {
     return [...dataColumns, actionColumn];
   }, [actionColumn]);
 
+  // View mode toggle for grid
+  const viewToggle = (
+    <div className="transactions-menu__view-toggle">
+      <button 
+        className={`transactions-menu__view-btn ${viewMode === 'primary' ? 'transactions-menu__view-btn--active' : ''}`}
+        onClick={() => setViewMode('primary')}
+      >
+        <FiList size={14} /> Primary
+      </button>
+      <button 
+        className={`transactions-menu__view-btn ${viewMode === 'secondary' ? 'transactions-menu__view-btn--active' : ''}`}
+        onClick={() => setViewMode('secondary')}
+      >
+        <FiRotateCcw size={14} /> Returns & Post
+      </button>
+    </div>
+  );
+
   const extraActions = (
     <>
+      {viewToggle}
       <button className="btn btn--outline btn--sm" onClick={() => setShowImportModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
         <FiUpload size={16} /> Import
       </button>
@@ -631,7 +679,7 @@ const AssetTransactionsMenu = () => {
         onTabChange={handleTabChange}
         onCreate={handleCreate}
         columns={columns}
-        data={transactions}
+        data={filteredData}
         loading={loading}
         totalCount={totalCount}
         page={page}
@@ -809,7 +857,7 @@ const AssetTransactionsMenu = () => {
         isOpen={showBulkActivateModal}
         onClose={() => setShowBulkActivateModal(false)}
         onConfirm={(ids) => handleBulkAction(ids, bulkAction)}
-        selectedIds={getSelectedIds(transactions)}
+        selectedIds={getSelectedIds(filteredData)}
         itemName="transactions"
         title={bulkTitle}
         description={bulkDescription}

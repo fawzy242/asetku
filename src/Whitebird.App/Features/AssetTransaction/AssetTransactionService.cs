@@ -158,6 +158,16 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     /// <inheritdoc />
     public async Task<ServiceResult<AssetTransactionDetailView>> CreateAsync(AssetTransactionCreateViewModel model)
     {
+        // IMPORTANT: RETURN, LOAN_RETURN, and POST_MAINTENANCE cannot be created manually
+        // They must be created via shortcuts (CreateReturnTransactionAsync, CreatePostMaintenanceTransactionAsync)
+        if (model.TransactionType == TransactionTypeConstants.RETURN ||
+            model.TransactionType == TransactionTypeConstants.LOAN_RETURN ||
+            model.TransactionType == TransactionTypeConstants.POST_MAINTENANCE)
+        {
+            return ServiceResult<AssetTransactionDetailView>.BadRequest(
+                $"{GetTransactionTypeName(model.TransactionType)} transactions cannot be created manually. Please use the appropriate shortcut action.");
+        }
+
         var asset = await _assetReps.GetByIdRawAsync(model.AssetId);
         if (asset == null)
         {
@@ -188,7 +198,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             var id = await _repository.InsertAsync(entity);
 
             if (entity.FromAssetTransactionId.HasValue &&
-                (entity.TransactionType == TransactionTypeConstants.LOAN_RETURN || 
+                (entity.TransactionType == TransactionTypeConstants.LOAN_RETURN ||
                  entity.TransactionType == TransactionTypeConstants.POST_MAINTENANCE))
             {
                 var pairedTxn = await _transactionReps.GetByIdRawAsync(entity.FromAssetTransactionId.Value);
@@ -475,23 +485,17 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         }, "get available paired transactions");
     }
 
-    // ============================================================
-    // NEW: SHORTCUT METHODS
-    // ============================================================
-
     /// <inheritdoc />
     public async Task<ServiceResult<AssetTransactionDetailView>> CreateReturnTransactionAsync(int sourceTransactionId, AssetReturnViewModel model)
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
-            // Get source transaction
             var sourceTransaction = await _transactionReps.GetByIdRawAsync(sourceTransactionId);
             if (sourceTransaction == null)
             {
                 return ServiceResult<AssetTransactionDetailView>.NotFound($"Source transaction with id {sourceTransactionId} not found");
             }
 
-            // Validate source transaction type (only HANDOVER, LOAN, MAINTENANCE can be returned)
             if (sourceTransaction.TransactionType != TransactionTypeConstants.HANDOVER &&
                 sourceTransaction.TransactionType != TransactionTypeConstants.LOAN &&
                 sourceTransaction.TransactionType != TransactionTypeConstants.MAINTENANCE)
@@ -500,13 +504,11 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                     $"Transaction type '{sourceTransaction.TransactionType}' cannot be returned. Only HANDOVER, LOAN, and MAINTENANCE can be returned.");
             }
 
-            // Check if already returned
             if (sourceTransaction.ActualReturnDate.HasValue)
             {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("Asset already returned");
             }
 
-            // Check if transaction is approved
             if (sourceTransaction.Approved != true)
             {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("Cannot return unapproved transaction");
@@ -518,7 +520,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult<AssetTransactionDetailView>.NotFound($"Asset with id {sourceTransaction.AssetId} not found");
             }
 
-            // Create RETURN transaction
             var returnTransaction = new AssetTransactionEntity
             {
                 AssetId = sourceTransaction.AssetId,
@@ -529,7 +530,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 Notes = model.Notes,
                 ConditionBefore = sourceTransaction.ConditionAfter,
                 ConditionAfter = model.ConditionAfter,
-                Approved = null, // Pending approval
+                Approved = null,
                 IsActive = true,
                 CreatedDate = DateTime.Now,
                 CreatedBy = _currentUserService.GetDisplayName(),
@@ -538,7 +539,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
             var id = await _repository.InsertAsync(returnTransaction);
 
-            // Update source transaction with return date
             sourceTransaction.ActualReturnDate = model.ActualReturnDate;
             sourceTransaction.ModifiedDate = DateTime.Now;
             sourceTransaction.ModifiedBy = _currentUserService.GetDisplayName();
@@ -569,21 +569,18 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
-            // Get source transaction
             var sourceTransaction = await _transactionReps.GetByIdRawAsync(sourceTransactionId);
             if (sourceTransaction == null)
             {
                 return ServiceResult<AssetTransactionDetailView>.NotFound($"Source transaction with id {sourceTransactionId} not found");
             }
 
-            // Validate source transaction type (only MAINTENANCE)
             if (sourceTransaction.TransactionType != TransactionTypeConstants.MAINTENANCE)
             {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest(
                     $"Transaction type '{sourceTransaction.TransactionType}' cannot create POST_MAINTENANCE. Only MAINTENANCE can.");
             }
 
-            // Check if already has paired transaction
             if (sourceTransaction.FromAssetTransactionId != null)
             {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("Maintenance transaction already has a paired POST_MAINTENANCE");
@@ -595,7 +592,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult<AssetTransactionDetailView>.NotFound($"Asset with id {sourceTransaction.AssetId} not found");
             }
 
-            // Create POST_MAINTENANCE transaction
             var postMaintenanceTransaction = new AssetTransactionEntity
             {
                 AssetId = sourceTransaction.AssetId,
@@ -604,7 +600,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 TransactionDate = model.CompletionDate,
                 ConditionAfter = model.ConditionAfter,
                 Notes = model.Notes,
-                Approved = null, // Pending approval
+                Approved = null,
                 IsActive = true,
                 CreatedDate = DateTime.Now,
                 CreatedBy = _currentUserService.GetDisplayName()
@@ -612,7 +608,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
             var id = await _repository.InsertAsync(postMaintenanceTransaction);
 
-            // Update source transaction with pairing
             sourceTransaction.FromAssetTransactionId = Convert.ToInt32(id);
             sourceTransaction.ModifiedDate = DateTime.Now;
             sourceTransaction.ModifiedBy = _currentUserService.GetDisplayName();
@@ -637,8 +632,24 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             await _activityLogService.LogErrorAsync(TableNames.AssetTransaction, 0, "Create Post-Maintenance Transaction", ex, _currentUserService.GetDisplayName());
         });
     }
-    
+
     #region Private Helpers
+
+    private string GetTransactionTypeName(int transactionType)
+    {
+        return transactionType switch
+        {
+            TransactionTypeConstants.HANDOVER => "HANDOVER",
+            TransactionTypeConstants.TRANSFER => "TRANSFER",
+            TransactionTypeConstants.LOAN => "LOAN",
+            TransactionTypeConstants.RETURN => "RETURN",
+            TransactionTypeConstants.LOAN_RETURN => "LOAN_RETURN",
+            TransactionTypeConstants.MAINTENANCE => "MAINTENANCE",
+            TransactionTypeConstants.POST_MAINTENANCE => "POST_MAINTENANCE",
+            TransactionTypeConstants.DISPOSAL => "DISPOSAL",
+            _ => "UNKNOWN"
+        };
+    }
 
     private async Task<ServiceResult<AssetTransactionDetailView>?> ValidateTransactionRulesAsync(AssetTransactionCreateViewModel model, AssetEntity asset)
     {
@@ -702,95 +713,12 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             }
         }
 
-        if (type == TransactionTypeConstants.RETURN)
-        {
-            if (!model.FromEmployeeId.HasValue)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest("RETURN requires FromEmployeeId");
-            }
-
-            var activeTransaction = await _transactionReps.GetActiveTransactionByAssetIdAsync(asset.AssetId);
-            if (activeTransaction == null || activeTransaction.ToEmployeeId != model.FromEmployeeId)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest($"Asset '{asset.AssetCode}' is not currently held by employee {model.FromEmployeeId}");
-            }
-
-            if (activeTransaction.TransactionType != TransactionTypeConstants.HANDOVER && 
-                activeTransaction.TransactionType != TransactionTypeConstants.TRANSFER)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest($"Asset '{asset.AssetCode}' is not in assigned state");
-            }
-        }
-
-        if (type == TransactionTypeConstants.LOAN_RETURN)
-        {
-            if (!model.FromAssetTransactionId.HasValue)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest("LOAN_RETURN requires FromAssetTransactionId");
-            }
-
-            var pairedTransaction = await _transactionReps.GetByIdRawAsync(model.FromAssetTransactionId.Value);
-            if (pairedTransaction == null)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest($"Paired transaction with id {model.FromAssetTransactionId} not found");
-            }
-
-            if (pairedTransaction.AssetId != model.AssetId)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest("Paired transaction must be for the same asset");
-            }
-
-            if (pairedTransaction.TransactionType != TransactionTypeConstants.LOAN)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest($"Cannot pair LOAN_RETURN with transaction type {pairedTransaction.TransactionType}");
-            }
-
-            if (pairedTransaction.FromAssetTransactionId != null)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest("Loan transaction is already closed");
-            }
-        }
-
         if (type == TransactionTypeConstants.MAINTENANCE)
         {
             var activeTransaction = await _transactionReps.GetActiveTransactionByAssetIdAsync(asset.AssetId);
             if (activeTransaction != null && activeTransaction.TransactionType == TransactionTypeConstants.MAINTENANCE)
             {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest($"Asset '{asset.AssetCode}' is already in maintenance");
-            }
-        }
-
-        if (type == TransactionTypeConstants.POST_MAINTENANCE)
-        {
-            if (!model.FromAssetTransactionId.HasValue)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest("POST_MAINTENANCE requires FromAssetTransactionId");
-            }
-
-            var pairedTransaction = await _transactionReps.GetByIdRawAsync(model.FromAssetTransactionId.Value);
-            if (pairedTransaction == null)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest($"Paired transaction with id {model.FromAssetTransactionId} not found");
-            }
-
-            if (pairedTransaction.AssetId != model.AssetId)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest("Paired transaction must be for the same asset");
-            }
-
-            if (pairedTransaction.TransactionType != TransactionTypeConstants.MAINTENANCE)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest($"Cannot pair POST_MAINTENANCE with transaction type {pairedTransaction.TransactionType}");
-            }
-
-            if (pairedTransaction.FromAssetTransactionId != null)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest("Maintenance transaction is already closed");
-            }
-
-            if (!model.ConditionAfter.HasValue)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest("POST_MAINTENANCE requires ConditionAfter");
             }
         }
 

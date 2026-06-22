@@ -13,7 +13,6 @@ export const ASSET_STATUSES = {
   ASSIGNED: 'Assigned',
   ON_LOAN: 'On Loan',
   IN_MAINTENANCE: 'In Maintenance',
-  UNDER_REPAIR: 'Under Repair',
   DAMAGED: 'Damaged',
   RETIRED: 'Retired',
   DISPOSED: 'Disposed',
@@ -28,7 +27,6 @@ export const ASSET_STATUS_OPTIONS = [
   { value: ASSET_STATUSES.ASSIGNED, label: 'Assigned' },
   { value: ASSET_STATUSES.ON_LOAN, label: 'On Loan' },
   { value: ASSET_STATUSES.IN_MAINTENANCE, label: 'In Maintenance' },
-  { value: ASSET_STATUSES.UNDER_REPAIR, label: 'Under Repair' },
   { value: ASSET_STATUSES.DAMAGED, label: 'Damaged' },
   { value: ASSET_STATUSES.RETIRED, label: 'Retired' },
   { value: ASSET_STATUSES.DISPOSED, label: 'Disposed' },
@@ -43,7 +41,8 @@ export const ASSET_STATUS_FILTER_OPTIONS = [
 ];
 
 /**
- * UPDATED: Asset status tabs untuk navigation (Inactive diganti Damaged)
+ * UPDATED: Asset status tabs untuk navigation
+ * REMOVED: Under Repair (not in backend)
  */
 export const ASSET_STATUS_TABS = [
   { id: 'all', label: 'All Assets' },
@@ -51,8 +50,7 @@ export const ASSET_STATUS_TABS = [
   { id: 'Assigned', label: 'Assigned' },
   { id: 'On Loan', label: 'On Loan' },
   { id: 'In Maintenance', label: 'In Maintenance' },
-  { id: 'Under Repair', label: 'Under Repair' },
-  { id: 'Damaged', label: 'Damaged' },  // Changed from Inactive to Damaged
+  { id: 'Damaged', label: 'Damaged' },
 ];
 
 /**
@@ -80,7 +78,7 @@ export const TRANSACTION_STATUS_FILTER_OPTIONS = [
 ];
 
 /**
- * UPDATED: Transaction tabs tanpa pending/approved dihapus approve button di action column
+ * UPDATED: Transaction tabs
  */
 export const TRANSACTION_TABS = [
   { id: 'pending', label: 'Pending' },
@@ -98,7 +96,6 @@ export const ASSET_STATUS_CHART_COLORS = {
   'Assigned': '#3b82f6',
   'On Loan': '#8b5cf6',
   'In Maintenance': '#f59e0b',
-  'Under Repair': '#d97706',
   'Damaged': '#ef4444',
   'Retired': '#6b7280',
   'Disposed': '#4b5563',

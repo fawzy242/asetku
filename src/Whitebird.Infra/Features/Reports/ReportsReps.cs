@@ -78,7 +78,6 @@ public class ReportsReps : IReportsReps
         var conditions = new List<string>();
         var parameters = new DynamicParameters();
 
-        // Status filter: Available, Assigned, Damaged
         if (!string.IsNullOrEmpty(status))
         {
             if (status == "Available")
@@ -208,14 +207,13 @@ public class ReportsReps : IReportsReps
     public async Task<IEnumerable<ReportsEmployeeAssetViewModel>> GetEmployeeAssetReportsAsync(
         int? employeeId = null)
     {
-        var conditions = new List<string> { 
-            "e.IsActive = 1", 
-            "at.Approved = 1", 
-            "at.FromAssetTransactionId IS NULL" 
+        var conditions = new List<string> {
+            "e.IsActive = 1",
+            "at.Approved = 1",
+            "at.FromAssetTransactionId IS NULL"
         };
         var parameters = new DynamicParameters();
 
-        // ONLY employeeId parameter, NO department filter
         if (employeeId.HasValue)
         {
             conditions.Add("e.EmployeeId = @EmployeeId");
@@ -462,6 +460,43 @@ public class ReportsReps : IReportsReps
     {
         const string sql = "SELECT COUNT(*) FROM Department WHERE IsActive = 1";
         return await _context.ExecuteScalarAsync<int>(sql);
+    }
+
+    // ============================================================
+    // NEW: MONTHLY STATS
+    // ============================================================
+
+    public async Task<IEnumerable<MonthlyStatDto>> GetMonthlyStatsAsync(int year)
+    {
+        const string sql = @"
+            SELECT 
+                MONTH(TransactionDate) as Month,
+                COUNT(*) as TransactionCount,
+                COUNT(DISTINCT AssetId) as UniqueAssetsCount
+            FROM AssetTransaction
+            WHERE YEAR(TransactionDate) = @Year
+              AND IsActive = 1
+            GROUP BY MONTH(TransactionDate)
+            ORDER BY Month";
+
+        var result = await _context.QueryAsync<MonthlyStatDto>(sql, new { Year = year });
+        return result;
+    }
+
+    public async Task<IEnumerable<CategoryBreakdownDto>> GetCategoryBreakdownAsync()
+    {
+        const string sql = @"
+            SELECT 
+                c.CategoryName as Category,
+                COUNT(a.AssetId) as AssetCount,
+                ISNULL(SUM(a.PurchasePrice), 0) as TotalValue
+            FROM Category c
+            LEFT JOIN Asset a ON c.CategoryId = a.CategoryId AND a.IsActive = 1
+            WHERE c.IsActive = 1
+            GROUP BY c.CategoryName
+            ORDER BY AssetCount DESC";
+
+        return await _context.QueryAsync<CategoryBreakdownDto>(sql);
     }
 
     // ============================================================

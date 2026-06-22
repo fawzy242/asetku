@@ -51,6 +51,16 @@ public interface IReportsService
     /// </summary>
     Task<ServiceResult<DashboardStatsViewModel>> GetDashboardStatsAsync();
 
+    /// <summary>
+    /// Gets monthly statistics for dashboard chart
+    /// </summary>
+    Task<ServiceResult<IEnumerable<MonthlyStatDto>>> GetMonthlyStatsAsync(int year);
+
+    /// <summary>
+    /// Gets category breakdown for dashboard chart
+    /// </summary>
+    Task<ServiceResult<IEnumerable<CategoryBreakdownDto>>> GetCategoryBreakdownAsync();
+
     // ============================================================
     // EXCEL EXPORTS
     // ============================================================

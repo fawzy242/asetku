@@ -21,7 +21,7 @@ export const TRANSACTION_TYPES = {
 
 /**
  * UPDATED: Transaction type options untuk dropdown/select.
- * REMOVED: RETURN and LOAN_RETURN (these are created via shortcuts only)
+ * REMOVED: RETURN, LOAN_RETURN, and POST_MAINTENANCE (only via shortcuts)
  */
 export const TRANSACTION_TYPE_OPTIONS = [
   { value: "", label: "Select Type" },
@@ -93,6 +93,26 @@ export const TRANSACTION_TYPES_RETURNABLE = [
 ];
 
 /**
+ * Transaction types that are primary (Grid 1)
+ */
+export const TRANSACTION_TYPES_PRIMARY = [
+  TRANSACTION_TYPES.HANDOVER,
+  TRANSACTION_TYPES.TRANSFER,
+  TRANSACTION_TYPES.LOAN,
+  TRANSACTION_TYPES.MAINTENANCE,
+  TRANSACTION_TYPES.DISPOSAL,
+];
+
+/**
+ * Transaction types that are secondary (Grid 2 - from shortcuts)
+ */
+export const TRANSACTION_TYPES_SECONDARY = [
+  TRANSACTION_TYPES.RETURN,
+  TRANSACTION_TYPES.LOAN_RETURN,
+  TRANSACTION_TYPES.POST_MAINTENANCE,
+];
+
+/**
  * Helper: Get transaction type name from code
  */
 export const getTransactionTypeName = (code) => {
@@ -105,6 +125,20 @@ export const getTransactionTypeName = (code) => {
  */
 export const getTransactionTypeCode = (name) => {
   return TRANSACTION_TYPES[name] || null;
+};
+
+/**
+ * Helper: Check if transaction type is primary
+ */
+export const isPrimaryTransactionType = (code) => {
+  return TRANSACTION_TYPES_PRIMARY.includes(code);
+};
+
+/**
+ * Helper: Check if transaction type is secondary
+ */
+export const isSecondaryTransactionType = (code) => {
+  return TRANSACTION_TYPES_SECONDARY.includes(code);
 };
 
 export default TRANSACTION_TYPES;

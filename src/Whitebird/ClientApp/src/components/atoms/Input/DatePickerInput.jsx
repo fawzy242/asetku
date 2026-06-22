@@ -17,6 +17,7 @@ const DatePickerInput = memo(({
   ...rest 
 }) => {
   const dayjsValue = value ? dayjs(value) : null;
+  const hasValue = value !== null && value !== undefined && value !== '';
 
   const handleChange = (newValue) => {
     if (onChange) {
@@ -43,14 +44,16 @@ const DatePickerInput = memo(({
             fullWidth: true,
             size: 'small',
             variant: 'outlined',
+            // FIX: Always set shrink to true when value exists
+            // This fixes the autofill issue where label doesn't float up
+            InputLabelProps: {
+              shrink: hasValue || true,
+            },
             sx: {
               '& .MuiOutlinedInput-root': {
                 borderRadius: '8px',
               },
               ...sx,
-            },
-            InputLabelProps: {
-              shrink: true,
             },
           },
         }}

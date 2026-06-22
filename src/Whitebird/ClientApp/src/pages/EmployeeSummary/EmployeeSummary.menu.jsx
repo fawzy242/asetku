@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { FiSearch, FiUser, FiBox, FiDollarSign, FiCalendar, FiMail, FiPhone, FiBriefcase, FiRefreshCw, FiAlertTriangle, FiLayers, FiCheckCircle, FiClock } from "react-icons/fi";
+import { FiSearch, FiUser, FiBox, FiDollarSign, FiCalendar, FiMail, FiPhone, FiBriefcase, FiRefreshCw, FiAlertTriangle, FiLayers, FiCheckCircle, FiClock, FiTool } from "react-icons/fi";
 import { Grid, Box, Typography, Avatar, Chip, Paper, IconButton, Tooltip } from "@mui/material";
 import { useLocation } from "react-router-dom";
 import EmployeeSummaryData from "./EmployeeSummary.data";
@@ -131,6 +131,7 @@ const EmployeeSummaryMenu = () => {
         setAssetSummary({
           currentlyHeldAssets: 0,
           assetsOnLoan: 0,
+          maintenanceAssets: 0,
           overdueLoans: 0,
           totalHistoricalAssets: 0,
           returnedAssets: 0,
@@ -143,7 +144,6 @@ const EmployeeSummaryMenu = () => {
     }
   }, []);
 
-  // Refresh function untuk reload data employee yang dipilih
   const handleRefresh = useCallback(async () => {
     if (!selectedEmployeeId) return;
     setLoadingData(true);
@@ -179,6 +179,11 @@ const EmployeeSummaryMenu = () => {
     (sum, a) => sum + (a.purchasePrice || 0), 0
   );
 
+  // Calculate maintenance assets from current assets with status "In Maintenance"
+  const maintenanceAssets = (assetSummary?.currentAssets || []).filter(
+    a => a.status === 'In Maintenance' || a.associationType === 'Maintenance'
+  ).length;
+
   const employeeOptions = useMemo(() => [
     { value: "", label: "Choose an employee..." },
     ...employees.map(e => ({ value: e.employeeId, label: `${e.employeeCode} - ${e.fullName}` }))
@@ -207,7 +212,7 @@ const EmployeeSummaryMenu = () => {
       </div>
       
       <Grid container spacing={3}>
-        {/* Employee Selection Card - dengan refresh button */}
+        {/* Employee Selection Card */}
         <Grid item xs={12}>
           <Card className="employee-summary__selection-card">
             <div className="employee-summary__selection-content">
@@ -283,7 +288,7 @@ const EmployeeSummaryMenu = () => {
               </Card>
             </Grid>
 
-            {/* Statistics Cards Row */}
+            {/* Statistics Cards Row - ADDED Maintenance Assets */}
             <Grid item xs={12}>
               <Grid container spacing={2}>
                 <Grid item xs={6} sm={4} md={2}>
@@ -298,6 +303,13 @@ const EmployeeSummaryMenu = () => {
                     <FiLayers size={28} className="employee-summary__stat-icon" style={{ color: '#8b5cf6' }} />
                     <Typography variant="h4" fontWeight={700}>{assetSummary?.assetsOnLoan || 0}</Typography>
                     <Typography variant="caption" color="text.secondary">On Loan</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={4} md={2}>
+                  <Paper elevation={0} className="employee-summary__stat-card">
+                    <FiTool size={28} className="employee-summary__stat-icon" style={{ color: '#f59e0b' }} />
+                    <Typography variant="h4" fontWeight={700}>{assetSummary?.maintenanceAssets || maintenanceAssets}</Typography>
+                    <Typography variant="caption" color="text.secondary">In Maintenance</Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={2}>
@@ -321,13 +333,6 @@ const EmployeeSummaryMenu = () => {
                     <FiAlertTriangle size={28} className="employee-summary__stat-icon" style={{ color: '#ef4444' }} />
                     <Typography variant="h4" fontWeight={700}>{assetSummary?.damagedReturns || 0}</Typography>
                     <Typography variant="caption" color="text.secondary">Damaged</Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} sm={4} md={2}>
-                  <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiClock size={28} className="employee-summary__stat-icon" style={{ color: '#f59e0b' }} />
-                    <Typography variant="h4" fontWeight={700}>{assetSummary?.overdueLoans || 0}</Typography>
-                    <Typography variant="caption" color="text.secondary">Overdue</Typography>
                   </Paper>
                 </Grid>
               </Grid>

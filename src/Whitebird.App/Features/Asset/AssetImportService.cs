@@ -243,6 +243,13 @@ public class AssetImportService : ImportServiceBase<AssetImportDto, AssetEntity>
         if (result.Errors.Any(e => e.RowNumber == rowNumber))
             return null;
 
+        // Operational Office Rule: If OperasionalOffice = true, OfficeId is required
+        if (dto.OperasionalOffice == true && !officeId.HasValue)
+        {
+            result.AddError(rowNumber, "OfficeName", "Office is required when Operational Office is enabled");
+            return null;
+        }
+
         return new AssetEntity
         {
             AssetCode = dto.AssetCode,
@@ -287,65 +294,4 @@ public class AssetImportService : ImportServiceBase<AssetImportDto, AssetEntity>
     }
 
     protected override string GetEntityIdentifier(AssetEntity entity) => entity.AssetCode;
-
-    public async Task<ServiceResult<ImportResult>> ImportFromTxtAsync(Stream fileStream, string? createdBy = null, char delimiter = '\t')
-    {
-        return await ExecuteWithTransactionAsync(async () =>
-        {
-            var dataTable = await ExcelHelper.ReadTxtToDataTableAsync(fileStream, delimiter, true);
-            var result = new ImportResult();
-            var entitiesToInsert = new List<AssetEntity>();
-            var createdByUser = createdBy ?? _currentUserService.GetDisplayName();
-            var cache = new Dictionary<string, object>();
-
-            await InitializeCachesAsync(cache);
-            result.TotalRows = dataTable.Rows.Count;
-
-            for (int i = 0; i < dataTable.Rows.Count; i++)
-            {
-                var row = dataTable.Rows[i];
-                var rowNumber = i + 2;
-
-                try
-                {
-                    var entity = await ProcessRowAsync(row, rowNumber, result, cache, createdByUser);
-                    
-                    if (entity == null || result.Errors.Any(e => e.RowNumber == rowNumber))
-                        continue;
-
-                    var isUnique = await IsEntityUniqueAsync(entity, result, rowNumber);
-                    if (!isUnique)
-                        continue;
-
-                    entitiesToInsert.Add(entity);
-                    result.SuccessCount++;
-                }
-                catch (Exception ex)
-                {
-                    result.AddError(rowNumber, "General", $"Error processing row: {ex.Message}");
-                    _logger.LogError(ex, "Error processing asset import row {RowNumber}", rowNumber);
-                }
-            }
-
-            if (entitiesToInsert.Any())
-            {
-                await _repository.BulkInsertAsync(entitiesToInsert);
-
-                foreach (var asset in entitiesToInsert)
-                {
-                    await _activityLogService.LogCreateAsync(
-                        TableNames.Asset,
-                        asset.AssetId,
-                        $"Asset '{asset.AssetCode}' imported successfully",
-                        createdByUser);
-                }
-            }
-
-            return ServiceResult<ImportResult>.Success(result,
-                $"Import completed: {result.SuccessCount} successful, {result.ErrorCount} errors");
-        }, "import assets from txt", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Asset, 0, "Import Assets from TXT", ex, _currentUserService.GetDisplayName());
-        });
-    }
 }

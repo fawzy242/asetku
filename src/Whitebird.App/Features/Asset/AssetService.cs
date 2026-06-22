@@ -95,7 +95,7 @@ public class AssetService : BaseService, IAssetService
             {
                 return ServiceResult<IEnumerable<AssetListView>>.NotFound($"Category with id {categoryId} not found");
             }
-            
+
             var assets = await _assetReps.GetByCategoryListViewAsync(categoryId);
             return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
         }, "get assets by category");
@@ -111,7 +111,7 @@ public class AssetService : BaseService, IAssetService
             {
                 return ServiceResult<IEnumerable<AssetListView>>.NotFound($"Office with id {officeId} not found");
             }
-            
+
             var assets = await _assetReps.GetByOfficeListViewAsync(officeId);
             return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
         }, "get assets by office");
@@ -133,6 +133,12 @@ public class AssetService : BaseService, IAssetService
         if (model.CategoryId <= 0)
         {
             return ServiceResult<AssetDetailView>.BadRequest("Valid category is required");
+        }
+
+        // Operational Office Rule: If OperasionalOffice = true, OfficeId is required
+        if (model.OperasionalOffice == true && !model.OfficeId.HasValue)
+        {
+            return ServiceResult<AssetDetailView>.BadRequest("Office is required when Operational Office is enabled");
         }
 
         var codeExists = await _assetReps.IsAssetCodeExistsAsync(model.AssetCode);
@@ -196,6 +202,12 @@ public class AssetService : BaseService, IAssetService
     /// <inheritdoc />
     public async Task<ServiceResult<AssetDetailView>> UpdateAsync(int id, AssetUpdateViewModel model)
     {
+        // Operational Office Rule: If OperasionalOffice = true, OfficeId is required
+        if (model.OperasionalOffice == true && !model.OfficeId.HasValue)
+        {
+            return ServiceResult<AssetDetailView>.BadRequest("Office is required when Operational Office is enabled");
+        }
+
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _assetReps.GetByIdRawAsync(id);
@@ -587,10 +599,7 @@ public class AssetService : BaseService, IAssetService
         }, "get asset dropdown list");
     }
 
-        // ============================================================
-    // NEW: AVAILABLE ASSETS FOR TRANSACTION
-    // ============================================================
-
+    /// <inheritdoc />
     public async Task<ServiceResult<IEnumerable<AssetDropdownView>>> GetAvailableAssetsForTransactionAsync()
     {
         return await ExecuteSafelyAsync(async () =>
@@ -599,7 +608,8 @@ public class AssetService : BaseService, IAssetService
             return ServiceResult<IEnumerable<AssetDropdownView>>.Success(assets);
         }, "get available assets for transaction");
     }
-    
+
+    /// <inheritdoc />
     public async Task<ServiceResult<bool>> IsAssetAvailableForTransactionAsync(int assetId)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -608,11 +618,8 @@ public class AssetService : BaseService, IAssetService
             return ServiceResult<bool>.Success(isAvailable);
         }, "check asset availability");
     }
-    
-    // ============================================================
-    // NEW: ASSET STATUS LISTS
-    // ============================================================
 
+    /// <inheritdoc />
     public async Task<ServiceResult<IEnumerable<AssetListView>>> GetDamagedAssetsAsync()
     {
         return await ExecuteSafelyAsync(async () =>
@@ -621,7 +628,8 @@ public class AssetService : BaseService, IAssetService
             return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
         }, "get damaged assets");
     }
-    
+
+    /// <inheritdoc />
     public async Task<ServiceResult<IEnumerable<AssetListView>>> GetInactiveAssetsAsync()
     {
         return await ExecuteSafelyAsync(async () =>
