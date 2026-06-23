@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { Grid, Chip, Box, Typography } from "@mui/material";
+import { Grid, Chip, Box, Typography, Divider } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
 import AssetTransactionsData from "./AssetTransactions.data";
-import GridView from "../../components/organisms/GridView/GridView";
+import DataTable from "../../components/molecules/DataTable/DataTable";
 import CrudModal from "../../components/molecules/CrudModal/CrudModal";
 import FormSection from "../../components/atoms/FormSection/FormSection";
 import Input from "../../components/atoms/Input/Input";
@@ -15,19 +15,19 @@ import ImportModal from "../../components/molecules/ImportModal/ImportModal";
 import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
 import Modal from "../../components/molecules/Modal/Modal";
 import Button from "../../components/atoms/Button/Button";
-import { FiUpload, FiCheckSquare, FiRotateCcw, FiTool, FiList, FiPlus } from "react-icons/fi";
+import Card from "../../components/atoms/Card/Card";
+import SearchToolbar from "../../components/molecules/SearchToolbar/SearchToolbar";
+import Tabs from "../../components/molecules/Tabs/Tabs";
+import { FiUpload, FiCheckSquare, FiPlus, FiCalendar } from "react-icons/fi";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
 import { 
   TRANSACTION_TYPE_OPTIONS, 
-  TRANSACTION_TYPE_FILTER_OPTIONS, 
   TRANSACTION_TYPES_REQUIRING_PAIR, 
   TRANSACTION_TYPES_REQUIRING_TO_EMPLOYEE, 
   TRANSACTION_TYPES_REQUIRING_FROM_EMPLOYEE, 
   TRANSACTION_TYPES, 
   getTransactionTypeName, 
   TRANSACTION_TYPES_RETURNABLE,
-  TRANSACTION_TYPES_PRIMARY,
-  TRANSACTION_TYPES_SECONDARY,
   isPrimaryTransactionType,
   isSecondaryTransactionType
 } from "../../core/constants/transactionTypes";
@@ -72,6 +72,8 @@ const TABS_WITH_CHECKBOX = ["pending", "approved"];
 const AssetTransactionsMenu = () => {
   const [activeTab, setActiveTab] = useState("pending");
   const [searchTerm, setSearchTerm] = useState("");
+  const [dateFilterStart, setDateFilterStart] = useState("");
+  const [dateFilterEnd, setDateFilterEnd] = useState("");
   const [showImportModal, setShowImportModal] = useState(false);
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
@@ -93,7 +95,6 @@ const AssetTransactionsMenu = () => {
   });
   const [pairedTransactionOptions, setPairedTransactionOptions] = useState([]);
   const [loadingPairedOptions, setLoadingPairedOptions] = useState(false);
-  const [viewMode, setViewMode] = useState("primary"); // "primary" or "secondary"
   const isMountedRef = useRef(true);
   const queryClient = useQueryClient();
   const { toast, confirm, confirmDelete } = useSweetAlert();
@@ -146,8 +147,15 @@ const AssetTransactionsMenu = () => {
       filters.search = searchTerm;
     }
     
+    if (dateFilterStart) {
+      filters.startDate = dateFilterStart;
+    }
+    if (dateFilterEnd) {
+      filters.endDate = dateFilterEnd;
+    }
+    
     return filters;
-  }, [activeTab, searchTerm]);
+  }, [activeTab, searchTerm, dateFilterStart, dateFilterEnd]);
 
   const fetchGridData = useCallback(async (params) => {
     const filters = buildFilters();
@@ -192,7 +200,7 @@ const AssetTransactionsMenu = () => {
     pageSize,
     setPageSize,
     reload
-  } = useGridData(['transactions', activeTab, searchTerm], fetchGridData);
+  } = useGridData(['transactions', activeTab, searchTerm, dateFilterStart, dateFilterEnd], fetchGridData);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -239,6 +247,13 @@ const AssetTransactionsMenu = () => {
 
   const handleSearch = useCallback((search) => {
     setSearchTerm(search);
+    setPage(1);
+    clearSelection();
+  }, [setPage, clearSelection]);
+
+  const handleDateFilterChange = useCallback((start, end) => {
+    setDateFilterStart(start);
+    setDateFilterEnd(end);
     setPage(1);
     clearSelection();
   }, [setPage, clearSelection]);
@@ -380,6 +395,8 @@ const AssetTransactionsMenu = () => {
     setActiveTab(tab); 
     setPage(1);
     setSearchTerm("");
+    setDateFilterStart("");
+    setDateFilterEnd("");
     clearSelection();
   }, [setPage, clearSelection]);
 
@@ -403,16 +420,16 @@ const AssetTransactionsMenu = () => {
     await transactionsData.downloadTemplate();
   }, []);
 
-  // Filter data based on view mode (primary vs secondary)
-  const filteredData = useMemo(() => {
+  // Filter data for Primary and Secondary grids
+  const primaryData = useMemo(() => {
     if (!transactions || transactions.length === 0) return [];
-    
-    if (viewMode === "primary") {
-      return transactions.filter(t => isPrimaryTransactionType(t.transactionType));
-    } else {
-      return transactions.filter(t => isSecondaryTransactionType(t.transactionType));
-    }
-  }, [transactions, viewMode]);
+    return transactions.filter(t => isPrimaryTransactionType(t.transactionType));
+  }, [transactions]);
+
+  const secondaryData = useMemo(() => {
+    if (!transactions || transactions.length === 0) return [];
+    return transactions.filter(t => isSecondaryTransactionType(t.transactionType));
+  }, [transactions]);
 
   const handleGridAction = useCallback((actionType, row) => {
     switch (actionType) {
@@ -442,38 +459,48 @@ const AssetTransactionsMenu = () => {
   const getConditionalActions = useCallback((row) => {
     const isPending = row.approved === null;
     const isApproved = row.approved === true;
-    const isRejected = row.approved === false;
     const isPrimary = isPrimaryTransactionType(row.transactionType);
-    const canReturn = isApproved && !row.actualReturnDate && !row.fromAssetTransactionId && 
+    const isSecondary = isSecondaryTransactionType(row.transactionType);
+    const isPaired = row.fromAssetTransactionId !== null && row.fromAssetTransactionId !== undefined;
+    
+    const hasReturnOrPost = isPaired;
+    
+    const canReturn = isApproved && !hasReturnOrPost && 
                       TRANSACTION_TYPES_RETURNABLE.includes(row.transactionType);
-    const canPostMaintenance = isApproved && !row.fromAssetTransactionId && 
+    const canPostMaintenance = isApproved && !hasReturnOrPost && 
                                row.transactionType === TRANSACTION_TYPES.MAINTENANCE;
     
     const actions = [];
     
-    // Only primary transactions can be edited
+    // Edit only for pending primary transactions
     if (isPrimary && isPending) {
       actions.push(ACTION_TYPES.EDIT);
     }
     
-    // Approve/Reject only for pending transactions
-    if (isPending) {
+    // Approve/Reject only for pending primary transactions
+    if (isPrimary && isPending) {
       actions.push(ACTION_TYPES.APPROVE);
       actions.push(ACTION_TYPES.REJECT);
     }
     
-    // Return only for approved primary transactions (HANDOVER, LOAN, MAINTENANCE)
-    if (isPrimary && canReturn) {
+    // Return only for approved primary transactions that haven't been returned yet
+    if (isPrimary && isApproved && canReturn) {
       actions.push(ACTION_TYPES.RETURN);
     }
     
-    // Post-Maintenance only for approved MAINTENANCE
-    if (isPrimary && canPostMaintenance) {
+    // Post-Maintenance only for approved MAINTENANCE that hasn't been posted yet
+    if (isPrimary && isApproved && canPostMaintenance) {
       actions.push(ACTION_TYPES.POST_MAINTENANCE);
     }
     
-    // Cancel only for pending transactions
-    if (isPending) {
+    // Delete only for pending primary transactions
+    if (isPrimary && isPending) {
+      actions.push(ACTION_TYPES.DELETE);
+    }
+    
+    // For secondary transactions (Grid 2) - only Edit and Delete
+    if (isSecondary && isPending) {
+      actions.push(ACTION_TYPES.EDIT);
       actions.push(ACTION_TYPES.DELETE);
     }
     
@@ -498,10 +525,20 @@ const AssetTransactionsMenu = () => {
     ...(assetConditions || []).map(c => ({ value: c.value, label: c.label }))
   ], [assetConditions]);
 
-  const assetOptions = useMemo(() => [
-    { value: "", label: "Select Asset" },
-    ...refAssets.map(a => ({ value: a.value, label: a.label }))
-  ], [refAssets]);
+  // Filter assets - exclude Operational Office = Yes
+  const filteredAssetOptions = useMemo(() => {
+    const availableAssets = refAssets.filter(a => {
+      if (a.operasionalOffice === true || a.operasionalOffice === 'true' || a.operasionalOffice === 1) {
+        return false;
+      }
+      return true;
+    });
+    
+    return [
+      { value: "", label: "Select Asset" },
+      ...availableAssets.map(a => ({ value: a.value, label: a.label }))
+    ];
+  }, [refAssets]);
 
   const employeeOptions = useMemo(() => [
     { value: "", label: "Select Employee" },
@@ -551,27 +588,44 @@ const AssetTransactionsMenu = () => {
     return [...dataColumns, actionColumn];
   }, [actionColumn]);
 
-  // View mode toggle for grid
-  const viewToggle = (
-    <div className="transactions-menu__view-toggle">
-      <button 
-        className={`transactions-menu__view-btn ${viewMode === 'primary' ? 'transactions-menu__view-btn--active' : ''}`}
-        onClick={() => setViewMode('primary')}
-      >
-        <FiList size={14} /> Primary
-      </button>
-      <button 
-        className={`transactions-menu__view-btn ${viewMode === 'secondary' ? 'transactions-menu__view-btn--active' : ''}`}
-        onClick={() => setViewMode('secondary')}
-      >
-        <FiRotateCcw size={14} /> Returns & Post
-      </button>
+  const handleCreatePrimary = useCallback(() => {
+    handleCreate();
+  }, [handleCreate]);
+
+  // Date filter component
+  const dateFilterComponent = (
+    <div className="transactions-menu__date-filter">
+      <FiCalendar size={16} />
+      <span>Date Range:</span>
+      <DatePickerInput 
+        label="Start Date" 
+        value={dateFilterStart} 
+        onChange={e => handleDateFilterChange(e.target.value, dateFilterEnd)} 
+        size="small"
+        sx={{ minWidth: '150px' }}
+      />
+      <span>to</span>
+      <DatePickerInput 
+        label="End Date" 
+        value={dateFilterEnd} 
+        onChange={e => handleDateFilterChange(dateFilterStart, e.target.value)} 
+        size="small"
+        sx={{ minWidth: '150px' }}
+      />
+      {(dateFilterStart || dateFilterEnd) && (
+        <button 
+          className="btn btn--text btn--sm" 
+          onClick={() => handleDateFilterChange("", "")}
+        >
+          Clear
+        </button>
+      )}
     </div>
   );
 
   const extraActions = (
     <>
-      {viewToggle}
+      {dateFilterComponent}
       <button className="btn btn--outline btn--sm" onClick={() => setShowImportModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
         <FiUpload size={16} /> Import
       </button>
@@ -586,7 +640,6 @@ const AssetTransactionsMenu = () => {
   if (loading && !transactions.length) return <div className="page-loading"><Spinner size="lg" /></div>;
 
   const bulkAction = getBulkAction();
-  const bulkButtonText = bulkAction === "approve" ? "Approve" : "Reject";
   const bulkTitle = bulkAction === "approve" ? "Approve Transactions" : "Reject Transactions";
   const bulkDescription = `This action will ${bulkAction} the selected transactions.`;
 
@@ -672,28 +725,75 @@ const AssetTransactionsMenu = () => {
 
   return (
     <div className="transactions-menu" style={{ background: 'transparent' }}>
-      <GridView
-        title="Asset Transactions"
-        tabs={TRANSACTION_TABS}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        onCreate={handleCreate}
-        columns={columns}
-        data={filteredData}
-        loading={loading}
-        totalCount={totalCount}
-        page={page}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-        onSearch={handleSearch}
-        showCheckbox={showCheckbox}
-        selectedRows={selectedRowIds}
-        onSelectionChange={handleSelectionChange}
-        createButtonText="New Transaction"
-        ariaLabel="Transactions data table"
-        extraActions={extraActions}
-      />
+      {/* Page Header */}
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Asset Transactions</h1>
+          <p className="page-description">Manage asset transaction history and approvals</p>
+        </div>
+        <div className="transactions-menu__header-actions">
+          <button className="btn btn--outline btn--sm" onClick={() => setShowImportModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+            <FiUpload size={16} /> Import
+          </button>
+          <button className="btn btn--primary btn--sm" onClick={handleCreatePrimary} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+            <FiPlus size={16} /> New Transaction
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <Tabs tabs={TRANSACTION_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+
+      {/* Search Toolbar */}
+      <SearchToolbar onSearch={handleSearch} placeholder="Search transactions..." />
+
+      {/* ============================================================ */}
+      {/* GRID 1: PRIMARY TRANSACTIONS */}
+      {/* ============================================================ */}
+      <Card className="transactions-menu__grid-card" title="Primary Transactions" subtitle="Handover, Transfer, Loan, Maintenance, Disposal">
+        <DataTable
+          rows={primaryData}
+          columns={columns}
+          loading={loading}
+          pageSize={pageSize}
+          page={page}
+          totalRowCount={totalCount}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          getRowId={(row) => row?.assetTransactionId || `primary-${Math.random()}`}
+          hideFooter={false}
+          autoHeight={false}
+          checkboxSelection={showCheckbox}
+          onRowSelectionModelChange={handleSelectionChange}
+          ariaLabel="Primary transactions data table"
+          disableColumnFilter={false}
+          disableColumnMenu={false}
+          paginationMode="server"
+        />
+      </Card>
+
+      {/* ============================================================ */}
+      {/* GRID 2: SECONDARY TRANSACTIONS */}
+      {/* ============================================================ */}
+      <Card className="transactions-menu__grid-card" title="Secondary Transactions" subtitle="Return, Loan Return, Post Maintenance">
+        <DataTable
+          rows={secondaryData}
+          columns={columns}
+          loading={loading}
+          pageSize={pageSize}
+          page={page}
+          totalRowCount={secondaryData.length}
+          getRowId={(row) => row?.assetTransactionId || `secondary-${Math.random()}`}
+          hideFooter={false}
+          autoHeight={false}
+          checkboxSelection={showCheckbox}
+          onRowSelectionModelChange={handleSelectionChange}
+          ariaLabel="Secondary transactions data table"
+          disableColumnFilter={false}
+          disableColumnMenu={false}
+          paginationMode="client"
+        />
+      </Card>
 
       <CrudModal
         isOpen={showModal}
@@ -720,7 +820,7 @@ const AssetTransactionsMenu = () => {
                 label="Asset" 
                 value={formData.assetId || ""} 
                 onChange={(e) => setFormField('assetId')(e.target.value)} 
-                options={assetOptions} 
+                options={filteredAssetOptions} 
                 required 
               />
             </Grid>
@@ -850,14 +950,14 @@ const AssetTransactionsMenu = () => {
         isImporting={isImporting}
         importResult={importResult}
         title="Import Transactions"
-        description="Upload Excel or TXT file with transaction data. Transactions will be imported as PENDING and need approval."
+        description="Upload Excel file with transaction data. Transactions will be imported as PENDING and need approval."
       />
 
       <BulkActivateModal
         isOpen={showBulkActivateModal}
         onClose={() => setShowBulkActivateModal(false)}
         onConfirm={(ids) => handleBulkAction(ids, bulkAction)}
-        selectedIds={getSelectedIds(filteredData)}
+        selectedIds={getSelectedIds(primaryData)}
         itemName="transactions"
         title={bulkTitle}
         description={bulkDescription}

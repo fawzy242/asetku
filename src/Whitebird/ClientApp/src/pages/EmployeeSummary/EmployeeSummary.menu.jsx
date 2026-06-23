@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { FiSearch, FiUser, FiBox, FiDollarSign, FiCalendar, FiMail, FiPhone, FiBriefcase, FiRefreshCw, FiAlertTriangle, FiLayers, FiCheckCircle, FiClock, FiTool } from "react-icons/fi";
+import { FiSearch, FiUser, FiBox, FiDollarSign, FiCalendar, FiMail, FiPhone, FiBriefcase, FiRefreshCw, FiAlertTriangle, FiLayers, FiCheckCircle, FiClock, FiTool, FiPieChart } from "react-icons/fi";
 import { Grid, Box, Typography, Avatar, Chip, Paper, IconButton, Tooltip } from "@mui/material";
 import { useLocation } from "react-router-dom";
 import EmployeeSummaryData from "./EmployeeSummary.data";
@@ -179,10 +179,25 @@ const EmployeeSummaryMenu = () => {
     (sum, a) => sum + (a.purchasePrice || 0), 0
   );
 
-  // Calculate maintenance assets from current assets with status "In Maintenance"
   const maintenanceAssets = (assetSummary?.currentAssets || []).filter(
     a => a.status === 'In Maintenance' || a.associationType === 'Maintenance'
   ).length;
+
+  // Asset Category Summary
+  const categorySummary = useMemo(() => {
+    const currentAssets = assetSummary?.currentAssets || [];
+    if (currentAssets.length === 0) return [];
+    
+    const categoryMap = {};
+    currentAssets.forEach(asset => {
+      const category = asset.categoryName || 'Uncategorized';
+      categoryMap[category] = (categoryMap[category] || 0) + 1;
+    });
+    
+    return Object.entries(categoryMap)
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [assetSummary?.currentAssets]);
 
   const employeeOptions = useMemo(() => [
     { value: "", label: "Choose an employee..." },
@@ -288,7 +303,7 @@ const EmployeeSummaryMenu = () => {
               </Card>
             </Grid>
 
-            {/* Statistics Cards Row - ADDED Maintenance Assets */}
+            {/* Statistics Cards Row */}
             <Grid item xs={12}>
               <Grid container spacing={2}>
                 <Grid item xs={6} sm={4} md={2}>
@@ -336,6 +351,72 @@ const EmployeeSummaryMenu = () => {
                   </Paper>
                 </Grid>
               </Grid>
+            </Grid>
+
+            {/* Asset Category Summary Card */}
+            <Grid item xs={12} md={6}>
+              <Card 
+                title="Asset Category Summary" 
+                subtitle="Distribution of assets by category"
+              >
+                {currentAssets.length === 0 ? (
+                  <div className="employee-summary__empty-state" style={{ padding: '24px' }}>
+                    <FiPieChart size={32} />
+                    <Typography variant="body2">No assets to summarize</Typography>
+                  </div>
+                ) : (
+                  <div className="employee-summary__category-grid">
+                    {categorySummary.map(({ category, count }) => (
+                      <div key={category} className="employee-summary__category-item">
+                        <span className="employee-summary__category-name">{category}</span>
+                        <span className="employee-summary__category-count">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            </Grid>
+
+            {/* Last Transaction Card */}
+            <Grid item xs={12} md={6}>
+              <Card 
+                title="Last Transaction" 
+                subtitle="Most recent activity"
+              >
+                {assetHistory.length === 0 ? (
+                  <div className="employee-summary__empty-state" style={{ padding: '24px' }}>
+                    <FiRefreshCw size={32} />
+                    <Typography variant="body2">No transactions found</Typography>
+                  </div>
+                ) : (
+                  <div className="employee-summary__last-transaction">
+                    <div className="employee-summary__last-transaction-row">
+                      <span className="employee-summary__last-transaction-label">Date:</span>
+                      <span className="employee-summary__last-transaction-value">
+                        {utilsHelper.formatDateTime(assetHistory[0]?.transactionDate) || '-'}
+                      </span>
+                    </div>
+                    <div className="employee-summary__last-transaction-row">
+                      <span className="employee-summary__last-transaction-label">Type:</span>
+                      <span className="employee-summary__last-transaction-value">
+                        {assetHistory[0]?.transactionTypeName || '-'}
+                      </span>
+                    </div>
+                    <div className="employee-summary__last-transaction-row">
+                      <span className="employee-summary__last-transaction-label">Asset:</span>
+                      <span className="employee-summary__last-transaction-value">
+                        {assetHistory[0]?.assetCode || '-'} - {assetHistory[0]?.assetName || '-'}
+                      </span>
+                    </div>
+                    <div className="employee-summary__last-transaction-row">
+                      <span className="employee-summary__last-transaction-label">Condition:</span>
+                      <span className="employee-summary__last-transaction-value">
+                        {assetHistory[0]?.conditionAfterName || '-'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </Card>
             </Grid>
 
             {/* Current Assets Table */}

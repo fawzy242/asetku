@@ -5,9 +5,35 @@
 .transactions-menu {
     color: var(--text-primary);
 
-    &__filters {
-        >* {
-            min-width: 200px;
+    &__header-actions {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        flex-wrap: wrap;
+    }
+
+    &__date-filter {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        padding: $spacing-xs $spacing-md;
+        background-color: var(--surface);
+        border-radius: $radius-md;
+        border: 1px solid var(--border);
+        font-size: $font-size-sm;
+        color: var(--text-secondary);
+        flex-wrap: wrap;
+
+        .MuiFormControl-root {
+            min-width: 130px;
+        }
+    }
+
+    &__grid-card {
+        margin-bottom: $spacing-xl;
+        
+        &:last-child {
+            margin-bottom: 0;
         }
     }
 
@@ -19,39 +45,13 @@
         border: 1px solid var(--border);
     }
 
-    &__view-toggle {
-        display: inline-flex;
-        border-radius: $radius-md;
-        overflow: hidden;
-        border: 1px solid var(--border);
-        background-color: var(--surface);
-    }
-
-    &__view-btn {
-        padding: $spacing-sm $spacing-md;
-        font-size: $font-size-sm;
-        font-weight: 500;
-        color: var(--text-secondary);
-        background: transparent;
-        border: none;
-        display: flex;
-        align-items: center;
-        gap: $spacing-xs;
-        transition: all $transition-fast;
-        cursor: pointer;
-
-        &:hover {
-            background-color: var(--card-bg);
-            color: var(--text-primary);
-        }
-
-        &--active {
-            background-color: var(--primary);
-            color: white;
-
-            &:hover {
-                background-color: var(--primary-hover);
-                color: white;
+    @include respond-to('sm') {
+        &__date-filter {
+            flex-direction: column;
+            align-items: stretch;
+            
+            .MuiFormControl-root {
+                min-width: 100%;
             }
         }
     }

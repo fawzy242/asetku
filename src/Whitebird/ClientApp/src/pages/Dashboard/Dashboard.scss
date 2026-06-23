@@ -13,7 +13,7 @@
         margin-top: $spacing-lg;
     }
 
-    // Stats Cards Grid - 4 columns on desktop
+    // Stats Cards Grid
     &__stats {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -34,7 +34,6 @@
         }
     }
 
-    // Modern Stat Card
     &__stat-card {
         display: flex;
         align-items: center;
@@ -145,43 +144,77 @@
         margin-top: $spacing-sm;
     }
 
-    // Alerts Section
+    // ============================================================
+    // ALERTS SECTION - FULL WIDTH CARDS
+    // ============================================================
     &__alerts {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
+        display: flex;
+        flex-direction: column;
         gap: $spacing-lg;
         margin-bottom: $spacing-xl;
+        width: 100%;
+    }
 
-        @include respond-to('md') {
-            grid-template-columns: 1fr;
+    &__alert-wrapper {
+        width: 100%;
+        display: block;
+    }
+
+    &__alert-card {
+        width: 100%;
+        border-left: 4px solid;
+        border-left-color: #ef4444;
+        
+        &--warning {
+            border-left-color: #f59e0b;
         }
     }
 
-    &__alert-title {
-        display: flex;
-        align-items: center;
-        font-weight: 600;
+    &__alert-header {
+        padding-bottom: $spacing-md;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: $spacing-md;
     }
 
-    &__alert-list {
+    &__alert-title-group {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        flex-wrap: wrap;
+    }
+
+    &__alert-icon {
+        font-size: 20px;
+    }
+
+    &__alert-count {
+        margin-left: $spacing-xs;
+    }
+
+    &__alert-body {
         display: flex;
         flex-direction: column;
-        gap: $spacing-md;
+        gap: $spacing-sm;
+        max-height: 300px;
+        overflow-y: auto;
     }
 
     &__alert-item {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: $spacing-sm 0;
-        border-bottom: 1px solid var(--border);
-        
-        &:last-child {
-            border-bottom: none;
+        padding: $spacing-sm $spacing-md;
+        background-color: var(--surface);
+        border-radius: $radius-md;
+        border: 1px solid var(--border);
+        transition: all $transition-fast;
+
+        &:hover {
+            border-color: var(--primary);
         }
     }
 
-    &__alert-info {
+    &__alert-item-info {
         display: flex;
         align-items: center;
         gap: $spacing-md;
@@ -197,7 +230,22 @@
 
     &__alert-name {
         font-size: $font-size-sm;
+        color: var(--text-primary);
+    }
+
+    &__alert-detail {
+        font-size: $font-size-xs;
         color: var(--text-secondary);
+        margin-left: $spacing-xs;
+    }
+
+    &__alert-more {
+        text-align: center;
+        padding: $spacing-sm;
+        font-size: $font-size-xs;
+        color: var(--text-secondary);
+        border-top: 1px solid var(--border);
+        margin-top: $spacing-sm;
     }
 
     &__alert-chip--expired {
@@ -221,5 +269,19 @@
     &__table-wrapper {
         width: 100%;
         overflow-x: auto;
+    }
+}
+
+// Dark mode
+[data-theme='dark'] {
+    .dashboard {
+        &__alert-item {
+            background-color: #1f2937;
+            border-color: #374151;
+            
+            &:hover {
+                border-color: #ef4444;
+            }
+        }
     }
 }

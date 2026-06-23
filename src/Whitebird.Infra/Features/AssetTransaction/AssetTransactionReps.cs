@@ -334,41 +334,42 @@ public class AssetTransactionReps : IAssetTransactionReps
     }
 
     public async Task<IEnumerable<AssetTransactionListView>> GetActiveLoansListViewAsync()
-    {
-        const string sql = @"
-            SELECT 
-                t.AssetTransactionId, t.AssetId,
-                a.AssetCode, a.AssetName,
-                t.TransactionType, md1.MasterDataName as TransactionTypeName,
-                t.FromEmployeeId, fe.FullName as FromEmployeeName,
-                t.ToEmployeeId, te.FullName as ToEmployeeName,
-                t.ToLocationId, tl.OfficeName as ToLocationName,
-                t.TransactionDate, t.ExpectedReturnDate, t.ActualReturnDate,
-                t.Notes,
-                t.ConditionBefore, md2.MasterDataName as ConditionBeforeName,
-                t.ConditionAfter, md3.MasterDataName as ConditionAfterName,
-                t.Approved, t.ApprovedBy,
-                t.MaintenanceType, md4.MasterDataName as MaintenanceTypeName,
-                t.MaintenanceCost, t.FromAssetTransactionId,
-                t.IsActive, t.CreatedDate, t.CreatedBy, t.ModifiedDate, t.ModifiedBy
-            FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId
-            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
-            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
-            LEFT JOIN Office tl ON t.ToLocationId = tl.OfficeId
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
-            LEFT JOIN MasterData md2 ON t.ConditionBefore = md2.ReferenceCode AND md2.ReferenceName = 'AssetCondition'
-            LEFT JOIN MasterData md3 ON t.ConditionAfter = md3.ReferenceCode AND md3.ReferenceName = 'AssetCondition'
-            LEFT JOIN MasterData md4 ON t.MaintenanceType = md4.ReferenceCode AND md4.ReferenceName = 'MaintenanceType'
-            WHERE t.TransactionType = @LoanType
-              AND t.Approved = 1
-              AND t.FromAssetTransactionId IS NULL
-              AND t.ActualReturnDate IS NULL
-              AND t.IsActive = 1
-            ORDER BY t.ExpectedReturnDate";
-
-        return await _context.QueryAsync<AssetTransactionListView>(sql, new { LoanType = TransactionTypeConstants.LOAN });
-    }
+{
+    const string sql = @"
+        SELECT 
+            t.AssetTransactionId, t.AssetId,
+            a.AssetCode, a.AssetName,
+            t.TransactionType, md1.MasterDataName as TransactionTypeName,
+            t.FromEmployeeId, fe.FullName as FromEmployeeName,
+            t.ToEmployeeId, te.FullName as ToEmployeeName,
+            t.ToLocationId, tl.OfficeName as ToLocationName,
+            t.TransactionDate, t.ExpectedReturnDate, t.ActualReturnDate,
+            t.Notes,
+            t.ConditionBefore, md2.MasterDataName as ConditionBeforeName,
+            t.ConditionAfter, md3.MasterDataName as ConditionAfterName,
+            t.Approved, t.ApprovedBy,
+            t.MaintenanceType, md4.MasterDataName as MaintenanceTypeName,
+            t.MaintenanceCost, t.FromAssetTransactionId,
+            t.IsActive, t.CreatedDate, t.CreatedBy, t.ModifiedDate, t.ModifiedBy
+        FROM AssetTransaction t
+        LEFT JOIN Asset a ON t.AssetId = a.AssetId
+        LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+        LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+        LEFT JOIN Office tl ON t.ToLocationId = tl.OfficeId
+        LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
+        LEFT JOIN MasterData md2 ON t.ConditionBefore = md2.ReferenceCode AND md2.ReferenceName = 'AssetCondition'
+        LEFT JOIN MasterData md3 ON t.ConditionAfter = md3.ReferenceCode AND md3.ReferenceName = 'AssetCondition'
+        LEFT JOIN MasterData md4 ON t.MaintenanceType = md4.ReferenceCode AND md4.ReferenceName = 'MaintenanceType'
+        WHERE t.TransactionType = @LoanType
+          AND t.Approved = 1
+          AND t.FromAssetTransactionId IS NULL
+          AND t.ActualReturnDate IS NULL
+          AND t.IsActive = 1
+          AND t.ExpectedReturnDate >= GETDATE()
+        ORDER BY t.ExpectedReturnDate";
+    
+    return await _context.QueryAsync<AssetTransactionListView>(sql, new { LoanType = TransactionTypeConstants.LOAN });
+}
 
     public async Task<IEnumerable<AssetTransactionListView>> GetOverdueLoansListViewAsync()
     {

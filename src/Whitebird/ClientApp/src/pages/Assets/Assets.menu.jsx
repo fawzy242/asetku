@@ -75,6 +75,9 @@ const AssetsMenu = () => {
     return activeTab === "Active" || activeTab === "Inactive";
   }, [activeTab]);
 
+  // Check if Operational Office is Yes - show/hide office field
+  const showOfficeField = formData.operasionalOffice === true;
+
   const buildFilters = useCallback(() => {
     const filters = {};
     if (activeTab !== 'all') {
@@ -146,6 +149,12 @@ const AssetsMenu = () => {
   }, [reload, queryClient, toast, confirmDelete]);
 
   const onSubmit = useCallback(async () => {
+    // Validate Operational Office rule
+    if (formData.operasionalOffice === true && !formData.officeId) {
+      toast.error('Office is required when Operational Office is enabled');
+      return false;
+    }
+    
     const success = await crudHandleSubmit();
     if (success && isMountedRef.current) {
       toast.success(editingAsset ? 'Asset updated successfully' : 'Asset created successfully');
@@ -153,7 +162,7 @@ const AssetsMenu = () => {
       reload();
     }
     return success;
-  }, [crudHandleSubmit, reload, queryClient, toast, editingAsset]);
+  }, [crudHandleSubmit, reload, queryClient, toast, editingAsset, formData]);
 
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
@@ -347,6 +356,37 @@ const AssetsMenu = () => {
           </Grid>
         </FormSection>
 
+        <FormSection title="Operational Office" description="Configure operational office settings">
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <Select 
+                label="Operasional Office" 
+                value={formData.operasionalOffice ? "true" : "false"} 
+                onChange={(e) => {
+                  const val = e.target.value === "true";
+                  setFormField('operasionalOffice')(val);
+                  // If set to No, clear officeId
+                  if (!val) {
+                    setFormField('officeId')("");
+                  }
+                }} 
+                options={booleanOptions} 
+              />
+            </Grid>
+            {showOfficeField && (
+              <Grid item xs={12} sm={6}>
+                <Select 
+                  label="Office" 
+                  value={formData.officeId || ""} 
+                  onChange={(e) => setFormField('officeId')(e.target.value)} 
+                  options={officeOptions} 
+                  required 
+                />
+              </Grid>
+            )}
+          </Grid>
+        </FormSection>
+
         <FormSection title="Technical Details" description="Brand, model, serial numbers, and network information">
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
@@ -402,10 +442,13 @@ const AssetsMenu = () => {
         <FormSection title="Location & Depreciation" description="Office assignment and financial depreciation">
           <Grid container spacing={2}>
             <Grid item xs={12} sm={4}>
-              <Select label="Office" value={formData.officeId || ""} onChange={(e) => setFormField('officeId')(e.target.value)} options={officeOptions} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Select label="Operasional Office" value={formData.operasionalOffice ? "true" : "false"} onChange={(e) => setFormField('operasionalOffice')(e.target.value === "true")} options={booleanOptions} />
+              <Select 
+                label="Office" 
+                value={formData.officeId || ""} 
+                onChange={(e) => setFormField('officeId')(e.target.value)} 
+                options={officeOptions} 
+                disabled={!showOfficeField}
+              />
             </Grid>
             <Grid item xs={12} sm={4}>
               <NumberInput label="Residual Value" value={formData.residualValue} onChange={(e) => setFormField('residualValue')(e.target.value)} prefix="Rp " thousandSeparator={true} decimalScale={0} />
@@ -443,7 +486,7 @@ const AssetsMenu = () => {
         isImporting={isImporting}
         importResult={importResult}
         title="Import Assets"
-        description="Upload Excel or TXT file with asset data. Assets will be imported as ACTIVE."
+        description="Upload Excel file with asset data. Assets will be imported as ACTIVE."
       />
 
       <BulkActivateModal

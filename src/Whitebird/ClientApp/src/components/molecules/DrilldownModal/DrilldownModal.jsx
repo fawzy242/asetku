@@ -26,7 +26,6 @@ const DrilldownModal = ({ isOpen, onClose, title, endpoint, params = {}, columns
     };
   }, []);
 
-  // Reset page when modal opens or endpoint/params change
   useEffect(() => {
     if (isOpen) {
       setPage(1);
@@ -39,7 +38,6 @@ const DrilldownModal = ({ isOpen, onClose, title, endpoint, params = {}, columns
       return;
     }
     
-    // Cancel previous request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -47,18 +45,13 @@ const DrilldownModal = ({ isOpen, onClose, title, endpoint, params = {}, columns
     
     setLoading(true);
     try {
-      // Build query string from params
       const queryParams = new URLSearchParams();
-      
-      // Add pagination params
       queryParams.append('page', page);
       queryParams.append('pageSize', pageSize);
       
-      // Handle special case for overdue-loans endpoint (no pagination params)
       const isOverdueLoans = endpoint === '/AssetTransaction/overdue-loans';
       const isActiveLoans = endpoint === '/AssetTransaction/active-loans';
       
-      // For special endpoints, don't add pagination params
       if (!isOverdueLoans && !isActiveLoans) {
         Object.entries(params).forEach(([key, value]) => {
           if (value !== null && value !== undefined && value !== '') {
@@ -72,7 +65,6 @@ const DrilldownModal = ({ isOpen, onClose, title, endpoint, params = {}, columns
       }
       
       const url = `${endpoint}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      console.log('DrilldownModal fetching:', url);
       
       const response = await apiService.get(url, {
         signal: abortControllerRef.current.signal
@@ -84,7 +76,6 @@ const DrilldownModal = ({ isOpen, onClose, title, endpoint, params = {}, columns
       let total = 0;
       let totalPagesCount = 1;
       
-      // Handle different response structures
       if (responseData?.data?.data && Array.isArray(responseData.data.data)) {
         items = responseData.data.data;
         total = responseData.data.totalCount || items.length;
@@ -132,7 +123,6 @@ const DrilldownModal = ({ isOpen, onClose, title, endpoint, params = {}, columns
     }
   }, [endpoint, params, page, pageSize]);
 
-  // Fetch data when modal opens or page changes
   useEffect(() => {
     if (isOpen && endpoint) {
       fetchData();
@@ -155,7 +145,7 @@ const DrilldownModal = ({ isOpen, onClose, title, endpoint, params = {}, columns
   ];
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={title} size="xl">
       {loading ? (
         <div className="page-loading"><Spinner size="lg" /></div>
       ) : data.length === 0 ? (

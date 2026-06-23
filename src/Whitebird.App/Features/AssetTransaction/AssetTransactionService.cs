@@ -410,43 +410,57 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
     /// <inheritdoc />
     public async Task<ServiceResult> CancelAsync(int id)
+{
+    return await ExecuteWithTransactionAsync(async () =>
     {
-        return await ExecuteWithTransactionAsync(async () =>
+        var existing = await _transactionReps.GetByIdRawAsync(id);
+        if (existing == null)
         {
-            var existing = await _transactionReps.GetByIdRawAsync(id);
-            if (existing == null)
-            {
-                return ServiceResult.NotFound($"Transaction with id {id} not found");
-            }
+            return ServiceResult.NotFound($"Transaction with id {id} not found");
+        }
 
-            if (existing.Approved != null)
-            {
-                return ServiceResult.BadRequest("Cannot cancel approved or rejected transaction");
-            }
-
-            existing.IsActive = false;
-            existing.ModifiedDate = DateTime.Now;
-            existing.ModifiedBy = _currentUserService.GetDisplayName();
-
-            var result = await _repository.UpdateAsync(existing);
-
-            if (result > 0)
-            {
-                await _activityLogService.LogUpdateAsync(
-                    TableNames.AssetTransaction,
-                    id,
-                    $"Transaction cancelled: Type '{existing.TransactionType}'",
-                    _currentUserService.GetDisplayName());
-            }
-
-            return result <= 0
-                ? ServiceResult.Failure("Failed to cancel transaction")
-                : ServiceResult.Success("Transaction cancelled successfully");
-        }, "cancel transaction", async (ex) =>
+        // Hanya pending yang bisa di-cancel
+        if (existing.Approved != null)
         {
-            await _activityLogService.LogErrorAsync(TableNames.AssetTransaction, id, "Cancel Transaction", ex, _currentUserService.GetDisplayName());
-        });
-    }
+            return ServiceResult.BadRequest("Cannot cancel approved or rejected transaction");
+        }
+
+        // Jika sudah paired (sudah ada return/post), tidak bisa di-cancel
+        if (existing.FromAssetTransactionId != null)
+        {
+            return ServiceResult.BadRequest("Cannot cancel transaction that already has a paired return or post-maintenance");
+        }
+
+        // Cek apakah transaksi ini menjadi source untuk transaksi lain
+        var pairedTransaction = await _transactionReps.GetPairedTransactionAsync(id);
+        if (pairedTransaction != null)
+        {
+            return ServiceResult.BadRequest("Cannot cancel transaction that is already paired with another transaction");
+        }
+
+        existing.IsActive = false;
+        existing.ModifiedDate = DateTime.Now;
+        existing.ModifiedBy = _currentUserService.GetDisplayName();
+
+        var result = await _repository.UpdateAsync(existing);
+
+        if (result > 0)
+        {
+            await _activityLogService.LogUpdateAsync(
+                TableNames.AssetTransaction,
+                id,
+                $"Transaction cancelled: Type '{existing.TransactionType}'",
+                _currentUserService.GetDisplayName());
+        }
+
+        return result <= 0
+            ? ServiceResult.Failure("Failed to cancel transaction")
+            : ServiceResult.Success("Transaction cancelled successfully");
+    }, "cancel transaction", async (ex) =>
+    {
+        await _activityLogService.LogErrorAsync(TableNames.AssetTransaction, id, "Cancel Transaction", ex, _currentUserService.GetDisplayName());
+    });
+}
 
     /// <inheritdoc />
     public async Task<ServiceResult<PaginatedResult<AssetTransactionListView>>> GetGridDataAsync(

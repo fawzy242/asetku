@@ -37,12 +37,10 @@ const StatCard = ({ icon: Icon, label, value, color, bgColor, onClick, clickable
   </div>
 );
 
-// ============================================================
-// DRILLDOWN COLUMNS - Enhanced dengan informasi lengkap
-// ============================================================
+// Drilldown columns - Enhanced
 const drilldownColumns = [
-  { field: "assetCode", headerName: "Asset Code", width: 120 },
-  { field: "assetName", headerName: "Asset Name", flex: 1, minWidth: 180 },
+  { field: "assetCode", headerName: "Code", width: 120 },
+  { field: "assetName", headerName: "Name", flex: 1, minWidth: 180 },
   { field: "categoryName", headerName: "Category", width: 150 },
   { field: "officeName", headerName: "Office", width: 150 },
   { field: "employeeName", headerName: "Employee", width: 150 },
@@ -64,7 +62,6 @@ const drilldownColumns = [
   },
 ];
 
-// Transaction columns untuk report
 const transactionColumns = [
   { field: "assetCode", headerName: "Asset Code", width: 120 },
   { field: "assetName", headerName: "Asset Name", flex: 1, minWidth: 180 },
@@ -112,7 +109,7 @@ const DashboardMenu = () => {
     setLoading(false);
   };
 
-  // Prepare monthly chart data
+  // Monthly chart data
   const monthlyLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const monthlyDataMap = {};
   monthlyStats.forEach(item => {
@@ -120,12 +117,12 @@ const DashboardMenu = () => {
   });
   const monthlyChartData = monthlyLabels.map((_, idx) => monthlyDataMap[idx] || 0);
 
-  // Prepare category breakdown for bar chart
+  // Category breakdown
   const categoryLabels = categoryBreakdown.map(item => item.category || 'Uncategorized');
   const categoryValues = categoryBreakdown.map(item => item.totalValue);
   const categoryColors = ['#dc2626', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ef4444', '#6b7280'];
 
-  // Chart Data
+  // Status chart
   const statusLabels = ['Available', 'Assigned', 'On Loan', 'In Maintenance', 'Damaged', 'Retired'];
   const statusDataValues = [
     stats.availableAssets || 0,
@@ -254,10 +251,18 @@ const DashboardMenu = () => {
     } 
   };
 
-  // Calculate This Month stats
   const currentMonth = new Date().getMonth();
   const thisMonthTransactions = monthlyStats.find(item => item.month === currentMonth + 1);
   const thisMonthCount = thisMonthTransactions?.transactionCount || 0;
+
+  // Calculate additional KPIs
+  const assetUtilizationRate = stats.totalAssets > 0 
+    ? ((stats.assignedAssets + stats.assetsOnLoan) / stats.totalAssets * 100) 
+    : 0;
+  
+  const assetAvailabilityRate = stats.totalAssets > 0 
+    ? (stats.availableAssets / stats.totalAssets * 100) 
+    : 0;
 
   const statCardsConfig = [
     { icon: FiPackage, label: 'Total Assets', value: stats.totalAssets || 0, endpoint: '/Asset/grid', params: {}, color: '#dc2626', bg: 'rgba(220, 38, 38, 0.1)' },
@@ -269,8 +274,9 @@ const DashboardMenu = () => {
     { icon: FiClock, label: 'Pending Approvals', value: stats.pendingApprovals || 0, endpoint: '/AssetTransaction/grid', params: { approved: null }, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
     { icon: FiAlertTriangle, label: 'Overdue Loans', value: stats.overdueLoanCount || 0, endpoint: '/AssetTransaction/overdue-loans', params: {}, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
     { icon: FiDollarSign, label: 'Total Value', value: utilsHelper.formatCurrency(stats.totalAssetValue), noDrilldown: true, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
-    { icon: FiTrendingUp, label: 'Monthly Avg', value: utilsHelper.formatCurrency((stats.totalAssetValue || 0) / 12), noDrilldown: true, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },
+    { icon: FiTrendingUp, label: 'Utilization', value: `${assetUtilizationRate.toFixed(1)}%`, noDrilldown: true, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },
     { icon: FiBarChart2, label: 'This Month', value: thisMonthCount, endpoint: '/AssetTransaction/grid', params: {}, color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)' },
+    { icon: FiCalendar, label: 'Avg Maintenance', value: stats.upcomingMaintenanceCount || 0, noDrilldown: true, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
   ];
 
   const handleCardClick = (card) => {
@@ -321,37 +327,70 @@ const DashboardMenu = () => {
             ))}
           </div>
 
+          {/* Alerts Section - Full Width Cards */}
           <div className="dashboard__alerts">
             {expiredWarranty.length > 0 && (
-              <Card title={<span className="dashboard__alert-title"><FiAlertTriangle style={{ marginRight: 8, color: '#ef4444' }} /> Expired Warranty ({expiredWarranty.length})</span>}>
-                <div className="dashboard__alert-list">
-                  {expiredWarranty.slice(0, 5).map(item => (
-                    <div key={item.assetId} className="dashboard__alert-item">
-                      <div className="dashboard__alert-info">
-                        <span className="dashboard__alert-code">{item.assetCode}</span>
-                        <span className="dashboard__alert-name">{item.assetName}</span>
-                      </div>
-                      <Chip label="Expired" size="small" className="dashboard__alert-chip--expired" />
+              <div className="dashboard__alert-wrapper">
+                <Card className="dashboard__alert-card">
+                  <div className="dashboard__alert-header">
+                    <div className="dashboard__alert-title-group">
+                      <FiAlertTriangle className="dashboard__alert-icon" style={{ color: '#ef4444' }} />
+                      <Typography variant="h6" fontWeight={600}>Expired Warranty</Typography>
+                      <Chip label={`${expiredWarranty.length} assets`} size="small" className="dashboard__alert-count" />
                     </div>
-                  ))}
-                </div>
-              </Card>
+                  </div>
+                  <div className="dashboard__alert-body">
+                    {expiredWarranty.slice(0, 8).map(item => (
+                      <div key={item.assetId} className="dashboard__alert-item">
+                        <div className="dashboard__alert-item-info">
+                          <span className="dashboard__alert-code">{item.assetCode}</span>
+                          <span className="dashboard__alert-name">{item.assetName}</span>
+                          <span className="dashboard__alert-detail">{item.categoryName || ''}</span>
+                          <span className="dashboard__alert-detail">{item.officeName || ''}</span>
+                        </div>
+                        <Chip label={`Expired: ${utilsHelper.formatDate(item.warrantyExpiryDate)}`} size="small" className="dashboard__alert-chip--expired" />
+                      </div>
+                    ))}
+                    {expiredWarranty.length > 8 && (
+                      <div className="dashboard__alert-more">
+                        +{expiredWarranty.length - 8} more expired warranties
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </div>
             )}
             
             {upcomingMaintenance.length > 0 && (
-              <Card title={<span className="dashboard__alert-title"><FiCalendar style={{ marginRight: 8, color: '#f59e0b' }} /> Upcoming Maintenance ({upcomingMaintenance.length})</span>}>
-                <div className="dashboard__alert-list">
-                  {upcomingMaintenance.slice(0, 5).map(item => (
-                    <div key={item.assetId} className="dashboard__alert-item">
-                      <div className="dashboard__alert-info">
-                        <span className="dashboard__alert-code">{item.assetCode}</span>
-                        <span className="dashboard__alert-name">{item.assetName}</span>
-                      </div>
-                      <Chip label={utilsHelper.formatDate(item.nextMaintenanceDate)} size="small" className="dashboard__alert-chip--upcoming" />
+              <div className="dashboard__alert-wrapper">
+                <Card className="dashboard__alert-card">
+                  <div className="dashboard__alert-header">
+                    <div className="dashboard__alert-title-group">
+                      <FiCalendar className="dashboard__alert-icon" style={{ color: '#f59e0b' }} />
+                      <Typography variant="h6" fontWeight={600}>Upcoming Maintenance</Typography>
+                      <Chip label={`${upcomingMaintenance.length} assets`} size="small" className="dashboard__alert-count" />
                     </div>
-                  ))}
-                </div>
-              </Card>
+                  </div>
+                  <div className="dashboard__alert-body">
+                    {upcomingMaintenance.slice(0, 8).map(item => (
+                      <div key={item.assetId} className="dashboard__alert-item">
+                        <div className="dashboard__alert-item-info">
+                          <span className="dashboard__alert-code">{item.assetCode}</span>
+                          <span className="dashboard__alert-name">{item.assetName}</span>
+                          <span className="dashboard__alert-detail">{item.categoryName || ''}</span>
+                          <span className="dashboard__alert-detail">{item.officeName || ''}</span>
+                        </div>
+                        <Chip label={utilsHelper.formatDate(item.nextMaintenanceDate)} size="small" className="dashboard__alert-chip--upcoming" />
+                      </div>
+                    ))}
+                    {upcomingMaintenance.length > 8 && (
+                      <div className="dashboard__alert-more">
+                        +{upcomingMaintenance.length - 8} more upcoming maintenance
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </div>
             )}
           </div>
         </div>
@@ -417,6 +456,7 @@ const DashboardMenu = () => {
         endpoint={drilldown.endpoint} 
         params={drilldown.params} 
         columns={drilldown.columns} 
+        size="xl"
       />
     </div>
   );

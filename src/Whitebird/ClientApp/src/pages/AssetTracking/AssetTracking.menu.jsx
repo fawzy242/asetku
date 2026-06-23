@@ -3,11 +3,12 @@ import {
   FiSearch, FiBox, FiUser, FiMapPin, FiRefreshCw, 
   FiCalendar, FiClock, FiAlertTriangle, FiActivity,
   FiArrowRight, FiCheckCircle, FiXCircle, FiTool,
-  FiArrowUpCircle, FiArrowDownCircle
+  FiArrowUpCircle, FiArrowDownCircle, FiPieChart,
+  FiList, FiMove
 } from "react-icons/fi";
 import { 
   Grid, Box, Typography, Avatar, Chip, Paper, 
-  Card as MuiCard, CardContent, IconButton, Tooltip 
+  IconButton, Tooltip, Tabs as MuiTabs, Tab
 } from "@mui/material";
 import { useLocation } from "react-router-dom";
 import AssetTrackingData from "./AssetTracking.data";
@@ -24,6 +25,9 @@ import "./AssetTracking.scss";
 
 const trackingData = new AssetTrackingData();
 
+// ============================================================
+// TIMELINE COLUMNS - Enhanced
+// ============================================================
 const timelineColumns = [
   { 
     field: "date", 
@@ -31,7 +35,7 @@ const timelineColumns = [
     width: 180,
     valueFormatter: (p) => p?.value ? utilsHelper.formatDateTime(p.value) : '-'
   },
-  { field: "transactionTypeName", headerName: "Activity", width: 160, flex: 0.5 },
+  { field: "transactionTypeName", headerName: "Activity Type", width: 160, flex: 0.5 },
   { field: "fromEmployeeName", headerName: "From", width: 150, valueFormatter: (p) => p?.value || '-' },
   { field: "toEmployeeName", headerName: "To", width: 150, valueFormatter: (p) => p?.value || '-' },
   { field: "toLocationName", headerName: "Location", width: 130, valueFormatter: (p) => p?.value || '-' },
@@ -90,6 +94,7 @@ const AssetTrackingMenu = () => {
   const [selectedAssetId, setSelectedAssetId] = useState(null);
   const [trackingData_, setTrackingData_] = useState(null);
   const [loadingData, setLoadingData] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState('all');
   const isMountedRef = useRef(true);
   const location = useLocation();
   const { toast } = useSweetAlert();
@@ -177,6 +182,15 @@ const AssetTrackingMenu = () => {
     }
   }, []);
 
+  // Refresh function
+  const handleRefresh = useCallback(async () => {
+    if (!selectedAssetId) return;
+    setLoadingData(true);
+    await handleAssetSelect(selectedAssetId);
+    setLoadingData(false);
+    toast.success('Data refreshed');
+  }, [selectedAssetId, handleAssetSelect, toast]);
+
   useEffect(() => {
     if (assets.length > 0) {
       const params = new URLSearchParams(location.search);
@@ -203,6 +217,56 @@ const AssetTrackingMenu = () => {
   const timeline = trackingData_?.timeline || [];
   const currentAsset = trackingData_;
 
+  // Filter timeline by transaction type category
+  const filteredTimeline = useMemo(() => {
+    if (historyFilter === 'all') return timeline;
+    
+    const filterMap = {
+      'movement': [TRANSACTION_TYPES.HANDOVER, TRANSACTION_TYPES.TRANSFER, TRANSACTION_TYPES.RETURN],
+      'loan': [TRANSACTION_TYPES.LOAN, TRANSACTION_TYPES.LOAN_RETURN],
+      'maintenance': [TRANSACTION_TYPES.MAINTENANCE, TRANSACTION_TYPES.POST_MAINTENANCE],
+      'disposal': [TRANSACTION_TYPES.DISPOSAL]
+    };
+    
+    const allowedTypes = filterMap[historyFilter] || [];
+    return timeline.filter(t => allowedTypes.includes(t.transactionType));
+  }, [timeline, historyFilter]);
+
+  // Calculate statistics per category
+  const stats = useMemo(() => {
+    const result = {
+      totalMovements: 0,
+      totalLoans: 0,
+      totalMaintenance: 0,
+      totalDisposals: 0
+    };
+    
+    timeline.forEach(t => {
+      if ([TRANSACTION_TYPES.HANDOVER, TRANSACTION_TYPES.TRANSFER, TRANSACTION_TYPES.RETURN].includes(t.transactionType)) {
+        result.totalMovements++;
+      }
+      if ([TRANSACTION_TYPES.LOAN, TRANSACTION_TYPES.LOAN_RETURN].includes(t.transactionType)) {
+        result.totalLoans++;
+      }
+      if ([TRANSACTION_TYPES.MAINTENANCE, TRANSACTION_TYPES.POST_MAINTENANCE].includes(t.transactionType)) {
+        result.totalMaintenance++;
+      }
+      if (t.transactionType === TRANSACTION_TYPES.DISPOSAL) {
+        result.totalDisposals++;
+      }
+    });
+    
+    return result;
+  }, [timeline]);
+
+  const historyFilterTabs = [
+    { id: 'all', label: 'All History' },
+    { id: 'movement', label: 'Movements' },
+    { id: 'loan', label: 'Loans' },
+    { id: 'maintenance', label: 'Maintenance' },
+    { id: 'disposal', label: 'Disposals' },
+  ];
+
   if (loading) {
     return (
       <div className="asset-tracking">
@@ -218,8 +282,17 @@ const AssetTrackingMenu = () => {
   return (
     <div className="asset-tracking">
       <div className="page-header">
-        <h1 className="page-title">Asset Tracking</h1>
-        <p className="page-description">Track asset location, status, and transaction history</p>
+        <div>
+          <h1 className="page-title">Asset Tracking</h1>
+          <p className="page-description">Track asset location, status, and transaction history</p>
+        </div>
+        {selectedAssetId && (
+          <Tooltip title="Refresh">
+            <IconButton onClick={handleRefresh} className="asset-tracking__refresh-header-btn">
+              <FiRefreshCw size={18} />
+            </IconButton>
+          </Tooltip>
+        )}
       </div>
       
       <Grid container spacing={3}>
@@ -238,17 +311,6 @@ const AssetTrackingMenu = () => {
                   options={assetOptions} 
                 />
               </div>
-              {selectedAssetId && (
-                <Tooltip title="Refresh">
-                  <IconButton 
-                    onClick={() => handleAssetSelect(selectedAssetId)} 
-                    size="small" 
-                    className="asset-tracking__refresh-btn"
-                  >
-                    <FiRefreshCw size={18} />
-                  </IconButton>
-                </Tooltip>
-              )}
             </div>
           </Card>
         </Grid>
@@ -279,17 +341,29 @@ const AssetTrackingMenu = () => {
                   </Grid>
                   <Grid item>
                     <div className="asset-tracking__info-row">
-                      <FiCalendar size={16} className="asset-tracking__info-icon" />
-                      <span className="asset-tracking__info-label">Last Transaction:</span>
-                      <span className="asset-tracking__info-value">
-                        {timeline.length > 0 ? utilsHelper.formatDate(timeline[0]?.date) : '-'}
-                      </span>
+                      <FiUser size={16} className="asset-tracking__info-icon" />
+                      <span className="asset-tracking__info-label">Holder:</span>
+                      <span className="asset-tracking__info-value">{currentAsset.currentHolderName || '-'}</span>
+                    </div>
+                    <div className="asset-tracking__info-row">
+                      <FiMapPin size={16} className="asset-tracking__info-icon" />
+                      <span className="asset-tracking__info-label">Location:</span>
+                      <span className="asset-tracking__info-value">{currentAsset.currentLocation || '-'}</span>
                     </div>
                     <div className="asset-tracking__info-row">
                       <FiActivity size={16} className="asset-tracking__info-icon" />
-                      <span className="asset-tracking__info-label">Total Transactions:</span>
-                      <span className="asset-tracking__info-value">{currentAsset.totalTransactions || 0}</span>
+                      <span className="asset-tracking__info-label">Condition:</span>
+                      <span className="asset-tracking__info-value">{currentAsset.condition || '-'}</span>
                     </div>
+                    {currentAsset.loanDueDate && (
+                      <div className="asset-tracking__info-row">
+                        <FiCalendar size={16} className="asset-tracking__info-icon" />
+                        <span className="asset-tracking__info-label">Due Date:</span>
+                        <span className="asset-tracking__info-value" style={{ color: currentAsset.isOverdue ? '#ef4444' : 'inherit' }}>
+                          {utilsHelper.formatDate(currentAsset.loanDueDate)}
+                        </span>
+                      </div>
+                    )}
                   </Grid>
                 </Grid>
               </Card>
@@ -300,113 +374,68 @@ const AssetTrackingMenu = () => {
               <Grid container spacing={2}>
                 <Grid item xs={6} sm={3}>
                   <Paper elevation={0} className="asset-tracking__stat-card">
-                    <FiUser size={28} className="asset-tracking__stat-icon" style={{ color: '#8b5cf6' }} />
-                    <Typography variant="body2" fontWeight={600} className="asset-tracking__stat-value">
-                      {currentAsset.currentHolderName || 'None'}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">Current Holder</Typography>
+                    <FiMove size={28} className="asset-tracking__stat-icon" style={{ color: '#3b82f6' }} />
+                    <Typography variant="h4" fontWeight={700}>{stats.totalMovements}</Typography>
+                    <Typography variant="caption" color="text.secondary">Movements</Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6} sm={3}>
                   <Paper elevation={0} className="asset-tracking__stat-card">
-                    <FiMapPin size={28} className="asset-tracking__stat-icon" style={{ color: '#3b82f6' }} />
-                    <Typography variant="body2" fontWeight={600} className="asset-tracking__stat-value">
-                      {currentAsset.currentLocation || '-'}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">Office Location</Typography>
+                    <FiClock size={28} className="asset-tracking__stat-icon" style={{ color: '#f59e0b' }} />
+                    <Typography variant="h4" fontWeight={700}>{stats.totalLoans}</Typography>
+                    <Typography variant="caption" color="text.secondary">Loans</Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6} sm={3}>
                   <Paper elevation={0} className="asset-tracking__stat-card">
-                    <FiActivity size={28} className="asset-tracking__stat-icon" style={{ color: currentAsset.currentStatus === 'Available' ? '#10b981' : '#f59e0b' }} />
-                    {getStatusChip(currentAsset.currentStatus)}
-                    <Typography variant="caption" color="text.secondary">Current Status</Typography>
+                    <FiTool size={28} className="asset-tracking__stat-icon" style={{ color: '#8b5cf6' }} />
+                    <Typography variant="h4" fontWeight={700}>{stats.totalMaintenance}</Typography>
+                    <Typography variant="caption" color="text.secondary">Maintenance</Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6} sm={3}>
                   <Paper elevation={0} className="asset-tracking__stat-card">
-                    <FiRefreshCw size={28} className="asset-tracking__stat-icon" style={{ color: '#dc2626' }} />
-                    <Typography variant="h4" fontWeight={700}>{currentAsset.totalTransactions || 0}</Typography>
-                    <Typography variant="caption" color="text.secondary">Total Transactions</Typography>
+                    <FiXCircle size={28} className="asset-tracking__stat-icon" style={{ color: '#ef4444' }} />
+                    <Typography variant="h4" fontWeight={700}>{stats.totalDisposals}</Typography>
+                    <Typography variant="caption" color="text.secondary">Disposals</Typography>
                   </Paper>
                 </Grid>
               </Grid>
             </Grid>
 
-            {/* Timeline Section */}
+            {/* History Filter Tabs */}
             <Grid item xs={12}>
-              <Card 
-                title="Transaction Timeline"
-                subtitle={`${timeline.length} record(s) found`}
-              >
-                {loadingData ? (
-                  <Box sx={{ py: 4 }}>
-                    <Skeleton variant="rect" height={400} />
-                  </Box>
-                ) : timeline.length === 0 ? (
-                  <div className="asset-tracking__empty-state">
-                    <FiRefreshCw size={48} />
-                    <Typography variant="h6" gutterBottom>No Transaction History</Typography>
-                    <Typography variant="body2">This asset has no transaction records yet.</Typography>
-                  </div>
-                ) : (
-                  <>
-                    {/* Timeline Visual */}
-                    <Box className="asset-tracking__timeline-visual">
-                      {timeline.slice(0, 10).map((item, index) => (
-                        <div key={item.id || index} className="asset-tracking__timeline-item">
-                          <div className="asset-tracking__timeline-icon" style={{ backgroundColor: item.color || '#6b7280' }}>
-                            {item.icon || <FiActivity size={16} />}
-                          </div>
-                          <div className="asset-tracking__timeline-content">
-                            <div className="asset-tracking__timeline-header">
-                              <span className="asset-tracking__timeline-type">{item.transactionTypeName || 'Unknown'}</span>
-                              <span className="asset-tracking__timeline-date">
-                                {item.date ? utilsHelper.formatDateTime(item.date) : '-'}
-                              </span>
-                            </div>
-                            <div className="asset-tracking__timeline-details">
-                              {item.fromEmployeeName && (
-                                <span className="asset-tracking__timeline-detail">
-                                  From: {item.fromEmployeeName}
-                                </span>
-                              )}
-                              {item.toEmployeeName && (
-                                <span className="asset-tracking__timeline-detail">
-                                  To: {item.toEmployeeName}
-                                </span>
-                              )}
-                              {item.toLocationName && (
-                                <span className="asset-tracking__timeline-detail">
-                                  Location: {item.toLocationName}
-                                </span>
-                              )}
-                              {item.notes && (
-                                <span className="asset-tracking__timeline-detail asset-tracking__timeline-notes">
-                                  {item.notes}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      {timeline.length > 10 && (
-                        <div className="asset-tracking__timeline-more">
-                          +{timeline.length - 10} more transactions
-                        </div>
-                      )}
-                    </Box>
-
-                    <DataTable 
-                      rows={timeline} 
-                      columns={timelineColumns} 
-                      pageSize={10}
-                      getRowId={(row, index) => row.id || row.assetTransactionId || `timeline-${row.date}-${row.transactionTypeName}-${index}`}
-                      hideFooter={false}
-                      ariaLabel="Asset timeline table"
-                    />
-                  </>
-                )}
+              <Card>
+                <Box sx={{ borderBottom: 1, borderColor: 'var(--border)', mb: 2 }}>
+                  <MuiTabs 
+                    value={historyFilter} 
+                    onChange={(e, v) => setHistoryFilter(v)}
+                    variant="scrollable"
+                    scrollButtons="auto"
+                  >
+                    {historyFilterTabs.map(tab => (
+                      <Tab 
+                        key={tab.id} 
+                        value={tab.id} 
+                        label={tab.label}
+                        sx={{ 
+                          textTransform: 'none',
+                          fontWeight: 500,
+                          color: 'var(--text-secondary)',
+                          '&.Mui-selected': { color: 'var(--primary)' },
+                        }}
+                      />
+                    ))}
+                  </MuiTabs>
+                </Box>
+                <DataTable 
+                  rows={filteredTimeline} 
+                  columns={timelineColumns} 
+                  pageSize={10}
+                  getRowId={(row, index) => row.id || row.assetTransactionId || `timeline-${row.date}-${row.transactionTypeName}-${index}`}
+                  hideFooter={false}
+                  ariaLabel="Asset timeline table"
+                />
               </Card>
             </Grid>
           </>

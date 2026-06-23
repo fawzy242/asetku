@@ -91,13 +91,13 @@ public interface IAssetTransactionReps
     Task<IEnumerable<AssetTransactionListView>> GetRejectedListViewAsync();
     
     /// <summary>
-    /// Gets active loans as list view
+    /// Gets active loans as list view (ExpectedReturnDate >= GETDATE())
     /// </summary>
     /// <returns>Collection of active loan list views</returns>
     Task<IEnumerable<AssetTransactionListView>> GetActiveLoansListViewAsync();
     
     /// <summary>
-    /// Gets overdue loans as list view
+    /// Gets overdue loans as list view (ExpectedReturnDate < GETDATE())
     /// </summary>
     /// <returns>Collection of overdue loan list views</returns>
     Task<IEnumerable<AssetTransactionListView>> GetOverdueLoansListViewAsync();

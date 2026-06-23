@@ -28,9 +28,7 @@ export const TRANSACTION_TYPE_OPTIONS = [
   { value: TRANSACTION_TYPES.HANDOVER, label: "HANDOVER (Company → Employee)" },
   { value: TRANSACTION_TYPES.TRANSFER, label: "TRANSFER (Employee → Employee)" },
   { value: TRANSACTION_TYPES.LOAN, label: "LOAN (Company → Employee)" },
-  // RETURN and LOAN_RETURN are REMOVED - use shortcut buttons instead
   { value: TRANSACTION_TYPES.MAINTENANCE, label: "MAINTENANCE" },
-  // POST_MAINTENANCE is REMOVED - use shortcut button instead
   { value: TRANSACTION_TYPES.DISPOSAL, label: "DISPOSAL" },
 ];
 
