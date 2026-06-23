@@ -422,33 +422,33 @@ public class AssetService : BaseService, IAssetService
             var timeline = new List<AssetTimelineEntry>();
             foreach (var txn in history.OrderByDescending(t => t.TransactionDate))
             {
-                var transactionTypeNameResult = await _masterDataLookupService.GetTransactionTypeNameAsync(txn.TransactionType);
-                var transactionTypeName = transactionTypeNameResult.IsSuccess ? transactionTypeNameResult.Data : txn.TransactionType.ToString();
+                // Get transaction type name
+                var transactionTypeName = txn.TransactionTypeName ?? txn.TransactionType.ToString();
 
                 timeline.Add(new AssetTimelineEntry
                 {
                     Id = txn.AssetTransactionId,
                     Date = txn.TransactionDate,
-                    ActivityType = transactionTypeName ?? txn.TransactionType.ToString(),
+                    ActivityType = transactionTypeName,
                     Description = txn.Notes ?? $"Transaction: {transactionTypeName}",
-                    PreviousHolder = txn.FromEmployeeName,
-                    NewHolder = txn.ToEmployeeName,
-                    PreviousStatus = txn.ConditionBeforeName,
-                    NewStatus = txn.ConditionAfterName,
-                    Notes = txn.Notes
+                    PreviousHolder = txn.FromEmployeeName ?? "-",
+                    NewHolder = txn.ToEmployeeName ?? "-",
+                    PreviousStatus = txn.ConditionBeforeName ?? "-",
+                    NewStatus = txn.ConditionAfterName ?? "-",
+                    Notes = txn.Notes ?? "-"
                 });
             }
 
             var tracking = new AssetTrackingViewModel
             {
                 AssetId = asset.AssetId,
-                AssetCode = asset.AssetCode,
-                AssetName = asset.AssetName,
-                CurrentStatus = currentStatus,
-                CategoryName = asset.CategoryName,
-                CurrentHolderName = currentHolderName,
-                CurrentLocation = asset.OfficeName,
-                Condition = asset.AssetConditionName,
+                AssetCode = asset.AssetCode ?? "-",
+                AssetName = asset.AssetName ?? "-",
+                CurrentStatus = currentStatus ?? "Available",
+                CategoryName = asset.CategoryName ?? "-",
+                CurrentHolderName = currentHolderName ?? "-",
+                CurrentLocation = asset.OfficeName ?? "-",
+                Condition = asset.AssetConditionName ?? "-",
                 IsOnLoan = isOnLoan,
                 IsInMaintenance = isInMaintenance,
                 IsOverdue = isOverdue,

@@ -75,7 +75,6 @@ const AssetsMenu = () => {
     return activeTab === "Active" || activeTab === "Inactive";
   }, [activeTab]);
 
-  // Check if Operational Office is Yes - show/hide office field
   const showOfficeField = formData.operasionalOffice === true;
 
   const buildFilters = useCallback(() => {
@@ -149,7 +148,6 @@ const AssetsMenu = () => {
   }, [reload, queryClient, toast, confirmDelete]);
 
   const onSubmit = useCallback(async () => {
-    // Validate Operational Office rule
     if (formData.operasionalOffice === true && !formData.officeId) {
       toast.error('Office is required when Operational Office is enabled');
       return false;
@@ -277,12 +275,24 @@ const AssetsMenu = () => {
     },
     { field: "displayCondition", headerName: "Condition", width: 100 },
     { field: "officeName", headerName: "Office", width: 150 },
-    { 
-      field: "purchasePrice", 
-      headerName: "Price", 
-      width: 130, 
-      valueFormatter: (p) => p?.value ? utilsHelper.formatCurrency(p.value) : '-'
-    },
+  { 
+    field: "purchasePrice", 
+    headerName: "Price", 
+    width: 130,
+    renderCell: (params) => {
+      const value = params.row?.purchasePrice ?? params.value;
+      // Handle null, undefined, empty
+      if (value === null || value === undefined || value === '') {
+        return <span style={{ color: 'var(--text-secondary)' }}>-</span>;
+      }
+      // Convert string to number if needed
+      const numValue = typeof value === 'string' ? parseFloat(value) : value;
+      if (isNaN(numValue) || numValue === 0) {
+        return <span style={{ color: 'var(--text-secondary)' }}>-</span>;
+      }
+      return <span>{utilsHelper.formatCurrency(numValue)}</span>;
+    }
+  },
     actionColumn,
   ], [actionColumn]);
 
@@ -365,7 +375,6 @@ const AssetsMenu = () => {
                 onChange={(e) => {
                   const val = e.target.value === "true";
                   setFormField('operasionalOffice')(val);
-                  // If set to No, clear officeId
                   if (!val) {
                     setFormField('officeId')("");
                   }
@@ -376,7 +385,7 @@ const AssetsMenu = () => {
             {showOfficeField && (
               <Grid item xs={12} sm={6}>
                 <Select 
-                  label="Office" 
+                  label="Office *" 
                   value={formData.officeId || ""} 
                   onChange={(e) => setFormField('officeId')(e.target.value)} 
                   options={officeOptions} 
@@ -439,17 +448,8 @@ const AssetsMenu = () => {
           </Grid>
         </FormSection>
 
-        <FormSection title="Location & Depreciation" description="Office assignment and financial depreciation">
+        <FormSection title="Depreciation" description="Financial depreciation information">
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
-              <Select 
-                label="Office" 
-                value={formData.officeId || ""} 
-                onChange={(e) => setFormField('officeId')(e.target.value)} 
-                options={officeOptions} 
-                disabled={!showOfficeField}
-              />
-            </Grid>
             <Grid item xs={12} sm={4}>
               <NumberInput label="Residual Value" value={formData.residualValue} onChange={(e) => setFormField('residualValue')(e.target.value)} prefix="Rp " thousandSeparator={true} decimalScale={0} />
             </Grid>

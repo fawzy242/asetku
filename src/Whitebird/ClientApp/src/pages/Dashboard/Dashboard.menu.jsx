@@ -37,33 +37,8 @@ const StatCard = ({ icon: Icon, label, value, color, bgColor, onClick, clickable
   </div>
 );
 
-// Drilldown columns - Enhanced
-const drilldownColumns = [
-  { field: "assetCode", headerName: "Code", width: 120 },
-  { field: "assetName", headerName: "Name", flex: 1, minWidth: 180 },
-  { field: "categoryName", headerName: "Category", width: 150 },
-  { field: "officeName", headerName: "Office", width: 150 },
-  { field: "employeeName", headerName: "Employee", width: 150 },
-  { field: "departmentName", headerName: "Department", width: 150 },
-  { 
-    field: "currentStatus", 
-    headerName: "Status", 
-    width: 140, 
-    renderCell: (p) => {
-      const status = p?.value || '-';
-      return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
-    }
-  },
-  { 
-    field: "lastTransactionDate", 
-    headerName: "Last Transaction", 
-    width: 180, 
-    valueFormatter: (p) => p?.value ? utilsHelper.formatDateTime(p.value) : '-' 
-  },
-];
-
 const transactionColumns = [
-  { field: "assetCode", headerName: "Asset Code", width: 120 },
+  { field: "assetCode", headerName: "Code", width: 120 },
   { field: "assetName", headerName: "Asset Name", flex: 1, minWidth: 180 },
   { field: "transactionTypeName", headerName: "Type", width: 150 },
   { field: "fromEmployeeName", headerName: "From", width: 150 },
@@ -74,24 +49,62 @@ const transactionColumns = [
     if (p?.value === false) status = 'Rejected'; 
     return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
   } },
-  { field: "transactionDate", headerName: "Date", width: 160, valueFormatter: (p) => p?.value ? utilsHelper.formatDateTime(p.value) : '-' },
+  { 
+    field: "transactionDate", 
+    headerName: "Date", 
+    width: 180,
+    valueFormatter: (p) => {
+      if (!p?.value) return '-';
+      return utilsHelper.formatDateTime(p.value);
+    }
+  },
+];
+
+const expiredWarrantyColumns = [
+  { field: "assetCode", headerName: "Code", width: 120 },
+  { field: "assetName", headerName: "Name", flex: 1, minWidth: 180 },
+  { field: "categoryName", headerName: "Category", width: 150 },
+  { field: "officeName", headerName: "Office", width: 150 },
+  { 
+    field: "warrantyExpiryDate", 
+    headerName: "Expiry Date", 
+    width: 150,
+    valueFormatter: (p) => {
+      if (!p?.value) return '-';
+      return utilsHelper.formatDate(p.value);
+    }
+  },
+  { 
+    field: "purchasePrice", 
+    headerName: "Price", 
+    width: 130,
+    valueFormatter: (p) => {
+      if (!p?.value) return '-';
+      return utilsHelper.formatCurrency(p.value);
+    }
+  },
 ];
 
 const DashboardMenu = () => {
   const [activeTab, setActiveTab] = useState("summary");
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({});
-  const [monthlyStats, setMonthlyStats] = useState([]);
-  const [categoryBreakdown, setCategoryBreakdown] = useState([]);
-  const [expiredWarranty, setExpiredWarranty] = useState([]);
-  const [upcomingMaintenance, setUpcomingMaintenance] = useState([]);
-  const [recentTransactions, setRecentTransactions] = useState({ data: [] });
+  const [dashboardData_, setDashboardData_] = useState({
+    stats: {},
+    monthlyStats: [],
+    categoryBreakdown: [],
+    recentTransactions: [],
+    expiredWarranty: [],
+    upcomingMaintenance: []
+  });
   const [drilldown, setDrilldown] = useState({ isOpen: false, title: '', endpoint: '', params: {}, columns: null });
+  const [expiredWarrantyPage, setExpiredWarrantyPage] = useState(1);
+  const [recentPage, setRecentPage] = useState(1);
   const theme = useUIStore((s) => s.theme);
   const isDark = theme === 'dark';
   const textColor = isDark ? '#f9fafb' : '#111827';
   const gridColor = isDark ? '#374151' : '#e5e7eb';
-  const borderColor = isDark ? '#4b5563' : '#d1d5db';
+
+  const { stats, monthlyStats, categoryBreakdown, recentTransactions, expiredWarranty, upcomingMaintenance } = dashboardData_;
 
   useEffect(() => { loadData(); }, []);
 
@@ -99,17 +112,11 @@ const DashboardMenu = () => {
     setLoading(true);
     const result = await dashboardData.fetchDashboardData();
     if (result.success) {
-      setStats(result.data.stats);
-      setMonthlyStats(result.data.monthlyStats || []);
-      setCategoryBreakdown(result.data.categoryBreakdown || []);
-      setExpiredWarranty(result.data.expiredWarranty || []);
-      setUpcomingMaintenance(result.data.upcomingMaintenance || []);
-      setRecentTransactions(result.data.recentTransactions || { data: [] });
+      setDashboardData_(result.data);
     }
     setLoading(false);
   };
 
-  // Monthly chart data
   const monthlyLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const monthlyDataMap = {};
   monthlyStats.forEach(item => {
@@ -117,12 +124,10 @@ const DashboardMenu = () => {
   });
   const monthlyChartData = monthlyLabels.map((_, idx) => monthlyDataMap[idx] || 0);
 
-  // Category breakdown
   const categoryLabels = categoryBreakdown.map(item => item.category || 'Uncategorized');
   const categoryValues = categoryBreakdown.map(item => item.totalValue);
   const categoryColors = ['#dc2626', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ef4444', '#6b7280'];
 
-  // Status chart
   const statusLabels = ['Available', 'Assigned', 'On Loan', 'In Maintenance', 'Damaged', 'Retired'];
   const statusDataValues = [
     stats.availableAssets || 0,
@@ -159,10 +164,10 @@ const DashboardMenu = () => {
         backgroundColor: isDark ? '#1f2937' : '#ffffff', 
         titleColor: textColor, 
         bodyColor: textColor, 
-        borderColor, 
-        borderWidth: 1, 
-        padding: 10, 
-        cornerRadius: 8, 
+        borderColor: isDark ? '#4b5563' : '#d1d5db',
+        borderWidth: 1,
+        padding: 10,
+        cornerRadius: 8,
         callbacks: { 
           label: (context) => { 
             const label = context.label || ''; 
@@ -187,10 +192,10 @@ const DashboardMenu = () => {
       tension: 0.4, 
       pointBackgroundColor: '#dc2626', 
       pointBorderColor: '#ffffff', 
-      pointBorderWidth: 2, 
-      pointRadius: 4, 
-      pointHoverRadius: 6, 
-      borderWidth: 2 
+      pointBorderWidth: 2,
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      borderWidth: 2
     }] 
   };
   
@@ -203,10 +208,10 @@ const DashboardMenu = () => {
         backgroundColor: isDark ? '#1f2937' : '#ffffff', 
         titleColor: textColor, 
         bodyColor: textColor, 
-        borderColor, 
-        borderWidth: 1, 
-        padding: 10, 
-        cornerRadius: 8, 
+        borderColor: isDark ? '#4b5563' : '#d1d5db',
+        borderWidth: 1,
+        padding: 10,
+        cornerRadius: 8,
         callbacks: { label: (context) => `Transactions: ${context.raw}` } 
       } 
     }, 
@@ -222,10 +227,10 @@ const DashboardMenu = () => {
       label: 'Asset Value (IDR)', 
       data: categoryValues, 
       backgroundColor: categoryColors.slice(0, categoryLabels.length), 
-      borderRadius: 8, 
-      barPercentage: 0.7, 
+      borderRadius: 8,
+      barPercentage: 0.7,
       categoryPercentage: 0.8,
-      hoverBackgroundColor: '#dc2626' 
+      hoverBackgroundColor: '#dc2626'
     }] 
   };
   
@@ -238,10 +243,10 @@ const DashboardMenu = () => {
         backgroundColor: isDark ? '#1f2937' : '#ffffff', 
         titleColor: textColor, 
         bodyColor: textColor, 
-        borderColor, 
-        borderWidth: 1, 
-        padding: 10, 
-        cornerRadius: 8, 
+        borderColor: isDark ? '#4b5563' : '#d1d5db',
+        borderWidth: 1,
+        padding: 10,
+        cornerRadius: 8,
         callbacks: { label: (context) => `Value: ${utilsHelper.formatCurrency(context.raw)}` } 
       } 
     }, 
@@ -255,13 +260,8 @@ const DashboardMenu = () => {
   const thisMonthTransactions = monthlyStats.find(item => item.month === currentMonth + 1);
   const thisMonthCount = thisMonthTransactions?.transactionCount || 0;
 
-  // Calculate additional KPIs
   const assetUtilizationRate = stats.totalAssets > 0 
     ? ((stats.assignedAssets + stats.assetsOnLoan) / stats.totalAssets * 100) 
-    : 0;
-  
-  const assetAvailabilityRate = stats.totalAssets > 0 
-    ? (stats.availableAssets / stats.totalAssets * 100) 
     : 0;
 
   const statCardsConfig = [
@@ -271,7 +271,7 @@ const DashboardMenu = () => {
     { icon: FiLayers, label: 'On Loan', value: stats.assetsOnLoan || 0, endpoint: '/Asset/grid', params: { status: 'On Loan' }, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
     { icon: FiTool, label: 'In Maintenance', value: stats.assetsInMaintenance || 0, endpoint: '/Asset/grid', params: { status: 'In Maintenance' }, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
     { icon: FiShield, label: 'Damaged', value: stats.damagedAssets || 0, endpoint: '/Asset/grid', params: { status: 'Damaged' }, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
-    { icon: FiClock, label: 'Pending Approvals', value: stats.pendingApprovals || 0, endpoint: '/AssetTransaction/grid', params: { approved: null }, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+    { icon: FiClock, label: 'Pending Approvals', value: stats.pendingApprovals || 0, endpoint: '/AssetTransaction/pending-approvals', params: {}, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
     { icon: FiAlertTriangle, label: 'Overdue Loans', value: stats.overdueLoanCount || 0, endpoint: '/AssetTransaction/overdue-loans', params: {}, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
     { icon: FiDollarSign, label: 'Total Value', value: utilsHelper.formatCurrency(stats.totalAssetValue), noDrilldown: true, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
     { icon: FiTrendingUp, label: 'Utilization', value: `${assetUtilizationRate.toFixed(1)}%`, noDrilldown: true, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },
@@ -281,24 +281,26 @@ const DashboardMenu = () => {
 
   const handleCardClick = (card) => {
     if (card.noDrilldown) return;
-    
-    let columns = null;
-    if (card.label.includes('Transaction') || card.label.includes('Pending') || card.label.includes('Approvals')) {
-      columns = transactionColumns;
-    } else {
-      columns = drilldownColumns;
-    }
-    
     setDrilldown({ 
       isOpen: true, 
       title: `${card.label} Details`, 
       endpoint: card.endpoint, 
-      params: card.params, 
-      columns: columns 
+      params: card.params || {}, 
+      columns: transactionColumns
     });
   };
 
   if (loading) return <div className="page-loading"><Spinner size="lg" /></div>;
+
+  const paginatedExpiredWarranty = expiredWarranty.slice(
+    (expiredWarrantyPage - 1) * 10,
+    expiredWarrantyPage * 10
+  );
+
+  const paginatedRecent = recentTransactions.slice(
+    (recentPage - 1) * 10,
+    recentPage * 10
+  );
 
   return (
     <div className="dashboard fade-transition">
@@ -309,7 +311,6 @@ const DashboardMenu = () => {
 
       <Tabs tabs={DASHBOARD_TABS} activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* Summary Tab */}
       {activeTab === "summary" && (
         <div className="dashboard__tab-content">
           <div className="dashboard__stats">
@@ -327,76 +328,64 @@ const DashboardMenu = () => {
             ))}
           </div>
 
-          {/* Alerts Section - Full Width Cards */}
-          <div className="dashboard__alerts">
-            {expiredWarranty.length > 0 && (
-              <div className="dashboard__alert-wrapper">
-                <Card className="dashboard__alert-card">
-                  <div className="dashboard__alert-header">
-                    <div className="dashboard__alert-title-group">
-                      <FiAlertTriangle className="dashboard__alert-icon" style={{ color: '#ef4444' }} />
-                      <Typography variant="h6" fontWeight={600}>Expired Warranty</Typography>
-                      <Chip label={`${expiredWarranty.length} assets`} size="small" className="dashboard__alert-count" />
+          {expiredWarranty.length > 0 && (
+            <div className="dashboard__alert-wrapper">
+              <Card className="dashboard__alert-card">
+                <div className="dashboard__alert-header">
+                  <div className="dashboard__alert-title-group">
+                    <FiAlertTriangle className="dashboard__alert-icon" style={{ color: '#ef4444' }} />
+                    <Typography variant="h6" fontWeight={600}>Expired Warranty</Typography>
+                    <Chip label={`${expiredWarranty.length} assets`} size="small" className="dashboard__alert-count" />
+                  </div>
+                </div>
+                <div className="dashboard__alert-body">
+                  <DataTable 
+                    rows={paginatedExpiredWarranty} 
+                    columns={expiredWarrantyColumns} 
+                    pageSize={10}
+                    page={expiredWarrantyPage}
+                    totalRowCount={expiredWarranty.length}
+                    onPageChange={setExpiredWarrantyPage}
+                    getRowId={(row) => row?.assetId || `ew-${Math.random()}`}
+                    hideFooter={false}
+                    ariaLabel="Expired warranty table"
+                    paginationMode="client"
+                    autoHeight={false}
+                  />
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {upcomingMaintenance.length > 0 && (
+            <div className="dashboard__alert-wrapper">
+              <Card className="dashboard__alert-card">
+                <div className="dashboard__alert-header">
+                  <div className="dashboard__alert-title-group">
+                    <FiCalendar className="dashboard__alert-icon" style={{ color: '#f59e0b' }} />
+                    <Typography variant="h6" fontWeight={600}>Upcoming Maintenance</Typography>
+                    <Chip label={`${upcomingMaintenance.length} assets`} size="small" className="dashboard__alert-count" />
+                  </div>
+                </div>
+                <div className="dashboard__alert-body">
+                  {upcomingMaintenance.map(item => (
+                    <div key={item.assetId} className="dashboard__alert-item">
+                      <div className="dashboard__alert-item-info">
+                        <span className="dashboard__alert-code">{item.assetCode}</span>
+                        <span className="dashboard__alert-name">{item.assetName}</span>
+                        <span className="dashboard__alert-detail">{item.categoryName || ''}</span>
+                        <span className="dashboard__alert-detail">{item.officeName || ''}</span>
+                      </div>
+                      <Chip label={utilsHelper.formatDate(item.nextMaintenanceDate)} size="small" className="dashboard__alert-chip--upcoming" />
                     </div>
-                  </div>
-                  <div className="dashboard__alert-body">
-                    {expiredWarranty.slice(0, 8).map(item => (
-                      <div key={item.assetId} className="dashboard__alert-item">
-                        <div className="dashboard__alert-item-info">
-                          <span className="dashboard__alert-code">{item.assetCode}</span>
-                          <span className="dashboard__alert-name">{item.assetName}</span>
-                          <span className="dashboard__alert-detail">{item.categoryName || ''}</span>
-                          <span className="dashboard__alert-detail">{item.officeName || ''}</span>
-                        </div>
-                        <Chip label={`Expired: ${utilsHelper.formatDate(item.warrantyExpiryDate)}`} size="small" className="dashboard__alert-chip--expired" />
-                      </div>
-                    ))}
-                    {expiredWarranty.length > 8 && (
-                      <div className="dashboard__alert-more">
-                        +{expiredWarranty.length - 8} more expired warranties
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </div>
-            )}
-            
-            {upcomingMaintenance.length > 0 && (
-              <div className="dashboard__alert-wrapper">
-                <Card className="dashboard__alert-card">
-                  <div className="dashboard__alert-header">
-                    <div className="dashboard__alert-title-group">
-                      <FiCalendar className="dashboard__alert-icon" style={{ color: '#f59e0b' }} />
-                      <Typography variant="h6" fontWeight={600}>Upcoming Maintenance</Typography>
-                      <Chip label={`${upcomingMaintenance.length} assets`} size="small" className="dashboard__alert-count" />
-                    </div>
-                  </div>
-                  <div className="dashboard__alert-body">
-                    {upcomingMaintenance.slice(0, 8).map(item => (
-                      <div key={item.assetId} className="dashboard__alert-item">
-                        <div className="dashboard__alert-item-info">
-                          <span className="dashboard__alert-code">{item.assetCode}</span>
-                          <span className="dashboard__alert-name">{item.assetName}</span>
-                          <span className="dashboard__alert-detail">{item.categoryName || ''}</span>
-                          <span className="dashboard__alert-detail">{item.officeName || ''}</span>
-                        </div>
-                        <Chip label={utilsHelper.formatDate(item.nextMaintenanceDate)} size="small" className="dashboard__alert-chip--upcoming" />
-                      </div>
-                    ))}
-                    {upcomingMaintenance.length > 8 && (
-                      <div className="dashboard__alert-more">
-                        +{upcomingMaintenance.length - 8} more upcoming maintenance
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Charts Tab */}
       {activeTab === "charts" && (
         <div className="dashboard__tab-content">
           <div className="dashboard__charts-row">
@@ -431,18 +420,22 @@ const DashboardMenu = () => {
         </div>
       )}
 
-      {/* Recent Tab */}
       {activeTab === "recent" && (
         <div className="dashboard__tab-content">
           <Card title="Recent Transactions">
             <div className="dashboard__table-wrapper">
               <DataTable 
-                rows={recentTransactions.data || []} 
+                rows={paginatedRecent} 
                 columns={transactionColumns} 
-                pageSize={10} 
+                pageSize={10}
+                page={recentPage}
+                totalRowCount={recentTransactions.length}
+                onPageChange={setRecentPage}
                 getRowId={(row) => row?.assetTransactionId || `txn-${Math.random()}`} 
                 hideFooter={false} 
                 ariaLabel="Recent transactions table"
+                paginationMode="client"
+                autoHeight={false}
               />
             </div>
           </Card>
@@ -455,7 +448,7 @@ const DashboardMenu = () => {
         title={drilldown.title} 
         endpoint={drilldown.endpoint} 
         params={drilldown.params} 
-        columns={drilldown.columns} 
+        columns={transactionColumns} 
         size="xl"
       />
     </div>

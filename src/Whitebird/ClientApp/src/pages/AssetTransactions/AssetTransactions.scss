@@ -1,6 +1,5 @@
 @use '../../styles/variables' as *;
 @use '../../styles/mixins' as *;
-@use '../../styles/shared';
 
 .transactions-menu {
     color: var(--text-primary);
@@ -23,6 +22,7 @@
         font-size: $font-size-sm;
         color: var(--text-secondary);
         flex-wrap: wrap;
+        margin-bottom: $spacing-md;
 
         .MuiFormControl-root {
             min-width: 130px;
@@ -31,25 +31,17 @@
 
     &__grid-card {
         margin-bottom: $spacing-xl;
-        
+
         &:last-child {
             margin-bottom: 0;
         }
-    }
-
-    &__table {
-        background-color: var(--card-bg);
-        border-radius: $radius-lg;
-        overflow: hidden;
-        margin-bottom: $spacing-lg;
-        border: 1px solid var(--border);
     }
 
     @include respond-to('sm') {
         &__date-filter {
             flex-direction: column;
             align-items: stretch;
-            
+
             .MuiFormControl-root {
                 min-width: 100%;
             }

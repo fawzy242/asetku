@@ -115,6 +115,16 @@ public class ReportsService : BaseService, IReportsService
     }
 
     /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<RecentTransactionDto>>> GetRecentTransactionsAsync(int limit = 10)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var data = await _repository.GetRecentTransactionsAsync(limit);
+            return ServiceResult<IEnumerable<RecentTransactionDto>>.Success(data);
+        }, "get recent transactions");
+    }
+
+    /// <inheritdoc />
     public async Task<ServiceResult<byte[]>> GenerateAssetTransactionExcelAsync(
         DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null)
     {
@@ -196,7 +206,6 @@ public class ReportsService : BaseService, IReportsService
         using var package = new ExcelPackage();
         var worksheet = package.Workbook.Worksheets.Add(title.Length > 31 ? title.Substring(0, 31) : title);
 
-        // Title Row
         var titleCell = worksheet.Cells["A1:X1"];
         titleCell.Merge = true;
         titleCell.Value = title;
@@ -204,7 +213,6 @@ public class ReportsService : BaseService, IReportsService
         titleCell.Style.Font.Size = 16;
         titleCell.Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
 
-        // Subtitle Row
         var dateCell = worksheet.Cells["A2:X2"];
         dateCell.Merge = true;
         dateCell.Value = $"{subtitle} | Generated on: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
@@ -212,10 +220,7 @@ public class ReportsService : BaseService, IReportsService
         dateCell.Style.Font.Italic = true;
         dateCell.Style.Font.Size = 10;
 
-        // Headers
         AddHeaders(worksheet, 4, typeof(T));
-
-        // Data
         AddData(worksheet, data, 5);
 
         if (worksheet.Dimension != null)

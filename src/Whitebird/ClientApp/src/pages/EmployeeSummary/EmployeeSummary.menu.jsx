@@ -27,14 +27,20 @@ const assetColumns = [
   { 
     field: "sinceDate", 
     headerName: "Since", 
-    width: 120, 
-    valueFormatter: (p) => p?.value ? utilsHelper.formatDate(p.value) : '-' 
+    width: 120,
+    valueFormatter: (p) => {
+      if (!p?.value) return '-';
+      return utilsHelper.formatDate(p.value);
+    }
   },
   { 
     field: "expectedReturnDate", 
     headerName: "Expected Return", 
-    width: 130, 
-    valueFormatter: (p) => p?.value ? utilsHelper.formatDate(p.value) : '-' 
+    width: 130,
+    valueFormatter: (p) => {
+      if (!p?.value) return '-';
+      return utilsHelper.formatDate(p.value);
+    }
   },
   { 
     field: "isOverdue", 
@@ -50,8 +56,11 @@ const assetColumns = [
   { 
     field: "purchasePrice", 
     headerName: "Purchase Price", 
-    width: 130, 
-    valueFormatter: (p) => p?.value ? utilsHelper.formatCurrency(p.value) : '-' 
+    width: 130,
+    valueFormatter: (p) => {
+      if (!p?.value) return '-';
+      return utilsHelper.formatCurrency(p.value);
+    }
   },
 ];
 
@@ -59,16 +68,19 @@ const historyColumns = [
   { 
     field: "transactionDate", 
     headerName: "Date", 
-    width: 180, 
-    valueFormatter: (p) => p?.value ? utilsHelper.formatDateTime(p.value) : '-' 
+    width: 180,
+    valueFormatter: (p) => {
+      if (!p?.value) return '-';
+      return utilsHelper.formatDateTime(p.value);
+    }
   },
   { field: "transactionTypeName", headerName: "Type", width: 150 },
   { field: "assetCode", headerName: "Asset", width: 130 },
   { field: "assetName", headerName: "Asset Name", flex: 1, minWidth: 180 },
-  { field: "fromEmployeeName", headerName: "From", width: 150 },
-  { field: "toEmployeeName", headerName: "To", width: 150 },
-  { field: "conditionAfterName", headerName: "Condition", width: 100 },
-  { field: "notes", headerName: "Notes", width: 200 },
+  { field: "fromEmployeeName", headerName: "From", width: 150, valueFormatter: (p) => p?.value || '-' },
+  { field: "toEmployeeName", headerName: "To", width: 150, valueFormatter: (p) => p?.value || '-' },
+  { field: "conditionAfterName", headerName: "Condition", width: 100, valueFormatter: (p) => p?.value || '-' },
+  { field: "notes", headerName: "Notes", width: 200, valueFormatter: (p) => p?.value || '-' },
 ];
 
 const EmployeeSummaryMenu = () => {
@@ -119,30 +131,40 @@ const EmployeeSummaryMenu = () => {
     }
     setSelectedEmployeeId(employeeId);
     setLoadingData(true);
-    const [detailRes, summaryRes] = await Promise.all([
-      summaryData.fetchEmployeeDetail(employeeId),
-      summaryData.fetchAssetSummary(employeeId)
-    ]);
-    if (isMountedRef.current) {
-      if (detailRes.success) setEmployeeDetail(detailRes.data);
-      if (summaryRes.success) {
-        setAssetSummary(summaryRes.data);
-      } else {
-        setAssetSummary({
-          currentlyHeldAssets: 0,
-          assetsOnLoan: 0,
-          maintenanceAssets: 0,
-          overdueLoans: 0,
-          totalHistoricalAssets: 0,
-          returnedAssets: 0,
-          damagedReturns: 0,
-          currentAssets: [],
-          assetHistory: []
-        });
+    
+    try {
+      const [detailRes, summaryRes] = await Promise.all([
+        summaryData.fetchEmployeeDetail(employeeId),
+        summaryData.fetchAssetSummary(employeeId)
+      ]);
+      
+      if (isMountedRef.current) {
+        if (detailRes.success) setEmployeeDetail(detailRes.data);
+        if (summaryRes.success) {
+          setAssetSummary(summaryRes.data);
+        } else {
+          setAssetSummary({
+            currentlyHeldAssets: 0,
+            assetsOnLoan: 0,
+            maintenanceAssets: 0,
+            overdueLoans: 0,
+            totalHistoricalAssets: 0,
+            returnedAssets: 0,
+            damagedReturns: 0,
+            currentAssets: [],
+            assetHistory: []
+          });
+        }
+        setLoadingData(false);
       }
-      setLoadingData(false);
+    } catch (error) {
+      console.error('Error fetching employee summary:', error);
+      if (isMountedRef.current) {
+        toast.error('Failed to load employee data');
+        setLoadingData(false);
+      }
     }
-  }, []);
+  }, [toast]);
 
   const handleRefresh = useCallback(async () => {
     if (!selectedEmployeeId) return;
@@ -183,7 +205,6 @@ const EmployeeSummaryMenu = () => {
     a => a.status === 'In Maintenance' || a.associationType === 'Maintenance'
   ).length;
 
-  // Asset Category Summary
   const categorySummary = useMemo(() => {
     const currentAssets = assetSummary?.currentAssets || [];
     if (currentAssets.length === 0) return [];
@@ -227,7 +248,6 @@ const EmployeeSummaryMenu = () => {
       </div>
       
       <Grid container spacing={3}>
-        {/* Employee Selection Card */}
         <Grid item xs={12}>
           <Card className="employee-summary__selection-card">
             <div className="employee-summary__selection-content">
@@ -259,7 +279,6 @@ const EmployeeSummaryMenu = () => {
         
         {selectedEmployeeId && !loadingData && employeeDetail && (
           <>
-            {/* Employee Profile Card */}
             <Grid item xs={12}>
               <Card className="employee-summary__profile-card">
                 <Grid container spacing={3} alignItems="center">
@@ -303,7 +322,6 @@ const EmployeeSummaryMenu = () => {
               </Card>
             </Grid>
 
-            {/* Statistics Cards Row */}
             <Grid item xs={12}>
               <Grid container spacing={2}>
                 <Grid item xs={6} sm={4} md={2}>
@@ -353,7 +371,6 @@ const EmployeeSummaryMenu = () => {
               </Grid>
             </Grid>
 
-            {/* Asset Category Summary Card */}
             <Grid item xs={12} md={6}>
               <Card 
                 title="Asset Category Summary" 
@@ -377,7 +394,6 @@ const EmployeeSummaryMenu = () => {
               </Card>
             </Grid>
 
-            {/* Last Transaction Card */}
             <Grid item xs={12} md={6}>
               <Card 
                 title="Last Transaction" 
@@ -419,7 +435,6 @@ const EmployeeSummaryMenu = () => {
               </Card>
             </Grid>
 
-            {/* Current Assets Table */}
             <Grid item xs={12}>
               <Card 
                 title="Current Assets" 
@@ -440,13 +455,13 @@ const EmployeeSummaryMenu = () => {
                     pageSize={10} 
                     getRowId={(row) => row.assetId || `asset-${Math.random()}`} 
                     hideFooter={false}
+                    autoHeight={false}
                     ariaLabel="Employee current assets table"
                   />
                 )}
               </Card>
             </Grid>
 
-            {/* Asset History Table */}
             <Grid item xs={12}>
               <Card 
                 title="Asset History" 
@@ -465,6 +480,7 @@ const EmployeeSummaryMenu = () => {
                     pageSize={10} 
                     getRowId={(row) => row.assetTransactionId || `hist-${Math.random()}`} 
                     hideFooter={false}
+                    autoHeight={false}
                     ariaLabel="Employee asset history table"
                   />
                 )}

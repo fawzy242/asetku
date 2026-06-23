@@ -3,8 +3,7 @@ import {
   FiSearch, FiBox, FiUser, FiMapPin, FiRefreshCw, 
   FiCalendar, FiClock, FiAlertTriangle, FiActivity,
   FiArrowRight, FiCheckCircle, FiXCircle, FiTool,
-  FiArrowUpCircle, FiArrowDownCircle, FiPieChart,
-  FiList, FiMove
+  FiArrowUpCircle, FiArrowDownCircle, FiMove
 } from "react-icons/fi";
 import { 
   Grid, Box, Typography, Avatar, Chip, Paper, 
@@ -18,7 +17,7 @@ import Select from "../../components/atoms/Select/Select";
 import Spinner from "../../components/atoms/Spinner/Spinner";
 import Skeleton from "../../components/atoms/Skeleton/Skeleton";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
-import { TRANSACTION_TYPES } from "../../core/constants/transactionTypes";
+import { TRANSACTION_TYPES, getTransactionTypeName } from "../../core/constants/transactionTypes";
 import { useSweetAlert } from "../../hooks/useSweetAlert";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./AssetTracking.scss";
@@ -26,67 +25,25 @@ import "./AssetTracking.scss";
 const trackingData = new AssetTrackingData();
 
 // ============================================================
-// TIMELINE COLUMNS - Enhanced
+// TIMELINE COLUMNS - Direct mapping from backend response
 // ============================================================
 const timelineColumns = [
   { 
     field: "date", 
     headerName: "Date & Time", 
     width: 180,
-    valueFormatter: (p) => p?.value ? utilsHelper.formatDateTime(p.value) : '-'
+    valueFormatter: (p) => {
+      if (!p?.value) return '-';
+      return utilsHelper.formatDateTime(p.value);
+    }
   },
-  { field: "transactionTypeName", headerName: "Activity Type", width: 160, flex: 0.5 },
-  { field: "fromEmployeeName", headerName: "From", width: 150, valueFormatter: (p) => p?.value || '-' },
-  { field: "toEmployeeName", headerName: "To", width: 150, valueFormatter: (p) => p?.value || '-' },
-  { field: "toLocationName", headerName: "Location", width: 130, valueFormatter: (p) => p?.value || '-' },
-  { field: "conditionBeforeName", headerName: "Before", width: 100, valueFormatter: (p) => p?.value || '-' },
-  { field: "conditionAfterName", headerName: "After", width: 100, valueFormatter: (p) => p?.value || '-' },
+  { field: "activityType", headerName: "Activity Type", width: 160, flex: 0.5 },
+  { field: "previousHolder", headerName: "From", width: 150, valueFormatter: (p) => p?.value || '-' },
+  { field: "newHolder", headerName: "To", width: 150, valueFormatter: (p) => p?.value || '-' },
+  { field: "previousStatus", headerName: "Previous Status", width: 120, valueFormatter: (p) => p?.value || '-' },
+  { field: "newStatus", headerName: "New Status", width: 120, valueFormatter: (p) => p?.value || '-' },
   { field: "notes", headerName: "Notes", flex: 1, minWidth: 200, valueFormatter: (p) => p?.value || '-' },
 ];
-
-const getTransactionIcon = (type) => {
-  switch (type) {
-    case TRANSACTION_TYPES.HANDOVER:
-      return <FiArrowDownCircle size={18} color="#3b82f6" />;
-    case TRANSACTION_TYPES.TRANSFER:
-      return <FiArrowRight size={18} color="#8b5cf6" />;
-    case TRANSACTION_TYPES.LOAN:
-      return <FiArrowUpCircle size={18} color="#f59e0b" />;
-    case TRANSACTION_TYPES.RETURN:
-    case TRANSACTION_TYPES.LOAN_RETURN:
-      return <FiCheckCircle size={18} color="#10b981" />;
-    case TRANSACTION_TYPES.MAINTENANCE:
-      return <FiTool size={18} color="#f59e0b" />;
-    case TRANSACTION_TYPES.POST_MAINTENANCE:
-      return <FiCheckCircle size={18} color="#10b981" />;
-    case TRANSACTION_TYPES.DISPOSAL:
-      return <FiXCircle size={18} color="#ef4444" />;
-    default:
-      return <FiActivity size={18} />;
-  }
-};
-
-const getTransactionColor = (type) => {
-  switch (type) {
-    case TRANSACTION_TYPES.HANDOVER:
-      return '#3b82f6';
-    case TRANSACTION_TYPES.TRANSFER:
-      return '#8b5cf6';
-    case TRANSACTION_TYPES.LOAN:
-      return '#f59e0b';
-    case TRANSACTION_TYPES.RETURN:
-    case TRANSACTION_TYPES.LOAN_RETURN:
-      return '#10b981';
-    case TRANSACTION_TYPES.MAINTENANCE:
-      return '#f59e0b';
-    case TRANSACTION_TYPES.POST_MAINTENANCE:
-      return '#10b981';
-    case TRANSACTION_TYPES.DISPOSAL:
-      return '#ef4444';
-    default:
-      return '#6b7280';
-  }
-};
 
 const AssetTrackingMenu = () => {
   const [loading, setLoading] = useState(true);
@@ -127,6 +84,9 @@ const AssetTrackingMenu = () => {
     }
   };
 
+  // ============================================================
+  // HANDLE ASSET SELECT - Direct mapping from backend response
+  // ============================================================
   const handleAssetSelect = useCallback(async (assetId) => {
     if (!assetId) { 
       setSelectedAssetId(null); 
@@ -135,54 +95,82 @@ const AssetTrackingMenu = () => {
     }
     setSelectedAssetId(assetId);
     setLoadingData(true);
-    const trackingRes = await trackingData.fetchAssetTracking(assetId);
-    if (isMountedRef.current) {
-      if (trackingRes.success && trackingRes.data) {
-        setTrackingData_(trackingRes.data);
-      } else {
-        const [detailRes, transRes] = await Promise.all([
-          trackingData.fetchAssetDetail(assetId),
-          trackingData.fetchTransactions(assetId)
-        ]);
-        if (isMountedRef.current) {
-          const transactions = transRes.data || [];
-          const timeline = transactions.map(tx => ({
-            id: tx.assetTransactionId || `tx-${Date.now()}-${Math.random()}`,
-            date: tx.transactionDate,
-            transactionType: tx.transactionType,
-            transactionTypeName: tx.transactionTypeName || tx.transactionType,
-            fromEmployeeName: tx.fromEmployeeName,
-            toEmployeeName: tx.toEmployeeName,
-            toLocationName: tx.toLocationName,
-            conditionBeforeName: tx.conditionBeforeName,
-            conditionAfterName: tx.conditionAfterName,
-            notes: tx.notes,
-            icon: getTransactionIcon(tx.transactionType),
-            color: getTransactionColor(tx.transactionType)
-          }));
+    
+    try {
+      const trackingRes = await trackingData.fetchAssetTracking(assetId);
+      
+      if (isMountedRef.current) {
+        if (trackingRes.success && trackingRes.data) {
+          const data = trackingRes.data;
+          
+          // Direct mapping - backend sudah mengembalikan data lengkap
           setTrackingData_({
-            assetId: detailRes.data?.assetId,
-            assetCode: detailRes.data?.assetCode,
-            assetName: detailRes.data?.assetName,
-            currentStatus: detailRes.data?.currentStatus || 'Available',
-            categoryName: detailRes.data?.categoryName,
-            currentHolderName: detailRes.data?.currentHolderName,
-            currentLocation: detailRes.data?.officeName,
-            condition: detailRes.data?.assetConditionName,
-            isOnLoan: detailRes.data?.currentStatus === 'On Loan',
-            isInMaintenance: detailRes.data?.currentStatus === 'In Maintenance',
-            isOverdue: detailRes.data?.isOverdue || false,
-            loanDueDate: detailRes.data?.expectedReturnDate,
-            totalTransactions: transactions.length,
-            timeline: timeline
+            assetId: data.assetId,
+            assetCode: data.assetCode || '-',
+            assetName: data.assetName || '-',
+            currentStatus: data.currentStatus || 'Available',
+            categoryName: data.categoryName || '-',
+            currentHolderName: data.currentHolderName || '-',
+            currentLocation: data.currentLocation || '-',
+            condition: data.condition || '-',
+            isOnLoan: data.isOnLoan || false,
+            isInMaintenance: data.isInMaintenance || false,
+            isOverdue: data.isOverdue || false,
+            loanDueDate: data.loanDueDate,
+            totalTransactions: data.totalTransactions || 0,
+            timeline: data.timeline || []
           });
+        } else {
+          // Fallback: Fetch detail and transactions separately
+          const [detailRes, transRes] = await Promise.all([
+            trackingData.fetchAssetDetail(assetId),
+            trackingData.fetchTransactions(assetId)
+          ]);
+          
+          if (isMountedRef.current) {
+            const transactions = transRes.data || [];
+            const timeline = transactions.map(tx => ({
+              id: tx.assetTransactionId,
+              date: tx.transactionDate || new Date().toISOString(),
+              activityType: tx.transactionTypeName || getTransactionTypeName(tx.transactionType) || 'Unknown',
+              previousHolder: tx.fromEmployeeName || '-',
+              newHolder: tx.toEmployeeName || '-',
+              previousStatus: tx.conditionBeforeName || '-',
+              newStatus: tx.conditionAfterName || '-',
+              notes: tx.notes || '-'
+            }));
+            
+            setTrackingData_({
+              assetId: detailRes.data?.assetId,
+              assetCode: detailRes.data?.assetCode || '-',
+              assetName: detailRes.data?.assetName || '-',
+              currentStatus: detailRes.data?.currentStatus || 'Available',
+              categoryName: detailRes.data?.categoryName || '-',
+              currentHolderName: detailRes.data?.currentHolderName || '-',
+              currentLocation: detailRes.data?.officeName || '-',
+              condition: detailRes.data?.assetConditionName || '-',
+              isOnLoan: detailRes.data?.currentStatus === 'On Loan',
+              isInMaintenance: detailRes.data?.currentStatus === 'In Maintenance',
+              isOverdue: detailRes.data?.isOverdue || false,
+              loanDueDate: detailRes.data?.expectedReturnDate,
+              totalTransactions: transactions.length,
+              timeline: timeline
+            });
+          }
         }
       }
-      setLoadingData(false);
+    } catch (error) {
+      console.error('Error fetching asset tracking data:', error);
+      if (isMountedRef.current) {
+        toast.error('Failed to load asset tracking data');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setLoadingData(false);
+      }
     }
-  }, []);
+  }, [toast]);
 
-  // Refresh function
   const handleRefresh = useCallback(async () => {
     if (!selectedAssetId) return;
     setLoadingData(true);
@@ -217,22 +205,30 @@ const AssetTrackingMenu = () => {
   const timeline = trackingData_?.timeline || [];
   const currentAsset = trackingData_;
 
-  // Filter timeline by transaction type category
+  // ============================================================
+  // FILTER TIMELINE BY CATEGORY
+  // ============================================================
   const filteredTimeline = useMemo(() => {
     if (historyFilter === 'all') return timeline;
     
+    // Filter berdasarkan activityType
     const filterMap = {
-      'movement': [TRANSACTION_TYPES.HANDOVER, TRANSACTION_TYPES.TRANSFER, TRANSACTION_TYPES.RETURN],
-      'loan': [TRANSACTION_TYPES.LOAN, TRANSACTION_TYPES.LOAN_RETURN],
-      'maintenance': [TRANSACTION_TYPES.MAINTENANCE, TRANSACTION_TYPES.POST_MAINTENANCE],
-      'disposal': [TRANSACTION_TYPES.DISPOSAL]
+      'movement': ['HANDOVER', 'TRANSFER', 'RETURN'],
+      'loan': ['LOAN', 'LOAN_RETURN'],
+      'maintenance': ['MAINTENANCE', 'POST_MAINTENANCE'],
+      'disposal': ['DISPOSAL']
     };
     
     const allowedTypes = filterMap[historyFilter] || [];
-    return timeline.filter(t => allowedTypes.includes(t.transactionType));
+    return timeline.filter(t => {
+      const type = t.activityType?.toUpperCase() || '';
+      return allowedTypes.some(at => type.includes(at));
+    });
   }, [timeline, historyFilter]);
 
-  // Calculate statistics per category
+  // ============================================================
+  // STATISTICS PER CATEGORY
+  // ============================================================
   const stats = useMemo(() => {
     const result = {
       totalMovements: 0,
@@ -242,16 +238,17 @@ const AssetTrackingMenu = () => {
     };
     
     timeline.forEach(t => {
-      if ([TRANSACTION_TYPES.HANDOVER, TRANSACTION_TYPES.TRANSFER, TRANSACTION_TYPES.RETURN].includes(t.transactionType)) {
+      const type = t.activityType?.toUpperCase() || '';
+      if (['HANDOVER', 'TRANSFER', 'RETURN'].some(at => type.includes(at))) {
         result.totalMovements++;
       }
-      if ([TRANSACTION_TYPES.LOAN, TRANSACTION_TYPES.LOAN_RETURN].includes(t.transactionType)) {
+      if (['LOAN', 'LOAN_RETURN'].some(at => type.includes(at))) {
         result.totalLoans++;
       }
-      if ([TRANSACTION_TYPES.MAINTENANCE, TRANSACTION_TYPES.POST_MAINTENANCE].includes(t.transactionType)) {
+      if (['MAINTENANCE', 'POST_MAINTENANCE'].some(at => type.includes(at))) {
         result.totalMaintenance++;
       }
-      if (t.transactionType === TRANSACTION_TYPES.DISPOSAL) {
+      if (type.includes('DISPOSAL')) {
         result.totalDisposals++;
       }
     });
@@ -296,7 +293,9 @@ const AssetTrackingMenu = () => {
       </div>
       
       <Grid container spacing={3}>
-        {/* Asset Selection Card */}
+        {/* ============================================================ */}
+        {/* ASSET SELECTION CARD */}
+        {/* ============================================================ */}
         <Grid item xs={12}>
           <Card className="asset-tracking__selection-card">
             <div className="asset-tracking__selection-content">
@@ -315,9 +314,11 @@ const AssetTrackingMenu = () => {
           </Card>
         </Grid>
         
+        {/* ============================================================ */}
+        {/* ASSET PROFILE - Data from server */}
+        {/* ============================================================ */}
         {selectedAssetId && !loadingData && currentAsset && (
           <>
-            {/* Asset Profile Card */}
             <Grid item xs={12}>
               <Card className="asset-tracking__profile-card">
                 <Grid container spacing={3} alignItems="center">
@@ -364,12 +365,19 @@ const AssetTrackingMenu = () => {
                         </span>
                       </div>
                     )}
+                    <div className="asset-tracking__info-row">
+                      <FiRefreshCw size={16} className="asset-tracking__info-icon" />
+                      <span className="asset-tracking__info-label">Total Transactions:</span>
+                      <span className="asset-tracking__info-value">{currentAsset.totalTransactions || 0}</span>
+                    </div>
                   </Grid>
                 </Grid>
               </Card>
             </Grid>
 
-            {/* Statistics Cards Row */}
+            {/* ============================================================ */}
+            {/* STATISTICS CARDS - Data from server */}
+            {/* ============================================================ */}
             <Grid item xs={12}>
               <Grid container spacing={2}>
                 <Grid item xs={6} sm={3}>
@@ -403,7 +411,9 @@ const AssetTrackingMenu = () => {
               </Grid>
             </Grid>
 
-            {/* History Filter Tabs */}
+            {/* ============================================================ */}
+            {/* TIMELINE - With filter tabs */}
+            {/* ============================================================ */}
             <Grid item xs={12}>
               <Card>
                 <Box sx={{ borderBottom: 1, borderColor: 'var(--border)', mb: 2 }}>
@@ -432,7 +442,7 @@ const AssetTrackingMenu = () => {
                   rows={filteredTimeline} 
                   columns={timelineColumns} 
                   pageSize={10}
-                  getRowId={(row, index) => row.id || row.assetTransactionId || `timeline-${row.date}-${row.transactionTypeName}-${index}`}
+                  getRowId={(row, index) => row.id || row.assetTransactionId || `timeline-${row.date}-${row.activityType}-${index}`}
                   hideFooter={false}
                   ariaLabel="Asset timeline table"
                 />
@@ -441,6 +451,9 @@ const AssetTrackingMenu = () => {
           </>
         )}
         
+        {/* ============================================================ */}
+        {/* LOADING STATE */}
+        {/* ============================================================ */}
         {selectedAssetId && loadingData && (
           <Grid item xs={12}>
             <Card>
@@ -451,6 +464,9 @@ const AssetTrackingMenu = () => {
           </Grid>
         )}
 
+        {/* ============================================================ */}
+        {/* EMPTY STATE */}
+        {/* ============================================================ */}
         {!selectedAssetId && !loading && (
           <Grid item xs={12}>
             <Card>

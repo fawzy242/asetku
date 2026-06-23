@@ -26,6 +26,9 @@ public class DashboardStatsViewModel
     [Display(Name = "Disposed Assets")]
     public int DisposedAssets { get; set; }
 
+    [Display(Name = "Damaged Assets")]
+    public int DamagedAssets { get; set; }
+
     // Asset alerts
     [Display(Name = "Expired Warranty")]
     public int ExpiredWarrantyCount { get; set; }
@@ -86,4 +89,7 @@ public class DashboardStatsViewModel
     public decimal AverageAssetValue => TotalAssets > 0
         ? TotalAssetValue / TotalAssets
         : 0;
+
+    // Recent transactions
+    public IEnumerable<RecentTransactionDto> RecentTransactions { get; set; } = new List<RecentTransactionDto>();
 }

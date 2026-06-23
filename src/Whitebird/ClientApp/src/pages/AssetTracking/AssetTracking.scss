@@ -1,10 +1,5 @@
 @use '../../styles/variables' as *;
 @use '../../styles/mixins' as *;
-@use '../../styles/shared';
-
-// ============================================================
-// AssetTracking Styles
-// ============================================================
 
 .asset-tracking {
     color: var(--text-primary);
@@ -20,7 +15,8 @@
         border: 1px solid var(--border);
         width: 40px;
         height: 40px;
-        
+        border-radius: $radius-md;
+
         &:hover {
             background-color: var(--primary);
             color: white;
@@ -28,7 +24,6 @@
         }
     }
 
-    // Selection Card
     &__selection-card {
         .MuiCard__body {
             padding: $spacing-md;
@@ -58,7 +53,6 @@
         min-width: 250px;
     }
 
-    // Profile Card
     &__profile-card {
         .MuiCard__body {
             padding: $spacing-lg;
@@ -85,7 +79,6 @@
         margin-bottom: $spacing-md;
     }
 
-    // Info Row
     &__info-row {
         display: flex;
         align-items: center;
@@ -114,7 +107,6 @@
         flex-wrap: wrap;
     }
 
-    // Stat Card
     &__stat-card {
         padding: $spacing-lg;
         text-align: center;
@@ -138,12 +130,11 @@
         margin-bottom: $spacing-xs;
     }
 
-    // Empty State
     &__empty-state {
         text-align: center;
         padding: $spacing-3xl;
         color: var(--text-secondary);
-        
+
         svg {
             margin-bottom: $spacing-lg;
             opacity: 0.5;
@@ -157,30 +148,29 @@
     }
 }
 
-// Dark mode specific
 [data-theme='dark'] {
     .asset-tracking {
         &__selection-icon {
             background-color: rgba(239, 68, 68, 0.15);
         }
-        
+
         &__refresh-header-btn {
             background-color: #374151;
             border-color: #4b5563;
-            
+
             &:hover {
                 background-color: #ef4444;
             }
         }
-        
+
         &__profile-avatar {
             background-color: #ef4444;
         }
-        
+
         &__stat-card {
             background-color: #1f2937;
             border-color: #374151;
-            
+
             &:hover {
                 border-color: #ef4444;
             }

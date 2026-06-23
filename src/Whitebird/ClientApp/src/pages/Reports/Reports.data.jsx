@@ -84,10 +84,6 @@ class ReportsData extends BaseData {
     }
   }
 
-  // ============================================================
-  // EXCEL EXPORT METHODS - With proper blob handling
-  // ============================================================
-
   async exportTransaction(params) {
     try {
       const blob = await this.api.exportAssetTransactionExcel(params);

@@ -2,7 +2,6 @@ import apiService from '../../core/services/api.service';
 import utilsHelper from '../../core/utils/utils.helper';
 
 class AssetTransactionsApi {
-  // Basic CRUD
   async getAll() { 
     return (await apiService.get('/AssetTransaction')).data; 
   }
@@ -12,7 +11,17 @@ class AssetTransactionsApi {
   }
   
   async getGridData(params) { 
-    return (await apiService.get(`/AssetTransaction/grid${utilsHelper.buildQueryString(params)}`)).data; 
+    // Build query params dengan date filter
+    const queryParams = {};
+    if (params.page) queryParams.page = params.page;
+    if (params.pageSize) queryParams.pageSize = params.pageSize;
+    if (params.search) queryParams.search = params.search;
+    if (params.approved !== undefined && params.approved !== null) queryParams.approved = params.approved;
+    if (params.startDate) queryParams.startDate = params.startDate;
+    if (params.endDate) queryParams.endDate = params.endDate;
+    if (params.assetId) queryParams.assetId = params.assetId;
+    
+    return (await apiService.get(`/AssetTransaction/grid${utilsHelper.buildQueryString(queryParams)}`)).data; 
   }
   
   async getByAssetId(assetId) { 
@@ -59,7 +68,6 @@ class AssetTransactionsApi {
     return (await apiService.post(`/AssetTransaction/${id}/cancel`)).data; 
   }
   
-  // NEW: Shortcut endpoints
   async createReturnTransaction(id, data) {
     return (await apiService.post(`/AssetTransaction/${id}/return-shortcut`, data)).data;
   }
@@ -68,7 +76,6 @@ class AssetTransactionsApi {
     return (await apiService.post(`/AssetTransaction/${id}/post-maintenance`, data)).data;
   }
   
-  // Import
   async import(file) {
     const formData = new FormData();
     formData.append('file', file);
@@ -82,7 +89,6 @@ class AssetTransactionsApi {
     return response.data;
   }
   
-  // Reference Data
   async getAssets() { 
     return (await apiService.get('/Asset')).data; 
   }

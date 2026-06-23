@@ -11,7 +11,6 @@
         margin-top: $spacing-xs;
     }
 
-    // Selection Card
     &__selection-card {
         .MuiCard__body {
             padding: $spacing-md;
@@ -44,7 +43,7 @@
     &__refresh-btn {
         background-color: var(--surface);
         border: 1px solid var(--border);
-        
+
         &:hover {
             background-color: var(--primary);
             color: white;
@@ -52,7 +51,6 @@
         }
     }
 
-    // Profile Card
     &__profile-card {
         .MuiCard__body {
             padding: $spacing-lg;
@@ -78,7 +76,6 @@
         margin-top: $spacing-sm;
     }
 
-    // Info Row
     &__info-row {
         display: flex;
         align-items: center;
@@ -102,7 +99,6 @@
         color: var(--text-primary);
     }
 
-    // Stat Card
     &__stat-card {
         padding: $spacing-lg;
         text-align: center;
@@ -126,12 +122,76 @@
         margin-bottom: $spacing-xs;
     }
 
-    // Empty State
+    &__category-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: $spacing-sm;
+    }
+
+    &__category-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: $spacing-sm $spacing-md;
+        background-color: var(--surface);
+        border-radius: $radius-md;
+        border: 1px solid var(--border);
+        transition: all $transition-fast;
+
+        &:hover {
+            border-color: var(--primary);
+            transform: translateY(-1px);
+        }
+    }
+
+    &__category-name {
+        font-size: $font-size-sm;
+        color: var(--text-primary);
+    }
+
+    &__category-count {
+        font-weight: 600;
+        color: var(--primary);
+        background-color: rgba(220, 38, 38, 0.1);
+        padding: 0 $spacing-sm;
+        border-radius: $radius-sm;
+        font-size: $font-size-sm;
+    }
+
+    &__last-transaction {
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-sm;
+    }
+
+    &__last-transaction-row {
+        display: flex;
+        gap: $spacing-md;
+        padding: $spacing-sm 0;
+        border-bottom: 1px solid var(--border);
+
+        &:last-child {
+            border-bottom: none;
+        }
+    }
+
+    &__last-transaction-label {
+        min-width: 80px;
+        font-size: $font-size-sm;
+        color: var(--text-secondary);
+    }
+
+    &__last-transaction-value {
+        font-size: $font-size-sm;
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+
     &__empty-state {
         text-align: center;
         padding: $spacing-3xl;
         color: var(--text-secondary);
-        
+
         svg {
             margin-bottom: $spacing-lg;
             opacity: 0.5;
@@ -155,33 +215,57 @@
     }
 }
 
-// Dark mode specific
 [data-theme='dark'] {
     .employee-summary {
         &__selection-icon {
             background-color: rgba(239, 68, 68, 0.15);
         }
-        
+
         &__refresh-btn {
             background-color: #374151;
             border-color: #4b5563;
-            
+
             &:hover {
                 background-color: #ef4444;
             }
         }
-        
+
         &__profile-avatar {
             background-color: #ef4444;
         }
-        
+
         &__stat-card {
             background-color: #1f2937;
             border-color: #374151;
-            
+
             &:hover {
                 border-color: #ef4444;
             }
+        }
+
+        &__category-item {
+            background-color: #1f2937;
+            border-color: #374151;
+
+            &:hover {
+                border-color: #ef4444;
+            }
+        }
+
+        &__category-name {
+            color: #f9fafb;
+        }
+
+        &__category-count {
+            background-color: rgba(239, 68, 68, 0.15);
+        }
+
+        &__last-transaction-row {
+            border-bottom-color: #374151;
+        }
+
+        &__last-transaction-value {
+            color: #f9fafb;
         }
     }
 }

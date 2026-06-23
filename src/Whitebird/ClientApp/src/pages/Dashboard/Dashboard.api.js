@@ -14,6 +14,10 @@ class DashboardApi {
     return (await apiService.get('/Reports/dashboard/category-breakdown')).data; 
   }
   
+  async getRecentTransactions(limit = 10) { 
+    return (await apiService.get(`/Reports/dashboard/recent-transactions?limit=${limit}`)).data; 
+  }
+  
   async getExpiredWarranty() { 
     return (await apiService.get('/Asset/expired-warranty')).data; 
   }
@@ -24,10 +28,6 @@ class DashboardApi {
   
   async getPendingApprovals() { 
     return (await apiService.get('/AssetTransaction/pending-approvals')).data; 
-  }
-  
-  async getRecentTransactions() { 
-    return (await apiService.get('/AssetTransaction/grid?page=1&pageSize=5')).data; 
   }
 }
 

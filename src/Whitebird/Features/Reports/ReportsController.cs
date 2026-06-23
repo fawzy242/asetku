@@ -19,7 +19,7 @@ public class ReportsController : ControllerBase
     }
 
     // ============================================================
-    // DASHBOARD
+    // DASHBOARD - COMPLETE
     // ============================================================
 
     [HttpGet("dashboard/stats")]
@@ -36,6 +36,10 @@ public class ReportsController : ControllerBase
     [HttpGet("dashboard/category-breakdown")]
     public async Task<IActionResult> GetCategoryBreakdown()
         => this.HandleResult(await _reportService.GetCategoryBreakdownAsync());
+
+    [HttpGet("dashboard/recent-transactions")]
+    public async Task<IActionResult> GetRecentTransactions([FromQuery] int limit = 10)
+        => this.HandleResult(await _reportService.GetRecentTransactionsAsync(limit));
 
     // ============================================================
     // ASSET TRANSACTION REPORT

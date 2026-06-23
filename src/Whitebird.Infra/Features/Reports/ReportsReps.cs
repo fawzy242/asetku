@@ -17,7 +17,6 @@ public class ReportsReps : IReportsReps
         _context = context;
     }
 
-    /// <inheritdoc />
     public async Task<IEnumerable<ReportsAssetTransactionViewModel>> GetAssetTransactionReportsAsync(
         DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null)
     {
@@ -71,7 +70,6 @@ public class ReportsReps : IReportsReps
         return await _context.QueryAsync<ReportsAssetTransactionViewModel>(sql, parameters);
     }
 
-    /// <inheritdoc />
     public async Task<IEnumerable<ReportsAssetInventoryViewModel>> GetAssetInventoryReportsAsync(
         string? status = null, int? categoryId = null, int? supplierId = null)
     {
@@ -107,7 +105,7 @@ public class ReportsReps : IReportsReps
             }
             else if (status == "Damaged")
             {
-                conditions.Add("a.AssetCondition = @DamagedCondition");
+                conditions.Add("a.AssetCondition = @DamagedCondition OR a.IsActive = 0");
                 parameters.Add("@DamagedCondition", AssetConditionConstants.DAMAGED);
             }
             else if (status == "On Loan")
@@ -203,7 +201,6 @@ public class ReportsReps : IReportsReps
         return await _context.QueryAsync<ReportsAssetInventoryViewModel>(sql, sqlParams);
     }
 
-    /// <inheritdoc />
     public async Task<IEnumerable<ReportsEmployeeAssetViewModel>> GetEmployeeAssetReportsAsync(
         int? employeeId = null)
     {
@@ -253,7 +250,6 @@ public class ReportsReps : IReportsReps
         return await _context.QueryAsync<ReportsEmployeeAssetViewModel>(sql, parameters);
     }
 
-    /// <inheritdoc />
     public async Task<IEnumerable<ReportsMaintenanceViewModel>> GetMaintenanceReportsAsync(
         DateTime? startDate = null, DateTime? endDate = null, bool? isUpcoming = null)
     {
@@ -329,7 +325,6 @@ public class ReportsReps : IReportsReps
         return await _context.QueryAsync<ReportsMaintenanceViewModel>(sql, sqlParams);
     }
 
-    /// <inheritdoc />
     public async Task<IEnumerable<ReportsFinancialViewModel>> GetFinancialReportsAsync(
         DateTime? startDate = null, DateTime? endDate = null)
     {
@@ -382,43 +377,47 @@ public class ReportsReps : IReportsReps
         return await _context.QueryAsync<ReportsFinancialViewModel>(sql, parameters);
     }
 
-    /// <inheritdoc />
+    // ============================================================
+    // DASHBOARD STATS - COMPLETE
+    // ============================================================
+
     public async Task<DashboardStatsViewModel> GetDashboardStatsAsync()
     {
         const string sql = @"
-            WITH ActiveTransactions AS (
-                SELECT 
-                    AssetId,
-                    TransactionType,
-                    ToEmployeeId,
-                    ExpectedReturnDate,
-                    ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
-                FROM AssetTransaction
-                WHERE Approved = 1
-                  AND FromAssetTransactionId IS NULL
-                  AND IsActive = 1
-            )
+        WITH ActiveTransactions AS (
             SELECT 
-                (SELECT COUNT(*) FROM Asset WHERE IsActive = 1) AS TotalAssets,
-                (SELECT COUNT(*) FROM Asset a WHERE a.IsActive = 1 AND NOT EXISTS (
-                    SELECT 1 FROM ActiveTransactions at WHERE at.AssetId = a.AssetId AND at.rn = 1
-                )) AS AvailableAssets,
-                (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType IN (@HandoverType, @TransferType) AND at.rn = 1) AS AssignedAssets,
-                (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType = @LoanType AND at.rn = 1) AS AssetsOnLoan,
-                (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType = @MaintenanceType AND at.rn = 1) AS AssetsInMaintenance,
-                (SELECT COUNT(DISTINCT AssetId) FROM AssetTransaction WHERE TransactionType = @DisposalType AND Approved = 1 AND IsActive = 1) AS DisposedAssets,
-                (SELECT COUNT(*) FROM Asset WHERE WarrantyExpiryDate < GETDATE() AND WarrantyExpiryDate IS NOT NULL AND IsActive = 1) AS ExpiredWarrantyCount,
-                (SELECT COUNT(*) FROM Asset WHERE NextMaintenanceDate BETWEEN GETDATE() AND DATEADD(DAY, 30, GETDATE()) AND IsActive = 1) AS UpcomingMaintenanceCount,
-                (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType = @LoanType AND at.ExpectedReturnDate < GETDATE() AND at.rn = 1) AS OverdueLoanCount,
-                ISNULL((SELECT SUM(PurchasePrice) FROM Asset WHERE IsActive = 1), 0) AS TotalAssetValue,
-                (SELECT COUNT(*) FROM Employee WHERE IsActive = 1) AS TotalEmployees,
-                (SELECT COUNT(*) FROM Employee WHERE IsActive = 1 AND EmploymentStatus = @PermanentStatus) AS ActiveEmployees,
-                (SELECT COUNT(*) FROM AssetTransaction WHERE Approved IS NULL AND IsActive = 1) AS PendingApprovals,
-                (SELECT COUNT(*) FROM AssetTransaction WHERE Approved = 1 AND TransactionDate >= DATEADD(DAY, -30, GETDATE()) AND IsActive = 1) AS ApprovedTransactions,
-                (SELECT COUNT(*) FROM AssetTransaction WHERE Approved = 0 AND TransactionDate >= DATEADD(DAY, -30, GETDATE()) AND IsActive = 1) AS RejectedTransactions,
-                (SELECT COUNT(*) FROM AssetTransaction WHERE TransactionDate >= DATEADD(DAY, -30, GETDATE()) AND IsActive = 1) AS Last30DaysTransactions,
-                (SELECT COUNT(*) FROM Office WHERE IsActive = 1) AS TotalOffices,
-                (SELECT COUNT(*) FROM Department WHERE IsActive = 1) AS TotalDepartments";
+                AssetId,
+                TransactionType,
+                ToEmployeeId,
+                ExpectedReturnDate,
+                ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
+            FROM AssetTransaction
+            WHERE Approved = 1
+              AND FromAssetTransactionId IS NULL
+              AND IsActive = 1
+        )
+        SELECT 
+            (SELECT COUNT(*) FROM Asset WHERE IsActive = 1) AS TotalAssets,
+            (SELECT COUNT(*) FROM Asset a WHERE a.IsActive = 1 AND NOT EXISTS (
+                SELECT 1 FROM ActiveTransactions at WHERE at.AssetId = a.AssetId AND at.rn = 1
+            )) AS AvailableAssets,
+            (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType IN (@HandoverType, @TransferType) AND at.rn = 1) AS AssignedAssets,
+            (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType = @LoanType AND at.rn = 1) AS AssetsOnLoan,
+            (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType = @MaintenanceType AND at.rn = 1) AS AssetsInMaintenance,
+            (SELECT COUNT(DISTINCT AssetId) FROM AssetTransaction WHERE TransactionType = @DisposalType AND Approved = 1 AND IsActive = 1) AS DisposedAssets,
+            (SELECT COUNT(*) FROM Asset WHERE IsActive = 0 OR AssetCondition = @DamagedCondition) AS DamagedAssets,
+            (SELECT COUNT(*) FROM Asset WHERE WarrantyExpiryDate < GETDATE() AND WarrantyExpiryDate IS NOT NULL AND IsActive = 1) AS ExpiredWarrantyCount,
+            (SELECT COUNT(*) FROM Asset WHERE NextMaintenanceDate BETWEEN GETDATE() AND DATEADD(DAY, 30, GETDATE()) AND IsActive = 1) AS UpcomingMaintenanceCount,
+            (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType = @LoanType AND at.ExpectedReturnDate < GETDATE() AND at.rn = 1) AS OverdueLoanCount,
+            ISNULL((SELECT SUM(PurchasePrice) FROM Asset WHERE IsActive = 1), 0) AS TotalAssetValue,
+            (SELECT COUNT(*) FROM Employee WHERE IsActive = 1) AS TotalEmployees,
+            (SELECT COUNT(*) FROM Employee WHERE IsActive = 1 AND EmploymentStatus = @PermanentStatus) AS ActiveEmployees,
+            (SELECT COUNT(*) FROM AssetTransaction WHERE Approved IS NULL AND IsActive = 1) AS PendingApprovals,
+            (SELECT COUNT(*) FROM AssetTransaction WHERE Approved = 1 AND TransactionDate >= DATEADD(DAY, -30, GETDATE()) AND IsActive = 1) AS ApprovedTransactions,
+            (SELECT COUNT(*) FROM AssetTransaction WHERE Approved = 0 AND TransactionDate >= DATEADD(DAY, -30, GETDATE()) AND IsActive = 1) AS RejectedTransactions,
+            (SELECT COUNT(*) FROM AssetTransaction WHERE TransactionDate >= DATEADD(DAY, -30, GETDATE()) AND IsActive = 1) AS Last30DaysTransactions,
+            (SELECT COUNT(*) FROM Office WHERE IsActive = 1) AS TotalOffices,
+            (SELECT COUNT(*) FROM Department WHERE IsActive = 1) AS TotalDepartments";
 
         var parameters = new
         {
@@ -427,44 +426,13 @@ public class ReportsReps : IReportsReps
             LoanType = TransactionTypeConstants.LOAN,
             MaintenanceType = TransactionTypeConstants.MAINTENANCE,
             DisposalType = TransactionTypeConstants.DISPOSAL,
-            PermanentStatus = EmployeeStatusConstants.PERMANENT
+            PermanentStatus = EmployeeStatusConstants.PERMANENT,
+            DamagedCondition = AssetConditionConstants.DAMAGED
         };
 
         var result = await _context.QueryFirstOrDefaultAsync<DashboardStatsViewModel>(sql, parameters);
         return result ?? new DashboardStatsViewModel();
     }
-
-    /// <inheritdoc />
-    public async Task<int> GetPendingApprovalsCountAsync()
-    {
-        const string sql = "SELECT COUNT(*) FROM AssetTransaction WHERE Approved IS NULL AND IsActive = 1";
-        return await _context.ExecuteScalarAsync<int>(sql);
-    }
-
-    /// <inheritdoc />
-    public async Task<int> GetActiveEmployeesCountAsync()
-    {
-        const string sql = "SELECT COUNT(*) FROM Employee WHERE IsActive = 1 AND EmploymentStatus = @PermanentStatus";
-        return await _context.ExecuteScalarAsync<int>(sql, new { PermanentStatus = EmployeeStatusConstants.PERMANENT });
-    }
-
-    /// <inheritdoc />
-    public async Task<int> GetTotalOfficesCountAsync()
-    {
-        const string sql = "SELECT COUNT(*) FROM Office WHERE IsActive = 1";
-        return await _context.ExecuteScalarAsync<int>(sql);
-    }
-
-    /// <inheritdoc />
-    public async Task<int> GetTotalDepartmentsCountAsync()
-    {
-        const string sql = "SELECT COUNT(*) FROM Department WHERE IsActive = 1";
-        return await _context.ExecuteScalarAsync<int>(sql);
-    }
-
-    // ============================================================
-    // NEW: MONTHLY STATS
-    // ============================================================
 
     public async Task<IEnumerable<MonthlyStatDto>> GetMonthlyStatsAsync(int year)
     {
@@ -479,15 +447,14 @@ public class ReportsReps : IReportsReps
             GROUP BY MONTH(TransactionDate)
             ORDER BY Month";
 
-        var result = await _context.QueryAsync<MonthlyStatDto>(sql, new { Year = year });
-        return result;
+        return await _context.QueryAsync<MonthlyStatDto>(sql, new { Year = year });
     }
 
     public async Task<IEnumerable<CategoryBreakdownDto>> GetCategoryBreakdownAsync()
     {
         const string sql = @"
             SELECT 
-                c.CategoryName as Category,
+                ISNULL(c.CategoryName, 'Uncategorized') as Category,
                 COUNT(a.AssetId) as AssetCount,
                 ISNULL(SUM(a.PurchasePrice), 0) as TotalValue
             FROM Category c
@@ -499,8 +466,46 @@ public class ReportsReps : IReportsReps
         return await _context.QueryAsync<CategoryBreakdownDto>(sql);
     }
 
+    public async Task<IEnumerable<RecentTransactionDto>> GetRecentTransactionsAsync(int limit = 10)
+    {
+        const string sql = @"
+        SELECT TOP (@Limit)
+            t.AssetTransactionId,
+            a.AssetCode,
+            a.AssetName,
+            t.TransactionType,
+            md1.MasterDataName as TransactionTypeName,
+            fe.FullName as FromEmployeeName,
+            te.FullName as ToEmployeeName,
+            t.TransactionDate,
+            t.Approved,
+            t.ExpectedReturnDate,
+            t.Notes
+        FROM AssetTransaction t
+        LEFT JOIN Asset a ON t.AssetId = a.AssetId
+        LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+        LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+        LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
+        WHERE t.IsActive = 1
+        ORDER BY t.TransactionDate DESC";
+
+        return await _context.QueryAsync<RecentTransactionDto>(sql, new { Limit = limit });
+    }
+
+    public async Task<int> GetPendingApprovalsCountAsync()
+    {
+        const string sql = "SELECT COUNT(*) FROM AssetTransaction WHERE Approved IS NULL AND IsActive = 1";
+        return await _context.ExecuteScalarAsync<int>(sql);
+    }
+
+    public async Task<int> GetDamagedAssetsCountAsync()
+    {
+        const string sql = "SELECT COUNT(*) FROM Asset WHERE IsActive = 0 OR AssetCondition = @DamagedCondition";
+        return await _context.ExecuteScalarAsync<int>(sql, new { DamagedCondition = AssetConditionConstants.DAMAGED });
+    }
+
     // ============================================================
-    // EXPORT METHODS - Return same data for Excel export
+    // EXPORT METHODS
     // ============================================================
 
     public async Task<IEnumerable<ReportsAssetTransactionViewModel>> ExportAssetTransactionReportsAsync(
