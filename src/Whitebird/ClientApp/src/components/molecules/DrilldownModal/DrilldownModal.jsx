@@ -6,7 +6,28 @@ import Spinner from '../../atoms/Spinner/Spinner';
 import apiService from '../../../core/services/api.service';
 import { getStatusChipStyles } from '../../../core/constants/statusColors';
 
-const DrilldownModal = ({ isOpen, onClose, title, endpoint, params = {}, columns }) => {
+/**
+ * DrilldownModal - Generic modal for showing detailed data from dashboard cards
+ * @param {Object} props
+ * @param {boolean} props.isOpen - Modal visibility
+ * @param {Function} props.onClose - Close handler
+ * @param {string} props.title - Modal title
+ * @param {string} props.endpoint - API endpoint to fetch data
+ * @param {Object} props.params - Query parameters
+ * @param {Array} props.columns - Grid columns (optional, uses default if not provided)
+ * @param {string} props.size - Modal size (sm, md, lg, xl)
+ * @param {string} props.dataPath - Path to data array in response (e.g., 'data.data')
+ */
+const DrilldownModal = ({ 
+  isOpen, 
+  onClose, 
+  title, 
+  endpoint, 
+  params = {}, 
+  columns = null,
+  size = 'xl',
+  dataPath = 'data.data'
+}) => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -49,20 +70,12 @@ const DrilldownModal = ({ isOpen, onClose, title, endpoint, params = {}, columns
       queryParams.append('page', page);
       queryParams.append('pageSize', pageSize);
       
-      const isOverdueLoans = endpoint === '/AssetTransaction/overdue-loans';
-      const isActiveLoans = endpoint === '/AssetTransaction/active-loans';
-      
-      if (!isOverdueLoans && !isActiveLoans) {
-        Object.entries(params).forEach(([key, value]) => {
-          if (value !== null && value !== undefined && value !== '') {
-            if (key === 'approved' && value === null) {
-              queryParams.append(key, 'null');
-            } else {
-              queryParams.append(key, value);
-            }
-          }
-        });
-      }
+      // Add all params
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== null && value !== undefined && value !== '') {
+          queryParams.append(key, value);
+        }
+      });
       
       const url = `${endpoint}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       
@@ -72,40 +85,45 @@ const DrilldownModal = ({ isOpen, onClose, title, endpoint, params = {}, columns
       
       const responseData = response.data;
       
+      // Extract data using dataPath
       let items = [];
       let total = 0;
-      let totalPagesCount = 1;
       
-      if (responseData?.data?.data && Array.isArray(responseData.data.data)) {
+      // Parse dataPath (e.g., 'data.data' -> responseData.data.data)
+      const pathParts = dataPath.split('.');
+      let current = responseData;
+      for (const part of pathParts) {
+        if (current && current[part] !== undefined) {
+          current = current[part];
+        } else {
+          current = null;
+          break;
+        }
+      }
+      
+      if (Array.isArray(current)) {
+        items = current;
+        total = items.length;
+      } else if (responseData?.data?.data && Array.isArray(responseData.data.data)) {
         items = responseData.data.data;
         total = responseData.data.totalCount || items.length;
-        totalPagesCount = responseData.data.totalPages || Math.ceil(total / pageSize);
-      } 
-      else if (responseData?.data && Array.isArray(responseData.data)) {
+      } else if (responseData?.data && Array.isArray(responseData.data)) {
         items = responseData.data;
         total = items.length;
-        totalPagesCount = Math.ceil(total / pageSize);
-      } 
-      else if (Array.isArray(responseData)) {
+      } else if (Array.isArray(responseData)) {
         items = responseData;
         total = items.length;
-        totalPagesCount = Math.ceil(total / pageSize);
-      } 
-      else if (responseData?.data?.items && Array.isArray(responseData.data.items)) {
+      } else if (responseData?.data?.items && Array.isArray(responseData.data.items)) {
         items = responseData.data.items;
         total = responseData.data.totalCount || items.length;
-        totalPagesCount = responseData.data.totalPages || Math.ceil(total / pageSize);
-      } 
-      else if (responseData?.isSuccess && responseData?.data && Array.isArray(responseData.data)) {
-        items = responseData.data;
-        total = items.length;
-        totalPagesCount = Math.ceil(total / pageSize);
       }
+      
+      const calculatedTotalPages = Math.max(1, Math.ceil(total / pageSize));
       
       if (isMountedRef.current) {
         setData(items);
         setTotalCount(total);
-        setTotalPages(totalPagesCount);
+        setTotalPages(calculatedTotalPages);
       }
     } catch (error) {
       if (error?.name !== 'CanceledError' && error?.message !== 'canceled') {
@@ -121,7 +139,7 @@ const DrilldownModal = ({ isOpen, onClose, title, endpoint, params = {}, columns
         setLoading(false);
       }
     }
-  }, [endpoint, params, page, pageSize]);
+  }, [endpoint, params, page, pageSize, dataPath]);
 
   useEffect(() => {
     if (isOpen && endpoint) {
@@ -133,19 +151,38 @@ const DrilldownModal = ({ isOpen, onClose, title, endpoint, params = {}, columns
     setPage(newPage);
   };
 
-  const defaultColumns = columns || [
-    { field: "assetCode", headerName: "Code", width: 120 },
-    { field: "assetName", headerName: "Name", flex: 1, minWidth: 180 },
-    { 
-      field: "currentStatus", 
-      headerName: "Status", 
-      width: 140, 
-      renderCell: (p) => <Chip label={p?.value || '-'} size="small" sx={getStatusChipStyles(p?.value)} /> 
-    },
-  ];
+  // Default columns - detect if data has 'approved' field for status
+  const defaultColumns = useCallback(() => {
+    const firstItem = data[0] || {};
+    const hasApprovedField = 'approved' in firstItem;
+    
+    return [
+      { field: "assetCode", headerName: "Code", width: 120 },
+      { field: "assetName", headerName: "Name", flex: 1, minWidth: 180 },
+      { 
+        field: hasApprovedField ? "approved" : "currentStatus",
+        headerName: "Status", 
+        width: 140,
+        renderCell: (p) => {
+          let status = 'Pending';
+          if (hasApprovedField) {
+            // Transaction status
+            if (p?.value === true) status = 'Approved';
+            if (p?.value === false) status = 'Rejected';
+          } else {
+            // Asset status
+            status = p?.value || 'Available';
+          }
+          return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
+        }
+      },
+    ];
+  }, [data]);
+
+  const gridColumns = columns || defaultColumns();
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title} size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} title={title} size={size}>
       {loading ? (
         <div className="page-loading"><Spinner size="lg" /></div>
       ) : data.length === 0 ? (
@@ -161,7 +198,7 @@ const DrilldownModal = ({ isOpen, onClose, title, endpoint, params = {}, columns
           </Box>
           <DataTable
             rows={data}
-            columns={defaultColumns}
+            columns={gridColumns}
             pageSize={pageSize}
             getRowId={(row) => row.assetId || row.assetTransactionId || row.id || Math.random().toString()}
             hideFooter={true}

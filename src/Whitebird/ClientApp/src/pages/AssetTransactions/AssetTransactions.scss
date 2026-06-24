@@ -11,21 +11,80 @@
         flex-wrap: wrap;
     }
 
+    &__date-filter-container {
+        margin-bottom: $spacing-md;
+    }
+
     &__date-filter {
         display: flex;
         align-items: center;
-        gap: $spacing-sm;
-        padding: $spacing-xs $spacing-md;
+        gap: $spacing-md;
+        padding: $spacing-sm $spacing-lg;
         background-color: var(--surface);
         border-radius: $radius-md;
         border: 1px solid var(--border);
-        font-size: $font-size-sm;
-        color: var(--text-secondary);
         flex-wrap: wrap;
-        margin-bottom: $spacing-md;
+        min-height: 52px;
+
+        @include respond-to('md') {
+            flex-direction: column;
+            align-items: stretch;
+            gap: $spacing-sm;
+            padding: $spacing-md;
+        }
+    }
+
+    &__date-filter-label {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        color: var(--text-secondary);
+        font-size: $font-size-sm;
+        white-space: nowrap;
+        font-weight: 500;
+
+        svg {
+            color: var(--text-secondary);
+        }
+    }
+
+    &__date-filter-inputs {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        flex-wrap: wrap;
+        flex: 1;
+
+        @include respond-to('md') {
+            flex-direction: column;
+            align-items: stretch;
+            width: 100%;
+        }
 
         .MuiFormControl-root {
-            min-width: 130px;
+            min-width: 150px;
+            max-width: 200px;
+
+            @include respond-to('md') {
+                min-width: 100%;
+                max-width: 100%;
+            }
+        }
+    }
+
+    &__date-filter-separator {
+        color: var(--text-secondary);
+        font-size: $font-size-sm;
+        padding: 0 $spacing-xs;
+    }
+
+    &__date-filter-clear {
+        color: var(--text-secondary);
+        padding: 0 $spacing-sm;
+        font-size: $font-size-xs;
+        
+        &:hover {
+            color: var(--error);
         }
     }
 
@@ -34,17 +93,6 @@
 
         &:last-child {
             margin-bottom: 0;
-        }
-    }
-
-    @include respond-to('sm') {
-        &__date-filter {
-            flex-direction: column;
-            align-items: stretch;
-
-            .MuiFormControl-root {
-                min-width: 100%;
-            }
         }
     }
 }

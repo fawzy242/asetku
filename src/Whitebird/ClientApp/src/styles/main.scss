@@ -2,6 +2,7 @@
 @use 'mixins' as *;
 @use 'themes';
 @use 'shared';
+@use 'utilities'; 
 
 // ============================================================
 // GLOBAL RESET & BASE STYLES
@@ -309,7 +310,7 @@ img {
 }
 
 // ============================================================
-// SWEETALERT2 OVERRIDES
+// SWEETALERT2 OVERRIDES - Full Theming
 // ============================================================
 
 .swal-container {
@@ -334,10 +335,22 @@ img {
   margin-bottom: $spacing-md !important;
 }
 
+.swal-html {
+  color: var(--text-secondary) !important;
+  font-size: $font-size-sm !important;
+  text-align: center !important;
+}
+
 .swal-text {
   color: var(--text-secondary) !important;
   font-size: $font-size-sm !important;
   text-align: center !important;
+}
+
+.swal-actions {
+  gap: $spacing-md !important;
+  padding: $spacing-md 0 0 0 !important;
+  justify-content: center !important;
 }
 
 .swal-footer {
@@ -348,8 +361,90 @@ img {
   gap: $spacing-md !important;
 }
 
+// Confirm Button
+.swal-confirm-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: $spacing-sm !important;
+  padding: $spacing-sm $spacing-xl !important;
+  border-radius: $radius-md !important;
+  font-weight: 500 !important;
+  font-size: $font-size-sm !important;
+  line-height: 1.5 !important;
+  transition: all $transition-fast !important;
+  cursor: pointer !important;
+  border: 1px solid transparent !important;
+  white-space: nowrap !important;
+  height: 38px !important;
+  background-color: var(--primary) !important;
+  color: white !important;
+  
+  &:hover:not(:disabled) {
+    background-color: var(--primary-hover) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: $shadow-md !important;
+  }
+}
+
+// Cancel Button
+.swal-cancel-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: $spacing-sm !important;
+  padding: $spacing-sm $spacing-xl !important;
+  border-radius: $radius-md !important;
+  font-weight: 500 !important;
+  font-size: $font-size-sm !important;
+  line-height: 1.5 !important;
+  transition: all $transition-fast !important;
+  cursor: pointer !important;
+  border: 1px solid var(--border) !important;
+  white-space: nowrap !important;
+  height: 38px !important;
+  background-color: transparent !important;
+  color: var(--text-primary) !important;
+  
+  &:hover:not(:disabled) {
+    background-color: var(--surface) !important;
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
+  }
+}
+
+// Icons - Themed
 .swal-icon {
   margin-bottom: $spacing-md !important;
+  
+  &--success {
+    .swal-icon--success__ring {
+      border-color: var(--success) !important;
+    }
+    .swal-icon--success__line {
+      background-color: var(--success) !important;
+    }
+  }
+  
+  &--warning {
+    border-color: var(--warning) !important;
+    color: var(--warning) !important;
+  }
+  
+  &--error {
+    border-color: var(--error) !important;
+    color: var(--error) !important;
+  }
+  
+  &--info {
+    border-color: var(--info) !important;
+    color: var(--info) !important;
+  }
+  
+  &--question {
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
+  }
 }
 
 .swal-icon--success__ring {
@@ -386,13 +481,29 @@ img {
     color: #f9fafb !important;
   }
   
+  .swal-html {
+    color: #9ca3af !important;
+  }
+  
   .swal-text {
     color: #9ca3af !important;
   }
   
-  .swal-footer {
-    button {
-      background-color: transparent !important;
+  .swal-confirm-btn {
+    background-color: #ef4444 !important;
+    
+    &:hover {
+      background-color: #dc2626 !important;
+    }
+  }
+  
+  .swal-cancel-btn {
+    border-color: #4b5563 !important;
+    color: #f9fafb !important;
+    
+    &:hover {
+      border-color: #ef4444 !important;
+      color: #ef4444 !important;
     }
   }
 }

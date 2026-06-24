@@ -2,8 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { 
   FiSearch, FiBox, FiUser, FiMapPin, FiRefreshCw, 
   FiCalendar, FiClock, FiAlertTriangle, FiActivity,
-  FiArrowRight, FiCheckCircle, FiXCircle, FiTool,
-  FiArrowUpCircle, FiArrowDownCircle, FiMove
+  FiTool, FiMove
 } from "react-icons/fi";
 import { 
   Grid, Box, Typography, Avatar, Chip, Paper, 
@@ -15,9 +14,8 @@ import DataTable from "../../components/molecules/DataTable/DataTable";
 import Card from "../../components/atoms/Card/Card";
 import Select from "../../components/atoms/Select/Select";
 import Spinner from "../../components/atoms/Spinner/Spinner";
-import Skeleton from "../../components/atoms/Skeleton/Skeleton";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
-import { TRANSACTION_TYPES, getTransactionTypeName } from "../../core/constants/transactionTypes";
+import { getTransactionTypeName } from "../../core/constants/transactionTypes";
 import { useSweetAlert } from "../../hooks/useSweetAlert";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./AssetTracking.scss";
@@ -25,24 +23,82 @@ import "./AssetTracking.scss";
 const trackingData = new AssetTrackingData();
 
 // ============================================================
-// TIMELINE COLUMNS - Direct mapping from backend response
+// TIMELINE COLUMNS - Langsung mapping dari response
 // ============================================================
 const timelineColumns = [
   { 
     field: "date", 
     headerName: "Date & Time", 
     width: 180,
-    valueFormatter: (p) => {
-      if (!p?.value) return '-';
-      return utilsHelper.formatDateTime(p.value);
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.date || params?.value;
+      if (!value) return <span>-</span>;
+      return <span>{utilsHelper.formatDateTime(value)}</span>;
     }
   },
-  { field: "activityType", headerName: "Activity Type", width: 160, flex: 0.5 },
-  { field: "previousHolder", headerName: "From", width: 150, valueFormatter: (p) => p?.value || '-' },
-  { field: "newHolder", headerName: "To", width: 150, valueFormatter: (p) => p?.value || '-' },
-  { field: "previousStatus", headerName: "Previous Status", width: 120, valueFormatter: (p) => p?.value || '-' },
-  { field: "newStatus", headerName: "New Status", width: 120, valueFormatter: (p) => p?.value || '-' },
-  { field: "notes", headerName: "Notes", flex: 1, minWidth: 200, valueFormatter: (p) => p?.value || '-' },
+  { 
+    field: "activityType", 
+    headerName: "Activity Type", 
+    width: 160, 
+    flex: 0.5,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.activityType || row.transactionTypeName || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "previousHolder", 
+    headerName: "From", 
+    width: 150,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.previousHolder || row.fromEmployeeName || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "newHolder", 
+    headerName: "To", 
+    width: 150,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.newHolder || row.toEmployeeName || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "previousStatus", 
+    headerName: "Previous Status", 
+    width: 120,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.previousStatus || row.conditionBeforeName || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "newStatus", 
+    headerName: "New Status", 
+    width: 120,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.newStatus || row.conditionAfterName || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "notes", 
+    headerName: "Notes", 
+    flex: 1, 
+    minWidth: 200,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.notes || row.note || '-';
+      return <span>{value}</span>;
+    }
+  },
 ];
 
 const AssetTrackingMenu = () => {
@@ -85,7 +141,7 @@ const AssetTrackingMenu = () => {
   };
 
   // ============================================================
-  // HANDLE ASSET SELECT - Direct mapping from backend response
+  // HANDLE ASSET SELECT - Direct mapping dari response
   // ============================================================
   const handleAssetSelect = useCallback(async (assetId) => {
     if (!assetId) { 
@@ -130,14 +186,14 @@ const AssetTrackingMenu = () => {
           if (isMountedRef.current) {
             const transactions = transRes.data || [];
             const timeline = transactions.map(tx => ({
-              id: tx.assetTransactionId,
-              date: tx.transactionDate || new Date().toISOString(),
-              activityType: tx.transactionTypeName || getTransactionTypeName(tx.transactionType) || 'Unknown',
-              previousHolder: tx.fromEmployeeName || '-',
-              newHolder: tx.toEmployeeName || '-',
-              previousStatus: tx.conditionBeforeName || '-',
-              newStatus: tx.conditionAfterName || '-',
-              notes: tx.notes || '-'
+              id: tx.assetTransactionId || tx.id || Math.random().toString(),
+              date: tx.transactionDate || tx.date || new Date().toISOString(),
+              activityType: tx.transactionTypeName || tx.typeName || getTransactionTypeName(tx.transactionType) || 'Unknown',
+              previousHolder: tx.fromEmployeeName || tx.fromEmployee || tx.fromName || '-',
+              newHolder: tx.toEmployeeName || tx.toEmployee || tx.toName || '-',
+              previousStatus: tx.conditionBeforeName || tx.conditionBefore || tx.prevStatus || '-',
+              newStatus: tx.conditionAfterName || tx.conditionAfter || tx.newStatus || '-',
+              notes: tx.notes || tx.note || '-'
             }));
             
             setTrackingData_({
@@ -211,7 +267,6 @@ const AssetTrackingMenu = () => {
   const filteredTimeline = useMemo(() => {
     if (historyFilter === 'all') return timeline;
     
-    // Filter berdasarkan activityType
     const filterMap = {
       'movement': ['HANDOVER', 'TRANSFER', 'RETURN'],
       'loan': ['LOAN', 'LOAN_RETURN'],
@@ -315,7 +370,7 @@ const AssetTrackingMenu = () => {
         </Grid>
         
         {/* ============================================================ */}
-        {/* ASSET PROFILE - Data from server */}
+        {/* ASSET PROFILE - Data dari server */}
         {/* ============================================================ */}
         {selectedAssetId && !loadingData && currentAsset && (
           <>
@@ -376,7 +431,7 @@ const AssetTrackingMenu = () => {
             </Grid>
 
             {/* ============================================================ */}
-            {/* STATISTICS CARDS - Data from server */}
+            {/* STATISTICS CARDS */}
             {/* ============================================================ */}
             <Grid item xs={12}>
               <Grid container spacing={2}>
@@ -403,7 +458,7 @@ const AssetTrackingMenu = () => {
                 </Grid>
                 <Grid item xs={6} sm={3}>
                   <Paper elevation={0} className="asset-tracking__stat-card">
-                    <FiXCircle size={28} className="asset-tracking__stat-icon" style={{ color: '#ef4444' }} />
+                    <FiClock size={28} className="asset-tracking__stat-icon" style={{ color: '#ef4444' }} />
                     <Typography variant="h4" fontWeight={700}>{stats.totalDisposals}</Typography>
                     <Typography variant="caption" color="text.secondary">Disposals</Typography>
                   </Paper>
@@ -412,7 +467,7 @@ const AssetTrackingMenu = () => {
             </Grid>
 
             {/* ============================================================ */}
-            {/* TIMELINE - With filter tabs */}
+            {/* TIMELINE - Dengan filter tabs */}
             {/* ============================================================ */}
             <Grid item xs={12}>
               <Card>
@@ -442,7 +497,7 @@ const AssetTrackingMenu = () => {
                   rows={filteredTimeline} 
                   columns={timelineColumns} 
                   pageSize={10}
-                  getRowId={(row, index) => row.id || row.assetTransactionId || `timeline-${row.date}-${row.activityType}-${index}`}
+                  getRowId={(row) => row.id || row.assetTransactionId || `timeline-${row.date}-${row.activityType}-${Math.random()}`}
                   hideFooter={false}
                   ariaLabel="Asset timeline table"
                 />

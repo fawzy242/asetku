@@ -2,13 +2,18 @@ import Swal from 'sweetalert2';
 import toast from 'react-hot-toast';
 import 'sweetalert2/dist/sweetalert2.min.css';
 
-// SweetAlert2 default configuration with backdrop blur
+// SweetAlert2 default configuration with full theming
 export const swal = Swal.mixin({
   customClass: {
-    confirmButton: 'btn btn--primary',
-    cancelButton: 'btn btn--outline',
+    confirmButton: 'swal-confirm-btn',
+    cancelButton: 'swal-cancel-btn',
     popup: 'swal-popup',
     container: 'swal-container',
+    title: 'swal-title',
+    htmlContainer: 'swal-html',
+    icon: 'swal-icon',
+    actions: 'swal-actions',
+    footer: 'swal-footer',
   },
   buttonsStyling: false,
   reverseButtons: true,

@@ -37,50 +37,147 @@ const StatCard = ({ icon: Icon, label, value, color, bgColor, onClick, clickable
   </div>
 );
 
+// FIX: Transaction columns dengan renderCell
 const transactionColumns = [
-  { field: "assetCode", headerName: "Code", width: 120 },
-  { field: "assetName", headerName: "Asset Name", flex: 1, minWidth: 180 },
-  { field: "transactionTypeName", headerName: "Type", width: 150 },
-  { field: "fromEmployeeName", headerName: "From", width: 150 },
-  { field: "toEmployeeName", headerName: "To", width: 150 },
-  { field: "approved", headerName: "Status", width: 120, renderCell: (p) => { 
-    let status = 'Pending'; 
-    if (p?.value === true) status = 'Approved'; 
-    if (p?.value === false) status = 'Rejected'; 
-    return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
-  } },
+  { 
+    field: "assetCode", 
+    headerName: "Code", 
+    width: 120,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.assetCode || params?.value || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "assetName", 
+    headerName: "Asset Name", 
+    flex: 1, 
+    minWidth: 180,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.assetName || params?.value || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "transactionTypeName", 
+    headerName: "Type", 
+    width: 150,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.transactionTypeName || params?.value || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "fromEmployeeName", 
+    headerName: "From", 
+    width: 150,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.fromEmployeeName || params?.value || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "toEmployeeName", 
+    headerName: "To", 
+    width: 150,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.toEmployeeName || params?.value || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "approved", 
+    headerName: "Status", 
+    width: 120,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      let status = 'Pending';
+      if (row.approved === true || params?.value === true) status = 'Approved';
+      if (row.approved === false || params?.value === false) status = 'Rejected';
+      return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
+    }
+  },
   { 
     field: "transactionDate", 
     headerName: "Date", 
     width: 180,
-    valueFormatter: (p) => {
-      if (!p?.value) return '-';
-      return utilsHelper.formatDateTime(p.value);
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.transactionDate || params?.value;
+      if (!value) return <span>-</span>;
+      return <span>{utilsHelper.formatDateTime(value)}</span>;
     }
   },
 ];
 
+// FIX: Expired Warranty columns dengan renderCell
 const expiredWarrantyColumns = [
-  { field: "assetCode", headerName: "Code", width: 120 },
-  { field: "assetName", headerName: "Name", flex: 1, minWidth: 180 },
-  { field: "categoryName", headerName: "Category", width: 150 },
-  { field: "officeName", headerName: "Office", width: 150 },
+  { 
+    field: "assetCode", 
+    headerName: "Code", 
+    width: 120,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.assetCode || params?.value || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "assetName", 
+    headerName: "Name", 
+    flex: 1, 
+    minWidth: 180,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.assetName || params?.value || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "categoryName", 
+    headerName: "Category", 
+    width: 150,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.categoryName || params?.value || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "officeName", 
+    headerName: "Office", 
+    width: 150,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.officeName || params?.value || '-';
+      return <span>{value}</span>;
+    }
+  },
   { 
     field: "warrantyExpiryDate", 
     headerName: "Expiry Date", 
     width: 150,
-    valueFormatter: (p) => {
-      if (!p?.value) return '-';
-      return utilsHelper.formatDate(p.value);
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.warrantyExpiryDate || params?.value;
+      if (!value) return <span>-</span>;
+      return <span>{utilsHelper.formatDate(value)}</span>;
     }
   },
   { 
     field: "purchasePrice", 
     headerName: "Price", 
     width: 130,
-    valueFormatter: (p) => {
-      if (!p?.value) return '-';
-      return utilsHelper.formatCurrency(p.value);
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.purchasePrice || params?.value;
+      if (!value) return <span>-</span>;
+      return <span>{utilsHelper.formatCurrency(value)}</span>;
     }
   },
 ];
@@ -96,7 +193,7 @@ const DashboardMenu = () => {
     expiredWarranty: [],
     upcomingMaintenance: []
   });
-  const [drilldown, setDrilldown] = useState({ isOpen: false, title: '', endpoint: '', params: {}, columns: null });
+  const [drilldown, setDrilldown] = useState({ isOpen: false, title: '', endpoint: '', params: {} });
   const [expiredWarrantyPage, setExpiredWarrantyPage] = useState(1);
   const [recentPage, setRecentPage] = useState(1);
   const theme = useUIStore((s) => s.theme);
@@ -285,8 +382,7 @@ const DashboardMenu = () => {
       isOpen: true, 
       title: `${card.label} Details`, 
       endpoint: card.endpoint, 
-      params: card.params || {}, 
-      columns: transactionColumns
+      params: card.params || {},
     });
   };
 
@@ -371,8 +467,8 @@ const DashboardMenu = () => {
                   {upcomingMaintenance.map(item => (
                     <div key={item.assetId} className="dashboard__alert-item">
                       <div className="dashboard__alert-item-info">
-                        <span className="dashboard__alert-code">{item.assetCode}</span>
-                        <span className="dashboard__alert-name">{item.assetName}</span>
+                        <span className="dashboard__alert-code">{item.assetCode || '-'}</span>
+                        <span className="dashboard__alert-name">{item.assetName || '-'}</span>
                         <span className="dashboard__alert-detail">{item.categoryName || ''}</span>
                         <span className="dashboard__alert-detail">{item.officeName || ''}</span>
                       </div>
@@ -448,7 +544,6 @@ const DashboardMenu = () => {
         title={drilldown.title} 
         endpoint={drilldown.endpoint} 
         params={drilldown.params} 
-        columns={transactionColumns} 
         size="xl"
       />
     </div>

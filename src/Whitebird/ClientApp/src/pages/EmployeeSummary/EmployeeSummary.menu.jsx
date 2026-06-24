@@ -28,18 +28,20 @@ const assetColumns = [
     field: "sinceDate", 
     headerName: "Since", 
     width: 120,
-    valueFormatter: (p) => {
-      if (!p?.value) return '-';
-      return utilsHelper.formatDate(p.value);
+    renderCell: (params) => {
+      const value = params?.row?.sinceDate || params?.value;
+      if (!value) return <span>-</span>;
+      return <span>{utilsHelper.formatDate(value)}</span>;
     }
   },
   { 
     field: "expectedReturnDate", 
     headerName: "Expected Return", 
     width: 130,
-    valueFormatter: (p) => {
-      if (!p?.value) return '-';
-      return utilsHelper.formatDate(p.value);
+    renderCell: (params) => {
+      const value = params?.row?.expectedReturnDate || params?.value;
+      if (!value) return <span>-</span>;
+      return <span>{utilsHelper.formatDate(value)}</span>;
     }
   },
   { 
@@ -57,9 +59,10 @@ const assetColumns = [
     field: "purchasePrice", 
     headerName: "Purchase Price", 
     width: 130,
-    valueFormatter: (p) => {
-      if (!p?.value) return '-';
-      return utilsHelper.formatCurrency(p.value);
+    renderCell: (params) => {
+      const value = params?.row?.purchasePrice || params?.value;
+      if (!value) return <span>-</span>;
+      return <span>{utilsHelper.formatCurrency(value)}</span>;
     }
   },
 ];
@@ -69,18 +72,83 @@ const historyColumns = [
     field: "transactionDate", 
     headerName: "Date", 
     width: 180,
-    valueFormatter: (p) => {
-      if (!p?.value) return '-';
-      return utilsHelper.formatDateTime(p.value);
+    renderCell: (params) => {
+      const value = params?.row?.transactionDate || params?.value;
+      if (!value) return <span>-</span>;
+      return <span>{utilsHelper.formatDateTime(value)}</span>;
     }
   },
-  { field: "transactionTypeName", headerName: "Type", width: 150 },
-  { field: "assetCode", headerName: "Asset", width: 130 },
-  { field: "assetName", headerName: "Asset Name", flex: 1, minWidth: 180 },
-  { field: "fromEmployeeName", headerName: "From", width: 150, valueFormatter: (p) => p?.value || '-' },
-  { field: "toEmployeeName", headerName: "To", width: 150, valueFormatter: (p) => p?.value || '-' },
-  { field: "conditionAfterName", headerName: "Condition", width: 100, valueFormatter: (p) => p?.value || '-' },
-  { field: "notes", headerName: "Notes", width: 200, valueFormatter: (p) => p?.value || '-' },
+  { 
+    field: "transactionTypeName", 
+    headerName: "Type", 
+    width: 150,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.transactionTypeName || row.typeName || row.transactionType || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "assetCode", 
+    headerName: "Asset", 
+    width: 130,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.assetCode || row.code || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "assetName", 
+    headerName: "Asset Name", 
+    flex: 1, 
+    minWidth: 180,
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.assetName || row.name || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "fromEmployeeName", 
+    headerName: "From", 
+    width: 150, 
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.fromEmployeeName || row.fromEmployee || row.fromName || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "toEmployeeName", 
+    headerName: "To", 
+    width: 150, 
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.toEmployeeName || row.toEmployee || row.toName || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "conditionAfterName", 
+    headerName: "Condition", 
+    width: 100, 
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.conditionAfterName || row.conditionAfter || row.condition || '-';
+      return <span>{value}</span>;
+    }
+  },
+  { 
+    field: "notes", 
+    headerName: "Notes", 
+    width: 200, 
+    renderCell: (params) => {
+      const row = params?.row || {};
+      const value = row.notes || row.note || '-';
+      return <span>{value}</span>;
+    }
+  },
 ];
 
 const EmployeeSummaryMenu = () => {
@@ -415,7 +483,7 @@ const EmployeeSummaryMenu = () => {
                     <div className="employee-summary__last-transaction-row">
                       <span className="employee-summary__last-transaction-label">Type:</span>
                       <span className="employee-summary__last-transaction-value">
-                        {assetHistory[0]?.transactionTypeName || '-'}
+                        {assetHistory[0]?.transactionTypeName || assetHistory[0]?.typeName || '-'}
                       </span>
                     </div>
                     <div className="employee-summary__last-transaction-row">
@@ -427,7 +495,7 @@ const EmployeeSummaryMenu = () => {
                     <div className="employee-summary__last-transaction-row">
                       <span className="employee-summary__last-transaction-label">Condition:</span>
                       <span className="employee-summary__last-transaction-value">
-                        {assetHistory[0]?.conditionAfterName || '-'}
+                        {assetHistory[0]?.conditionAfterName || assetHistory[0]?.conditionAfter || '-'}
                       </span>
                     </div>
                   </div>

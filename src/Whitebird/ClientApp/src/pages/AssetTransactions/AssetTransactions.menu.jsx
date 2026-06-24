@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { Grid, Chip, Box, IconButton, Menu, MenuItem, ListItemIcon, ListItemText } from "@mui/material";
+import { Grid, Chip, Box } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
 import AssetTransactionsData from "./AssetTransactions.data";
 import DataTable from "../../components/molecules/DataTable/DataTable";
@@ -19,9 +19,7 @@ import Card from "../../components/atoms/Card/Card";
 import SearchToolbar from "../../components/molecules/SearchToolbar/SearchToolbar";
 import Tabs from "../../components/molecules/Tabs/Tabs";
 import { 
-  FiUpload, FiCheckSquare, FiPlus, FiCalendar, 
-  FiMoreVertical, FiEdit2, FiTrash2, FiCheck, FiX, 
-  FiRotateCcw, FiTool 
+  FiUpload, FiCheckSquare, FiPlus, FiCalendar
 } from "react-icons/fi";
 import { getStatusChipStyles } from "../../core/constants/statusColors";
 import { 
@@ -35,7 +33,7 @@ import {
   isPrimaryTransactionType,
   isSecondaryTransactionType
 } from "../../core/constants/transactionTypes";
-import { ACTION_TYPES } from "../../hooks/useGridActions";
+import { ACTION_TYPES, useGridActions } from "../../hooks/useGridActions";
 import { useBulkSelection } from "../../hooks/useBulkSelection";
 import { useSweetAlert } from "../../hooks/useSweetAlert";
 import { useGridData } from "../../hooks/useGridData";
@@ -113,10 +111,6 @@ const AssetTransactionsMenu = () => {
   });
   const [pairedTransactionOptions, setPairedTransactionOptions] = useState([]);
   const [loadingPairedOptions, setLoadingPairedOptions] = useState(false);
-  
-  // Menu state
-  const [menuAnchorEl, setMenuAnchorEl] = useState(null);
-  const [selectedMenuRow, setSelectedMenuRow] = useState(null);
   
   const isMountedRef = useRef(true);
   const queryClient = useQueryClient();
@@ -451,59 +445,34 @@ const AssetTransactionsMenu = () => {
   }, []);
 
   // ============================================================
-  // FILTER DATA
-  // ============================================================
-  const primaryData = useMemo(() => {
-    if (!transactions || transactions.length === 0) return [];
-    return transactions.filter(t => isPrimaryTransactionType(t.transactionType));
-  }, [transactions]);
-
-  const secondaryData = useMemo(() => {
-    if (!transactions || transactions.length === 0) return [];
-    return transactions.filter(t => isSecondaryTransactionType(t.transactionType));
-  }, [transactions]);
-
-  // ============================================================
   // GET CONDITIONAL ACTIONS
   // ============================================================
   const getConditionalActions = useCallback((row) => {
     const isPending = row.approved === null;
     const isApproved = row.approved === true;
     const isPrimary = isPrimaryTransactionType(row.transactionType);
-    const isSecondary = isSecondaryTransactionType(row.transactionType);
     const isPaired = row.fromAssetTransactionId !== null && row.fromAssetTransactionId !== undefined;
     
-    const hasReturnOrPost = isPaired;
-    
-    const canReturn = isApproved && !hasReturnOrPost && 
+    const canReturn = isApproved && !isPaired && 
                       TRANSACTION_TYPES_RETURNABLE.includes(row.transactionType);
-    const canPostMaintenance = isApproved && !hasReturnOrPost && 
+    const canPostMaintenance = isApproved && !isPaired && 
                                row.transactionType === TRANSACTION_TYPES.MAINTENANCE;
     
     const actions = [];
     
-    // ============================================================
-    // PENDING TAB: EDIT & DELETE only
-    // ============================================================
     if (isPending) {
       actions.push(ACTION_TYPES.EDIT);
       actions.push(ACTION_TYPES.DELETE);
     }
     
-    // ============================================================
-    // APPROVED TAB: EDIT, DELETE, plus conditional RETURN/POST
-    // ============================================================
     if (isApproved) {
-      // Edit and Delete always available for approved
       actions.push(ACTION_TYPES.EDIT);
       actions.push(ACTION_TYPES.DELETE);
       
-      // RETURN - for HANDOVER, TRANSFER, LOAN that haven't been returned
       if (isPrimary && canReturn) {
         actions.push(ACTION_TYPES.RETURN);
       }
       
-      // POST MAINTENANCE - for MAINTENANCE that hasn't been posted
       if (isPrimary && canPostMaintenance) {
         actions.push(ACTION_TYPES.POST_MAINTENANCE);
       }
@@ -513,12 +482,9 @@ const AssetTransactionsMenu = () => {
   }, []);
 
   // ============================================================
-  // HANDLE ACTION - Close menu after action
+  // HANDLE ACTION
   // ============================================================
   const handleActionClick = useCallback((actionType, row) => {
-    setMenuAnchorEl(null);
-    setSelectedMenuRow(null);
-    
     switch (actionType) {
       case ACTION_TYPES.EDIT:
         handleEdit(row);
@@ -544,82 +510,14 @@ const AssetTransactionsMenu = () => {
   }, [handleEdit, handleCancel, handleApprove, handleReject, handleReturnShortcut, handlePostMaintenanceShortcut]);
 
   // ============================================================
-  // HANDLE MENU OPEN
+  // USE GRID ACTIONS HOOK
   // ============================================================
-  const handleMenuOpen = useCallback((event, row) => {
-    event.stopPropagation();
-    setMenuAnchorEl(event.currentTarget);
-    setSelectedMenuRow(row);
-  }, []);
-
-  const handleMenuClose = useCallback(() => {
-    setMenuAnchorEl(null);
-    setSelectedMenuRow(null);
-  }, []);
-
-  // ============================================================
-  // RENDER ACTIONS
-  // ============================================================
-  const renderActions = useCallback((params) => {
-    const row = params.row;
-    const actions = getConditionalActions(row);
-    
-    if (!actions || actions.length === 0) {
-      return null;
-    }
-    
-    const isMenuOpen = Boolean(menuAnchorEl) && selectedMenuRow?.assetTransactionId === row.assetTransactionId;
-    
-    return (
-      <>
-        <IconButton 
-          size="small" 
-          onClick={(e) => handleMenuOpen(e, row)}
-          aria-label="Actions"
-        >
-          <FiMoreVertical size={18} />
-        </IconButton>
-        <Menu
-          anchorEl={menuAnchorEl}
-          open={isMenuOpen}
-          onClose={handleMenuClose}
-          PaperProps={{ 
-            sx: { 
-              minWidth: 180, 
-              borderRadius: '8px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              backgroundColor: 'var(--card-bg)',
-            } 
-          }}
-        >
-          {actions.includes(ACTION_TYPES.EDIT) && (
-            <MenuItem onClick={() => handleActionClick(ACTION_TYPES.EDIT, row)}>
-              <ListItemIcon><FiEdit2 size={16} /></ListItemIcon>
-              <ListItemText>Edit</ListItemText>
-            </MenuItem>
-          )}
-          {actions.includes(ACTION_TYPES.DELETE) && (
-            <MenuItem onClick={() => handleActionClick(ACTION_TYPES.DELETE, row)} sx={{ color: '#ef4444' }}>
-              <ListItemIcon sx={{ color: '#ef4444' }}><FiTrash2 size={16} /></ListItemIcon>
-              <ListItemText>Delete</ListItemText>
-            </MenuItem>
-          )}
-          {actions.includes(ACTION_TYPES.RETURN) && (
-            <MenuItem onClick={() => handleActionClick(ACTION_TYPES.RETURN, row)} sx={{ color: '#f59e0b' }}>
-              <ListItemIcon sx={{ color: '#f59e0b' }}><FiRotateCcw size={16} /></ListItemIcon>
-              <ListItemText>Return</ListItemText>
-            </MenuItem>
-          )}
-          {actions.includes(ACTION_TYPES.POST_MAINTENANCE) && (
-            <MenuItem onClick={() => handleActionClick(ACTION_TYPES.POST_MAINTENANCE, row)} sx={{ color: '#3b82f6' }}>
-              <ListItemIcon sx={{ color: '#3b82f6' }}><FiTool size={16} /></ListItemIcon>
-              <ListItemText>Post Maintenance</ListItemText>
-            </MenuItem>
-          )}
-        </Menu>
-      </>
-    );
-  }, [menuAnchorEl, selectedMenuRow, getConditionalActions, handleActionClick, handleMenuOpen, handleMenuClose]);
+  const { actionColumn } = useGridActions({
+    actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
+    onAction: handleActionClick,
+    getConditionalActions,
+    rowIdField: 'assetTransactionId',
+  });
 
   const showFromEmployee = TRANSACTION_TYPES_REQUIRING_FROM_EMPLOYEE.includes(parseInt(formData.transactionType));
   const showToEmployee = TRANSACTION_TYPES_REQUIRING_TO_EMPLOYEE.includes(parseInt(formData.transactionType));
@@ -662,7 +560,7 @@ const AssetTransactionsMenu = () => {
   };
 
   // ============================================================
-  // GRID COLUMNS - WITH DATE FORMATTER FIX
+  // GRID COLUMNS
   // ============================================================
   const columns = useMemo(() => {
     const dataColumns = [
@@ -670,32 +568,72 @@ const AssetTransactionsMenu = () => {
         field: "transactionDate", 
         headerName: "Date", 
         width: 180,
-        valueFormatter: (p) => {
-          if (!p?.value) return '-';
-          const formatted = utilsHelper.formatDateTime(p.value);
-          return formatted;
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const value = row.transactionDate || params?.value;
+          if (!value) return <span>-</span>;
+          return <span>{utilsHelper.formatDateTime(value)}</span>;
         }
       },
-      { field: "assetCode", headerName: "Asset Code", width: 120 },
-      { field: "assetName", headerName: "Asset Name", flex: 1, minWidth: 160 },
+      { 
+        field: "assetCode", 
+        headerName: "Asset Code", 
+        width: 120,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const value = row.assetCode || params?.value || '-';
+          return <span>{value}</span>;
+        }
+      },
+      { 
+        field: "assetName", 
+        headerName: "Asset Name", 
+        flex: 1, 
+        minWidth: 160,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const value = row.assetName || params?.value || '-';
+          return <span>{value}</span>;
+        }
+      },
       { 
         field: "transactionTypeName", 
         headerName: "Type", 
         width: 150,
-        renderCell: (p) => {
-          const typeName = p?.value || '';
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const typeName = row.transactionTypeName || params?.value || '';
           const colors = getTransactionTypeColor(typeName);
           return <Chip label={colors.label} size="small" sx={{ bgcolor: colors.bg, color: colors.color, fontWeight: 500 }} />;
         }
       },
-      { field: "fromEmployeeName", headerName: "From", width: 150, valueFormatter: (p) => p?.value || '-' },
-      { field: "toEmployeeName", headerName: "To", width: 150, valueFormatter: (p) => p?.value || '-' },
+      { 
+        field: "fromEmployeeName", 
+        headerName: "From", 
+        width: 150,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const value = row.fromEmployeeName || params?.value || '-';
+          return <span>{value}</span>;
+        }
+      },
+      { 
+        field: "toEmployeeName", 
+        headerName: "To", 
+        width: 150,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const value = row.toEmployeeName || params?.value || '-';
+          return <span>{value}</span>;
+        }
+      },
       { 
         field: "approved", 
         headerName: "Status", 
         width: 120,
-        renderCell: (p) => {
-          const status = getDisplayStatus(p?.row);
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const status = getDisplayStatus(row);
           return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
         }
       },
@@ -703,78 +641,94 @@ const AssetTransactionsMenu = () => {
         field: "expectedReturnDate", 
         headerName: "Exp. Return", 
         width: 130,
-        valueFormatter: (p) => {
-          if (!p?.value) return '-';
-          return utilsHelper.formatDate(p.value);
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const value = row.expectedReturnDate || params?.value;
+          if (!value) return <span>-</span>;
+          return <span>{utilsHelper.formatDate(value)}</span>;
         }
       },
-      {
-        field: "actions",
-        headerName: "Actions",
-        width: 80,
-        sortable: false,
-        renderCell: renderActions
-      }
     ];
-    return dataColumns;
-  }, [renderActions]);
+    return [...dataColumns, actionColumn];
+  }, [actionColumn]);
 
   const handleCreatePrimary = useCallback(() => {
     handleCreate();
   }, [handleCreate]);
 
   // ============================================================
-  // DATE FILTER - Di atas SearchToolbar
+  // FILTER DATA FOR GRIDS
+  // ============================================================
+  const primaryData = useMemo(() => {
+    if (!transactions || transactions.length === 0) return [];
+    return transactions.filter(t => isPrimaryTransactionType(t.transactionType));
+  }, [transactions]);
+
+  const secondaryData = useMemo(() => {
+    if (!transactions || transactions.length === 0) return [];
+    return transactions.filter(t => isSecondaryTransactionType(t.transactionType));
+  }, [transactions]);
+
+  // ============================================================
+  // DATE FILTER - RAPIH DENGAN FLEX
   // ============================================================
   const dateFilterComponent = (
     <div className="transactions-menu__date-filter">
-      <FiCalendar size={16} />
-      <span>Date Range:</span>
-      <DatePickerInput 
-        label="Start Date" 
-        value={dateFilterStart} 
-        onChange={e => handleDateFilterChange(e.target.value, dateFilterEnd)} 
-        size="small"
-        sx={{ minWidth: '150px' }}
-      />
-      <span>to</span>
-      <DatePickerInput 
-        label="End Date" 
-        value={dateFilterEnd} 
-        onChange={e => handleDateFilterChange(dateFilterStart, e.target.value)} 
-        size="small"
-        sx={{ minWidth: '150px' }}
-      />
-      {(dateFilterStart || dateFilterEnd) && (
-        <button 
-          className="btn btn--text btn--sm" 
-          onClick={() => handleDateFilterChange("", "")}
-        >
-          Clear
-        </button>
-      )}
+      <div className="transactions-menu__date-filter-label">
+        <FiCalendar size={16} />
+        <span>Date Range:</span>
+      </div>
+      <div className="transactions-menu__date-filter-inputs">
+        <DatePickerInput 
+          label="Start Date" 
+          value={dateFilterStart} 
+          onChange={e => handleDateFilterChange(e.target.value, dateFilterEnd)} 
+          size="small"
+          sx={{ minWidth: '150px', maxWidth: '200px' }}
+        />
+        <span className="transactions-menu__date-filter-separator">to</span>
+        <DatePickerInput 
+          label="End Date" 
+          value={dateFilterEnd} 
+          onChange={e => handleDateFilterChange(dateFilterStart, e.target.value)} 
+          size="small"
+          sx={{ minWidth: '150px', maxWidth: '200px' }}
+        />
+        {(dateFilterStart || dateFilterEnd) && (
+          <button 
+            className="btn btn--text btn--sm transactions-menu__date-filter-clear" 
+            onClick={() => handleDateFilterChange("", "")}
+          >
+            Clear
+          </button>
+        )}
+      </div>
     </div>
   );
 
   // ============================================================
-  // BULK ACTION BUTTON - FOR PRIMARY GRID ONLY
+  // BULK ACTION BUTTON - FIX: PERIKSA selectedRowIds LANGSUNG
   // ============================================================
-  const bulkActionButton = hasSelection && showCheckbox && (
+  // Gunakan selectedRowIds langsung, bukan hasSelection
+  const bulkActionButton = (selectedRowIds.length > 0 && showCheckbox) && (
     <button 
       className="btn btn--primary btn--sm" 
       onClick={() => setShowBulkActivateModal(true)} 
       style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
     >
       <FiCheckSquare size={16} /> 
-      {getBulkAction() === "approve" ? "Approve" : "Reject"} ({selectionCount})
+      {getBulkAction() === "approve" ? "Approve" : "Reject"} ({selectedRowIds.length})
     </button>
   );
 
-  const extraActions = (
+  // Tambahkan juga di header actions
+  const headerActions = (
     <>
-      {dateFilterComponent}
       <button className="btn btn--outline btn--sm" onClick={() => setShowImportModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
         <FiUpload size={16} /> Import
+      </button>
+      <button className="btn btn--primary btn--sm" onClick={handleCreatePrimary} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+        <FiPlus size={16} /> New Transaction
       </button>
       {bulkActionButton}
     </>
@@ -874,16 +828,15 @@ const AssetTransactionsMenu = () => {
           <p className="page-description">Manage asset transaction history and approvals</p>
         </div>
         <div className="transactions-menu__header-actions">
-          <button className="btn btn--outline btn--sm" onClick={() => setShowImportModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-            <FiUpload size={16} /> Import
-          </button>
-          <button className="btn btn--primary btn--sm" onClick={handleCreatePrimary} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-            <FiPlus size={16} /> New Transaction
-          </button>
+          {headerActions}
         </div>
       </div>
 
       <Tabs tabs={TRANSACTION_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+
+      <div className="transactions-menu__date-filter-container">
+        {dateFilterComponent}
+      </div>
 
       <SearchToolbar onSearch={handleSearch} placeholder="Search transactions..." />
 
@@ -922,7 +875,8 @@ const AssetTransactionsMenu = () => {
           loading={loading}
           pageSize={pageSize}
           page={page}
-          totalRowCount={secondaryData.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
           getRowId={(row) => row?.assetTransactionId || `secondary-${Math.random()}`}
           hideFooter={false}
           autoHeight={false}

@@ -275,24 +275,24 @@ const AssetsMenu = () => {
     },
     { field: "displayCondition", headerName: "Condition", width: 100 },
     { field: "officeName", headerName: "Office", width: 150 },
-  { 
-    field: "purchasePrice", 
-    headerName: "Price", 
-    width: 130,
-    renderCell: (params) => {
-      const value = params.row?.purchasePrice ?? params.value;
-      // Handle null, undefined, empty
-      if (value === null || value === undefined || value === '') {
-        return <span style={{ color: 'var(--text-secondary)' }}>-</span>;
+    { 
+      field: "purchasePrice", 
+      headerName: "Price", 
+      width: 130,
+      renderCell: (params) => {
+        const row = params.row || {};
+        const value = row.purchasePrice !== undefined ? row.purchasePrice : params.value;
+        if (value === null || value === undefined || value === '') {
+          return <span style={{ color: 'var(--text-secondary)' }}>-</span>;
+        }
+        const numValue = typeof value === 'string' ? parseFloat(value) : value;
+        if (isNaN(numValue)) {
+          return <span style={{ color: 'var(--text-secondary)' }}>-</span>;
+        }
+        // Show 0 as "Rp0"
+        return <span>{utilsHelper.formatCurrency(numValue)}</span>;
       }
-      // Convert string to number if needed
-      const numValue = typeof value === 'string' ? parseFloat(value) : value;
-      if (isNaN(numValue) || numValue === 0) {
-        return <span style={{ color: 'var(--text-secondary)' }}>-</span>;
-      }
-      return <span>{utilsHelper.formatCurrency(numValue)}</span>;
-    }
-  },
+    },
     actionColumn,
   ], [actionColumn]);
 
