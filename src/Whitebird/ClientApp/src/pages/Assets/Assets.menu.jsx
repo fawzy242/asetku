@@ -152,7 +152,7 @@ const AssetsMenu = () => {
       toast.error('Office is required when Operational Office is enabled');
       return false;
     }
-    
+
     const success = await crudHandleSubmit();
     if (success && isMountedRef.current) {
       toast.success(editingAsset ? 'Asset updated successfully' : 'Asset created successfully');
@@ -267,21 +267,24 @@ const AssetsMenu = () => {
     { field: "categoryName", headerName: "Category", width: 150 },
     { field: "brand", headerName: "Brand", width: 100 },
     { field: "model", headerName: "Model", width: 100 },
-    { 
-      field: "displayStatus", 
-      headerName: "Status", 
-      width: 140, 
-      renderCell: (p) => <Chip label={p?.value || '-'} size="small" sx={getStatusChipStyles(p?.value)} /> 
+    {
+      field: "displayStatus",
+      headerName: "Status",
+      width: 140,
+      renderCell: (p) => {
+        const status = p?.value || 'Available';
+        return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
+      }
     },
     { field: "displayCondition", headerName: "Condition", width: 100 },
     { field: "officeName", headerName: "Office", width: 150 },
-    { 
-      field: "purchasePrice", 
-      headerName: "Price", 
+    {
+      field: "purchasePrice",
+      headerName: "Price",
       width: 130,
       renderCell: (params) => {
-        const row = params.row || {};
-        const value = row.purchasePrice !== undefined ? row.purchasePrice : params.value;
+        const row = params?.row || {};
+        const value = row.purchasePrice !== undefined ? row.purchasePrice : params?.value;
         if (value === null || value === undefined || value === '') {
           return <span style={{ color: 'var(--text-secondary)' }}>-</span>;
         }
@@ -289,7 +292,6 @@ const AssetsMenu = () => {
         if (isNaN(numValue)) {
           return <span style={{ color: 'var(--text-secondary)' }}>-</span>;
         }
-        // Show 0 as "Rp0"
         return <span>{utilsHelper.formatCurrency(numValue)}</span>;
       }
     },
@@ -347,7 +349,7 @@ const AssetsMenu = () => {
         onSubmit={onSubmit}
         isSubmitting={isSubmitting}
         submitText={editingAsset ? "Update" : "Create"}
-        size="lg"
+        size="xl"
       >
         <FormSection title="Basic Information" description="Asset code, name, and category">
           <Grid container spacing={2}>
@@ -369,27 +371,27 @@ const AssetsMenu = () => {
         <FormSection title="Operational Office" description="Configure operational office settings">
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <Select 
-                label="Operasional Office" 
-                value={formData.operasionalOffice ? "true" : "false"} 
+              <Select
+                label="Operasional Office"
+                value={formData.operasionalOffice ? "true" : "false"}
                 onChange={(e) => {
                   const val = e.target.value === "true";
                   setFormField('operasionalOffice')(val);
                   if (!val) {
                     setFormField('officeId')("");
                   }
-                }} 
-                options={booleanOptions} 
+                }}
+                options={booleanOptions}
               />
             </Grid>
             {showOfficeField && (
               <Grid item xs={12} sm={6}>
-                <Select 
-                  label="Office *" 
-                  value={formData.officeId || ""} 
-                  onChange={(e) => setFormField('officeId')(e.target.value)} 
-                  options={officeOptions} 
-                  required 
+                <Select
+                  label="Office *"
+                  value={formData.officeId || ""}
+                  onChange={(e) => setFormField('officeId')(e.target.value)}
+                  options={officeOptions}
+                  required
                 />
               </Grid>
             )}
@@ -468,7 +470,7 @@ const AssetsMenu = () => {
               <Input label="Notes" value={formData.notes || ""} onChange={(e) => setFormField('notes')(e.target.value)} multiline rows={3} />
             </Grid>
             <Grid item xs={12}>
-              <FileUploader 
+              <FileUploader
                 referenceTable="Asset"
                 referenceId={editingAsset?.assetId}
                 onUploadComplete={reload}

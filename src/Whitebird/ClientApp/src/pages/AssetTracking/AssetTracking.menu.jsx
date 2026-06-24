@@ -159,7 +159,6 @@ const AssetTrackingMenu = () => {
         if (trackingRes.success && trackingRes.data) {
           const data = trackingRes.data;
           
-          // Direct mapping - backend sudah mengembalikan data lengkap
           setTrackingData_({
             assetId: data.assetId,
             assetCode: data.assetCode || '-',
@@ -334,22 +333,13 @@ const AssetTrackingMenu = () => {
   return (
     <div className="asset-tracking">
       <div className="page-header">
-        <div>
-          <h1 className="page-title">Asset Tracking</h1>
-          <p className="page-description">Track asset location, status, and transaction history</p>
-        </div>
-        {selectedAssetId && (
-          <Tooltip title="Refresh">
-            <IconButton onClick={handleRefresh} className="asset-tracking__refresh-header-btn">
-              <FiRefreshCw size={18} />
-            </IconButton>
-          </Tooltip>
-        )}
+        <h1 className="page-title">Asset Tracking</h1>
+        <p className="page-description">Track asset location, status, and transaction history</p>
       </div>
       
       <Grid container spacing={3}>
         {/* ============================================================ */}
-        {/* ASSET SELECTION CARD */}
+        {/* ASSET SELECTION CARD - Refresh button DI DALAM CARD seperti Employee Summary */}
         {/* ============================================================ */}
         <Grid item xs={12}>
           <Card className="asset-tracking__selection-card">
@@ -365,6 +355,18 @@ const AssetTrackingMenu = () => {
                   options={assetOptions} 
                 />
               </div>
+              {/* Refresh button DI DALAM CARD - SAMA seperti Employee Summary */}
+              {selectedAssetId && (
+                <Tooltip title="Refresh Data">
+                  <IconButton 
+                    onClick={handleRefresh} 
+                    size="small" 
+                    className="asset-tracking__refresh-btn"
+                  >
+                    <FiRefreshCw size={18} />
+                  </IconButton>
+                </Tooltip>
+              )}
             </div>
           </Card>
         </Grid>

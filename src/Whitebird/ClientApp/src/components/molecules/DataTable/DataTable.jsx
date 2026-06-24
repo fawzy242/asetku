@@ -62,12 +62,10 @@ const DataTable = memo(({
   const handlePaginationModelChange = (newModel) => {
     setPaginationModel(newModel);
     
-    // Trigger server-side pagination
     if (onPaginationModelChange) {
       onPaginationModelChange(newModel);
     }
     
-    // Legacy callbacks
     if (onPageChange && newModel.page + 1 !== page) {
       onPageChange(newModel.page + 1);
     }
@@ -79,10 +77,14 @@ const DataTable = memo(({
   // For server-side pagination, use totalRowCount from API
   const rowCount = paginationMode === 'server' ? totalRowCount : safeRows.length;
 
+  // Hapus totalRowCount untuk client pagination
+  const effectiveTotalRowCount = paginationMode === 'server' ? totalRowCount : undefined;
+
   const dataGridSx = {
     border: 'none',
     backgroundColor: 'transparent',
-    height: autoHeight ? 'auto' : 500,
+    // Berikan height default jika autoHeight false
+    height: autoHeight ? 'auto' : 400,
     minHeight: 300,
     '& .MuiDataGrid-main': { width: '100%' },
     '& .MuiDataGrid-virtualScroller': {
@@ -172,7 +174,7 @@ const DataTable = memo(({
   };
 
   return (
-    <div className={`data-table ${className}`}>
+    <div className={`data-table ${className}`} style={{ width: '100%', minHeight: autoHeight ? 'auto' : '300px' }}>
       <DataGrid
         rows={safeRows}
         columns={columns}
@@ -194,7 +196,7 @@ const DataTable = memo(({
         disableColumnSelector={disableColumnSelector}
         disableColumnResize={disableColumnResize}
         sx={dataGridSx}
-        rowCount={rowCount}
+        rowCount={effectiveTotalRowCount}
         paginationMode={paginationMode}
         slotProps={{
           loadingOverlay: {

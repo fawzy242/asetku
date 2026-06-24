@@ -353,12 +353,14 @@ img {
   justify-content: center !important;
 }
 
+// REMOVE garis footer
 .swal-footer {
   border-top: none !important;
-  padding: $spacing-md 0 0 0 !important;
+  padding: 0 !important;
   display: flex !important;
   justify-content: center !important;
   gap: $spacing-md !important;
+  background: transparent !important;
 }
 
 // Confirm Button
@@ -379,7 +381,7 @@ img {
   height: 38px !important;
   background-color: var(--primary) !important;
   color: white !important;
-  
+
   &:hover:not(:disabled) {
     background-color: var(--primary-hover) !important;
     transform: translateY(-1px) !important;
@@ -405,7 +407,7 @@ img {
   height: 38px !important;
   background-color: transparent !important;
   color: var(--text-primary) !important;
-  
+
   &:hover:not(:disabled) {
     background-color: var(--surface) !important;
     border-color: var(--primary) !important;
@@ -416,31 +418,32 @@ img {
 // Icons - Themed
 .swal-icon {
   margin-bottom: $spacing-md !important;
-  
+
   &--success {
     .swal-icon--success__ring {
       border-color: var(--success) !important;
     }
+
     .swal-icon--success__line {
       background-color: var(--success) !important;
     }
   }
-  
+
   &--warning {
     border-color: var(--warning) !important;
     color: var(--warning) !important;
   }
-  
+
   &--error {
     border-color: var(--error) !important;
     color: var(--error) !important;
   }
-  
+
   &--info {
     border-color: var(--info) !important;
     color: var(--info) !important;
   }
-  
+
   &--question {
     border-color: var(--primary) !important;
     color: var(--primary) !important;
@@ -476,31 +479,31 @@ img {
     background-color: #1f2937 !important;
     border-color: #374151 !important;
   }
-  
+
   .swal-title {
     color: #f9fafb !important;
   }
-  
+
   .swal-html {
     color: #9ca3af !important;
   }
-  
+
   .swal-text {
     color: #9ca3af !important;
   }
-  
+
   .swal-confirm-btn {
     background-color: #ef4444 !important;
-    
+
     &:hover {
       background-color: #dc2626 !important;
     }
   }
-  
+
   .swal-cancel-btn {
     border-color: #4b5563 !important;
     color: #f9fafb !important;
-    
+
     &:hover {
       border-color: #ef4444 !important;
       color: #ef4444 !important;

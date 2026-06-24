@@ -17,6 +17,7 @@ export const swal = Swal.mixin({
   },
   buttonsStyling: false,
   reverseButtons: true,
+  // Blur effect sama seperti Modal component
   backdrop: `rgba(0, 0, 0, 0.6)`,
   allowOutsideClick: false,
   allowEscapeKey: true,

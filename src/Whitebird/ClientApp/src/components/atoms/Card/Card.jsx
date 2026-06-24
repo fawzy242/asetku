@@ -9,7 +9,8 @@ const Card = memo(({
   className = "",
   hoverable = false,
   padding = true,
-  onClick = null,  // ADD onClick prop
+  onClick = null,
+  minHeight = 'auto',
 }) => {
   const classNames = [
     "card",
@@ -24,7 +25,10 @@ const Card = memo(({
     <div 
       className={classNames} 
       onClick={onClick}
-      style={{ cursor: onClick ? 'pointer' : 'default' }}
+      style={{ 
+        cursor: onClick ? 'pointer' : 'default',
+        minHeight: minHeight,
+      }}
     >
       {(title || subtitle || actions) && (
         <div className="card__header">

@@ -38,6 +38,21 @@ const EMPLOYEE_TABS = [
   { id: "Inactive", label: "Inactive" },
 ];
 
+// Custom styling untuk employment status
+const getEmploymentStatusStyles = (statusName) => {
+  const styles = {
+    'Permanent': { bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', label: 'Permanent' },
+    'Contract': { bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', label: 'Contract' },
+    'Probation': { bg: 'rgba(139, 92, 246, 0.15)', color: '#8b5cf6', label: 'Probation' },
+    'Intern': { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', label: 'Intern' },
+    'Freelance': { bg: 'rgba(236, 72, 153, 0.15)', color: '#ec4899', label: 'Freelance' },
+    'Resigned': { bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', label: 'Resigned' },
+    'Terminated': { bg: 'rgba(239, 68, 68, 0.15)', color: '#dc2626', label: 'Terminated' },
+    'On Leave': { bg: 'rgba(245, 158, 11, 0.15)', color: '#d97706', label: 'On Leave' },
+  };
+  return styles[statusName] || { bg: 'rgba(107, 114, 128, 0.15)', color: '#6b7280', label: statusName || 'Unknown' };
+};
+
 const EmployeesMenu = () => {
   const [activeTab, setActiveTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -238,18 +253,53 @@ const EmployeesMenu = () => {
     ...offices.map(o => ({ value: o.value, label: o.label }))
   ], [offices]);
 
+  // KOLOM: Employee Status (isActive) di belakang, Employment Status di kanan Full Name
   const columns = useMemo(() => [
     { field: "employeeCode", headerName: "Code", width: 120 },
-    { field: "fullName", headerName: "Full Name", flex: 1, minWidth: 180 },
+    { 
+      field: "fullName", 
+      headerName: "Full Name", 
+      flex: 1, 
+      minWidth: 180 
+    },
+    { 
+      field: "employmentStatusName", 
+      headerName: "Employment Status", 
+      width: 160,
+      renderCell: (p) => {
+        const statusName = p?.value || 'Unknown';
+        const styles = getEmploymentStatusStyles(statusName);
+        return (
+          <Chip 
+            label={styles.label} 
+            size="small" 
+            sx={{ 
+              bgcolor: styles.bg, 
+              color: styles.color, 
+              fontWeight: 500,
+              fontSize: '0.75rem',
+              height: '24px',
+              borderRadius: '16px',
+              '& .MuiChip-label': {
+                px: 1.5,
+              }
+            }} 
+          />
+        );
+      }
+    },
     { field: "departmentName", headerName: "Department", width: 150 },
     { field: "positionName", headerName: "Position", width: 150 },
     { field: "email", headerName: "Email", width: 200 },
     { field: "officeName", headerName: "Office", width: 150 },
     { 
-      field: "employmentStatusName", 
+      field: "isActive", 
       headerName: "Status", 
-      width: 120, 
-      renderCell: (p) => <Chip label={p?.value || '-'} size="small" sx={getStatusChipStyles(p?.value)} /> 
+      width: 120,
+      renderCell: (p) => {
+        const status = p?.value ? 'Active' : 'Inactive';
+        return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
+      }
     },
     actionColumn,
   ], [actionColumn]);
@@ -305,7 +355,7 @@ const EmployeesMenu = () => {
         onSubmit={onSubmit}
         isSubmitting={isSubmitting}
         submitText={editingEmployee ? "Update" : "Create"}
-        size="lg"
+        size="xl"
       >
         <FormSection title="Basic Information" description="Employee code and full name">
           <Grid container spacing={2}>
@@ -361,7 +411,7 @@ const EmployeesMenu = () => {
         </FormSection>
 
         <FormSection title="Attachments" description="Supporting documents">
-          <FileUploader 
+          <FileUploader
             referenceTable="Employee"
             referenceId={editingEmployee?.employeeId}
             onUploadComplete={reload}

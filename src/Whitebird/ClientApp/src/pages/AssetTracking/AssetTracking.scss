@@ -10,12 +10,15 @@
         margin-top: $spacing-xs;
     }
 
-    &__refresh-header-btn {
+    // Refresh button di dalam selection card - SAMA seperti Employee Summary
+    &__refresh-btn {
         background-color: var(--surface);
         border: 1px solid var(--border);
-        width: 40px;
-        height: 40px;
+        width: 36px;
+        height: 36px;
         border-radius: $radius-md;
+        transition: all $transition-fast;
+        flex-shrink: 0;
 
         &:hover {
             background-color: var(--primary);
@@ -46,6 +49,7 @@
         background-color: rgba(220, 38, 38, 0.1);
         border-radius: $radius-lg;
         color: var(--primary);
+        flex-shrink: 0;
     }
 
     &__selection-select {
@@ -150,17 +154,18 @@
 
 [data-theme='dark'] {
     .asset-tracking {
-        &__selection-icon {
-            background-color: rgba(239, 68, 68, 0.15);
-        }
-
-        &__refresh-header-btn {
+        &__refresh-btn {
             background-color: #374151;
             border-color: #4b5563;
 
             &:hover {
                 background-color: #ef4444;
+                border-color: #ef4444;
             }
+        }
+
+        &__selection-icon {
+            background-color: rgba(239, 68, 68, 0.15);
         }
 
         &__profile-avatar {

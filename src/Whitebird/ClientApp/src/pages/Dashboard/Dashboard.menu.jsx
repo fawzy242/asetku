@@ -37,11 +37,10 @@ const StatCard = ({ icon: Icon, label, value, color, bgColor, onClick, clickable
   </div>
 );
 
-// FIX: Transaction columns dengan renderCell
 const transactionColumns = [
-  { 
-    field: "assetCode", 
-    headerName: "Code", 
+  {
+    field: "assetCode",
+    headerName: "Code",
     width: 120,
     renderCell: (params) => {
       const row = params?.row || {};
@@ -49,10 +48,10 @@ const transactionColumns = [
       return <span>{value}</span>;
     }
   },
-  { 
-    field: "assetName", 
-    headerName: "Asset Name", 
-    flex: 1, 
+  {
+    field: "assetName",
+    headerName: "Asset Name",
+    flex: 1,
     minWidth: 180,
     renderCell: (params) => {
       const row = params?.row || {};
@@ -60,9 +59,9 @@ const transactionColumns = [
       return <span>{value}</span>;
     }
   },
-  { 
-    field: "transactionTypeName", 
-    headerName: "Type", 
+  {
+    field: "transactionTypeName",
+    headerName: "Type",
     width: 150,
     renderCell: (params) => {
       const row = params?.row || {};
@@ -70,9 +69,9 @@ const transactionColumns = [
       return <span>{value}</span>;
     }
   },
-  { 
-    field: "fromEmployeeName", 
-    headerName: "From", 
+  {
+    field: "fromEmployeeName",
+    headerName: "From",
     width: 150,
     renderCell: (params) => {
       const row = params?.row || {};
@@ -80,9 +79,9 @@ const transactionColumns = [
       return <span>{value}</span>;
     }
   },
-  { 
-    field: "toEmployeeName", 
-    headerName: "To", 
+  {
+    field: "toEmployeeName",
+    headerName: "To",
     width: 150,
     renderCell: (params) => {
       const row = params?.row || {};
@@ -90,9 +89,9 @@ const transactionColumns = [
       return <span>{value}</span>;
     }
   },
-  { 
-    field: "approved", 
-    headerName: "Status", 
+  {
+    field: "approved",
+    headerName: "Status",
     width: 120,
     renderCell: (params) => {
       const row = params?.row || {};
@@ -102,9 +101,9 @@ const transactionColumns = [
       return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
     }
   },
-  { 
-    field: "transactionDate", 
-    headerName: "Date", 
+  {
+    field: "transactionDate",
+    headerName: "Date",
     width: 180,
     renderCell: (params) => {
       const row = params?.row || {};
@@ -115,11 +114,10 @@ const transactionColumns = [
   },
 ];
 
-// FIX: Expired Warranty columns dengan renderCell
 const expiredWarrantyColumns = [
-  { 
-    field: "assetCode", 
-    headerName: "Code", 
+  {
+    field: "assetCode",
+    headerName: "Code",
     width: 120,
     renderCell: (params) => {
       const row = params?.row || {};
@@ -127,10 +125,10 @@ const expiredWarrantyColumns = [
       return <span>{value}</span>;
     }
   },
-  { 
-    field: "assetName", 
-    headerName: "Name", 
-    flex: 1, 
+  {
+    field: "assetName",
+    headerName: "Name",
+    flex: 1,
     minWidth: 180,
     renderCell: (params) => {
       const row = params?.row || {};
@@ -138,9 +136,9 @@ const expiredWarrantyColumns = [
       return <span>{value}</span>;
     }
   },
-  { 
-    field: "categoryName", 
-    headerName: "Category", 
+  {
+    field: "categoryName",
+    headerName: "Category",
     width: 150,
     renderCell: (params) => {
       const row = params?.row || {};
@@ -148,9 +146,9 @@ const expiredWarrantyColumns = [
       return <span>{value}</span>;
     }
   },
-  { 
-    field: "officeName", 
-    headerName: "Office", 
+  {
+    field: "officeName",
+    headerName: "Office",
     width: 150,
     renderCell: (params) => {
       const row = params?.row || {};
@@ -158,9 +156,9 @@ const expiredWarrantyColumns = [
       return <span>{value}</span>;
     }
   },
-  { 
-    field: "warrantyExpiryDate", 
-    headerName: "Expiry Date", 
+  {
+    field: "warrantyExpiryDate",
+    headerName: "Expiry Date",
     width: 150,
     renderCell: (params) => {
       const row = params?.row || {};
@@ -169,9 +167,9 @@ const expiredWarrantyColumns = [
       return <span>{utilsHelper.formatDate(value)}</span>;
     }
   },
-  { 
-    field: "purchasePrice", 
-    headerName: "Price", 
+  {
+    field: "purchasePrice",
+    headerName: "Price",
     width: 130,
     renderCell: (params) => {
       const row = params?.row || {};
@@ -191,7 +189,8 @@ const DashboardMenu = () => {
     categoryBreakdown: [],
     recentTransactions: [],
     expiredWarranty: [],
-    upcomingMaintenance: []
+    upcomingMaintenance: [],
+    pendingApprovals: []
   });
   const [drilldown, setDrilldown] = useState({ isOpen: false, title: '', endpoint: '', params: {} });
   const [expiredWarrantyPage, setExpiredWarrantyPage] = useState(1);
@@ -210,6 +209,16 @@ const DashboardMenu = () => {
     const result = await dashboardData.fetchDashboardData();
     if (result.success) {
       setDashboardData_(result.data);
+    } else {
+      setDashboardData_({
+        stats: {},
+        monthlyStats: [],
+        categoryBreakdown: [],
+        recentTransactions: [],
+        expiredWarranty: [],
+        upcomingMaintenance: [],
+        pendingApprovals: []
+      });
     }
     setLoading(false);
   };
@@ -236,130 +245,136 @@ const DashboardMenu = () => {
   ];
   const statusBackgroundColors = statusLabels.map(s => ASSET_STATUS_CHART_COLORS[s] || '#6b7280');
 
-  const doughnutChartData = { 
-    labels: statusLabels, 
-    datasets: [{ 
-      data: statusDataValues, 
-      backgroundColor: statusBackgroundColors, 
-      borderWidth: 0, 
-      hoverOffset: 10, 
-      borderRadius: 8, 
-      spacing: 2 
-    }] 
+  const doughnutChartData = {
+    labels: statusLabels,
+    datasets: [{
+      data: statusDataValues,
+      backgroundColor: statusBackgroundColors,
+      borderWidth: 0,
+      hoverOffset: 10,
+      borderRadius: 8,
+      spacing: 2
+    }]
   };
-  
-  const doughnutChartOptions = { 
-    responsive: true, 
-    maintainAspectRatio: false, 
-    cutout: '65%', 
-    plugins: { 
-      legend: { 
-        position: 'bottom', 
-        labels: { color: textColor, padding: 16, usePointStyle: true, pointStyleWidth: 12, pointStyleHeight: 12, font: { size: 12, family: "'Inter', sans-serif" }, boxWidth: 12, boxHeight: 12 } 
-      }, 
-      tooltip: { 
-        backgroundColor: isDark ? '#1f2937' : '#ffffff', 
-        titleColor: textColor, 
-        bodyColor: textColor, 
+
+  const doughnutChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '65%',
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { color: textColor, padding: 16, usePointStyle: true, pointStyleWidth: 12, pointStyleHeight: 12, font: { size: 12, family: "'Inter', sans-serif" }, boxWidth: 12, boxHeight: 12 }
+      },
+      tooltip: {
+        backgroundColor: isDark ? '#1f2937' : '#ffffff',
+        titleColor: textColor,
+        bodyColor: textColor,
         borderColor: isDark ? '#4b5563' : '#d1d5db',
         borderWidth: 1,
         padding: 10,
         cornerRadius: 8,
-        callbacks: { 
-          label: (context) => { 
-            const label = context.label || ''; 
-            const value = context.raw || 0; 
-            const total = context.dataset.data.reduce((a, b) => a + b, 0); 
-            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0; 
-            return `${label}: ${value} (${percentage}%)`; 
-          } 
-        } 
-      } 
-    } 
+        callbacks: {
+          label: (context) => {
+            const label = context.label || '';
+            const value = context.raw || 0;
+            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+            return `${label}: ${value} (${percentage}%)`;
+          }
+        }
+      }
+    }
   };
 
-  const lineChartData = { 
-    labels: monthlyLabels, 
-    datasets: [{ 
-      label: 'Transactions', 
-      data: monthlyChartData, 
-      borderColor: '#dc2626', 
-      backgroundColor: 'rgba(220, 38, 38, 0.1)', 
-      fill: true, 
-      tension: 0.4, 
-      pointBackgroundColor: '#dc2626', 
-      pointBorderColor: '#ffffff', 
+  const lineChartData = {
+    labels: monthlyLabels,
+    datasets: [{
+      label: 'Transactions',
+      data: monthlyChartData,
+      borderColor: '#dc2626',
+      backgroundColor: 'rgba(220, 38, 38, 0.1)',
+      fill: true,
+      tension: 0.4,
+      pointBackgroundColor: '#dc2626',
+      pointBorderColor: '#ffffff',
       pointBorderWidth: 2,
       pointRadius: 4,
       pointHoverRadius: 6,
       borderWidth: 2
-    }] 
+    }]
   };
-  
-  const lineChartOptions = { 
-    responsive: true, 
-    maintainAspectRatio: false, 
-    plugins: { 
-      legend: { display: false }, 
-      tooltip: { 
-        backgroundColor: isDark ? '#1f2937' : '#ffffff', 
-        titleColor: textColor, 
-        bodyColor: textColor, 
+
+  const lineChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: isDark ? '#1f2937' : '#ffffff',
+        titleColor: textColor,
+        bodyColor: textColor,
         borderColor: isDark ? '#4b5563' : '#d1d5db',
         borderWidth: 1,
         padding: 10,
         cornerRadius: 8,
-        callbacks: { label: (context) => `Transactions: ${context.raw}` } 
-      } 
-    }, 
-    scales: { 
-      y: { grid: { color: gridColor }, ticks: { color: textColor, stepSize: Math.max(1, Math.ceil(Math.max(...monthlyChartData, 10) / 5)) }, title: { display: true, text: 'Number of Transactions', color: textColor, font: { size: 12 } } }, 
-      x: { grid: { display: false }, ticks: { color: textColor } } 
-    } 
+        callbacks: { label: (context) => `Transactions: ${context.raw}` }
+      }
+    },
+    scales: {
+      y: { grid: { color: gridColor }, ticks: { color: textColor, stepSize: Math.max(1, Math.ceil(Math.max(...monthlyChartData, 10) / 5)) }, title: { display: true, text: 'Number of Transactions', color: textColor, font: { size: 12 } } },
+      x: { grid: { display: false }, ticks: { color: textColor } }
+    }
   };
 
-  const barChartData = { 
-    labels: categoryLabels, 
-    datasets: [{ 
-      label: 'Asset Value (IDR)', 
-      data: categoryValues, 
-      backgroundColor: categoryColors.slice(0, categoryLabels.length), 
+  const barChartData = {
+    labels: categoryLabels,
+    datasets: [{
+      label: 'Asset Value (IDR)',
+      data: categoryValues,
+      backgroundColor: categoryColors.slice(0, categoryLabels.length),
       borderRadius: 8,
       barPercentage: 0.7,
       categoryPercentage: 0.8,
       hoverBackgroundColor: '#dc2626'
-    }] 
+    }]
   };
-  
-  const barChartOptions = { 
-    responsive: true, 
-    maintainAspectRatio: false, 
-    plugins: { 
-      legend: { display: false }, 
-      tooltip: { 
-        backgroundColor: isDark ? '#1f2937' : '#ffffff', 
-        titleColor: textColor, 
-        bodyColor: textColor, 
+
+  const barChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: isDark ? '#1f2937' : '#ffffff',
+        titleColor: textColor,
+        bodyColor: textColor,
         borderColor: isDark ? '#4b5563' : '#d1d5db',
         borderWidth: 1,
         padding: 10,
         cornerRadius: 8,
-        callbacks: { label: (context) => `Value: ${utilsHelper.formatCurrency(context.raw)}` } 
-      } 
-    }, 
-    scales: { 
-      y: { grid: { color: gridColor }, ticks: { color: textColor, callback: (value) => utilsHelper.formatCurrency(value) }, title: { display: true, text: 'Total Value (IDR)', color: textColor, font: { size: 12 } } }, 
-      x: { grid: { display: false }, ticks: { color: textColor, font: { size: 11 } } } 
-    } 
+        callbacks: { label: (context) => `Value: ${utilsHelper.formatCurrency(context.raw)}` }
+      }
+    },
+    scales: {
+      y: { grid: { color: gridColor }, ticks: { color: textColor, callback: (value) => utilsHelper.formatCurrency(value) }, title: { display: true, text: 'Total Value (IDR)', color: textColor, font: { size: 12 } } },
+      x: { grid: { display: false }, ticks: { color: textColor, font: { size: 11 } } }
+    }
   };
 
   const currentMonth = new Date().getMonth();
   const thisMonthTransactions = monthlyStats.find(item => item.month === currentMonth + 1);
   const thisMonthCount = thisMonthTransactions?.transactionCount || 0;
 
-  const assetUtilizationRate = stats.totalAssets > 0 
-    ? ((stats.assignedAssets + stats.assetsOnLoan) / stats.totalAssets * 100) 
+  const assetUtilizationRate = stats.totalAssets > 0
+    ? ((stats.assignedAssets + stats.assetsOnLoan) / stats.totalAssets * 100)
     : 0;
+
+  // FIX: Gunakan data dari dashboardData_ untuk pending approvals
+  const pendingApprovalsCount = dashboardData_.pendingApprovals?.length || stats.pendingApprovals || 0;
+
+  // FIX: Cek apakah ada data damaged
+  const damagedCount = stats.damagedAssets || 0;
 
   const statCardsConfig = [
     { icon: FiPackage, label: 'Total Assets', value: stats.totalAssets || 0, endpoint: '/Asset/grid', params: {}, color: '#dc2626', bg: 'rgba(220, 38, 38, 0.1)' },
@@ -367,8 +382,8 @@ const DashboardMenu = () => {
     { icon: FiUser, label: 'Assigned', value: stats.assignedAssets || 0, endpoint: '/Asset/grid', params: { status: 'Assigned' }, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
     { icon: FiLayers, label: 'On Loan', value: stats.assetsOnLoan || 0, endpoint: '/Asset/grid', params: { status: 'On Loan' }, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
     { icon: FiTool, label: 'In Maintenance', value: stats.assetsInMaintenance || 0, endpoint: '/Asset/grid', params: { status: 'In Maintenance' }, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
-    { icon: FiShield, label: 'Damaged', value: stats.damagedAssets || 0, endpoint: '/Asset/grid', params: { status: 'Damaged' }, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
-    { icon: FiClock, label: 'Pending Approvals', value: stats.pendingApprovals || 0, endpoint: '/AssetTransaction/pending-approvals', params: {}, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+    { icon: FiShield, label: 'Damaged', value: damagedCount, endpoint: '/Asset/grid', params: { status: 'Damaged' }, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
+    { icon: FiClock, label: 'Pending Approvals', value: pendingApprovalsCount, endpoint: '/AssetTransaction/pending-approvals', params: {}, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
     { icon: FiAlertTriangle, label: 'Overdue Loans', value: stats.overdueLoanCount || 0, endpoint: '/AssetTransaction/overdue-loans', params: {}, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
     { icon: FiDollarSign, label: 'Total Value', value: utilsHelper.formatCurrency(stats.totalAssetValue), noDrilldown: true, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
     { icon: FiTrendingUp, label: 'Utilization', value: `${assetUtilizationRate.toFixed(1)}%`, noDrilldown: true, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },
@@ -378,10 +393,10 @@ const DashboardMenu = () => {
 
   const handleCardClick = (card) => {
     if (card.noDrilldown) return;
-    setDrilldown({ 
-      isOpen: true, 
-      title: `${card.label} Details`, 
-      endpoint: card.endpoint, 
+    setDrilldown({
+      isOpen: true,
+      title: `${card.label} Details`,
+      endpoint: card.endpoint,
       params: card.params || {},
     });
   };
@@ -411,15 +426,15 @@ const DashboardMenu = () => {
         <div className="dashboard__tab-content">
           <div className="dashboard__stats">
             {statCardsConfig.map((card) => (
-              <StatCard 
-                key={card.label} 
-                icon={card.icon} 
-                label={card.label} 
-                value={card.value} 
-                color={card.color} 
-                bgColor={card.bg} 
-                onClick={() => handleCardClick(card)} 
-                clickable={!card.noDrilldown} 
+              <StatCard
+                key={card.label}
+                icon={card.icon}
+                label={card.label}
+                value={card.value}
+                color={card.color}
+                bgColor={card.bg}
+                onClick={() => handleCardClick(card)}
+                clickable={!card.noDrilldown}
               />
             ))}
           </div>
@@ -434,13 +449,12 @@ const DashboardMenu = () => {
                     <Chip label={`${expiredWarranty.length} assets`} size="small" className="dashboard__alert-count" />
                   </div>
                 </div>
-                <div className="dashboard__alert-body">
-                  <DataTable 
-                    rows={paginatedExpiredWarranty} 
-                    columns={expiredWarrantyColumns} 
+                <div className="dashboard__alert-body" style={{ minHeight: '200px' }}>
+                  <DataTable
+                    rows={paginatedExpiredWarranty}
+                    columns={expiredWarrantyColumns}
                     pageSize={10}
                     page={expiredWarrantyPage}
-                    totalRowCount={expiredWarranty.length}
                     onPageChange={setExpiredWarrantyPage}
                     getRowId={(row) => row?.assetId || `ew-${Math.random()}`}
                     hideFooter={false}
@@ -498,8 +512,8 @@ const DashboardMenu = () => {
               <div className="dashboard__chart-insight">
                 <Typography variant="caption" color="text.secondary">
                   <FiTrendingUp size={14} style={{ marginRight: 4 }} />
-                  {monthlyChartData.length > 1 && monthlyChartData[monthlyChartData.length - 1] > monthlyChartData[monthlyChartData.length - 2] 
-                    ? '↑ Increasing trend compared to last month' 
+                  {monthlyChartData.length > 1 && monthlyChartData[monthlyChartData.length - 1] > monthlyChartData[monthlyChartData.length - 2]
+                    ? '↑ Increasing trend compared to last month'
                     : '↓ Decreasing trend compared to last month'}
                 </Typography>
               </div>
@@ -520,15 +534,14 @@ const DashboardMenu = () => {
         <div className="dashboard__tab-content">
           <Card title="Recent Transactions">
             <div className="dashboard__table-wrapper">
-              <DataTable 
-                rows={paginatedRecent} 
-                columns={transactionColumns} 
+              <DataTable
+                rows={paginatedRecent}
+                columns={transactionColumns}
                 pageSize={10}
                 page={recentPage}
-                totalRowCount={recentTransactions.length}
                 onPageChange={setRecentPage}
-                getRowId={(row) => row?.assetTransactionId || `txn-${Math.random()}`} 
-                hideFooter={false} 
+                getRowId={(row) => row?.assetTransactionId || `txn-${Math.random()}`}
+                hideFooter={false}
                 ariaLabel="Recent transactions table"
                 paginationMode="client"
                 autoHeight={false}
@@ -538,12 +551,12 @@ const DashboardMenu = () => {
         </div>
       )}
 
-      <DrilldownModal 
-        isOpen={drilldown.isOpen} 
-        onClose={() => setDrilldown(prev => ({ ...prev, isOpen: false }))} 
-        title={drilldown.title} 
-        endpoint={drilldown.endpoint} 
-        params={drilldown.params} 
+      <DrilldownModal
+        isOpen={drilldown.isOpen}
+        onClose={() => setDrilldown(prev => ({ ...prev, isOpen: false }))}
+        title={drilldown.title}
+        endpoint={drilldown.endpoint}
+        params={drilldown.params}
         size="xl"
       />
     </div>
