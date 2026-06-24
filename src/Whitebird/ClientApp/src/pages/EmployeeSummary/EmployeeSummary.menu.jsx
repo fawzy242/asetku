@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { FiSearch, FiUser, FiBox, FiDollarSign, FiCalendar, FiMail, FiPhone, FiBriefcase, FiRefreshCw, FiAlertTriangle, FiLayers, FiCheckCircle, FiClock, FiTool, FiPieChart } from "react-icons/fi";
+import { FiSearch, FiUser, FiBox, FiDollarSign, FiCalendar, FiMail, FiPhone, FiBriefcase, FiRefreshCw, FiAlertTriangle, FiLayers, FiTool, FiPieChart } from "react-icons/fi";
 import { Grid, Box, Typography, Avatar, Chip, Paper, IconButton, Tooltip } from "@mui/material";
 import { useLocation } from "react-router-dom";
 import EmployeeSummaryData from "./EmployeeSummary.data";
@@ -8,7 +8,9 @@ import Card from "../../components/atoms/Card/Card";
 import Select from "../../components/atoms/Select/Select";
 import Spinner from "../../components/atoms/Spinner/Spinner";
 import Skeleton from "../../components/atoms/Skeleton/Skeleton";
-import { getStatusChipStyles } from "../../core/constants/statusColors";
+import StatusChip from "../../components/atoms/StatusChip/StatusChip";
+import InfoRow from "../../components/molecules/InfoRow/InfoRow";
+import { useOptions } from "../../hooks/useOptions";
 import { useSweetAlert } from "../../hooks/useSweetAlert";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./EmployeeSummary.scss";
@@ -19,10 +21,12 @@ const assetColumns = [
   { field: "assetCode", headerName: "Asset Code", width: 130 },
   { field: "assetName", headerName: "Asset Name", flex: 1, minWidth: 180 },
   { field: "categoryName", headerName: "Category", width: 150 },
-  { field: "status", headerName: "Status", width: 140, renderCell: (p) => {
-    const status = p?.value || '-';
-    return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
-  }},
+  { 
+    field: "status", 
+    headerName: "Status", 
+    width: 140, 
+    renderCell: (p) => <StatusChip status={p?.value || "-"} />
+  },
   { field: "associationType", headerName: "Type", width: 110 },
   { 
     field: "sinceDate", 
@@ -30,7 +34,7 @@ const assetColumns = [
     width: 120,
     renderCell: (params) => {
       const value = params?.row?.sinceDate || params?.value;
-      if (!value) return <span>-</span>;
+      if (!value) return <span className="u-text-muted">-</span>;
       return <span>{utilsHelper.formatDate(value)}</span>;
     }
   },
@@ -40,7 +44,7 @@ const assetColumns = [
     width: 130,
     renderCell: (params) => {
       const value = params?.row?.expectedReturnDate || params?.value;
-      if (!value) return <span>-</span>;
+      if (!value) return <span className="u-text-muted">-</span>;
       return <span>{utilsHelper.formatDate(value)}</span>;
     }
   },
@@ -61,7 +65,7 @@ const assetColumns = [
     width: 130,
     renderCell: (params) => {
       const value = params?.row?.purchasePrice || params?.value;
-      if (!value) return <span>-</span>;
+      if (!value) return <span className="u-text-muted">-</span>;
       return <span>{utilsHelper.formatCurrency(value)}</span>;
     }
   },
@@ -74,7 +78,7 @@ const historyColumns = [
     width: 180,
     renderCell: (params) => {
       const value = params?.row?.transactionDate || params?.value;
-      if (!value) return <span>-</span>;
+      if (!value) return <span className="u-text-muted">-</span>;
       return <span>{utilsHelper.formatDateTime(value)}</span>;
     }
   },
@@ -84,7 +88,7 @@ const historyColumns = [
     width: 150,
     renderCell: (params) => {
       const row = params?.row || {};
-      const value = row.transactionTypeName || row.typeName || row.transactionType || '-';
+      const value = row.transactionTypeName || row.typeName || row.transactionType || "-";
       return <span>{value}</span>;
     }
   },
@@ -94,7 +98,7 @@ const historyColumns = [
     width: 130,
     renderCell: (params) => {
       const row = params?.row || {};
-      const value = row.assetCode || row.code || '-';
+      const value = row.assetCode || row.code || "-";
       return <span>{value}</span>;
     }
   },
@@ -105,7 +109,7 @@ const historyColumns = [
     minWidth: 180,
     renderCell: (params) => {
       const row = params?.row || {};
-      const value = row.assetName || row.name || '-';
+      const value = row.assetName || row.name || "-";
       return <span>{value}</span>;
     }
   },
@@ -115,7 +119,7 @@ const historyColumns = [
     width: 150, 
     renderCell: (params) => {
       const row = params?.row || {};
-      const value = row.fromEmployeeName || row.fromEmployee || row.fromName || '-';
+      const value = row.fromEmployeeName || row.fromEmployee || row.fromName || "-";
       return <span>{value}</span>;
     }
   },
@@ -125,7 +129,7 @@ const historyColumns = [
     width: 150, 
     renderCell: (params) => {
       const row = params?.row || {};
-      const value = row.toEmployeeName || row.toEmployee || row.toName || '-';
+      const value = row.toEmployeeName || row.toEmployee || row.toName || "-";
       return <span>{value}</span>;
     }
   },
@@ -135,7 +139,7 @@ const historyColumns = [
     width: 100, 
     renderCell: (params) => {
       const row = params?.row || {};
-      const value = row.conditionAfterName || row.conditionAfter || row.condition || '-';
+      const value = row.conditionAfterName || row.conditionAfter || row.condition || "-";
       return <span>{value}</span>;
     }
   },
@@ -145,7 +149,7 @@ const historyColumns = [
     width: 200, 
     renderCell: (params) => {
       const row = params?.row || {};
-      const value = row.notes || row.note || '-';
+      const value = row.notes || row.note || "-";
       return <span>{value}</span>;
     }
   },
@@ -176,7 +180,7 @@ const EmployeeSummaryMenu = () => {
     if (isMountedRef.current && r.success) {
       setEmployees(r.data);
       const params = new URLSearchParams(location.search);
-      const employeeIdParam = params.get('employeeId');
+      const employeeIdParam = params.get("employeeId");
       if (employeeIdParam) {
         const employeeId = parseInt(employeeIdParam, 10);
         const employeeExists = r.data.some(e => e.employeeId === employeeId);
@@ -226,9 +230,9 @@ const EmployeeSummaryMenu = () => {
         setLoadingData(false);
       }
     } catch (error) {
-      console.error('Error fetching employee summary:', error);
+      console.error("Error fetching employee summary:", error);
       if (isMountedRef.current) {
-        toast.error('Failed to load employee data');
+        toast.error("Failed to load employee data");
         setLoadingData(false);
       }
     }
@@ -247,14 +251,14 @@ const EmployeeSummaryMenu = () => {
         setAssetSummary(summaryRes.data);
       }
       setLoadingData(false);
-      toast.success('Data refreshed');
+      toast.success("Data refreshed");
     }
   }, [selectedEmployeeId, toast]);
 
   useEffect(() => {
     if (employees.length > 0) {
       const params = new URLSearchParams(location.search);
-      const employeeIdParam = params.get('employeeId');
+      const employeeIdParam = params.get("employeeId");
       if (employeeIdParam) {
         const employeeId = parseInt(employeeIdParam, 10);
         const employeeExists = employees.some(e => e.employeeId === employeeId);
@@ -270,7 +274,7 @@ const EmployeeSummaryMenu = () => {
   );
 
   const maintenanceAssets = (assetSummary?.currentAssets || []).filter(
-    a => a.status === 'In Maintenance' || a.associationType === 'Maintenance'
+    a => a.status === "In Maintenance" || a.associationType === "Maintenance"
   ).length;
 
   const categorySummary = useMemo(() => {
@@ -279,7 +283,7 @@ const EmployeeSummaryMenu = () => {
     
     const categoryMap = {};
     currentAssets.forEach(asset => {
-      const category = asset.categoryName || 'Uncategorized';
+      const category = asset.categoryName || "Uncategorized";
       categoryMap[category] = (categoryMap[category] || 0) + 1;
     });
     
@@ -288,10 +292,10 @@ const EmployeeSummaryMenu = () => {
       .sort((a, b) => b.count - a.count);
   }, [assetSummary?.currentAssets]);
 
-  const employeeOptions = useMemo(() => [
-    { value: "", label: "Choose an employee..." },
-    ...employees.map(e => ({ value: e.employeeId, label: `${e.employeeCode} - ${e.fullName}` }))
-  ], [employees]);
+  const employeeOptions = useOptions(
+    employees.map(e => ({ value: e.employeeId, label: `${e.employeeCode} - ${e.fullName}` })),
+    "Choose an employee..."
+  );
 
   const currentAssets = assetSummary?.currentAssets || [];
   const assetHistory = assetSummary?.assetHistory || [];
@@ -352,38 +356,26 @@ const EmployeeSummaryMenu = () => {
                 <Grid container spacing={3} alignItems="center">
                   <Grid item>
                     <Avatar className="employee-summary__profile-avatar">
-                      {employeeDetail?.fullName?.charAt(0) || '?'}
+                      {employeeDetail?.fullName?.charAt(0) || "?"}
                     </Avatar>
                   </Grid>
                   <Grid item xs>
                     <Typography variant="h5" fontWeight={700} className="employee-summary__profile-name">
-                      {employeeDetail?.fullName || '-'}
+                      {employeeDetail?.fullName || "-"}
                     </Typography>
                     <div className="employee-summary__profile-tags">
-                      <Chip icon={<FiBriefcase />} label={employeeDetail?.employeeCode || '-'} size="small" variant="outlined" />
-                      <Chip icon={<FiBriefcase />} label={employeeDetail?.positionName || '-'} size="small" variant="outlined" />
-                      <Chip icon={<FiBriefcase />} label={employeeDetail?.departmentName || '-'} size="small" variant="outlined" />
-                      <Chip icon={<FiMail />} label={employeeDetail?.email || '-'} size="small" variant="outlined" />
-                      <Chip icon={<FiPhone />} label={employeeDetail?.phoneNumber || '-'} size="small" variant="outlined" />
-                      <Chip label={employeeDetail?.employmentStatusName || '-'} size="small" sx={getStatusChipStyles(employeeDetail?.employmentStatusName)} />
+                      <Chip icon={<FiBriefcase />} label={employeeDetail?.employeeCode || "-"} size="small" variant="outlined" />
+                      <Chip icon={<FiBriefcase />} label={employeeDetail?.positionName || "-"} size="small" variant="outlined" />
+                      <Chip icon={<FiBriefcase />} label={employeeDetail?.departmentName || "-"} size="small" variant="outlined" />
+                      <Chip icon={<FiMail />} label={employeeDetail?.email || "-"} size="small" variant="outlined" />
+                      <Chip icon={<FiPhone />} label={employeeDetail?.phoneNumber || "-"} size="small" variant="outlined" />
+                      <StatusChip status={employeeDetail?.employmentStatusName} />
                     </div>
                   </Grid>
                   <Grid item>
-                    <div className="employee-summary__info-row">
-                      <FiCalendar size={16} className="employee-summary__info-icon" />
-                      <span className="employee-summary__info-label">Join Date:</span>
-                      <span className="employee-summary__info-value">
-                        {utilsHelper.formatDate(employeeDetail?.joinDate) || '-'}
-                      </span>
-                    </div>
+                    <InfoRow icon={FiCalendar} label="Join Date" value={utilsHelper.formatDate(employeeDetail?.joinDate)} />
                     {employeeDetail?.resignDate && (
-                      <div className="employee-summary__info-row">
-                        <FiCalendar size={16} className="employee-summary__info-icon" />
-                        <span className="employee-summary__info-label">Resign Date:</span>
-                        <span className="employee-summary__info-value">
-                          {utilsHelper.formatDate(employeeDetail?.resignDate)}
-                        </span>
-                      </div>
+                      <InfoRow icon={FiCalendar} label="Resign Date" value={utilsHelper.formatDate(employeeDetail?.resignDate)} />
                     )}
                   </Grid>
                 </Grid>
@@ -394,44 +386,44 @@ const EmployeeSummaryMenu = () => {
               <Grid container spacing={2}>
                 <Grid item xs={6} sm={4} md={2}>
                   <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiBox size={28} className="employee-summary__stat-icon" style={{ color: '#dc2626' }} />
+                    <FiBox size={28} className="employee-summary__stat-icon employee-summary__stat-icon--red" />
                     <Typography variant="h4" fontWeight={700}>{assetSummary?.currentlyHeldAssets || currentAssets.length}</Typography>
                     <Typography variant="caption" color="text.secondary">Total Assets</Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={2}>
                   <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiLayers size={28} className="employee-summary__stat-icon" style={{ color: '#8b5cf6' }} />
+                    <FiLayers size={28} className="employee-summary__stat-icon employee-summary__stat-icon--purple" />
                     <Typography variant="h4" fontWeight={700}>{assetSummary?.assetsOnLoan || 0}</Typography>
                     <Typography variant="caption" color="text.secondary">On Loan</Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={2}>
                   <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiTool size={28} className="employee-summary__stat-icon" style={{ color: '#f59e0b' }} />
+                    <FiTool size={28} className="employee-summary__stat-icon employee-summary__stat-icon--yellow" />
                     <Typography variant="h4" fontWeight={700}>{assetSummary?.maintenanceAssets || maintenanceAssets}</Typography>
                     <Typography variant="caption" color="text.secondary">In Maintenance</Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={2}>
                   <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiDollarSign size={28} className="employee-summary__stat-icon" style={{ color: '#10b981' }} />
+                    <FiDollarSign size={28} className="employee-summary__stat-icon employee-summary__stat-icon--green" />
                     <Typography variant="h4" fontWeight={700}>{utilsHelper.formatCurrency(totalAssetValue)}</Typography>
                     <Typography variant="caption" color="text.secondary">Total Value</Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={2}>
                   <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiRefreshCw size={28} className="employee-summary__stat-icon" style={{ color: '#3b82f6' }} />
+                    <FiRefreshCw size={28} className="employee-summary__stat-icon employee-summary__stat-icon--blue" />
                     <Typography variant="h4" fontWeight={700}>{assetSummary?.returnedAssets || assetHistory.filter(t => 
-                      t.transactionTypeName === 'RETURN' || t.transactionTypeName === 'LOAN_RETURN'
+                      t.transactionTypeName === "RETURN" || t.transactionTypeName === "LOAN_RETURN"
                     ).length}</Typography>
                     <Typography variant="caption" color="text.secondary">Returns</Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={2}>
                   <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiAlertTriangle size={28} className="employee-summary__stat-icon" style={{ color: '#ef4444' }} />
+                    <FiAlertTriangle size={28} className="employee-summary__stat-icon employee-summary__stat-icon--red" />
                     <Typography variant="h4" fontWeight={700}>{assetSummary?.damagedReturns || 0}</Typography>
                     <Typography variant="caption" color="text.secondary">Damaged</Typography>
                   </Paper>
@@ -445,7 +437,7 @@ const EmployeeSummaryMenu = () => {
                 subtitle="Distribution of assets by category"
               >
                 {currentAssets.length === 0 ? (
-                  <div className="employee-summary__empty-state" style={{ padding: '24px' }}>
+                  <div className="employee-summary__empty-state u-p-24">
                     <FiPieChart size={32} />
                     <Typography variant="body2">No assets to summarize</Typography>
                   </div>
@@ -468,36 +460,16 @@ const EmployeeSummaryMenu = () => {
                 subtitle="Most recent activity"
               >
                 {assetHistory.length === 0 ? (
-                  <div className="employee-summary__empty-state" style={{ padding: '24px' }}>
+                  <div className="employee-summary__empty-state u-p-24">
                     <FiRefreshCw size={32} />
                     <Typography variant="body2">No transactions found</Typography>
                   </div>
                 ) : (
                   <div className="employee-summary__last-transaction">
-                    <div className="employee-summary__last-transaction-row">
-                      <span className="employee-summary__last-transaction-label">Date:</span>
-                      <span className="employee-summary__last-transaction-value">
-                        {utilsHelper.formatDateTime(assetHistory[0]?.transactionDate) || '-'}
-                      </span>
-                    </div>
-                    <div className="employee-summary__last-transaction-row">
-                      <span className="employee-summary__last-transaction-label">Type:</span>
-                      <span className="employee-summary__last-transaction-value">
-                        {assetHistory[0]?.transactionTypeName || assetHistory[0]?.typeName || '-'}
-                      </span>
-                    </div>
-                    <div className="employee-summary__last-transaction-row">
-                      <span className="employee-summary__last-transaction-label">Asset:</span>
-                      <span className="employee-summary__last-transaction-value">
-                        {assetHistory[0]?.assetCode || '-'} - {assetHistory[0]?.assetName || '-'}
-                      </span>
-                    </div>
-                    <div className="employee-summary__last-transaction-row">
-                      <span className="employee-summary__last-transaction-label">Condition:</span>
-                      <span className="employee-summary__last-transaction-value">
-                        {assetHistory[0]?.conditionAfterName || assetHistory[0]?.conditionAfter || '-'}
-                      </span>
-                    </div>
+                    <InfoRow icon={FiCalendar} label="Date" value={utilsHelper.formatDateTime(assetHistory[0]?.transactionDate)} />
+                    <InfoRow icon={FiRefreshCw} label="Type" value={assetHistory[0]?.transactionTypeName || assetHistory[0]?.typeName} />
+                    <InfoRow icon={FiBox} label="Asset" value={`${assetHistory[0]?.assetCode || "-"} - ${assetHistory[0]?.assetName || "-"}`} />
+                    <InfoRow icon={FiTool} label="Condition" value={assetHistory[0]?.conditionAfterName || assetHistory[0]?.conditionAfter} />
                   </div>
                 )}
               </Card>

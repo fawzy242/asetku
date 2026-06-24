@@ -80,18 +80,17 @@
     }
 }
 
-// Dark mode specific
 [data-theme='dark'] {
     .master-data {
         &__item {
             background-color: #1f2937;
             border-color: #374151;
-            
+
             &:hover {
                 border-color: #ef4444;
             }
         }
-        
+
         &__item-name {
             color: #f9fafb;
         }

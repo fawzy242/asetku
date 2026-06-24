@@ -24,12 +24,12 @@ const Select = memo(forwardRef(({
   registerOptions = {},
 }, ref) => {
   const theme = useUIStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = theme === "dark";
 
   const safeOptions = useMemo(() => {
     if (!Array.isArray(options)) return [];
     return options.filter(opt =>
-      opt !== null && opt !== undefined && typeof opt === 'object' &&
+      opt !== null && opt !== undefined && typeof opt === "object" &&
       opt.value !== undefined && opt.value !== null
     );
   }, [options]);
@@ -58,7 +58,7 @@ const Select = memo(forwardRef(({
 
   const finalRef = (el) => {
     registerProps.ref?.(el);
-    if (typeof ref === 'function') ref(el);
+    if (typeof ref === "function") ref(el);
     else if (ref) ref.current = el;
   };
 
@@ -78,35 +78,35 @@ const Select = memo(forwardRef(({
         loadingText="Loading..."
         noOptionsText="No options"
         sx={{
-          '& .MuiOutlinedInput-root': {
-            borderRadius: '8px',
-            backgroundColor: isDark ? '#374151' : '#ffffff',
-            '& fieldset': {
-              borderColor: isDark ? '#4b5563' : '#d1d5db',
+          "& .MuiOutlinedInput-root": {
+            borderRadius: "8px",
+            backgroundColor: isDark ? "#374151" : "#ffffff",
+            "& fieldset": {
+              borderColor: isDark ? "#4b5563" : "#d1d5db",
             },
-            '&:hover fieldset': {
-              borderColor: 'var(--primary)',
+            "&:hover fieldset": {
+              borderColor: "var(--primary)",
             },
-            '&.Mui-focused fieldset': {
-              borderColor: 'var(--primary)',
+            "&.Mui-focused fieldset": {
+              borderColor: "var(--primary)",
             },
-            '& .MuiAutocomplete-input': {
-              color: isDark ? '#f9fafb' : '#111827',
-            },
-          },
-          '& .MuiInputLabel-root': {
-            color: isDark ? '#9ca3af' : '#6b7280',
-            '&.Mui-focused': {
-              color: 'var(--primary)',
-            },
-            '&.Mui-error': {
-              color: 'var(--error)',
+            "& .MuiAutocomplete-input": {
+              color: isDark ? "#f9fafb" : "#111827",
             },
           },
-          '& .MuiFormHelperText-root': {
-            color: 'var(--error)',
-            margin: '4px 0 0 0',
-            fontSize: '12px',
+          "& .MuiInputLabel-root": {
+            color: isDark ? "#9ca3af" : "#6b7280",
+            "&.Mui-focused": {
+              color: "var(--primary)",
+            },
+            "&.Mui-error": {
+              color: "var(--error)",
+            },
+          },
+          "& .MuiFormHelperText-root": {
+            color: "var(--error)",
+            margin: "4px 0 0 0",
+            fontSize: "12px",
           },
         }}
         renderInput={(params) => (

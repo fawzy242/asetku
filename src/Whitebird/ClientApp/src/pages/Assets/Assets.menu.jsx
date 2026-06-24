@@ -13,8 +13,8 @@ import Spinner from "../../components/atoms/Spinner/Spinner";
 import FileUploader from "../../components/molecules/FileUploader/FileUploader";
 import ImportModal from "../../components/molecules/ImportModal/ImportModal";
 import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
+import StatusChip from "../../components/atoms/StatusChip/StatusChip";
 import { FiUpload, FiCheckSquare } from "react-icons/fi";
-import { getStatusChipStyles } from "../../core/constants/statusColors";
 import { ASSET_GRID_TABS } from "../../core/constants/assetStatuses";
 import { ACTION_TYPES, useGridActions } from "../../hooks/useGridActions";
 import { useBulkSelection } from "../../hooks/useBulkSelection";
@@ -22,6 +22,7 @@ import { useSweetAlert } from "../../hooks/useSweetAlert";
 import { useGridData } from "../../hooks/useGridData";
 import { useReferenceData } from "../../hooks/useReferenceData";
 import { useCrudFormBase } from "../../hooks/useCrudFormBase";
+import { useOptions } from "../../hooks/useOptions";
 import { cleanAssetFormData } from "../../core/utils/formHelpers";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./Assets.scss";
@@ -62,14 +63,14 @@ const AssetsMenu = () => {
     handleClose,
     handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, assetsData, {
-    idField: 'assetId',
+    idField: "assetId",
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['assets'] });
-      queryClient.invalidateQueries({ queryKey: ['reference', 'assets'] });
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["reference", "assets"] });
     },
   });
 
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } = useBulkSelection({ idField: 'assetId' });
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } = useBulkSelection({ idField: "assetId" });
 
   const showCheckbox = useMemo(() => {
     return activeTab === "Active" || activeTab === "Inactive";
@@ -79,7 +80,7 @@ const AssetsMenu = () => {
 
   const buildFilters = useCallback(() => {
     const filters = {};
-    if (activeTab !== 'all') {
+    if (activeTab !== "all") {
       filters.status = activeTab;
     }
     if (searchTerm) {
@@ -109,7 +110,7 @@ const AssetsMenu = () => {
     pageSize,
     setPageSize,
     reload
-  } = useGridData(['assets', activeTab, searchTerm], fetchGridData);
+  } = useGridData(["assets", activeTab, searchTerm], fetchGridData);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -125,8 +126,8 @@ const AssetsMenu = () => {
     return (rawAssets || []).map(asset => ({
       ...asset,
       id: asset.assetId,
-      displayStatus: asset.currentStatus || asset.status || 'Available',
-      displayCondition: asset.assetConditionName || '-',
+      displayStatus: asset.currentStatus || asset.status || "Available",
+      displayCondition: asset.assetConditionName || "-",
     }));
   }, [rawAssets]);
 
@@ -137,26 +138,26 @@ const AssetsMenu = () => {
   }, [setPage, clearSelection]);
 
   const handleDelete = useCallback(async (asset) => {
-    const confirmed = await confirmDelete('Delete Asset', `Are you sure you want to delete "${asset.assetName}"?`);
+    const confirmed = await confirmDelete("Delete Asset", `Are you sure you want to delete "${asset.assetName}"?`);
     if (!confirmed) return;
     const r = await assetsData.delete(asset.assetId);
     if (r.success && isMountedRef.current) {
-      toast.success('Asset deleted successfully');
-      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      toast.success("Asset deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
       reload();
     }
   }, [reload, queryClient, toast, confirmDelete]);
 
   const onSubmit = useCallback(async () => {
     if (formData.operasionalOffice === true && !formData.officeId) {
-      toast.error('Office is required when Operational Office is enabled');
+      toast.error("Office is required when Operational Office is enabled");
       return false;
     }
 
     const success = await crudHandleSubmit();
     if (success && isMountedRef.current) {
-      toast.success(editingAsset ? 'Asset updated successfully' : 'Asset created successfully');
-      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      toast.success(editingAsset ? "Asset updated successfully" : "Asset created successfully");
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
       reload();
     }
     return success;
@@ -170,18 +171,18 @@ const AssetsMenu = () => {
   }, [setPage, clearSelection]);
 
   const handleBulkActivate = useCallback(async (ids, activate) => {
-    const actionText = activate ? 'activate' : 'deactivate';
+    const actionText = activate ? "activate" : "deactivate";
     const confirmed = await confirm({
-      title: activate ? 'Activate Assets' : 'Deactivate Assets',
+      title: activate ? "Activate Assets" : "Deactivate Assets",
       text: `Are you sure you want to ${actionText} ${ids.length} asset(s)?`,
-      confirmButtonText: activate ? 'Yes, Activate' : 'Yes, Deactivate',
+      confirmButtonText: activate ? "Yes, Activate" : "Yes, Deactivate",
     });
     if (!confirmed) return;
     const r = await assetsData.bulkActivate(ids, activate);
     if (r.success && isMountedRef.current) {
       toast.success(`${r.data || ids.length} asset(s) ${actionText}d successfully`);
       clearSelection();
-      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
       reload();
     }
   }, [reload, queryClient, toast, confirm, clearSelection]);
@@ -197,7 +198,7 @@ const AssetsMenu = () => {
       } else {
         toast.warning(`Import completed: ${r.data.successCount} success, ${r.data.errorCount} errors`);
       }
-      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
       reload();
     }
   }, [reload, queryClient, toast]);
@@ -227,28 +228,14 @@ const AssetsMenu = () => {
     actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
     onAction: handleGridAction,
     getConditionalActions,
-    rowIdField: 'assetId',
+    rowIdField: "assetId",
   });
 
-  const categoryOptions = useMemo(() => [
-    { value: "", label: "Select Category" },
-    ...categories.map(c => ({ value: c.value, label: c.label }))
-  ], [categories]);
-
-  const supplierOptions = useMemo(() => [
-    { value: "", label: "Select Supplier" },
-    ...suppliers.map(s => ({ value: s.value, label: s.label }))
-  ], [suppliers]);
-
-  const officeOptions = useMemo(() => [
-    { value: "", label: "Select Office" },
-    ...offices.map(o => ({ value: o.value, label: o.label }))
-  ], [offices]);
-
-  const conditionOptions = useMemo(() => [
-    { value: "", label: "Select Condition" },
-    ...assetConditions.map(c => ({ value: c.value, label: c.label }))
-  ], [assetConditions]);
+  // Use centralized useOptions hook
+  const categoryOptions = useOptions(categories, "Select Category");
+  const supplierOptions = useOptions(suppliers, "Select Supplier");
+  const officeOptions = useOptions(offices, "Select Office");
+  const conditionOptions = useOptions(assetConditions, "Select Condition");
 
   const conditionPurchaseOptions = [
     { value: "", label: "Select Purchase Condition" },
@@ -272,8 +259,8 @@ const AssetsMenu = () => {
       headerName: "Status",
       width: 140,
       renderCell: (p) => {
-        const status = p?.value || 'Available';
-        return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
+        const status = p?.value || "Available";
+        return <StatusChip status={status} />;
       }
     },
     { field: "displayCondition", headerName: "Condition", width: 100 },
@@ -285,12 +272,12 @@ const AssetsMenu = () => {
       renderCell: (params) => {
         const row = params?.row || {};
         const value = row.purchasePrice !== undefined ? row.purchasePrice : params?.value;
-        if (value === null || value === undefined || value === '') {
-          return <span style={{ color: 'var(--text-secondary)' }}>-</span>;
+        if (value === null || value === undefined || value === "") {
+          return <span className="u-text-muted">-</span>;
         }
-        const numValue = typeof value === 'string' ? parseFloat(value) : value;
+        const numValue = typeof value === "string" ? parseFloat(value) : value;
         if (isNaN(numValue)) {
-          return <span style={{ color: 'var(--text-secondary)' }}>-</span>;
+          return <span className="u-text-muted">-</span>;
         }
         return <span>{utilsHelper.formatCurrency(numValue)}</span>;
       }
@@ -300,11 +287,11 @@ const AssetsMenu = () => {
 
   const extraActions = (
     <>
-      <button className="btn btn--outline btn--sm" onClick={() => setShowImportModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+      <button className="btn btn--outline btn--sm u-inline-flex u-btn-gap" onClick={() => setShowImportModal(true)}>
         <FiUpload size={16} /> Import
       </button>
       {hasSelection && showCheckbox && (
-        <button className="btn btn--primary btn--sm" onClick={() => setShowBulkActivateModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+        <button className="btn btn--primary btn--sm u-inline-flex u-btn-gap" onClick={() => setShowBulkActivateModal(true)}>
           <FiCheckSquare size={16} /> {activeTab === "Active" ? "Deactivate" : "Activate"} ({selectionCount})
         </button>
       )}
@@ -354,16 +341,16 @@ const AssetsMenu = () => {
         <FormSection title="Basic Information" description="Asset code, name, and category">
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <Input label="Asset Code" value={formData.assetCode || ""} onChange={(e) => setFormField('assetCode')(e.target.value)} required />
+              <Input label="Asset Code" value={formData.assetCode || ""} onChange={(e) => setFormField("assetCode")(e.target.value)} required />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Input label="Asset Name" value={formData.assetName || ""} onChange={(e) => setFormField('assetName')(e.target.value)} required />
+              <Input label="Asset Name" value={formData.assetName || ""} onChange={(e) => setFormField("assetName")(e.target.value)} required />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Select label="Category" value={formData.categoryId || ""} onChange={(e) => setFormField('categoryId')(e.target.value)} options={categoryOptions} required />
+              <Select label="Category" value={formData.categoryId || ""} onChange={(e) => setFormField("categoryId")(e.target.value)} options={categoryOptions} required />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Select label="Supplier" value={formData.supplierId || ""} onChange={(e) => setFormField('supplierId')(e.target.value)} options={supplierOptions} />
+              <Select label="Supplier" value={formData.supplierId || ""} onChange={(e) => setFormField("supplierId")(e.target.value)} options={supplierOptions} />
             </Grid>
           </Grid>
         </FormSection>
@@ -376,9 +363,9 @@ const AssetsMenu = () => {
                 value={formData.operasionalOffice ? "true" : "false"}
                 onChange={(e) => {
                   const val = e.target.value === "true";
-                  setFormField('operasionalOffice')(val);
+                  setFormField("operasionalOffice")(val);
                   if (!val) {
-                    setFormField('officeId')("");
+                    setFormField("officeId")("");
                   }
                 }}
                 options={booleanOptions}
@@ -389,7 +376,7 @@ const AssetsMenu = () => {
                 <Select
                   label="Office *"
                   value={formData.officeId || ""}
-                  onChange={(e) => setFormField('officeId')(e.target.value)}
+                  onChange={(e) => setFormField("officeId")(e.target.value)}
                   options={officeOptions}
                   required
                 />
@@ -401,28 +388,28 @@ const AssetsMenu = () => {
         <FormSection title="Technical Details" description="Brand, model, serial numbers, and network information">
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <Input label="Brand" value={formData.brand || ""} onChange={(e) => setFormField('brand')(e.target.value)} />
+              <Input label="Brand" value={formData.brand || ""} onChange={(e) => setFormField("brand")(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Input label="Model" value={formData.model || ""} onChange={(e) => setFormField('model')(e.target.value)} />
+              <Input label="Model" value={formData.model || ""} onChange={(e) => setFormField("model")(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <Input label="Serial Number" value={formData.serialNumber || ""} onChange={(e) => setFormField('serialNumber')(e.target.value)} />
+              <Input label="Serial Number" value={formData.serialNumber || ""} onChange={(e) => setFormField("serialNumber")(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <Input label="IMEI" value={formData.imei || ""} onChange={(e) => setFormField('imei')(e.target.value)} />
+              <Input label="IMEI" value={formData.imei || ""} onChange={(e) => setFormField("imei")(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <Input label="MAC Address" value={formData.macAddress || ""} onChange={(e) => setFormField('macAddress')(e.target.value)} />
+              <Input label="MAC Address" value={formData.macAddress || ""} onChange={(e) => setFormField("macAddress")(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <Input label="Hostname" value={formData.hostname || ""} onChange={(e) => setFormField('hostname')(e.target.value)} />
+              <Input label="Hostname" value={formData.hostname || ""} onChange={(e) => setFormField("hostname")(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <Input label="IP Address" value={formData.ipAddress || ""} onChange={(e) => setFormField('ipAddress')(e.target.value)} />
+              <Input label="IP Address" value={formData.ipAddress || ""} onChange={(e) => setFormField("ipAddress")(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <Input label="Invoice Number" value={formData.invoiceNumber || ""} onChange={(e) => setFormField('invoiceNumber')(e.target.value)} />
+              <Input label="Invoice Number" value={formData.invoiceNumber || ""} onChange={(e) => setFormField("invoiceNumber")(e.target.value)} />
             </Grid>
           </Grid>
         </FormSection>
@@ -430,22 +417,22 @@ const AssetsMenu = () => {
         <FormSection title="Purchase Information" description="Purchase date, price, warranty, and condition">
           <Grid container spacing={2}>
             <Grid item xs={12} sm={4}>
-              <DatePickerInput label="Purchase Date" value={formData.purchaseDate || ""} onChange={(e) => setFormField('purchaseDate')(e.target.value)} />
+              <DatePickerInput label="Purchase Date" value={formData.purchaseDate || ""} onChange={(e) => setFormField("purchaseDate")(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <NumberInput label="Purchase Price" value={formData.purchasePrice} onChange={(e) => setFormField('purchasePrice')(e.target.value)} prefix="Rp " thousandSeparator={true} decimalScale={0} />
+              <NumberInput label="Purchase Price" value={formData.purchasePrice} onChange={(e) => setFormField("purchasePrice")(e.target.value)} prefix="Rp " thousandSeparator={true} decimalScale={0} />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <NumberInput label="Warranty (Months)" value={formData.warrantyPeriod} onChange={(e) => setFormField('warrantyPeriod')(e.target.value)} suffix=" months" decimalScale={0} min={0} />
+              <NumberInput label="Warranty (Months)" value={formData.warrantyPeriod} onChange={(e) => setFormField("warrantyPeriod")(e.target.value)} suffix=" months" decimalScale={0} min={0} />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <DatePickerInput label="Warranty Expiry" value={formData.warrantyExpiryDate || ""} onChange={(e) => setFormField('warrantyExpiryDate')(e.target.value)} />
+              <DatePickerInput label="Warranty Expiry" value={formData.warrantyExpiryDate || ""} onChange={(e) => setFormField("warrantyExpiryDate")(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <Select label="Condition" value={formData.assetCondition || ""} onChange={(e) => setFormField('assetCondition')(e.target.value)} options={conditionOptions} />
+              <Select label="Condition" value={formData.assetCondition || ""} onChange={(e) => setFormField("assetCondition")(e.target.value)} options={conditionOptions} />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <Select label="Purchase Condition" value={formData.assetConditionPurchase || ""} onChange={(e) => setFormField('assetConditionPurchase')(e.target.value)} options={conditionPurchaseOptions} />
+              <Select label="Purchase Condition" value={formData.assetConditionPurchase || ""} onChange={(e) => setFormField("assetConditionPurchase")(e.target.value)} options={conditionPurchaseOptions} />
             </Grid>
           </Grid>
         </FormSection>
@@ -453,13 +440,13 @@ const AssetsMenu = () => {
         <FormSection title="Depreciation" description="Financial depreciation information">
           <Grid container spacing={2}>
             <Grid item xs={12} sm={4}>
-              <NumberInput label="Residual Value" value={formData.residualValue} onChange={(e) => setFormField('residualValue')(e.target.value)} prefix="Rp " thousandSeparator={true} decimalScale={0} />
+              <NumberInput label="Residual Value" value={formData.residualValue} onChange={(e) => setFormField("residualValue")(e.target.value)} prefix="Rp " thousandSeparator={true} decimalScale={0} />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <NumberInput label="Useful Life (Years)" value={formData.usefulLife} onChange={(e) => setFormField('usefulLife')(e.target.value)} suffix=" years" decimalScale={0} min={1} />
+              <NumberInput label="Useful Life (Years)" value={formData.usefulLife} onChange={(e) => setFormField("usefulLife")(e.target.value)} suffix=" years" decimalScale={0} min={1} />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <DatePickerInput label="Depreciation Start" value={formData.depreciationStartDate || ""} onChange={(e) => setFormField('depreciationStartDate')(e.target.value)} />
+              <DatePickerInput label="Depreciation Start" value={formData.depreciationStartDate || ""} onChange={(e) => setFormField("depreciationStartDate")(e.target.value)} />
             </Grid>
           </Grid>
         </FormSection>
@@ -467,7 +454,7 @@ const AssetsMenu = () => {
         <FormSection title="Notes & Attachments" description="Additional information and file attachments">
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <Input label="Notes" value={formData.notes || ""} onChange={(e) => setFormField('notes')(e.target.value)} multiline rows={3} />
+              <Input label="Notes" value={formData.notes || ""} onChange={(e) => setFormField("notes")(e.target.value)} multiline rows={3} />
             </Grid>
             <Grid item xs={12}>
               <FileUploader

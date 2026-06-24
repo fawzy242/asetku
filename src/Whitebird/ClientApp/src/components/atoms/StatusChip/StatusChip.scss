@@ -1,0 +1,22 @@
+@use '../../../styles/variables' as *;
+@use '../../../styles/mixins' as *;
+
+.status-chip {
+    font-weight: 500;
+    font-size: 0.75rem;
+    height: 24px;
+    border-radius: 16px;
+
+    .MuiChip-label {
+        padding: 0 $spacing-md;
+    }
+
+    &--large {
+        height: 32px;
+        font-size: 0.875rem;
+
+        .MuiChip-label {
+            padding: 0 $spacing-lg;
+        }
+    }
+}

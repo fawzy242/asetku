@@ -40,15 +40,18 @@
     }
 
     &--xl {
-        max-width: 900px;
+        max-width: 950px;
     }
 
     @include respond-to('sm') {
         width: 95%;
         max-height: 95vh;
         margin: $spacing-sm;
-        
-        &--sm, &--md, &--lg, &--xl {
+
+        &--sm,
+        &--md,
+        &--lg,
+        &--xl {
             max-width: 95%;
         }
     }
@@ -100,6 +103,7 @@
     from {
         opacity: 0;
     }
+
     to {
         opacity: 1;
     }
@@ -110,6 +114,7 @@
         opacity: 0;
         transform: translateY(-15px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);

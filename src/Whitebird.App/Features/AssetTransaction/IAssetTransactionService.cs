@@ -48,7 +48,7 @@ public interface IAssetTransactionService
     // GRID & TRACKING
     // ============================================================
 
-    Task<ServiceResult<PaginatedResult<AssetTransactionListView>>> GetGridDataAsync(int page, int pageSize, string? search = null, bool? approved = null, int? assetId = null);
+    Task<ServiceResult<PaginatedResult<AssetTransactionListView>>> GetGridDataAsync(int page, int pageSize, string? search = null, bool? approved = null, int? assetId = null, DateTime? startDate = null, DateTime? endDate = null);
 
     // ============================================================
     // ACTIVE LOANS

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { FiDownload, FiFileText, FiBox, FiUsers, FiTool, FiTrendingUp } from "react-icons/fi";
-import { Grid, Box, Typography, Chip } from "@mui/material";
+import { Grid, Typography, Chip } from "@mui/material";
 import ReportsData from "./Reports.data";
 import Card from "../../components/atoms/Card/Card";
 import Button from "../../components/atoms/Button/Button";
@@ -8,6 +8,7 @@ import Select from "../../components/atoms/Select/Select";
 import DatePickerInput from "../../components/atoms/Input/DatePickerInput";
 import Spinner from "../../components/atoms/Spinner/Spinner";
 import { useReferenceData } from "../../hooks/useReferenceData";
+import { useOptions } from "../../hooks/useOptions";
 import { useSweetAlert } from "../../hooks/useSweetAlert";
 import "./Reports.scss";
 
@@ -49,7 +50,7 @@ const ReportsMenu = () => {
   const [supplierFilter, setSupplierFilter] = useState("");
   const [transactionTypeFilter, setTransactionTypeFilter] = useState("");
   const [employeeFilter, setEmployeeFilter] = useState("");
-  
+
   const { categories, suppliers, employees, isLoading: loadingRefData } = useReferenceData();
   const { toast } = useSweetAlert();
   const isMountedRef = useRef(true);
@@ -60,6 +61,13 @@ const ReportsMenu = () => {
   }, []);
 
   const currentReport = REPORT_TYPES.find(r => r.id === selectedReport) || REPORT_TYPES[0];
+
+  const categoryOptions = useOptions(categories, "All Categories");
+  const supplierOptions = useOptions(suppliers, "All Suppliers");
+  const employeeOptions = useOptions(
+    employees.map(e => ({ value: e.value, label: e.label })),
+    "All Employees"
+  );
 
   const buildParams = useCallback(() => {
     const params = {};
@@ -104,10 +112,6 @@ const ReportsMenu = () => {
     setEmployeeFilter("");
   };
 
-  const categoryOptions = [{ value: "", label: "All Categories" }, ...categories.map(c => ({ value: c.value, label: c.label }))];
-  const supplierOptions = [{ value: "", label: "All Suppliers" }, ...suppliers.map(s => ({ value: s.value, label: s.label }))];
-  const employeeOptions = [{ value: "", label: "All Employees" }, ...employees.map(e => ({ value: e.value, label: e.label }))];
-
   if (loadingRefData) {
     return (
       <div className="reports-menu">
@@ -125,7 +129,7 @@ const ReportsMenu = () => {
           <Card title="Select Report Type">
             <div className="reports-menu__report-types">
               {REPORT_TYPES.map(report => (
-                <button key={report.id} className={`reports-menu__report-card ${selectedReport === report.id ? 'reports-menu__report-card--active' : ''}`} onClick={() => setSelectedReport(report.id)}>
+                <button key={report.id} className={`reports-menu__report-card ${selectedReport === report.id ? "reports-menu__report-card--active" : ""}`} onClick={() => setSelectedReport(report.id)}>
                   <div className="reports-menu__report-icon">{report.icon}</div>
                   <div className="reports-menu__report-info">
                     <h3 className="reports-menu__report-label">{report.label}</h3>
@@ -140,13 +144,63 @@ const ReportsMenu = () => {
         <Grid item xs={12}>
           <Card title="Filter Options">
             <div className="reports-menu__filters">
-              {currentReport.hasDateRange && (<><DatePickerInput label="Start Date" value={dateRange.startDate} onChange={e => setDateRange(prev => ({ ...prev, startDate: e.target.value }))} /><DatePickerInput label="End Date" value={dateRange.endDate} onChange={e => setDateRange(prev => ({ ...prev, endDate: e.target.value }))} /></>)}
-              {currentReport.hasStatusFilter && (<Select label="Status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} options={INVENTORY_STATUS_OPTIONS} />)}
-              {currentReport.hasCategoryFilter && (<Select label="Category" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} options={categoryOptions} />)}
-              {currentReport.hasSupplierFilter && (<Select label="Supplier" value={supplierFilter} onChange={e => setSupplierFilter(e.target.value)} options={supplierOptions} />)}
-              {currentReport.hasTransactionTypeFilter && (<Select label="Transaction Type" value={transactionTypeFilter} onChange={e => setTransactionTypeFilter(e.target.value)} options={TRANSACTION_TYPE_OPTIONS} />)}
-              {currentReport.hasEmployeeFilter && (<Select label="Employee" value={employeeFilter} onChange={e => setEmployeeFilter(e.target.value)} options={employeeOptions} />)}
-              <div className="reports-menu__filter-actions"><Button variant="outline" onClick={resetFilters}>Reset Filters</Button></div>
+              {currentReport.hasDateRange && (
+                <>
+                  <DatePickerInput
+                    label="Start Date"
+                    value={dateRange.startDate}
+                    onChange={e => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                  />
+                  <DatePickerInput
+                    label="End Date"
+                    value={dateRange.endDate}
+                    onChange={e => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                  />
+                </>
+              )}
+              {currentReport.hasStatusFilter && (
+                <Select
+                  label="Status"
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value)}
+                  options={INVENTORY_STATUS_OPTIONS}
+                />
+              )}
+              {currentReport.hasCategoryFilter && (
+                <Select
+                  label="Category"
+                  value={categoryFilter}
+                  onChange={e => setCategoryFilter(e.target.value)}
+                  options={categoryOptions}
+                />
+              )}
+              {currentReport.hasSupplierFilter && (
+                <Select
+                  label="Supplier"
+                  value={supplierFilter}
+                  onChange={e => setSupplierFilter(e.target.value)}
+                  options={supplierOptions}
+                />
+              )}
+              {currentReport.hasTransactionTypeFilter && (
+                <Select
+                  label="Transaction Type"
+                  value={transactionTypeFilter}
+                  onChange={e => setTransactionTypeFilter(e.target.value)}
+                  options={TRANSACTION_TYPE_OPTIONS}
+                />
+              )}
+              {currentReport.hasEmployeeFilter && (
+                <Select
+                  label="Employee"
+                  value={employeeFilter}
+                  onChange={e => setEmployeeFilter(e.target.value)}
+                  options={employeeOptions}
+                />
+              )}
+              <div className="reports-menu__filter-actions">
+                <Button variant="outline" onClick={resetFilters}>Reset Filters</Button>
+              </div>
             </div>
           </Card>
         </Grid>
@@ -158,7 +212,9 @@ const ReportsMenu = () => {
                 <Typography variant="h6" fontWeight={600}>Download {currentReport.label}</Typography>
                 <Typography variant="body2" color="text.secondary">{currentReport.description} will be exported as Excel file (.xlsx)</Typography>
               </div>
-              <Button variant="primary" size="lg" onClick={handleExport} loading={isExporting} startIcon={<FiDownload />}>Generate Report</Button>
+              <Button variant="primary" size="lg" onClick={handleExport} loading={isExporting} startIcon={<FiDownload />}>
+                Generate Report
+              </Button>
             </div>
           </Card>
         </Grid>

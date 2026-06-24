@@ -348,76 +348,96 @@ public class AssetTransactionReps : IAssetTransactionReps
 
     public async Task<IEnumerable<AssetTransactionListView>> GetActiveLoansListViewAsync()
     {
-        const string sql = @"
-            SELECT 
-                t.AssetTransactionId, t.AssetId,
-                a.AssetCode, a.AssetName,
-                t.TransactionType, md1.MasterDataName as TransactionTypeName,
-                t.FromEmployeeId, fe.FullName as FromEmployeeName,
-                t.ToEmployeeId, te.FullName as ToEmployeeName,
-                t.ToLocationId, tl.OfficeName as ToLocationName,
-                t.TransactionDate, t.ExpectedReturnDate, t.ActualReturnDate,
-                t.Notes,
-                t.ConditionBefore, md2.MasterDataName as ConditionBeforeName,
-                t.ConditionAfter, md3.MasterDataName as ConditionAfterName,
-                t.Approved, t.ApprovedBy,
-                t.MaintenanceType, md4.MasterDataName as MaintenanceTypeName,
-                t.MaintenanceCost, t.FromAssetTransactionId,
-                t.IsActive, t.CreatedDate, t.CreatedBy, t.ModifiedDate, t.ModifiedBy
-            FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId
-            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
-            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
-            LEFT JOIN Office tl ON t.ToLocationId = tl.OfficeId
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
-            LEFT JOIN MasterData md2 ON t.ConditionBefore = md2.ReferenceCode AND md2.ReferenceName = 'AssetCondition'
-            LEFT JOIN MasterData md3 ON t.ConditionAfter = md3.ReferenceCode AND md3.ReferenceName = 'AssetCondition'
-            LEFT JOIN MasterData md4 ON t.MaintenanceType = md4.ReferenceCode AND md4.ReferenceName = 'MaintenanceType'
-            WHERE t.TransactionType = @LoanType
-              AND t.Approved = 1
-              AND t.FromAssetTransactionId IS NULL
-              AND t.ActualReturnDate IS NULL
-              AND t.IsActive = 1
-              AND t.ExpectedReturnDate >= GETDATE()
-            ORDER BY t.ExpectedReturnDate";
+        const string sql = @";WITH getData as (
+	SELECT 
+		t.AssetTransactionId, t.AssetId,
+		a.AssetCode, a.AssetName,
+		t.TransactionType, md1.MasterDataName as TransactionTypeName,
+		t.FromEmployeeId, fe.FullName as FromEmployeeName,
+		t.ToEmployeeId, te.FullName as ToEmployeeName,
+		t.ToLocationId, tl.OfficeName as ToLocationName,
+		t.TransactionDate, t.ExpectedReturnDate, t.ActualReturnDate,
+		t.Notes,
+		t.ConditionBefore, md2.MasterDataName as ConditionBeforeName,
+		t.ConditionAfter, md3.MasterDataName as ConditionAfterName,
+		t.Approved, t.ApprovedBy,
+		t.MaintenanceType, md4.MasterDataName as MaintenanceTypeName,
+		t.MaintenanceCost, t.FromAssetTransactionId,
+		t.IsActive, t.CreatedDate, t.CreatedBy, t.ModifiedDate, t.ModifiedBy
+	FROM AssetTransaction t
+	LEFT JOIN Asset a ON t.AssetId = a.AssetId
+	LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+	LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+	LEFT JOIN Office tl ON t.ToLocationId = tl.OfficeId
+	LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
+	LEFT JOIN MasterData md2 ON t.ConditionBefore = md2.ReferenceCode AND md2.ReferenceName = 'AssetCondition'
+	LEFT JOIN MasterData md3 ON t.ConditionAfter = md3.ReferenceCode AND md3.ReferenceName = 'AssetCondition'
+	LEFT JOIN MasterData md4 ON t.MaintenanceType = md4.ReferenceCode AND md4.ReferenceName = 'MaintenanceType'
+	WHERE t.TransactionType in (3,5)
+		AND t.Approved = 1
+		AND t.IsActive = 1
+)
+, getReturnLoan as (
+	select * from getData A WHERE A.IsActive = 1 and A.Approved = 1 and A.TransactionType = 5
+)
+, getLoan as (
+	select A.* from getData A
+	LEFT JOIN getReturnLoan B on A.AssetTransactionId = B.FromAssetTransactionId
+	where A.TransactionType = 3 AND ((B.AssetTransactionId is null and isnull(A.ExpectedReturnDate,'') >= GETDATE()) OR (B.AssetTransactionId is not null and A.ExpectedReturnDate >= B.ActualReturnDate))
+)
+select A.* from getLoan A
+UNION ALL
+select A.* from getReturnLoan A
+join getLoan B on A.FromAssetTransactionId = B.AssetTransactionId
+ORDER BY AssetTransactionId";
 
-        return await _context.QueryAsync<AssetTransactionListView>(sql, new { LoanType = TransactionTypeConstants.LOAN });
+        return await _context.QueryAsync<AssetTransactionListView>(sql);
     }
 
     public async Task<IEnumerable<AssetTransactionListView>> GetOverdueLoansListViewAsync()
     {
-        const string sql = @"
-            SELECT 
-                t.AssetTransactionId, t.AssetId,
-                a.AssetCode, a.AssetName,
-                t.TransactionType, md1.MasterDataName as TransactionTypeName,
-                t.FromEmployeeId, fe.FullName as FromEmployeeName,
-                t.ToEmployeeId, te.FullName as ToEmployeeName,
-                t.ToLocationId, tl.OfficeName as ToLocationName,
-                t.TransactionDate, t.ExpectedReturnDate, t.ActualReturnDate,
-                t.Notes,
-                t.ConditionBefore, md2.MasterDataName as ConditionBeforeName,
-                t.ConditionAfter, md3.MasterDataName as ConditionAfterName,
-                t.Approved, t.ApprovedBy,
-                t.MaintenanceType, md4.MasterDataName as MaintenanceTypeName,
-                t.MaintenanceCost, t.FromAssetTransactionId,
-                t.IsActive, t.CreatedDate, t.CreatedBy, t.ModifiedDate, t.ModifiedBy
-            FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId
-            LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
-            LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
-            LEFT JOIN Office tl ON t.ToLocationId = tl.OfficeId
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
-            LEFT JOIN MasterData md2 ON t.ConditionBefore = md2.ReferenceCode AND md2.ReferenceName = 'AssetCondition'
-            LEFT JOIN MasterData md3 ON t.ConditionAfter = md3.ReferenceCode AND md3.ReferenceName = 'AssetCondition'
-            LEFT JOIN MasterData md4 ON t.MaintenanceType = md4.ReferenceCode AND md4.ReferenceName = 'MaintenanceType'
-            WHERE t.TransactionType = @LoanType
-              AND t.Approved = 1
-              AND t.FromAssetTransactionId IS NULL
-              AND t.ExpectedReturnDate < GETDATE()
-              AND t.ActualReturnDate IS NULL
-              AND t.IsActive = 1
-            ORDER BY t.ExpectedReturnDate";
+        const string sql = @";WITH getData as (
+	SELECT 
+		t.AssetTransactionId, t.AssetId,
+		a.AssetCode, a.AssetName,
+		t.TransactionType, md1.MasterDataName as TransactionTypeName,
+		t.FromEmployeeId, fe.FullName as FromEmployeeName,
+		t.ToEmployeeId, te.FullName as ToEmployeeName,
+		t.ToLocationId, tl.OfficeName as ToLocationName,
+		t.TransactionDate, t.ExpectedReturnDate, t.ActualReturnDate,
+		t.Notes,
+		t.ConditionBefore, md2.MasterDataName as ConditionBeforeName,
+		t.ConditionAfter, md3.MasterDataName as ConditionAfterName,
+		t.Approved, t.ApprovedBy,
+		t.MaintenanceType, md4.MasterDataName as MaintenanceTypeName,
+		t.MaintenanceCost, t.FromAssetTransactionId,
+		t.IsActive, t.CreatedDate, t.CreatedBy, t.ModifiedDate, t.ModifiedBy
+	FROM AssetTransaction t
+	LEFT JOIN Asset a ON t.AssetId = a.AssetId
+	LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
+	LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+	LEFT JOIN Office tl ON t.ToLocationId = tl.OfficeId
+	LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType'
+	LEFT JOIN MasterData md2 ON t.ConditionBefore = md2.ReferenceCode AND md2.ReferenceName = 'AssetCondition'
+	LEFT JOIN MasterData md3 ON t.ConditionAfter = md3.ReferenceCode AND md3.ReferenceName = 'AssetCondition'
+	LEFT JOIN MasterData md4 ON t.MaintenanceType = md4.ReferenceCode AND md4.ReferenceName = 'MaintenanceType'
+	WHERE t.TransactionType in (3,5)
+		AND t.Approved = 1
+		AND t.IsActive = 1
+)
+, getReturnLoan as (
+	select * from getData A WHERE A.IsActive = 1 and A.Approved = 1 and A.TransactionType = 5
+)
+, getLoan as (
+	select A.* from getData A
+	LEFT JOIN getReturnLoan B on A.AssetTransactionId = B.FromAssetTransactionId
+	where A.TransactionType = 3 AND ((B.AssetTransactionId is null and isnull(A.ExpectedReturnDate,'') < GETDATE()) OR (B.AssetTransactionId is not null and A.ExpectedReturnDate < B.ActualReturnDate))
+)
+select A.* from getLoan A
+UNION ALL
+select A.* from getReturnLoan A
+join getLoan B on A.FromAssetTransactionId = B.AssetTransactionId
+ORDER BY AssetTransactionId";
 
         return await _context.QueryAsync<AssetTransactionListView>(sql, new { LoanType = TransactionTypeConstants.LOAN });
     }
@@ -656,9 +676,9 @@ public class AssetTransactionReps : IAssetTransactionReps
     }
 
     public async Task<PaginatedResult<AssetTransactionListView>> GetPagedListAsync(
-        int page, int pageSize, string? search = null, bool? approved = null, int? assetId = null)
+        int page, int pageSize, string? search = null, bool? approved = null, int? assetId = null, DateTime? startDate = null, DateTime? endDate = null)
     {
-        var (whereClause, parameters) = BuildTransactionWhereClause(search, approved, assetId);
+        var (whereClause, parameters) = BuildTransactionWhereClause(search, approved, assetId, null, startDate, endDate, true);
 
         var countSql = $@"
             SELECT COUNT(*) FROM AssetTransaction t

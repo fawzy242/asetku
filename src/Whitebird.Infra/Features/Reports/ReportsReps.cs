@@ -405,7 +405,17 @@ public class ReportsReps : IReportsReps
             (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType = @LoanType AND at.rn = 1) AS AssetsOnLoan,
             (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType = @MaintenanceType AND at.rn = 1) AS AssetsInMaintenance,
             (SELECT COUNT(DISTINCT AssetId) FROM AssetTransaction WHERE TransactionType = @DisposalType AND Approved = 1 AND IsActive = 1) AS DisposedAssets,
-            (SELECT COUNT(*) FROM Asset WHERE IsActive = 0 OR AssetCondition = @DamagedCondition) AS DamagedAssets,
+            (
+				select COUNT(*) from (
+					SELECT AssetId FROM Asset WHERE IsActive = 0 OR AssetCondition = @DamagedCondition
+					UNION
+					select AssetId from (
+						select AssetId,TransactionType,ROW_NUMBER() OVER (Partition by AssetId Order by AssetTransactionId Desc) as rn from AssetTransaction where IsActive = 1 and Approved = 1
+					) A
+					where rn = 1 and TransactionType = @DisposalType
+				) A
+			
+			) AS DamagedAssets,
             (SELECT COUNT(*) FROM Asset WHERE WarrantyExpiryDate < GETDATE() AND WarrantyExpiryDate IS NOT NULL AND IsActive = 1) AS ExpiredWarrantyCount,
             (SELECT COUNT(*) FROM Asset WHERE NextMaintenanceDate BETWEEN GETDATE() AND DATEADD(DAY, 30, GETDATE()) AND IsActive = 1) AS UpcomingMaintenanceCount,
             (SELECT COUNT(*) FROM ActiveTransactions at WHERE at.TransactionType = @LoanType AND at.ExpectedReturnDate < GETDATE() AND at.rn = 1) AS OverdueLoanCount,

@@ -464,11 +464,11 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
     /// <inheritdoc />
     public async Task<ServiceResult<PaginatedResult<AssetTransactionListView>>> GetGridDataAsync(
-        int page, int pageSize, string? search = null, bool? approved = null, int? assetId = null)
+        int page, int pageSize, string? search = null, bool? approved = null, int? assetId = null, DateTime? startDate = null, DateTime? endDate = null)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var result = await _transactionReps.GetPagedListAsync(page, pageSize, search, approved, assetId);
+            var result = await _transactionReps.GetPagedListAsync(page, pageSize, search, approved, assetId, startDate, endDate);
             var viewModels = result.Data.ToList();
             MarkOverdueStatus(viewModels);
 

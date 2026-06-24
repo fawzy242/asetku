@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Grid, Chip } from "@mui/material";
+import { Grid } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
 import CategoriesData from "./Categories.data";
 import GridView from "../../components/organisms/GridView/GridView";
@@ -9,13 +9,14 @@ import Input from "../../components/atoms/Input/Input";
 import Select from "../../components/atoms/Select/Select";
 import Spinner from "../../components/atoms/Spinner/Spinner";
 import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
-import { getStatusChipStyles } from "../../core/constants/statusColors";
+import StatusChip from "../../components/atoms/StatusChip/StatusChip";
 import { ACTION_TYPES, useGridActions } from "../../hooks/useGridActions";
 import { useBulkSelection } from "../../hooks/useBulkSelection";
 import { useSweetAlert } from "../../hooks/useSweetAlert";
 import { useGridData } from "../../hooks/useGridData";
 import { useReferenceData } from "../../hooks/useReferenceData";
 import { useCrudFormBase } from "../../hooks/useCrudFormBase";
+import { useOptions } from "../../hooks/useOptions";
 import { cleanCategoryFormData } from "../../core/utils/formHelpers";
 import "./Categories.scss";
 
@@ -53,13 +54,13 @@ const CategoriesMenu = () => {
     handleClose,
     handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, categoriesData, {
-    idField: 'categoryId',
+    idField: "categoryId",
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reference', 'categories'] });
+      queryClient.invalidateQueries({ queryKey: ["reference", "categories"] });
     },
   });
 
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } = useBulkSelection({ idField: 'categoryId' });
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } = useBulkSelection({ idField: "categoryId" });
 
   const showCheckbox = activeTab === "active" || activeTab === "inactive";
 
@@ -97,7 +98,7 @@ const CategoriesMenu = () => {
     pageSize,
     setPageSize,
     reload
-  } = useGridData(['categories', activeTab, searchTerm], fetchGridData);
+  } = useGridData(["categories", activeTab, searchTerm], fetchGridData);
 
   useEffect(() => {
     reload();
@@ -111,26 +112,26 @@ const CategoriesMenu = () => {
   }, [setPage, clearSelection]);
 
   const handleDelete = useCallback(async (cat) => {
-    const confirmed = await confirmDelete('Delete Category', `Are you sure you want to delete "${cat.categoryName}"?`);
+    const confirmed = await confirmDelete("Delete Category", `Are you sure you want to delete "${cat.categoryName}"?`);
     if (!confirmed) return;
     const r = await categoriesData.delete(cat.categoryId);
     if (r.success) {
-      toast.success('Category deleted successfully');
-      queryClient.invalidateQueries({ queryKey: ['reference', 'categories'] });
+      toast.success("Category deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["reference", "categories"] });
       reload();
       clearSelection();
     }
   }, [reload, queryClient, toast, confirmDelete, clearSelection]);
 
   const handleBulkActivate = useCallback(async (ids, activate) => {
-    const actionText = activate ? 'activate' : 'deactivate';
+    const actionText = activate ? "activate" : "deactivate";
     const confirmed = await confirm({
-      title: activate ? 'Activate Categories' : 'Deactivate Categories',
+      title: activate ? "Activate Categories" : "Deactivate Categories",
       text: `Are you sure you want to ${actionText} ${ids.length} categor(ies)?`,
-      confirmButtonText: activate ? 'Yes, Activate' : 'Yes, Deactivate',
+      confirmButtonText: activate ? "Yes, Activate" : "Yes, Deactivate",
     });
     if (!confirmed) return;
-    
+
     let successCount = 0;
     for (const id of ids) {
       const result = await categoriesData.fetchById(id);
@@ -142,16 +143,16 @@ const CategoriesMenu = () => {
     }
     if (successCount > 0) {
       toast.success(`${successCount} categor(ies) ${actionText}d successfully`);
-      queryClient.invalidateQueries({ queryKey: ['reference', 'categories'] });
+      queryClient.invalidateQueries({ queryKey: ["reference", "categories"] });
       reload();
       clearSelection();
     }
   }, [reload, queryClient, toast, confirm, clearSelection]);
 
   const onSubmit = useCallback(async () => {
-    const submitData = { 
-      ...formData, 
-      isActive: editingCategory ? editingCategory.isActive : true 
+    const submitData = {
+      ...formData,
+      isActive: editingCategory ? editingCategory.isActive : true
     };
     if (submitData.parentCategoryId === "" || submitData.parentCategoryId === null || submitData.parentCategoryId === undefined) {
       submitData.parentCategoryId = null;
@@ -161,7 +162,7 @@ const CategoriesMenu = () => {
     });
     const success = await crudHandleSubmit();
     if (success) {
-      toast.success(editingCategory ? 'Category updated successfully' : 'Category created successfully');
+      toast.success(editingCategory ? "Category updated successfully" : "Category created successfully");
       reload();
       clearSelection();
     }
@@ -196,15 +197,13 @@ const CategoriesMenu = () => {
     actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
     onAction: handleGridAction,
     getConditionalActions,
-    rowIdField: 'categoryId',
+    rowIdField: "categoryId",
   });
 
-  const parentCategoryOptions = useMemo(() => [
-    { value: "", label: "None (Top Level)" },
-    ...parentCategories
-      .filter(c => !editingCategory || c.value !== editingCategory.categoryId)
-      .map(c => ({ value: c.value, label: c.label }))
-  ], [parentCategories, editingCategory]);
+  const parentCategoryOptions = useOptions(
+    parentCategories.filter(c => !editingCategory || c.value !== editingCategory.categoryId),
+    "None (Top Level)"
+  );
 
   const columns = useMemo(() => [
     { field: "categoryName", headerName: "Name", flex: 1, minWidth: 200 },
@@ -216,8 +215,8 @@ const CategoriesMenu = () => {
       headerName: "Status",
       width: 110,
       renderCell: (p) => {
-        const status = p.value ? 'Active' : 'Inactive';
-        return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
+        const status = p.value ? "Active" : "Inactive";
+        return <StatusChip status={status} />;
       },
     },
     actionColumn,
@@ -226,9 +225,9 @@ const CategoriesMenu = () => {
   const extraActions = (
     <>
       {hasSelection && showCheckbox && (
-        <button className="btn btn--primary btn--sm" onClick={() => setShowBulkActivateModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-          {activeTab === "active" ? "Deactivate" : "Activate"} ({selectionCount})
-        </button>
+        <Button variant="primary" size="sm" onClick={() => setShowBulkActivateModal(true)} className="u-inline-flex u-btn-gap">
+          <FiCheckSquare size={16} /> {activeTab === "active" ? "Deactivate" : "Activate"} ({selectionCount})
+        </Button>
       )}
     </>
   );
@@ -277,27 +276,27 @@ const CategoriesMenu = () => {
         <FormSection title="Basic Information" description="Category name and description">
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <Input 
-                label="Category Name" 
-                value={formData.categoryName || ""} 
-                onChange={(e) => setFormField('categoryName')(e.target.value)} 
-                required 
+              <Input
+                label="Category Name"
+                value={formData.categoryName || ""}
+                onChange={(e) => setFormField("categoryName")(e.target.value)}
+                required
               />
             </Grid>
             <Grid item xs={12}>
-              <Input 
-                label="Description" 
-                value={formData.description || ""} 
-                onChange={(e) => setFormField('description')(e.target.value)} 
-                multiline 
-                rows={2} 
+              <Input
+                label="Description"
+                value={formData.description || ""}
+                onChange={(e) => setFormField("description")(e.target.value)}
+                multiline
+                rows={2}
               />
             </Grid>
             <Grid item xs={12}>
               <Select
                 label="Parent Category"
                 value={formData.parentCategoryId || ""}
-                onChange={(e) => setFormField('parentCategoryId')(e.target.value || null)}
+                onChange={(e) => setFormField("parentCategoryId")(e.target.value || null)}
                 options={parentCategoryOptions}
               />
             </Grid>

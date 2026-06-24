@@ -1,0 +1,17 @@
+@use '../../../styles/variables' as *;
+@use '../../../styles/mixins' as *;
+
+.return-modal-content {
+    &__info-detail {
+        margin: 4px 0 0;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+
+    &__actions {
+        display: flex;
+        gap: $spacing-md;
+        justify-content: flex-end;
+        margin-top: $spacing-lg;
+    }
+}

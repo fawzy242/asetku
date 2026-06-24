@@ -5,9 +5,13 @@
 // UTILITY CLASSES - Replace inline styles
 // ============================================================
 
-// Flex utilities
+// Display utilities
 .u-flex {
   display: flex;
+}
+
+.u-inline-flex {
+  display: inline-flex;
 }
 
 .u-flex-center {
@@ -32,64 +36,207 @@
   flex-wrap: wrap;
 }
 
-.u-inline-flex {
-  display: inline-flex;
-}
-
 .u-inline-flex-center {
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
+.u-block {
+  display: block;
+}
+
+.u-hidden {
+  display: none;
+}
+
 // Gap utilities
-.u-gap-4 { gap: $spacing-xs; }
-.u-gap-8 { gap: $spacing-sm; }
-.u-gap-12 { gap: $spacing-md; }
-.u-gap-16 { gap: $spacing-md; }
-.u-gap-20 { gap: $spacing-lg; }
-.u-gap-24 { gap: $spacing-lg; }
-.u-gap-32 { gap: $spacing-xl; }
+.u-gap-4 {
+  gap: $spacing-xs;
+}
+
+.u-gap-8 {
+  gap: $spacing-sm;
+}
+
+.u-gap-12 {
+  gap: $spacing-md;
+}
+
+.u-gap-16 {
+  gap: $spacing-md;
+}
+
+.u-gap-20 {
+  gap: $spacing-lg;
+}
+
+.u-gap-24 {
+  gap: $spacing-lg;
+}
+
+.u-gap-32 {
+  gap: $spacing-xl;
+}
 
 // Text utilities
-.u-text-primary { color: var(--text-primary); }
-.u-text-secondary { color: var(--text-secondary); }
-.u-text-success { color: var(--success); }
-.u-text-warning { color: var(--warning); }
-.u-text-error { color: var(--error); }
-.u-text-info { color: var(--info); }
+.u-text-primary {
+  color: var(--text-primary);
+}
+
+.u-text-secondary {
+  color: var(--text-secondary);
+}
+
+.u-text-success {
+  color: var(--success);
+}
+
+.u-text-warning {
+  color: var(--warning);
+}
+
+.u-text-error {
+  color: var(--error);
+}
+
+.u-text-info {
+  color: var(--info);
+}
+
+.u-text-muted {
+  color: var(--text-secondary);
+}
+
+.u-text-center {
+  text-align: center;
+}
+
+.u-text-left {
+  text-align: left;
+}
+
+.u-text-right {
+  text-align: right;
+}
 
 // Background utilities
-.u-bg-primary { background-color: var(--primary); }
-.u-bg-surface { background-color: var(--surface); }
-.u-bg-card { background-color: var(--card-bg); }
+.u-bg-primary {
+  background-color: var(--primary);
+}
+
+.u-bg-surface {
+  background-color: var(--surface);
+}
+
+.u-bg-card {
+  background-color: var(--card-bg);
+}
 
 // Border utilities
-.u-border { border: 1px solid var(--border); }
-.u-border-primary { border: 1px solid var(--primary); }
+.u-border {
+  border: 1px solid var(--border);
+}
+
+.u-border-primary {
+  border: 1px solid var(--primary);
+}
+
+.u-border-none {
+  border: none;
+}
+
+.u-rounded {
+  border-radius: $radius-md;
+}
+
+.u-rounded-lg {
+  border-radius: $radius-lg;
+}
+
+.u-rounded-full {
+  border-radius: $radius-full;
+}
 
 // Padding utilities
-.u-p-4 { padding: $spacing-xs; }
-.u-p-8 { padding: $spacing-sm; }
-.u-p-12 { padding: $spacing-md; }
-.u-p-16 { padding: $spacing-md; }
-.u-p-20 { padding: $spacing-lg; }
-.u-p-24 { padding: $spacing-lg; }
-.u-p-32 { padding: $spacing-xl; }
+.u-p-4 {
+  padding: $spacing-xs;
+}
+
+.u-p-8 {
+  padding: $spacing-sm;
+}
+
+.u-p-12 {
+  padding: $spacing-md;
+}
+
+.u-p-16 {
+  padding: $spacing-md;
+}
+
+.u-p-20 {
+  padding: $spacing-lg;
+}
+
+.u-p-24 {
+  padding: $spacing-lg;
+}
+
+.u-p-32 {
+  padding: $spacing-xl;
+}
 
 // Margin utilities
-.u-m-4 { margin: $spacing-xs; }
-.u-m-8 { margin: $spacing-sm; }
-.u-m-12 { margin: $spacing-md; }
-.u-m-16 { margin: $spacing-md; }
-.u-m-20 { margin: $spacing-lg; }
-.u-m-24 { margin: $spacing-lg; }
-.u-m-32 { margin: $spacing-xl; }
+.u-m-4 {
+  margin: $spacing-xs;
+}
 
-// Text alignment
-.u-text-center { text-align: center; }
-.u-text-left { text-align: left; }
-.u-text-right { text-align: right; }
+.u-m-8 {
+  margin: $spacing-sm;
+}
+
+.u-m-12 {
+  margin: $spacing-md;
+}
+
+.u-m-16 {
+  margin: $spacing-md;
+}
+
+.u-m-20 {
+  margin: $spacing-lg;
+}
+
+.u-m-24 {
+  margin: $spacing-lg;
+}
+
+.u-m-32 {
+  margin: $spacing-xl;
+}
+
+.u-m-auto {
+  margin: auto;
+}
+
+// Width utilities
+.u-w-full {
+  width: 100%;
+}
+
+.u-w-auto {
+  width: auto;
+}
+
+// Height utilities
+.u-h-full {
+  height: 100%;
+}
+
+.u-h-auto {
+  height: auto;
+}
 
 // Responsive utilities
 .u-hide-mobile {
@@ -100,6 +247,7 @@
 
 .u-hide-desktop {
   display: none !important;
+
   @include respond-to('sm') {
     display: block !important;
   }
@@ -107,15 +255,71 @@
 
 .u-hide-desktop-flex {
   display: none !important;
+
   @include respond-to('sm') {
     display: flex !important;
   }
 }
 
-// Width utilities
-.u-w-full { width: 100%; }
-.u-w-auto { width: auto; }
+// Button utilities - untuk inline button styling
+.u-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
 
-// Height utilities
-.u-h-full { height: 100%; }
-.u-h-auto { height: auto; }
+.u-btn-sm {
+  font-size: $font-size-sm;
+  padding: $spacing-xs $spacing-md;
+}
+
+.u-btn-gap {
+  gap: $spacing-sm;
+}
+
+// Min height utilities
+.u-min-h-200 {
+  min-height: 200px;
+}
+
+.u-min-h-300 {
+  min-height: 300px;
+}
+
+.u-min-h-400 {
+  min-height: 400px;
+}
+
+// Overflow utilities
+.u-overflow-hidden {
+  overflow: hidden;
+}
+
+.u-overflow-auto {
+  overflow: auto;
+}
+
+.u-overflow-y-auto {
+  overflow-y: auto;
+}
+
+.u-overflow-x-auto {
+  overflow-x: auto;
+}
+
+// Position utilities
+.u-relative {
+  position: relative;
+}
+
+.u-absolute {
+  position: absolute;
+}
+
+.u-fixed {
+  position: fixed;
+}
+
+.u-sticky {
+  position: sticky;
+}

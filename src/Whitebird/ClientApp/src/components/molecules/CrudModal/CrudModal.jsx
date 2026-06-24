@@ -3,22 +3,6 @@ import { Box } from '@mui/material';
 import Modal from '../Modal/Modal';
 import ModalActions from '../ModalActions/ModalActions';
 
-/**
- * Standardized CRUD modal component with proper spacing
- * @param {Object} props
- * @param {boolean} props.isOpen - Modal visibility
- * @param {Function} props.onClose - Close handler
- * @param {string} props.title - Modal title
- * @param {React.ReactNode} props.children - Form content
- * @param {Function} props.onSubmit - Submit handler
- * @param {boolean} props.isSubmitting - Loading state
- * @param {string} props.submitText - Submit button text (default: 'Submit')
- * @param {string} props.cancelText - Cancel button text (default: 'Cancel')
- * @param {boolean} props.showCancel - Show cancel button (default: true)
- * @param {string} props.size - Modal size: 'sm' | 'md' | 'lg' | 'xl' (default: 'md')
- * @param {boolean} props.disableSubmit - Disable submit button
- * @param {React.ReactNode} props.extraActions - Extra actions below form
- */
 const CrudModal = ({
   isOpen,
   onClose,

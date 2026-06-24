@@ -64,9 +64,11 @@ public class AssetTransactionController : ControllerBase
         [FromQuery] string? search = null,
         [FromQuery] bool? approved = null,
         [FromQuery] int? assetId = null,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null,
         [FromQuery] int? transactionType = null)
     {
-        return this.HandleResult(await _transactionService.GetGridDataAsync(page, pageSize, search, approved, assetId));
+        return this.HandleResult(await _transactionService.GetGridDataAsync(page, pageSize, search, approved, assetId, startDate, endDate));
     }
 
     [HttpPost]

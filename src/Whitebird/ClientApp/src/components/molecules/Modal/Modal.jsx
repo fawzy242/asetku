@@ -20,7 +20,7 @@ const Modal = ({
 }) => {
   const overlayRef = useRef(null);
   const theme = useUIStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = theme === "dark";
 
   const muiTheme = useMemo(() => createAppTheme(isDark), [isDark]);
   const modalId = useMemo(() => `modal-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, []);
@@ -58,9 +58,9 @@ const Modal = ({
         className={`modal modal--${size} ${className}`}
         onClick={(e) => e.stopPropagation()}
         style={{
-          backgroundColor: isDark ? '#1f2937' : '#ffffff',
-          color: isDark ? '#f9fafb' : '#111827',
-          borderColor: isDark ? '#374151' : '#e5e7eb',
+          backgroundColor: isDark ? "#1f2937" : "#ffffff",
+          color: isDark ? "#f9fafb" : "#111827",
+          borderColor: isDark ? "#374151" : "#e5e7eb",
         }}
       >
         <ThemeProvider theme={muiTheme}>
@@ -68,7 +68,7 @@ const Modal = ({
             <div
               className="modal__header"
               style={{
-                borderBottomColor: isDark ? '#374151' : '#e5e7eb',
+                borderBottomColor: isDark ? "#374151" : "#e5e7eb",
               }}
             >
               {title && (
@@ -76,7 +76,7 @@ const Modal = ({
                   className="modal__title"
                   id={`${modalId}-title`}
                   style={{
-                    color: isDark ? '#f9fafb' : '#111827',
+                    color: isDark ? "#f9fafb" : "#111827",
                   }}
                 >
                   {title}
@@ -99,7 +99,7 @@ const Modal = ({
             <div
               className="modal__footer"
               style={{
-                borderTopColor: isDark ? '#374151' : '#e5e7eb',
+                borderTopColor: isDark ? "#374151" : "#e5e7eb",
               }}
             >
               {actions}

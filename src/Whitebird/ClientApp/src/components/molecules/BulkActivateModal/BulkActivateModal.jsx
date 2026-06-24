@@ -1,15 +1,15 @@
 import React, { useState } from "react";
-import { FiCheckSquare, FiX, FiAlertTriangle } from "react-icons/fi";
+import { FiCheckSquare, FiAlertTriangle } from "react-icons/fi";
 import { Box, Typography, Chip } from "@mui/material";
 import Modal from "../Modal/Modal";
 import Button from "../../atoms/Button/Button";
 import "./BulkActivateModal.scss";
 
-const BulkActivateModal = ({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  selectedIds = [], 
+const BulkActivateModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  selectedIds = [],
   itemName = "items",
   title = "Bulk Activation",
   description = "This action will change the status of the selected items."
@@ -31,11 +31,11 @@ const BulkActivateModal = ({
         <div className="bulk-activate-modal__icon">
           <FiAlertTriangle size={48} />
         </div>
-        
+
         <Typography variant="h6" className="bulk-activate-modal__title">
-          {activate ? 'Activate' : 'Deactivate'} {selectedIds.length} {itemName}?
+          {activate ? "Activate" : "Deactivate"} {selectedIds.length} {itemName}?
         </Typography>
-        
+
         <Typography variant="body2" className="bulk-activate-modal__description">
           {description}
         </Typography>
@@ -47,18 +47,18 @@ const BulkActivateModal = ({
           </div>
           <div className="bulk-activate-modal__selected-list">
             {selectedIds.slice(0, 10).map((id, idx) => (
-              <Chip 
-                key={idx} 
-                label={`ID: ${id}`} 
-                size="small" 
+              <Chip
+                key={idx}
+                label={`ID: ${id}`}
+                size="small"
                 variant="outlined"
                 className="bulk-activate-modal__selected-chip"
               />
             ))}
             {selectedIds.length > 10 && (
-              <Chip 
-                label={`+${selectedIds.length - 10} more`} 
-                size="small" 
+              <Chip
+                label={`+${selectedIds.length - 10} more`}
+                size="small"
                 variant="outlined"
                 className="bulk-activate-modal__selected-chip"
               />
@@ -70,9 +70,9 @@ const BulkActivateModal = ({
           <Button variant="outline" onClick={onClose} disabled={isActivating}>
             Cancel
           </Button>
-          <Button 
-            variant={activate ? "primary" : "danger"} 
-            onClick={handleConfirm} 
+          <Button
+            variant={activate ? "primary" : "danger"}
+            onClick={handleConfirm}
             loading={isActivating}
           >
             {activate ? "Yes, Activate" : "Yes, Deactivate"}

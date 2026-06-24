@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Grid, Chip } from "@mui/material";
+import { Grid } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
 import DepartmentsData from "./Departments.data";
 import GridView from "../../components/organisms/GridView/GridView";
@@ -8,7 +8,9 @@ import FormSection from "../../components/atoms/FormSection/FormSection";
 import Input from "../../components/atoms/Input/Input";
 import Spinner from "../../components/atoms/Spinner/Spinner";
 import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
-import { getStatusChipStyles } from "../../core/constants/statusColors";
+import StatusChip from "../../components/atoms/StatusChip/StatusChip";
+import Button from "../../components/atoms/Button/Button";
+import { FiCheckSquare } from "react-icons/fi";
 import { ACTION_TYPES, useGridActions } from "../../hooks/useGridActions";
 import { useBulkSelection } from "../../hooks/useBulkSelection";
 import { useSweetAlert } from "../../hooks/useSweetAlert";
@@ -50,13 +52,13 @@ const DepartmentsMenu = () => {
     handleClose,
     handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, departmentsData, {
-    idField: 'departmentId',
+    idField: "departmentId",
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reference', 'departments'] });
+      queryClient.invalidateQueries({ queryKey: ["reference", "departments"] });
     },
   });
 
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } = useBulkSelection({ idField: 'departmentId' });
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } = useBulkSelection({ idField: "departmentId" });
 
   const showCheckbox = activeTab === "active" || activeTab === "inactive";
 
@@ -94,7 +96,7 @@ const DepartmentsMenu = () => {
     pageSize,
     setPageSize,
     reload
-  } = useGridData(['departments', activeTab, searchTerm], fetchGridData);
+  } = useGridData(["departments", activeTab, searchTerm], fetchGridData);
 
   useEffect(() => {
     reload();
@@ -108,26 +110,26 @@ const DepartmentsMenu = () => {
   }, [setPage, clearSelection]);
 
   const handleDelete = useCallback(async (dept) => {
-    const confirmed = await confirmDelete('Delete Department', `Are you sure you want to delete "${dept.departmentName}"? This may affect employees assigned to it.`);
+    const confirmed = await confirmDelete("Delete Department", `Are you sure you want to delete "${dept.departmentName}"? This may affect employees assigned to it.`);
     if (!confirmed) return;
     const r = await departmentsData.delete(dept.departmentId);
     if (r.success) {
-      toast.success('Department deleted successfully');
-      queryClient.invalidateQueries({ queryKey: ['reference', 'departments'] });
+      toast.success("Department deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["reference", "departments"] });
       reload();
       clearSelection();
     }
   }, [reload, queryClient, toast, confirmDelete, clearSelection]);
 
   const handleBulkActivate = useCallback(async (ids, activate) => {
-    const actionText = activate ? 'activate' : 'deactivate';
+    const actionText = activate ? "activate" : "deactivate";
     const confirmed = await confirm({
-      title: activate ? 'Activate Departments' : 'Deactivate Departments',
+      title: activate ? "Activate Departments" : "Deactivate Departments",
       text: `Are you sure you want to ${actionText} ${ids.length} department(s)?`,
-      confirmButtonText: activate ? 'Yes, Activate' : 'Yes, Deactivate',
+      confirmButtonText: activate ? "Yes, Activate" : "Yes, Deactivate",
     });
     if (!confirmed) return;
-    
+
     let successCount = 0;
     for (const id of ids) {
       const result = await departmentsData.fetchById(id);
@@ -139,23 +141,23 @@ const DepartmentsMenu = () => {
     }
     if (successCount > 0) {
       toast.success(`${successCount} department(s) ${actionText}d successfully`);
-      queryClient.invalidateQueries({ queryKey: ['reference', 'departments'] });
+      queryClient.invalidateQueries({ queryKey: ["reference", "departments"] });
       reload();
       clearSelection();
     }
   }, [reload, queryClient, toast, confirm, clearSelection]);
 
   const onSubmit = useCallback(async () => {
-    const submitData = { 
-      ...formData, 
-      isActive: editingDepartment ? editingDepartment.isActive : true 
+    const submitData = {
+      ...formData,
+      isActive: editingDepartment ? editingDepartment.isActive : true
     };
     Object.keys(submitData).forEach(key => {
       setFormField(key)(submitData[key]);
     });
     const success = await crudHandleSubmit();
     if (success) {
-      toast.success(editingDepartment ? 'Department updated successfully' : 'Department created successfully');
+      toast.success(editingDepartment ? "Department updated successfully" : "Department created successfully");
       reload();
       clearSelection();
     }
@@ -190,7 +192,7 @@ const DepartmentsMenu = () => {
     actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
     onAction: handleGridAction,
     getConditionalActions,
-    rowIdField: 'departmentId',
+    rowIdField: "departmentId",
   });
 
   const columns = useMemo(() => [
@@ -203,8 +205,8 @@ const DepartmentsMenu = () => {
       headerName: "Status",
       width: 110,
       renderCell: (p) => {
-        const status = p.value ? 'Active' : 'Inactive';
-        return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
+        const status = p.value ? "Active" : "Inactive";
+        return <StatusChip status={status} />;
       },
     },
     actionColumn,
@@ -213,9 +215,9 @@ const DepartmentsMenu = () => {
   const extraActions = (
     <>
       {hasSelection && showCheckbox && (
-        <button className="btn btn--primary btn--sm" onClick={() => setShowBulkActivateModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-          {activeTab === "active" ? "Deactivate" : "Activate"} ({selectionCount})
-        </button>
+        <Button variant="primary" size="sm" onClick={() => setShowBulkActivateModal(true)} className="u-inline-flex u-btn-gap">
+          <FiCheckSquare size={16} /> {activeTab === "active" ? "Deactivate" : "Activate"} ({selectionCount})
+        </Button>
       )}
     </>
   );
@@ -264,28 +266,28 @@ const DepartmentsMenu = () => {
         <FormSection title="Basic Information" description="Department code and name">
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <Input 
-                label="Department Code" 
-                value={formData.departmentCode || ""} 
-                onChange={(e) => setFormField('departmentCode')(e.target.value)} 
+              <Input
+                label="Department Code"
+                value={formData.departmentCode || ""}
+                onChange={(e) => setFormField("departmentCode")(e.target.value)}
                 placeholder="Optional (max 100 chars)"
               />
             </Grid>
             <Grid item xs={12}>
-              <Input 
-                label="Department Name" 
-                value={formData.departmentName || ""} 
-                onChange={(e) => setFormField('departmentName')(e.target.value)} 
-                required 
+              <Input
+                label="Department Name"
+                value={formData.departmentName || ""}
+                onChange={(e) => setFormField("departmentName")(e.target.value)}
+                required
               />
             </Grid>
             <Grid item xs={12}>
-              <Input 
-                label="Description" 
-                value={formData.description || ""} 
-                onChange={(e) => setFormField('description')(e.target.value)} 
-                multiline 
-                rows={2} 
+              <Input
+                label="Description"
+                value={formData.description || ""}
+                onChange={(e) => setFormField("description")(e.target.value)}
+                multiline
+                rows={2}
               />
             </Grid>
           </Grid>

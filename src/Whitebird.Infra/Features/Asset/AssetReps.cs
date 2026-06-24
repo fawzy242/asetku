@@ -762,7 +762,7 @@ public class AssetReps : IAssetReps
                 SELECT AssetId, TransactionType,
                        ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
                 FROM AssetTransaction
-                WHERE Approved = 1 AND FromAssetTransactionId IS NULL AND IsActive = 1
+                WHERE Approved = 1 AND IsActive = 1
             ) lt ON a.AssetId = lt.AssetId AND lt.rn = 1
             {whereClause}
             {orderBy}

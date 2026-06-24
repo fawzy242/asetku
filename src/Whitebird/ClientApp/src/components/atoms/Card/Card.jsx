@@ -10,7 +10,7 @@ const Card = memo(({
   hoverable = false,
   padding = true,
   onClick = null,
-  minHeight = 'auto',
+  minHeight = "auto",
 }) => {
   const classNames = [
     "card",
@@ -22,11 +22,11 @@ const Card = memo(({
     .join(" ");
 
   return (
-    <div 
-      className={classNames} 
+    <div
+      className={classNames}
       onClick={onClick}
-      style={{ 
-        cursor: onClick ? 'pointer' : 'default',
+      style={{
+        cursor: onClick ? "pointer" : "default",
         minHeight: minHeight,
       }}
     >

@@ -1,0 +1,31 @@
+@use '../../../styles/variables' as *;
+@use '../../../styles/mixins' as *;
+
+.info-row {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    margin-bottom: $spacing-sm;
+
+    &__icon {
+        color: var(--text-secondary);
+        min-width: 18px;
+        flex-shrink: 0;
+    }
+
+    &__label {
+        min-width: 70px;
+        font-size: $font-size-sm;
+        color: var(--text-secondary);
+    }
+
+    &__value {
+        font-size: $font-size-sm;
+        font-weight: 500;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: $spacing-xs;
+        flex-wrap: wrap;
+    }
+}

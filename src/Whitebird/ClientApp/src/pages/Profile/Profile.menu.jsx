@@ -8,38 +8,13 @@ import Button from "../../components/atoms/Button/Button";
 import Input from "../../components/atoms/Input/Input";
 import Spinner from "../../components/atoms/Spinner/Spinner";
 import FormSection from "../../components/atoms/FormSection/FormSection";
+import InfoRow from "../../components/molecules/InfoRow/InfoRow";
 import { useSweetAlert } from "../../hooks/useSweetAlert";
 import apiService from "../../core/services/api.service";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./Profile.scss";
 
 const profileData = new ProfileData();
-
-// Info row component
-const InfoRow = ({ icon: Icon, label, value }) => (
-  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1, borderBottom: '1px solid var(--border)' }}>
-    <Box sx={{ 
-      width: 40, 
-      height: 40, 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      bgcolor: 'var(--surface)', 
-      borderRadius: 2, 
-      color: 'var(--primary)' 
-    }}>
-      <Icon size={20} />
-    </Box>
-    <Box sx={{ flex: 1 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
-        {label}
-      </Typography>
-      <Typography variant="body1" fontWeight={500}>
-        {value || '-'}
-      </Typography>
-    </Box>
-  </Box>
-);
 
 const ProfileMenu = () => {
   const [loading, setLoading] = useState(true);
@@ -49,14 +24,14 @@ const ProfileMenu = () => {
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState(null);
-  const [passwordData, setPasswordData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
-  const [formData, setFormData] = useState({ fullName: '', email: '', phoneNumber: '', username: '' });
+  const [passwordData, setPasswordData] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" });
+  const [formData, setFormData] = useState({ fullName: "", email: "", phoneNumber: "", username: "" });
   const [errors, setErrors] = useState({});
-  const { refreshUser, toast } = useSweetAlert();
-  const { refreshUser: refreshAuthUser } = useAuth();
+  const { refreshUser: refreshAuthUser, toast } = useSweetAlert();
+  const { refreshUser: refreshAuth } = useAuth();
 
-  useEffect(() => { 
-    loadProfile(); 
+  useEffect(() => {
+    loadProfile();
   }, []);
 
   const loadProfile = async () => {
@@ -65,14 +40,14 @@ const ProfileMenu = () => {
     if (r.success) {
       setProfile(r.data);
       setFormData({
-        fullName: r.data.fullName || '',
-        email: r.data.email || '',
-        phoneNumber: r.data.phoneNumber || '',
-        username: r.data.username || '',
+        fullName: r.data.fullName || "",
+        email: r.data.email || "",
+        phoneNumber: r.data.phoneNumber || "",
+        username: r.data.username || "",
       });
       loadProfilePhoto(r.data.userId);
     } else {
-      toast.error(r.error || 'Failed to load profile');
+      toast.error(r.error || "Failed to load profile");
     }
     setLoading(false);
   };
@@ -80,7 +55,7 @@ const ProfileMenu = () => {
   const loadProfilePhoto = async (userId) => {
     if (!userId) return;
     try {
-      const response = await apiService.get(`/Auth/profile-photo/${userId}`, { responseType: 'blob' });
+      const response = await apiService.get(`/Auth/profile-photo/${userId}`, { responseType: "blob" });
       if (response.data && response.data.size > 0) {
         const url = URL.createObjectURL(response.data);
         setProfilePhotoUrl(url);
@@ -94,71 +69,71 @@ const ProfileMenu = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file (JPEG, PNG, GIF, WEBP)');
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file (JPEG, PNG, GIF, WEBP)");
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB');
+      toast.error("Image size must be less than 5MB");
       return;
     }
 
     setUploadingPhoto(true);
     const formDataUpload = new FormData();
-    formDataUpload.append('file', file);
+    formDataUpload.append("file", file);
 
     try {
-      const response = await apiService.post('/Auth/profile-photo', formDataUpload, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const response = await apiService.post("/Auth/profile-photo", formDataUpload, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
       if (response.data?.isSuccess) {
-        toast.success('Profile photo updated');
-        await refreshAuthUser();
+        toast.success("Profile photo updated");
+        await refreshAuth();
         loadProfilePhoto(profile?.userId);
       } else {
-        toast.error(response.data?.message || 'Failed to upload photo');
+        toast.error(response.data?.message || "Failed to upload photo");
       }
     } catch {
-      toast.error('Failed to upload photo');
+      toast.error("Failed to upload photo");
     } finally {
       setUploadingPhoto(false);
     }
   };
 
   const handleDeletePhoto = async () => {
-    const confirmed = await refreshAuthUser.confirmDelete?.() || window.confirm('Delete profile photo?');
+    const confirmed = await toast.confirmDelete?.() || window.confirm("Delete profile photo?");
     if (!confirmed) return;
 
     try {
-      const response = await apiService.delete('/Auth/profile-photo');
+      const response = await apiService.delete("/Auth/profile-photo");
       if (response.data?.isSuccess) {
-        toast.success('Profile photo deleted');
+        toast.success("Profile photo deleted");
         setProfilePhotoUrl(null);
-        await refreshAuthUser();
+        await refreshAuth();
       } else {
-        toast.error(response.data?.message || 'Failed to delete photo');
+        toast.error(response.data?.message || "Failed to delete photo");
       }
     } catch {
-      toast.error('Failed to delete photo');
+      toast.error("Failed to delete photo");
     }
   };
 
   const validatePassword = () => {
     const err = {};
-    if (!passwordData.oldPassword) err.oldPassword = 'Current password is required';
-    if (!passwordData.newPassword) err.newPassword = 'New password is required';
-    else if (passwordData.newPassword.length < 4) err.newPassword = 'Password must be at least 4 characters';
-    if (passwordData.newPassword !== passwordData.confirmPassword) err.confirmPassword = 'Passwords do not match';
+    if (!passwordData.oldPassword) err.oldPassword = "Current password is required";
+    if (!passwordData.newPassword) err.newPassword = "New password is required";
+    else if (passwordData.newPassword.length < 4) err.newPassword = "Password must be at least 4 characters";
+    if (passwordData.newPassword !== passwordData.confirmPassword) err.confirmPassword = "Passwords do not match";
     setErrors(err);
     return Object.keys(err).length === 0;
   };
 
   const validateProfile = () => {
     const err = {};
-    if (!formData.fullName?.trim()) err.fullName = 'Full name is required';
-    if (!formData.email?.trim()) err.email = 'Email is required';
-    else if (!utilsHelper.validateEmail(formData.email)) err.email = 'Please enter a valid email address';
+    if (!formData.fullName?.trim()) err.fullName = "Full name is required";
+    if (!formData.email?.trim()) err.email = "Email is required";
+    else if (!utilsHelper.validateEmail(formData.email)) err.email = "Please enter a valid email address";
     setErrors(err);
     return Object.keys(err).length === 0;
   };
@@ -166,23 +141,23 @@ const ProfileMenu = () => {
   const handlePasswordChange = async (e) => {
     e.preventDefault();
     if (!validatePassword()) return;
-    
-    const confirmed = await refreshAuthUser.confirm?.({
-      title: 'Change Password',
-      text: 'Are you sure you want to change your password?',
-      confirmButtonText: 'Yes, Change',
-    }) || window.confirm('Change password?');
-    
+
+    const confirmed = await toast.confirm?.({
+      title: "Change Password",
+      text: "Are you sure you want to change your password?",
+      confirmButtonText: "Yes, Change",
+    }) || window.confirm("Change password?");
+
     if (!confirmed) return;
-    
+
     setSaving(true);
     const r = await profileData.changePassword(passwordData.oldPassword, passwordData.newPassword, passwordData.confirmPassword);
     setSaving(false);
-    
+
     if (r.success) {
-      toast.success('Password changed successfully');
+      toast.success("Password changed successfully");
       setShowPasswordForm(false);
-      setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
+      setPasswordData({ oldPassword: "", newPassword: "", confirmPassword: "" });
       setErrors({});
     }
   };
@@ -190,42 +165,42 @@ const ProfileMenu = () => {
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
     if (!validateProfile()) return;
-    
+
     setSaving(true);
     await new Promise(resolve => setTimeout(resolve, 500));
     setSaving(false);
     setEditMode(false);
     setProfile(prev => ({ ...prev, ...formData }));
-    
+
     const storedUser = utilsHelper.getLocalStorage("user");
     if (storedUser) {
       const updatedUser = { ...storedUser, ...formData };
       utilsHelper.setLocalStorage("user", updatedUser);
     }
-    
-    toast.success('Profile updated successfully');
+
+    toast.success("Profile updated successfully");
   };
 
   const handleCancelEdit = () => {
     setEditMode(false);
     setFormData({
-      fullName: profile?.fullName || '',
-      email: profile?.email || '',
-      phoneNumber: profile?.phoneNumber || '',
-      username: profile?.username || '',
+      fullName: profile?.fullName || "",
+      email: profile?.email || "",
+      phoneNumber: profile?.phoneNumber || "",
+      username: profile?.username || "",
     });
     setErrors({});
   };
 
   const handleCancelPassword = () => {
     setShowPasswordForm(false);
-    setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
+    setPasswordData({ oldPassword: "", newPassword: "", confirmPassword: "" });
     setErrors({});
   };
 
   if (loading) return <div className="profile-loading"><Spinner size="lg" /></div>;
 
-  const userInitial = profile?.fullName?.charAt(0) || profile?.username?.charAt(0) || 'U';
+  const userInitial = profile?.fullName?.charAt(0) || profile?.username?.charAt(0) || "U";
 
   return (
     <div className="profile-menu fade-transition">
@@ -242,36 +217,35 @@ const ProfileMenu = () => {
         {/* Profile Information Card */}
         <Grid item xs={12} md={7}>
           <Card>
-            {/* Profile Photo Section */}
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 3, mb: 4, pb: 3, borderBottom: '1px solid var(--border)' }}>
-              <Box sx={{ position: 'relative' }}>
-                <Avatar 
-                  src={profilePhotoUrl || undefined} 
-                  sx={{ width: 100, height: 100, bgcolor: 'var(--primary)', fontSize: 40, fontWeight: 600 }}
+            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 3, mb: 4, pb: 3, borderBottom: "1px solid var(--border)" }}>
+              <Box sx={{ position: "relative" }}>
+                <Avatar
+                  src={profilePhotoUrl || undefined}
+                  sx={{ width: 100, height: 100, bgcolor: "var(--primary)", fontSize: 40, fontWeight: 600 }}
                 >
                   {!profilePhotoUrl && userInitial}
                 </Avatar>
                 {uploadingPhoto && (
-                  <Box sx={{ 
-                    position: 'absolute', 
-                    top: 0, 
-                    left: 0, 
-                    width: '100%', 
-                    height: '100%', 
-                    bgcolor: 'rgba(0,0,0,0.5)', 
-                    borderRadius: '50%', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center' 
+                  <Box sx={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "100%",
+                    bgcolor: "rgba(0,0,0,0.5)",
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
                   }}>
-                    <CircularProgress size={30} sx={{ color: 'white' }} />
+                    <CircularProgress size={30} sx={{ color: "white" }} />
                   </Box>
                 )}
-                <Box sx={{ position: 'absolute', bottom: -8, right: -8, display: 'flex', gap: 1 }}>
+                <Box sx={{ position: "absolute", bottom: -8, right: -8, display: "flex", gap: 1 }}>
                   <IconButton
                     size="small"
                     component="label"
-                    sx={{ bgcolor: 'var(--primary)', color: 'white', '&:hover': { bgcolor: 'var(--primary-hover)' } }}
+                    sx={{ bgcolor: "var(--primary)", color: "white", "&:hover": { bgcolor: "var(--primary-hover)" } }}
                   >
                     <FiCamera size={16} />
                     <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden onChange={handlePhotoUpload} />
@@ -280,7 +254,7 @@ const ProfileMenu = () => {
                     <IconButton
                       size="small"
                       onClick={handleDeletePhoto}
-                      sx={{ bgcolor: 'var(--error)', color: 'white', '&:hover': { opacity: 0.9 } }}
+                      sx={{ bgcolor: "var(--error)", color: "white", "&:hover": { opacity: 0.9 } }}
                     >
                       <FiTrash2 size={14} />
                     </IconButton>
@@ -289,9 +263,9 @@ const ProfileMenu = () => {
               </Box>
               <Box sx={{ flex: 1 }}>
                 <Typography variant="h6" fontWeight={600}>{profile?.fullName}</Typography>
-                <Typography variant="body2" color="text.secondary">{profile?.roleId || 'User'}</Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                  <FiCalendar size={12} /> Member since {utilsHelper.formatDate(profile?.createdDate, 'MMMM D, YYYY')}
+                <Typography variant="body2" color="text.secondary">{profile?.roleId || "User"}</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5 }}>
+                  <FiCalendar size={12} /> Member since {utilsHelper.formatDate(profile?.createdDate, "MMMM D, YYYY")}
                 </Typography>
               </Box>
               {!editMode && (
@@ -301,13 +275,12 @@ const ProfileMenu = () => {
               )}
             </Box>
 
-            {/* Profile Details */}
             {!editMode ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                 <InfoRow icon={FiUser} label="Full Name" value={profile?.fullName} />
                 <InfoRow icon={FiMail} label="Email" value={profile?.email} />
                 <InfoRow icon={FiBriefcase} label="Username" value={`@${profile?.username}`} />
-                <InfoRow icon={FiShield} label="Role" value={profile?.roleId || 'User'} />
+                <InfoRow icon={FiShield} label="Role" value={profile?.roleId || "User"} />
                 {profile?.phoneNumber && (
                   <InfoRow icon={FiBriefcase} label="Phone" value={profile?.phoneNumber} />
                 )}
@@ -316,36 +289,36 @@ const ProfileMenu = () => {
               <form onSubmit={handleProfileUpdate}>
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
-                    <Input 
-                      label="Full Name" 
-                      value={formData.fullName} 
-                      onChange={e => setFormData({ ...formData, fullName: e.target.value })} 
-                      error={errors.fullName} 
-                      required 
+                    <Input
+                      label="Full Name"
+                      value={formData.fullName}
+                      onChange={e => setFormData({ ...formData, fullName: e.target.value })}
+                      error={errors.fullName}
+                      required
                     />
                   </Grid>
                   <Grid item xs={12}>
-                    <Input 
-                      label="Email" 
-                      type="email" 
-                      value={formData.email} 
-                      onChange={e => setFormData({ ...formData, email: e.target.value })} 
-                      error={errors.email} 
-                      required 
+                    <Input
+                      label="Email"
+                      type="email"
+                      value={formData.email}
+                      onChange={e => setFormData({ ...formData, email: e.target.value })}
+                      error={errors.email}
+                      required
                     />
                   </Grid>
                   <Grid item xs={12}>
-                    <Input 
-                      label="Phone (Optional)" 
-                      value={formData.phoneNumber} 
-                      onChange={e => setFormData({ ...formData, phoneNumber: e.target.value })} 
+                    <Input
+                      label="Phone (Optional)"
+                      value={formData.phoneNumber}
+                      onChange={e => setFormData({ ...formData, phoneNumber: e.target.value })}
                     />
                   </Grid>
                   <Grid item xs={12}>
                     <Input label="Username" value={formData.username} disabled />
                   </Grid>
                   <Grid item xs={12}>
-                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
+                    <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end", mt: 2 }}>
                       <Button type="button" variant="outline" onClick={handleCancelEdit} startIcon={<FiX />}>
                         Cancel
                       </Button>
@@ -363,16 +336,16 @@ const ProfileMenu = () => {
         {/* Security Card */}
         <Grid item xs={12} md={5}>
           <Card>
-            <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-              <Box sx={{ 
-                width: 48, 
-                height: 48, 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                bgcolor: 'rgba(220,38,38,0.1)', 
-                borderRadius: 2, 
-                color: 'var(--primary)' 
+            <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
+              <Box sx={{
+                width: 48,
+                height: 48,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                bgcolor: "rgba(220,38,38,0.1)",
+                borderRadius: 2,
+                color: "var(--primary)"
               }}>
                 <FiLock size={24} />
               </Box>
@@ -390,34 +363,34 @@ const ProfileMenu = () => {
               <form onSubmit={handlePasswordChange}>
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
-                    <Input 
-                      label="Current Password" 
-                      type="password" 
-                      value={passwordData.oldPassword} 
-                      onChange={e => setPasswordData({ ...passwordData, oldPassword: e.target.value })} 
-                      error={errors.oldPassword} 
+                    <Input
+                      label="Current Password"
+                      type="password"
+                      value={passwordData.oldPassword}
+                      onChange={e => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
+                      error={errors.oldPassword}
                     />
                   </Grid>
                   <Grid item xs={12}>
-                    <Input 
-                      label="New Password" 
-                      type="password" 
-                      value={passwordData.newPassword} 
-                      onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })} 
-                      error={errors.newPassword} 
+                    <Input
+                      label="New Password"
+                      type="password"
+                      value={passwordData.newPassword}
+                      onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                      error={errors.newPassword}
                     />
                   </Grid>
                   <Grid item xs={12}>
-                    <Input 
-                      label="Confirm New Password" 
-                      type="password" 
-                      value={passwordData.confirmPassword} 
-                      onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })} 
-                      error={errors.confirmPassword} 
+                    <Input
+                      label="Confirm New Password"
+                      type="password"
+                      value={passwordData.confirmPassword}
+                      onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                      error={errors.confirmPassword}
                     />
                   </Grid>
                   <Grid item xs={12}>
-                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
+                    <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end", mt: 2 }}>
                       <Button type="button" variant="outline" onClick={handleCancelPassword} startIcon={<FiX />}>
                         Cancel
                       </Button>

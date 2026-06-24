@@ -152,7 +152,7 @@ public interface IAssetTransactionReps
     /// <param name="assetId">Asset ID filter</param>
     /// <returns>Paginated result with transaction list views</returns>
     Task<PaginatedResult<AssetTransactionListView>> GetPagedListAsync(
-        int page, int pageSize, string? search = null, bool? approved = null, int? assetId = null);
+        int page, int pageSize, string? search = null, bool? approved = null, int? assetId = null, DateTime? startDate = null, DateTime? endDate = null);
     
     /// <summary>
     /// Gets paged list of pending approvals

@@ -11,6 +11,22 @@
         margin-top: $spacing-xs;
     }
 
+    &__refresh-btn {
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        width: 36px;
+        height: 36px;
+        border-radius: $radius-md;
+        transition: all $transition-fast;
+        flex-shrink: 0;
+
+        &:hover {
+            background-color: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+    }
+
     &__selection-card {
         .MuiCard__body {
             padding: $spacing-md;
@@ -33,22 +49,12 @@
         background-color: rgba(220, 38, 38, 0.1);
         border-radius: $radius-lg;
         color: var(--primary);
+        flex-shrink: 0;
     }
 
     &__selection-select {
         flex: 1;
         min-width: 250px;
-    }
-
-    &__refresh-btn {
-        background-color: var(--surface);
-        border: 1px solid var(--border);
-
-        &:hover {
-            background-color: var(--primary);
-            color: white;
-            border-color: var(--primary);
-        }
     }
 
     &__profile-card {
@@ -76,29 +82,6 @@
         margin-top: $spacing-sm;
     }
 
-    &__info-row {
-        display: flex;
-        align-items: center;
-        gap: $spacing-sm;
-        margin-bottom: $spacing-sm;
-    }
-
-    &__info-icon {
-        color: var(--text-secondary);
-    }
-
-    &__info-label {
-        min-width: 100px;
-        font-size: $font-size-sm;
-        color: var(--text-secondary);
-    }
-
-    &__info-value {
-        font-size: $font-size-sm;
-        font-weight: 500;
-        color: var(--text-primary);
-    }
-
     &__stat-card {
         padding: $spacing-lg;
         text-align: center;
@@ -120,6 +103,26 @@
 
     &__stat-icon {
         margin-bottom: $spacing-xs;
+
+        &--red {
+            color: #dc2626;
+        }
+
+        &--purple {
+            color: #8b5cf6;
+        }
+
+        &--yellow {
+            color: #f59e0b;
+        }
+
+        &--green {
+            color: #10b981;
+        }
+
+        &--blue {
+            color: #3b82f6;
+        }
     }
 
     &__category-grid {
@@ -164,29 +167,6 @@
         gap: $spacing-sm;
     }
 
-    &__last-transaction-row {
-        display: flex;
-        gap: $spacing-md;
-        padding: $spacing-sm 0;
-        border-bottom: 1px solid var(--border);
-
-        &:last-child {
-            border-bottom: none;
-        }
-    }
-
-    &__last-transaction-label {
-        min-width: 80px;
-        font-size: $font-size-sm;
-        color: var(--text-secondary);
-    }
-
-    &__last-transaction-value {
-        font-size: $font-size-sm;
-        font-weight: 500;
-        color: var(--text-primary);
-    }
-
     &__empty-state {
         text-align: center;
         padding: $spacing-3xl;
@@ -217,17 +197,18 @@
 
 [data-theme='dark'] {
     .employee-summary {
-        &__selection-icon {
-            background-color: rgba(239, 68, 68, 0.15);
-        }
-
         &__refresh-btn {
             background-color: #374151;
             border-color: #4b5563;
 
             &:hover {
                 background-color: #ef4444;
+                border-color: #ef4444;
             }
+        }
+
+        &__selection-icon {
+            background-color: rgba(239, 68, 68, 0.15);
         }
 
         &__profile-avatar {
@@ -258,14 +239,6 @@
 
         &__category-count {
             background-color: rgba(239, 68, 68, 0.15);
-        }
-
-        &__last-transaction-row {
-            border-bottom-color: #374151;
-        }
-
-        &__last-transaction-value {
-            color: #f9fafb;
         }
     }
 }

@@ -28,6 +28,7 @@ const GridView = ({
   createButtonText = 'Add New',
   ariaLabel = 'Data table',
   extraActions = null,
+  className = '',
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -44,9 +45,8 @@ const GridView = ({
     return `row-${Math.random().toString(36).substr(2, 9)}`;
   }, []);
 
-  // Show spinner only on initial load
   const showSpinner = loading && (!data || data.length === 0) && isInitialLoad;
-  
+
   useEffect(() => {
     if (!loading && data && data.length > 0) {
       setIsInitialLoad(false);
@@ -63,7 +63,7 @@ const GridView = ({
 
   if (showSpinner) {
     return (
-      <Box className="grid-view">
+      <Box className={`grid-view ${className}`}>
         <div className="page-header">
           <h1 className="page-title" style={{ margin: 0 }}>{title}</h1>
         </div>
@@ -73,11 +73,10 @@ const GridView = ({
   }
 
   return (
-    <Box className="grid-view">
-      {/* Header with Title and Actions */}
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
+    <Box className={`grid-view ${className}`}>
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
         alignItems: 'center',
         mb: 3,
         flexWrap: 'wrap',
@@ -94,15 +93,12 @@ const GridView = ({
         </Box>
       </Box>
 
-      {/* Tabs */}
       {tabs && tabs.length > 0 && (
         <Tabs tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
       )}
 
-      {/* Search Toolbar */}
       <SearchToolbar onSearch={handleSearch} placeholder="Search..." />
 
-      {/* Data Table with server-side pagination */}
       <Box
         sx={{
           backgroundColor: 'var(--card-bg)',

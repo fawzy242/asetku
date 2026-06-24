@@ -18,10 +18,11 @@ import Button from "../../components/atoms/Button/Button";
 import Card from "../../components/atoms/Card/Card";
 import SearchToolbar from "../../components/molecules/SearchToolbar/SearchToolbar";
 import Tabs from "../../components/molecules/Tabs/Tabs";
-import {
-  FiUpload, FiCheckSquare, FiPlus, FiCalendar
-} from "react-icons/fi";
-import { getStatusChipStyles } from "../../core/constants/statusColors";
+import StatusChip from "../../components/atoms/StatusChip/StatusChip";
+import TransactionFilter from "../../components/molecules/TransactionFilter/TransactionFilter";
+import ReturnModalContent from "../../components/molecules/ReturnModalContent/ReturnModalContent";
+import PostMaintenanceModalContent from "../../components/molecules/PostMaintenanceModalContent/PostMaintenanceModalContent";
+import { FiUpload, FiCheckSquare, FiPlus } from "react-icons/fi";
 import {
   TRANSACTION_TYPE_OPTIONS,
   TRANSACTION_TYPES_REQUIRING_PAIR,
@@ -39,6 +40,7 @@ import { useSweetAlert } from "../../hooks/useSweetAlert";
 import { useGridData } from "../../hooks/useGridData";
 import { useReferenceData } from "../../hooks/useReferenceData";
 import { useCrudFormBase } from "../../hooks/useCrudFormBase";
+import { useOptions } from "../../hooks/useOptions";
 import { cleanTransactionFormData } from "../../core/utils/formHelpers";
 import utilsHelper from "../../core/utils/utils.helper";
 import "./AssetTransactions.scss";
@@ -73,16 +75,16 @@ const TABS_WITH_CHECKBOX = ["pending", "approved"];
 
 const getTransactionTypeColor = (typeName) => {
   const colors = {
-    'HANDOVER': { bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', label: 'Handover' },
-    'TRANSFER': { bg: 'rgba(139, 92, 246, 0.15)', color: '#8b5cf6', label: 'Transfer' },
-    'LOAN': { bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', label: 'Loan' },
-    'RETURN': { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', label: 'Return' },
-    'LOAN_RETURN': { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', label: 'Loan Return' },
-    'MAINTENANCE': { bg: 'rgba(245, 158, 11, 0.15)', color: '#d97706', label: 'Maintenance' },
-    'POST_MAINTENANCE': { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', label: 'Post Maintenance' },
-    'DISPOSAL': { bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', label: 'Disposal' },
+    "HANDOVER": { bg: "rgba(59, 130, 246, 0.15)", color: "#3b82f6", label: "Handover" },
+    "TRANSFER": { bg: "rgba(139, 92, 246, 0.15)", color: "#8b5cf6", label: "Transfer" },
+    "LOAN": { bg: "rgba(245, 158, 11, 0.15)", color: "#f59e0b", label: "Loan" },
+    "RETURN": { bg: "rgba(16, 185, 129, 0.15)", color: "#10b981", label: "Return" },
+    "LOAN_RETURN": { bg: "rgba(16, 185, 129, 0.15)", color: "#10b981", label: "Loan Return" },
+    "MAINTENANCE": { bg: "rgba(245, 158, 11, 0.15)", color: "#d97706", label: "Maintenance" },
+    "POST_MAINTENANCE": { bg: "rgba(16, 185, 129, 0.15)", color: "#10b981", label: "Post Maintenance" },
+    "DISPOSAL": { bg: "rgba(239, 68, 68, 0.15)", color: "#ef4444", label: "Disposal" },
   };
-  return colors[typeName] || { bg: 'rgba(107, 114, 128, 0.1)', color: '#6b7280', label: typeName || 'Unknown' };
+  return colors[typeName] || { bg: "rgba(107, 114, 128, 0.1)", color: "#6b7280", label: typeName || "Unknown" };
 };
 
 const AssetTransactionsMenu = () => {
@@ -130,9 +132,9 @@ const AssetTransactionsMenu = () => {
     handleClose,
     handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, transactionsData, {
-    idField: 'assetTransactionId',
+    idField: "assetTransactionId",
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
     },
   });
 
@@ -143,7 +145,7 @@ const AssetTransactionsMenu = () => {
     handleSelectionChange: handlePrimarySelectionChange,
     clearSelection: clearPrimarySelection,
     getSelectedIds: getPrimarySelectedIds
-  } = useBulkSelection({ idField: 'assetTransactionId' });
+  } = useBulkSelection({ idField: "assetTransactionId" });
 
   const {
     selectedRowIds: selectedSecondaryIds,
@@ -152,7 +154,7 @@ const AssetTransactionsMenu = () => {
     handleSelectionChange: handleSecondarySelectionChange,
     clearSelection: clearSecondarySelection,
     getSelectedIds: getSecondarySelectedIds
-  } = useBulkSelection({ idField: 'assetTransactionId' });
+  } = useBulkSelection({ idField: "assetTransactionId" });
 
   const showCheckbox = TABS_WITH_CHECKBOX.includes(activeTab);
 
@@ -165,13 +167,13 @@ const AssetTransactionsMenu = () => {
   const buildFilters = useCallback(() => {
     const filters = {};
 
-    if (activeTab === 'active-loans' || activeTab === 'overdue-loans' || activeTab === 'rejected') {
+    if (activeTab === "active-loans" || activeTab === "overdue-loans" || activeTab === "rejected") {
       return filters;
     }
 
-    if (activeTab === 'pending') {
+    if (activeTab === "pending") {
       filters.approved = null;
-    } else if (activeTab === 'approved') {
+    } else if (activeTab === "approved") {
       filters.approved = true;
     }
 
@@ -192,7 +194,7 @@ const AssetTransactionsMenu = () => {
   const fetchGridData = useCallback(async (params) => {
     const filters = buildFilters();
 
-    if (activeTab === 'active-loans') {
+    if (activeTab === "active-loans") {
       try {
         const result = await transactionsData.api.getActiveLoans();
         if (result?.data && isMountedRef.current) {
@@ -201,7 +203,7 @@ const AssetTransactionsMenu = () => {
         }
       } catch { }
       return { success: true, data: { data: [], totalCount: 0 } };
-    } else if (activeTab === 'overdue-loans') {
+    } else if (activeTab === "overdue-loans") {
       try {
         const result = await transactionsData.api.getOverdueLoans();
         if (result?.data && isMountedRef.current) {
@@ -210,7 +212,7 @@ const AssetTransactionsMenu = () => {
         }
       } catch { }
       return { success: true, data: { data: [], totalCount: 0 } };
-    } else if (activeTab === 'rejected') {
+    } else if (activeTab === "rejected") {
       try {
         const result = await transactionsData.api.getByApprovalStatus(false);
         if (result?.data && isMountedRef.current) {
@@ -241,7 +243,7 @@ const AssetTransactionsMenu = () => {
     pageSize,
     setPageSize,
     reload
-  } = useGridData(['transactions', activeTab, searchTerm, dateFilterStart, dateFilterEnd], fetchGridData);
+  } = useGridData(["transactions", activeTab, searchTerm, dateFilterStart, dateFilterEnd], fetchGridData);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -271,7 +273,7 @@ const AssetTransactionsMenu = () => {
           if (isMountedRef.current) {
             setPairedTransactionOptions(validPairs.map(t => ({
               value: t.assetTransactionId,
-              label: `${getTransactionTypeName(t.transactionType)} - ${utilsHelper.formatDate(t.transactionDate)} (${t.assetCode || 'N/A'})`
+              label: `${getTransactionTypeName(t.transactionType)} - ${utilsHelper.formatDate(t.transactionDate)} (${t.assetCode || "N/A"})`
             })));
           }
         } catch {
@@ -282,7 +284,7 @@ const AssetTransactionsMenu = () => {
     } else {
       setPairedTransactionOptions([]);
       if (!TRANSACTION_TYPES_REQUIRING_PAIR.includes(parseInt(formData.transactionType))) {
-        setFormField('fromAssetTransactionId')("");
+        setFormField("fromAssetTransactionId")("");
       }
     }
   }, [formData.transactionType, formData.assetId, setFormField]);
@@ -304,14 +306,14 @@ const AssetTransactionsMenu = () => {
 
   const handleApprove = useCallback(async (tx) => {
     const confirmed = await confirm({
-      title: 'Approve Transaction',
+      title: "Approve Transaction",
       text: `Are you sure you want to approve transaction for ${tx.assetCode}?`,
-      confirmButtonText: 'Yes, Approve',
+      confirmButtonText: "Yes, Approve",
     });
     if (!confirmed) return;
     const r = await transactionsData.approve(tx.assetTransactionId, true);
     if (r.success && isMountedRef.current) {
-      toast.success('Transaction approved');
+      toast.success("Transaction approved");
       reload();
       clearPrimarySelection();
       clearSecondarySelection();
@@ -320,16 +322,16 @@ const AssetTransactionsMenu = () => {
 
   const handleReject = useCallback(async (tx) => {
     const confirmed = await confirm({
-      title: 'Reject Transaction',
+      title: "Reject Transaction",
       text: `Are you sure you want to reject transaction for ${tx.assetCode}?`,
-      icon: 'warning',
-      confirmButtonText: 'Yes, Reject',
-      confirmButtonColor: '#ef4444',
+      icon: "warning",
+      confirmButtonText: "Yes, Reject",
+      confirmButtonColor: "#ef4444",
     });
     if (!confirmed) return;
     const r = await transactionsData.approve(tx.assetTransactionId, false);
     if (r.success && isMountedRef.current) {
-      toast.success('Transaction rejected');
+      toast.success("Transaction rejected");
       reload();
       clearPrimarySelection();
       clearSecondarySelection();
@@ -337,11 +339,11 @@ const AssetTransactionsMenu = () => {
   }, [reload, toast, confirm, clearPrimarySelection, clearSecondarySelection]);
 
   const handleCancel = useCallback(async (tx) => {
-    const confirmed = await confirmDelete('Cancel Transaction', `Are you sure you want to cancel transaction for ${tx.assetCode}?`);
+    const confirmed = await confirmDelete("Cancel Transaction", `Are you sure you want to cancel transaction for ${tx.assetCode}?`);
     if (!confirmed) return;
     const r = await transactionsData.cancel(tx.assetTransactionId);
     if (r.success && isMountedRef.current) {
-      toast.success('Transaction cancelled');
+      toast.success("Transaction cancelled");
       reload();
       clearPrimarySelection();
       clearSecondarySelection();
@@ -378,13 +380,13 @@ const AssetTransactionsMenu = () => {
     });
     setIsReturnSubmitting(false);
     if (r.isSuccess && isMountedRef.current) {
-      toast.success('Return transaction created');
+      toast.success("Return transaction created");
       setShowReturnModal(false);
       reload();
       clearPrimarySelection();
       clearSecondarySelection();
     } else {
-      toast.error(r.message || 'Failed to create return transaction');
+      toast.error(r.message || "Failed to create return transaction");
     }
   }, [selectedTransaction, isReturnSubmitting, returnData, reload, toast, clearPrimarySelection, clearSecondarySelection]);
 
@@ -398,17 +400,17 @@ const AssetTransactionsMenu = () => {
     });
     setIsPostMaintenanceSubmitting(false);
     if (r.isSuccess && isMountedRef.current) {
-      toast.success('Post-maintenance transaction created');
+      toast.success("Post-maintenance transaction created");
       setShowPostMaintenanceModal(false);
       reload();
       clearPrimarySelection();
       clearSecondarySelection();
     } else {
-      toast.error(r.message || 'Failed to create post-maintenance transaction');
+      toast.error(r.message || "Failed to create post-maintenance transaction");
     }
   }, [selectedTransaction, isPostMaintenanceSubmitting, postMaintenanceData, reload, toast, clearPrimarySelection, clearSecondarySelection]);
 
-  const handleBulkAction = useCallback(async (ids, action, gridType = 'primary') => {
+  const handleBulkAction = useCallback(async (ids, action, gridType = "primary") => {
     const actionText = action === "approve" ? "approve" : "reject";
     const confirmed = await confirm({
       title: action === "approve" ? "Approve Transactions" : "Reject Transactions",
@@ -425,7 +427,7 @@ const AssetTransactionsMenu = () => {
     }
     if (successCount > 0 && isMountedRef.current) {
       toast.success(`${successCount} transaction(s) ${actionText}d successfully`);
-      if (gridType === 'primary') {
+      if (gridType === "primary") {
         clearPrimarySelection();
       } else {
         clearSecondarySelection();
@@ -437,7 +439,7 @@ const AssetTransactionsMenu = () => {
   const onSubmit = useCallback(async () => {
     const success = await crudHandleSubmit();
     if (success && isMountedRef.current) {
-      toast.success(editingTransaction ? 'Transaction updated successfully' : 'Transaction created successfully (Pending approval)');
+      toast.success(editingTransaction ? "Transaction updated successfully" : "Transaction created successfully (Pending approval)");
       reload();
       clearPrimarySelection();
       clearSecondarySelection();
@@ -539,7 +541,7 @@ const AssetTransactionsMenu = () => {
     actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
     onAction: handleActionClick,
     getConditionalActions,
-    rowIdField: 'assetTransactionId',
+    rowIdField: "assetTransactionId",
   });
 
   const showFromEmployee = TRANSACTION_TYPES_REQUIRING_FROM_EMPLOYEE.includes(parseInt(formData.transactionType));
@@ -548,14 +550,11 @@ const AssetTransactionsMenu = () => {
   const showMaintenanceFields = parseInt(formData.transactionType) === TRANSACTION_TYPES.MAINTENANCE || parseInt(formData.transactionType) === TRANSACTION_TYPES.POST_MAINTENANCE;
   const showExpectedReturnDate = parseInt(formData.transactionType) === TRANSACTION_TYPES.LOAN;
 
-  const conditionOptions = useMemo(() => [
-    { value: "", label: "Select Condition" },
-    ...(assetConditions || []).map(c => ({ value: c.value, label: c.label }))
-  ], [assetConditions]);
+  const conditionOptions = useOptions(assetConditions, "Select Condition");
 
   const filteredAssetOptions = useMemo(() => {
     const availableAssets = refAssets.filter(a => {
-      if (a.operasionalOffice === true || a.operasionalOffice === 'true' || a.operasionalOffice === 1) {
+      if (a.operasionalOffice === true || a.operasionalOffice === "true" || a.operasionalOffice === 1) {
         return false;
       }
       return true;
@@ -566,20 +565,13 @@ const AssetTransactionsMenu = () => {
     ];
   }, [refAssets]);
 
-  const employeeOptions = useMemo(() => [
-    { value: "", label: "Select Employee" },
-    ...employees.map(e => ({ value: e.value, label: e.label }))
-  ], [employees]);
-
-  const officeOptionsSelect = useMemo(() => [
-    { value: "", label: "Select Office" },
-    ...offices.map(o => ({ value: o.value, label: o.label }))
-  ], [offices]);
+  const employeeOptions = useOptions(employees, "Select Employee");
+  const officeOptionsSelect = useOptions(offices, "Select Office");
 
   const getDisplayStatus = (row) => {
-    if (row.approved === true) return 'Approved';
-    if (row.approved === false) return 'Rejected';
-    return 'Pending';
+    if (row.approved === true) return "Approved";
+    if (row.approved === false) return "Rejected";
+    return "Pending";
   };
 
   const columns = useMemo(() => {
@@ -591,7 +583,7 @@ const AssetTransactionsMenu = () => {
         renderCell: (params) => {
           const row = params?.row || {};
           const value = row.transactionDate || params?.value;
-          if (!value) return <span>-</span>;
+          if (!value) return <span className="u-text-muted">-</span>;
           return <span>{utilsHelper.formatDateTime(value)}</span>;
         }
       },
@@ -601,7 +593,7 @@ const AssetTransactionsMenu = () => {
         width: 120,
         renderCell: (params) => {
           const row = params?.row || {};
-          const value = row.assetCode || params?.value || '-';
+          const value = row.assetCode || params?.value || "-";
           return <span>{value}</span>;
         }
       },
@@ -612,7 +604,7 @@ const AssetTransactionsMenu = () => {
         minWidth: 160,
         renderCell: (params) => {
           const row = params?.row || {};
-          const value = row.assetName || params?.value || '-';
+          const value = row.assetName || params?.value || "-";
           return <span>{value}</span>;
         }
       },
@@ -622,7 +614,7 @@ const AssetTransactionsMenu = () => {
         width: 150,
         renderCell: (params) => {
           const row = params?.row || {};
-          const typeName = row.transactionTypeName || params?.value || '';
+          const typeName = row.transactionTypeName || params?.value || "";
           const colors = getTransactionTypeColor(typeName);
           return <Chip label={colors.label} size="small" sx={{ bgcolor: colors.bg, color: colors.color, fontWeight: 500 }} />;
         }
@@ -633,7 +625,7 @@ const AssetTransactionsMenu = () => {
         width: 150,
         renderCell: (params) => {
           const row = params?.row || {};
-          const value = row.fromEmployeeName || params?.value || '-';
+          const value = row.fromEmployeeName || params?.value || "-";
           return <span>{value}</span>;
         }
       },
@@ -643,7 +635,7 @@ const AssetTransactionsMenu = () => {
         width: 150,
         renderCell: (params) => {
           const row = params?.row || {};
-          const value = row.toEmployeeName || params?.value || '-';
+          const value = row.toEmployeeName || params?.value || "-";
           return <span>{value}</span>;
         }
       },
@@ -654,7 +646,7 @@ const AssetTransactionsMenu = () => {
         renderCell: (params) => {
           const row = params?.row || {};
           const status = getDisplayStatus(row);
-          return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
+          return <StatusChip status={status} />;
         }
       },
       {
@@ -664,7 +656,7 @@ const AssetTransactionsMenu = () => {
         renderCell: (params) => {
           const row = params?.row || {};
           const value = row.expectedReturnDate || params?.value;
-          if (!value) return <span>-</span>;
+          if (!value) return <span className="u-text-muted">-</span>;
           return <span>{utilsHelper.formatDate(value)}</span>;
         }
       },
@@ -696,70 +688,38 @@ const AssetTransactionsMenu = () => {
     return transactions.filter(t => isSecondaryTransactionType(t.transactionType));
   }, [transactions]);
 
-  const dateFilterComponent = (
-    <div className="transactions-menu__date-filter">
-      <div className="transactions-menu__date-filter-label">
-        <FiCalendar size={16} />
-        <span>Date Range:</span>
-      </div>
-      <div className="transactions-menu__date-filter-inputs">
-        <DatePickerInput
-          label="Start Date"
-          value={dateFilterStart}
-          onChange={e => handleDateFilterChange(e.target.value, dateFilterEnd)}
-          size="small"
-          sx={{ minWidth: '150px', maxWidth: '200px' }}
-        />
-        <span className="transactions-menu__date-filter-separator">to</span>
-        <DatePickerInput
-          label="End Date"
-          value={dateFilterEnd}
-          onChange={e => handleDateFilterChange(dateFilterStart, e.target.value)}
-          size="small"
-          sx={{ minWidth: '150px', maxWidth: '200px' }}
-        />
-        {(dateFilterStart || dateFilterEnd) && (
-          <button
-            className="btn btn--text btn--sm transactions-menu__date-filter-clear"
-            onClick={() => handleDateFilterChange("", "")}
-          >
-            Clear
-          </button>
-        )}
-      </div>
-    </div>
-  );
-
   const bulkActionButtonPrimary = (selectedPrimaryIds.length > 0 && showCheckbox) && (
-    <button
-      className="btn btn--primary btn--sm"
+    <Button
+      variant="primary"
+      size="sm"
       onClick={() => setShowBulkActivateModalPrimary(true)}
-      style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+      className="u-inline-flex u-btn-gap"
     >
       <FiCheckSquare size={16} />
       {getBulkAction() === "approve" ? "Approve" : "Reject"} ({selectedPrimaryIds.length})
-    </button>
+    </Button>
   );
 
   const bulkActionButtonSecondary = (selectedSecondaryIds.length > 0 && showCheckbox) && (
-    <button
-      className="btn btn--primary btn--sm"
+    <Button
+      variant="primary"
+      size="sm"
       onClick={() => setShowBulkActivateModalSecondary(true)}
-      style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+      className="u-inline-flex u-btn-gap"
     >
       <FiCheckSquare size={16} />
       {getBulkAction() === "approve" ? "Approve" : "Reject"} ({selectedSecondaryIds.length})
-    </button>
+    </Button>
   );
 
   const headerActions = (
     <>
-      <button className="btn btn--outline btn--sm" onClick={() => setShowImportModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+      <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)} className="u-inline-flex u-btn-gap">
         <FiUpload size={16} /> Import
-      </button>
-      <button className="btn btn--primary btn--sm" onClick={handleCreatePrimary} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+      </Button>
+      <Button variant="primary" size="sm" onClick={handleCreatePrimary} className="u-inline-flex u-btn-gap">
         <FiPlus size={16} /> New Transaction
-      </button>
+      </Button>
     </>
   );
 
@@ -768,86 +728,6 @@ const AssetTransactionsMenu = () => {
   const bulkAction = getBulkAction();
   const bulkTitle = bulkAction === "approve" ? "Approve Transactions" : "Reject Transactions";
   const bulkDescription = `This action will ${bulkAction} the selected transactions.`;
-
-  const returnModalContent = (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Box sx={{ p: 2, bgcolor: 'var(--surface)', borderRadius: 2 }}>
-        <strong style={{ color: 'var(--text-primary)' }}>
-          {selectedTransaction?.assetCode} - {selectedTransaction?.assetName}
-        </strong>
-        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-          Transaction ID: {selectedTransaction?.assetTransactionId}
-        </p>
-        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-          Type: {selectedTransaction?.transactionTypeName} | Holder: {selectedTransaction?.toEmployeeName || 'None'}
-        </p>
-      </Box>
-      <DatePickerInput
-        label="Actual Return Date"
-        value={returnData.actualReturnDate}
-        onChange={e => setReturnData({ ...returnData, actualReturnDate: e.target.value })}
-        required
-      />
-      <Select
-        label="Condition After"
-        value={returnData.conditionAfter}
-        onChange={e => setReturnData({ ...returnData, conditionAfter: e.target.value })}
-        options={conditionOptions}
-        required
-      />
-      <Input
-        label="Notes"
-        value={returnData.notes || ""}
-        onChange={e => setReturnData({ ...returnData, notes: e.target.value })}
-        multiline
-        rows={2}
-      />
-      <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
-        <Button variant="outline" onClick={() => setShowReturnModal(false)} disabled={isReturnSubmitting}>Cancel</Button>
-        <Button variant="primary" onClick={handleReturnSubmit} loading={isReturnSubmitting}>Confirm Return</Button>
-      </Box>
-    </Box>
-  );
-
-  const postMaintenanceModalContent = (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Box sx={{ p: 2, bgcolor: 'var(--surface)', borderRadius: 2 }}>
-        <strong style={{ color: 'var(--text-primary)' }}>
-          {selectedTransaction?.assetCode} - {selectedTransaction?.assetName}
-        </strong>
-        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-          Transaction ID: {selectedTransaction?.assetTransactionId}
-        </p>
-        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-          Type: {selectedTransaction?.transactionTypeName} | Maintenance Transaction
-        </p>
-      </Box>
-      <DatePickerInput
-        label="Completion Date"
-        value={postMaintenanceData.completionDate}
-        onChange={e => setPostMaintenanceData({ ...postMaintenanceData, completionDate: e.target.value })}
-        required
-      />
-      <Select
-        label="Condition After"
-        value={postMaintenanceData.conditionAfter}
-        onChange={e => setPostMaintenanceData({ ...postMaintenanceData, conditionAfter: e.target.value })}
-        options={conditionOptions}
-        required
-      />
-      <Input
-        label="Notes"
-        value={postMaintenanceData.notes || ""}
-        onChange={e => setPostMaintenanceData({ ...postMaintenanceData, notes: e.target.value })}
-        multiline
-        rows={2}
-      />
-      <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
-        <Button variant="outline" onClick={() => setShowPostMaintenanceModal(false)} disabled={isPostMaintenanceSubmitting}>Cancel</Button>
-        <Button variant="primary" onClick={handlePostMaintenanceSubmit} loading={isPostMaintenanceSubmitting}>Confirm Post-Maintenance</Button>
-      </Box>
-    </Box>
-  );
 
   return (
     <div className="transactions-menu">
@@ -864,7 +744,14 @@ const AssetTransactionsMenu = () => {
       <Tabs tabs={TRANSACTION_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
 
       <div className="transactions-menu__date-filter-container">
-        {dateFilterComponent}
+        <TransactionFilter
+          startDate={dateFilterStart}
+          endDate={dateFilterEnd}
+          onStartDateChange={handleDateFilterChange}
+          onEndDateChange={(value) => handleDateFilterChange(dateFilterStart, value)}
+          onClear={() => handleDateFilterChange("", "")}
+          hasFilter={!!(dateFilterStart || dateFilterEnd)}
+        />
       </div>
 
       <SearchToolbar onSearch={handleSearch} placeholder="Search transactions..." />
@@ -937,7 +824,7 @@ const AssetTransactionsMenu = () => {
               <Select
                 label="Transaction Type"
                 value={formData.transactionType || ""}
-                onChange={(e) => setFormField('transactionType')(e.target.value)}
+                onChange={(e) => setFormField("transactionType")(e.target.value)}
                 options={TRANSACTION_TYPE_OPTIONS}
                 required
               />
@@ -946,7 +833,7 @@ const AssetTransactionsMenu = () => {
               <Select
                 label="Asset"
                 value={formData.assetId || ""}
-                onChange={(e) => setFormField('assetId')(e.target.value)}
+                onChange={(e) => setFormField("assetId")(e.target.value)}
                 options={filteredAssetOptions}
                 required
               />
@@ -956,7 +843,7 @@ const AssetTransactionsMenu = () => {
                 <Select
                   label="From Employee"
                   value={formData.fromEmployeeId || ""}
-                  onChange={(e) => setFormField('fromEmployeeId')(e.target.value)}
+                  onChange={(e) => setFormField("fromEmployeeId")(e.target.value)}
                   options={employeeOptions}
                 />
               </Grid>
@@ -966,7 +853,7 @@ const AssetTransactionsMenu = () => {
                 <Select
                   label="To Employee"
                   value={formData.toEmployeeId || ""}
-                  onChange={(e) => setFormField('toEmployeeId')(e.target.value)}
+                  onChange={(e) => setFormField("toEmployeeId")(e.target.value)}
                   options={employeeOptions}
                   required
                 />
@@ -976,7 +863,7 @@ const AssetTransactionsMenu = () => {
               <Select
                 label="To Office"
                 value={formData.toLocationId || ""}
-                onChange={(e) => setFormField('toLocationId')(e.target.value)}
+                onChange={(e) => setFormField("toLocationId")(e.target.value)}
                 options={officeOptionsSelect}
               />
             </Grid>
@@ -985,7 +872,7 @@ const AssetTransactionsMenu = () => {
                 <Select
                   label="Paired Transaction"
                   value={formData.fromAssetTransactionId || ""}
-                  onChange={(e) => setFormField('fromAssetTransactionId')(e.target.value)}
+                  onChange={(e) => setFormField("fromAssetTransactionId")(e.target.value)}
                   options={[{ value: "", label: loadingPairedOptions ? "Loading..." : "Select Paired Transaction" }, ...pairedTransactionOptions]}
                   required
                   disabled={loadingPairedOptions}
@@ -997,7 +884,7 @@ const AssetTransactionsMenu = () => {
                 <DatePickerInput
                   label="Expected Return Date"
                   value={formData.expectedReturnDate || ""}
-                  onChange={(e) => setFormField('expectedReturnDate')(e.target.value)}
+                  onChange={(e) => setFormField("expectedReturnDate")(e.target.value)}
                 />
               </Grid>
             )}
@@ -1010,7 +897,7 @@ const AssetTransactionsMenu = () => {
               <Select
                 label="Condition Before"
                 value={formData.conditionBefore || ""}
-                onChange={(e) => setFormField('conditionBefore')(e.target.value)}
+                onChange={(e) => setFormField("conditionBefore")(e.target.value)}
                 options={conditionOptions}
               />
             </Grid>
@@ -1020,7 +907,7 @@ const AssetTransactionsMenu = () => {
                   <Select
                     label="Maintenance Type"
                     value={formData.maintenanceType || ""}
-                    onChange={(e) => setFormField('maintenanceType')(e.target.value)}
+                    onChange={(e) => setFormField("maintenanceType")(e.target.value)}
                     options={[{ value: "", label: "Select Type" }]}
                   />
                 </Grid>
@@ -1028,7 +915,7 @@ const AssetTransactionsMenu = () => {
                   <NumberInput
                     label="Maintenance Cost"
                     value={formData.maintenanceCost}
-                    onChange={(e) => setFormField('maintenanceCost')(e.target.value)}
+                    onChange={(e) => setFormField("maintenanceCost")(e.target.value)}
                     prefix="Rp "
                     thousandSeparator={true}
                     decimalScale={0}
@@ -1045,7 +932,7 @@ const AssetTransactionsMenu = () => {
               <Input
                 label="Notes"
                 value={formData.notes || ""}
-                onChange={(e) => setFormField('notes')(e.target.value)}
+                onChange={(e) => setFormField("notes")(e.target.value)}
                 multiline
                 rows={3}
               />
@@ -1062,11 +949,27 @@ const AssetTransactionsMenu = () => {
       </CrudModal>
 
       <Modal isOpen={showReturnModal} onClose={() => !isReturnSubmitting && setShowReturnModal(false)} title="Return Asset" size="md">
-        {returnModalContent}
+        <ReturnModalContent
+          transaction={selectedTransaction}
+          returnData={returnData}
+          onReturnDataChange={setReturnData}
+          onSubmit={handleReturnSubmit}
+          onCancel={() => setShowReturnModal(false)}
+          isSubmitting={isReturnSubmitting}
+          conditionOptions={conditionOptions}
+        />
       </Modal>
 
       <Modal isOpen={showPostMaintenanceModal} onClose={() => !isPostMaintenanceSubmitting && setShowPostMaintenanceModal(false)} title="Post Maintenance" size="md">
-        {postMaintenanceModalContent}
+        <PostMaintenanceModalContent
+          transaction={selectedTransaction}
+          postData={postMaintenanceData}
+          onPostDataChange={setPostMaintenanceData}
+          onSubmit={handlePostMaintenanceSubmit}
+          onCancel={() => setShowPostMaintenanceModal(false)}
+          isSubmitting={isPostMaintenanceSubmitting}
+          conditionOptions={conditionOptions}
+        />
       </Modal>
 
       <ImportModal
@@ -1083,7 +986,7 @@ const AssetTransactionsMenu = () => {
       <BulkActivateModal
         isOpen={showBulkActivateModalPrimary}
         onClose={() => setShowBulkActivateModalPrimary(false)}
-        onConfirm={(ids) => handleBulkAction(ids, bulkAction, 'primary')}
+        onConfirm={(ids) => handleBulkAction(ids, bulkAction, "primary")}
         selectedIds={getPrimarySelectedIds(primaryData)}
         itemName="transactions"
         title={bulkTitle}
@@ -1093,7 +996,7 @@ const AssetTransactionsMenu = () => {
       <BulkActivateModal
         isOpen={showBulkActivateModalSecondary}
         onClose={() => setShowBulkActivateModalSecondary(false)}
-        onConfirm={(ids) => handleBulkAction(ids, bulkAction, 'secondary')}
+        onConfirm={(ids) => handleBulkAction(ids, bulkAction, "secondary")}
         selectedIds={getSecondarySelectedIds(secondaryData)}
         itemName="transactions"
         title={bulkTitle}

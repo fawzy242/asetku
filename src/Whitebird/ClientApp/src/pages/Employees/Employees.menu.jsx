@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { Grid, Chip } from "@mui/material";
+import { Grid } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
 import EmployeesData from "./Employees.data";
 import GridView from "../../components/organisms/GridView/GridView";
@@ -12,14 +12,17 @@ import Spinner from "../../components/atoms/Spinner/Spinner";
 import FileUploader from "../../components/molecules/FileUploader/FileUploader";
 import ImportModal from "../../components/molecules/ImportModal/ImportModal";
 import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
+import StatusChip from "../../components/atoms/StatusChip/StatusChip";
+import EmploymentStatusChip from "../../components/atoms/EmploymentStatusChip/EmploymentStatusChip";
+import Button from "../../components/atoms/Button/Button"; // ADD THIS IMPORT
 import { FiUpload, FiCheckSquare } from "react-icons/fi";
-import { getStatusChipStyles } from "../../core/constants/statusColors";
 import { ACTION_TYPES, useGridActions } from "../../hooks/useGridActions";
 import { useBulkSelection } from "../../hooks/useBulkSelection";
 import { useSweetAlert } from "../../hooks/useSweetAlert";
 import { useGridData } from "../../hooks/useGridData";
 import { useReferenceData } from "../../hooks/useReferenceData";
 import { useCrudFormBase } from "../../hooks/useCrudFormBase";
+import { useOptions } from "../../hooks/useOptions";
 import { cleanEmployeeFormData } from "../../core/utils/formHelpers";
 import "./Employees.scss";
 
@@ -37,21 +40,6 @@ const EMPLOYEE_TABS = [
   { id: "Active", label: "Active" },
   { id: "Inactive", label: "Inactive" },
 ];
-
-// Custom styling untuk employment status
-const getEmploymentStatusStyles = (statusName) => {
-  const styles = {
-    'Permanent': { bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', label: 'Permanent' },
-    'Contract': { bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', label: 'Contract' },
-    'Probation': { bg: 'rgba(139, 92, 246, 0.15)', color: '#8b5cf6', label: 'Probation' },
-    'Intern': { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', label: 'Intern' },
-    'Freelance': { bg: 'rgba(236, 72, 153, 0.15)', color: '#ec4899', label: 'Freelance' },
-    'Resigned': { bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', label: 'Resigned' },
-    'Terminated': { bg: 'rgba(239, 68, 68, 0.15)', color: '#dc2626', label: 'Terminated' },
-    'On Leave': { bg: 'rgba(245, 158, 11, 0.15)', color: '#d97706', label: 'On Leave' },
-  };
-  return styles[statusName] || { bg: 'rgba(107, 114, 128, 0.15)', color: '#6b7280', label: statusName || 'Unknown' };
-};
 
 const EmployeesMenu = () => {
   const [activeTab, setActiveTab] = useState("all");
@@ -77,13 +65,13 @@ const EmployeesMenu = () => {
     handleClose,
     handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, employeesData, {
-    idField: 'employeeId',
+    idField: "employeeId",
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
+      queryClient.invalidateQueries({ queryKey: ["reference", "employees"] });
     },
   });
 
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } = useBulkSelection({ idField: 'employeeId' });
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } = useBulkSelection({ idField: "employeeId" });
 
   const showCheckbox = useMemo(() => {
     return activeTab === "Active" || activeTab === "Inactive";
@@ -123,7 +111,7 @@ const EmployeesMenu = () => {
     pageSize,
     setPageSize,
     reload
-  } = useGridData(['employees', activeTab, searchTerm], fetchGridData);
+  } = useGridData(["employees", activeTab, searchTerm], fetchGridData);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -142,12 +130,12 @@ const EmployeesMenu = () => {
   }, [setPage, clearSelection]);
 
   const handleDelete = useCallback(async (emp) => {
-    const confirmed = await confirmDelete('Delete Employee', `Are you sure you want to delete "${emp.fullName}"?`);
+    const confirmed = await confirmDelete("Delete Employee", `Are you sure you want to delete "${emp.fullName}"?`);
     if (!confirmed) return;
     const r = await employeesData.delete(emp.employeeId);
     if (r.success && isMountedRef.current) {
-      toast.success('Employee deleted successfully');
-      queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
+      toast.success("Employee deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["reference", "employees"] });
       reload();
       clearSelection();
     }
@@ -156,8 +144,8 @@ const EmployeesMenu = () => {
   const onSubmit = useCallback(async () => {
     const success = await crudHandleSubmit();
     if (success && isMountedRef.current) {
-      toast.success(editingEmployee ? 'Employee updated successfully' : 'Employee created successfully');
-      queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
+      toast.success(editingEmployee ? "Employee updated successfully" : "Employee created successfully");
+      queryClient.invalidateQueries({ queryKey: ["reference", "employees"] });
       reload();
       clearSelection();
     }
@@ -172,18 +160,18 @@ const EmployeesMenu = () => {
   }, [setPage, clearSelection]);
 
   const handleBulkActivate = useCallback(async (ids, activate) => {
-    const actionText = activate ? 'activate' : 'deactivate';
+    const actionText = activate ? "activate" : "deactivate";
     const confirmed = await confirm({
-      title: activate ? 'Activate Employees' : 'Deactivate Employees',
+      title: activate ? "Activate Employees" : "Deactivate Employees",
       text: `Are you sure you want to ${actionText} ${ids.length} employee(s)?`,
-      confirmButtonText: activate ? 'Yes, Activate' : 'Yes, Deactivate',
+      confirmButtonText: activate ? "Yes, Activate" : "Yes, Deactivate",
     });
     if (!confirmed) return;
     const r = await employeesData.bulkActivate(ids, activate);
     if (r.success && isMountedRef.current) {
       toast.success(`${r.data || ids.length} employee(s) ${actionText}d successfully`);
       clearSelection();
-      queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
+      queryClient.invalidateQueries({ queryKey: ["reference", "employees"] });
       reload();
     }
   }, [reload, queryClient, toast, confirm, clearSelection]);
@@ -199,7 +187,7 @@ const EmployeesMenu = () => {
       } else {
         toast.warning(`Import completed: ${r.data.successCount} success, ${r.data.errorCount} errors`);
       }
-      queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
+      queryClient.invalidateQueries({ queryKey: ["reference", "employees"] });
       reload();
       clearSelection();
     }
@@ -230,30 +218,14 @@ const EmployeesMenu = () => {
     actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
     onAction: handleGridAction,
     getConditionalActions,
-    rowIdField: 'employeeId',
+    rowIdField: "employeeId",
   });
 
-  const departmentOptions = useMemo(() => [
-    { value: "", label: "Select Department" },
-    ...departments.map(d => ({ value: d.value, label: d.label }))
-  ], [departments]);
+  const departmentOptions = useOptions(departments, "Select Department");
+  const positionOptions = useOptions(employeePositions, "Select Position");
+  const statusOptions = useOptions(employeeStatuses, "Select Status");
+  const officeOptions = useOptions(offices, "Select Office");
 
-  const positionOptions = useMemo(() => [
-    { value: "", label: "Select Position" },
-    ...employeePositions.map(p => ({ value: p.value, label: p.label }))
-  ], [employeePositions]);
-
-  const statusOptions = useMemo(() => [
-    { value: "", label: "Select Status" },
-    ...employeeStatuses.map(s => ({ value: s.value, label: s.label }))
-  ], [employeeStatuses]);
-
-  const officeOptions = useMemo(() => [
-    { value: "", label: "Select Office" },
-    ...offices.map(o => ({ value: o.value, label: o.label }))
-  ], [offices]);
-
-  // KOLOM: Employee Status (isActive) di belakang, Employment Status di kanan Full Name
   const columns = useMemo(() => [
     { field: "employeeCode", headerName: "Code", width: 120 },
     { 
@@ -267,25 +239,8 @@ const EmployeesMenu = () => {
       headerName: "Employment Status", 
       width: 160,
       renderCell: (p) => {
-        const statusName = p?.value || 'Unknown';
-        const styles = getEmploymentStatusStyles(statusName);
-        return (
-          <Chip 
-            label={styles.label} 
-            size="small" 
-            sx={{ 
-              bgcolor: styles.bg, 
-              color: styles.color, 
-              fontWeight: 500,
-              fontSize: '0.75rem',
-              height: '24px',
-              borderRadius: '16px',
-              '& .MuiChip-label': {
-                px: 1.5,
-              }
-            }} 
-          />
-        );
+        const status = p?.value || "Unknown";
+        return <EmploymentStatusChip status={status} />;
       }
     },
     { field: "departmentName", headerName: "Department", width: 150 },
@@ -297,8 +252,8 @@ const EmployeesMenu = () => {
       headerName: "Status", 
       width: 120,
       renderCell: (p) => {
-        const status = p?.value ? 'Active' : 'Inactive';
-        return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
+        const status = p?.value ? "Active" : "Inactive";
+        return <StatusChip status={status} />;
       }
     },
     actionColumn,
@@ -306,13 +261,13 @@ const EmployeesMenu = () => {
 
   const extraActions = (
     <>
-      <button className="btn btn--outline btn--sm" onClick={() => setShowImportModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+      <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)} className="u-inline-flex u-btn-gap">
         <FiUpload size={16} /> Import
-      </button>
+      </Button>
       {hasSelection && showCheckbox && (
-        <button className="btn btn--primary btn--sm" onClick={() => setShowBulkActivateModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+        <Button variant="primary" size="sm" onClick={() => setShowBulkActivateModal(true)} className="u-inline-flex u-btn-gap">
           <FiCheckSquare size={16} /> {activeTab === "Active" ? "Deactivate" : "Activate"} ({selectionCount})
-        </button>
+        </Button>
       )}
     </>
   );
@@ -360,10 +315,10 @@ const EmployeesMenu = () => {
         <FormSection title="Basic Information" description="Employee code and full name">
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <Input label="Employee Code" value={formData.employeeCode || ""} onChange={(e) => setFormField('employeeCode')(e.target.value)} required />
+              <Input label="Employee Code" value={formData.employeeCode || ""} onChange={(e) => setFormField("employeeCode")(e.target.value)} required />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Input label="Full Name" value={formData.fullName || ""} onChange={(e) => setFormField('fullName')(e.target.value)} required />
+              <Input label="Full Name" value={formData.fullName || ""} onChange={(e) => setFormField("fullName")(e.target.value)} required />
             </Grid>
           </Grid>
         </FormSection>
@@ -371,13 +326,13 @@ const EmployeesMenu = () => {
         <FormSection title="Contact Information" description="Address, phone, and email">
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <Input label="Address" value={formData.address || ""} onChange={(e) => setFormField('address')(e.target.value)} multiline rows={2} />
+              <Input label="Address" value={formData.address || ""} onChange={(e) => setFormField("address")(e.target.value)} multiline rows={2} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Input label="Phone Number" value={formData.phoneNumber || ""} onChange={(e) => setFormField('phoneNumber')(e.target.value)} />
+              <Input label="Phone Number" value={formData.phoneNumber || ""} onChange={(e) => setFormField("phoneNumber")(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Input label="Email" type="email" value={formData.email || ""} onChange={(e) => setFormField('email')(e.target.value)} />
+              <Input label="Email" type="email" value={formData.email || ""} onChange={(e) => setFormField("email")(e.target.value)} />
             </Grid>
           </Grid>
         </FormSection>
@@ -385,16 +340,16 @@ const EmployeesMenu = () => {
         <FormSection title="Employment Details" description="Department, position, status, and office">
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <Select label="Department" value={formData.departmentId || ""} onChange={(e) => setFormField('departmentId')(e.target.value)} options={departmentOptions} />
+              <Select label="Department" value={formData.departmentId || ""} onChange={(e) => setFormField("departmentId")(e.target.value)} options={departmentOptions} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Select label="Position" value={formData.position || ""} onChange={(e) => setFormField('position')(e.target.value)} options={positionOptions} />
+              <Select label="Position" value={formData.position || ""} onChange={(e) => setFormField("position")(e.target.value)} options={positionOptions} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Select label="Employment Status" value={formData.employmentStatus || ""} onChange={(e) => setFormField('employmentStatus')(e.target.value)} options={statusOptions} />
+              <Select label="Employment Status" value={formData.employmentStatus || ""} onChange={(e) => setFormField("employmentStatus")(e.target.value)} options={statusOptions} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Select label="Office" value={formData.officeId || ""} onChange={(e) => setFormField('officeId')(e.target.value)} options={officeOptions} />
+              <Select label="Office" value={formData.officeId || ""} onChange={(e) => setFormField("officeId")(e.target.value)} options={officeOptions} />
             </Grid>
           </Grid>
         </FormSection>
@@ -402,10 +357,10 @@ const EmployeesMenu = () => {
         <FormSection title="Dates" description="Join and resignation dates">
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <DatePickerInput label="Join Date" value={formData.joinDate || ""} onChange={(e) => setFormField('joinDate')(e.target.value)} />
+              <DatePickerInput label="Join Date" value={formData.joinDate || ""} onChange={(e) => setFormField("joinDate")(e.target.value)} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <DatePickerInput label="Resign Date" value={formData.resignDate || ""} onChange={(e) => setFormField('resignDate')(e.target.value)} />
+              <DatePickerInput label="Resign Date" value={formData.resignDate || ""} onChange={(e) => setFormField("resignDate")(e.target.value)} />
             </Grid>
           </Grid>
         </FormSection>

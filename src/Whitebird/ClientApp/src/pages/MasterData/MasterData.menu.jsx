@@ -19,14 +19,14 @@ const TABS = [
 
 const MasterDataMenu = () => {
   const [activeTab, setActiveTab] = useState("transaction-types");
-  
-  const { 
-    transactionTypes, 
-    assetConditions, 
-    employeePositions, 
-    employeeStatuses, 
-    officeTypes, 
-    maintenanceTypes, 
+
+  const {
+    transactionTypes,
+    assetConditions,
+    employeePositions,
+    employeeStatuses,
+    officeTypes,
+    maintenanceTypes,
     assetConditionPurchases,
     isLoading,
     isError
@@ -75,7 +75,7 @@ const MasterDataMenu = () => {
           <h1 className="page-title">Master Data</h1>
         </div>
         <Card>
-          <Box sx={{ textAlign: 'center', py: 6, color: 'var(--error)' }}>
+          <Box sx={{ textAlign: "center", py: 6, color: "var(--error)" }}>
             <FiDatabase size={48} style={{ marginBottom: 16 }} />
             <Typography variant="h6" sx={{ mb: 1 }}>Failed to load master data</Typography>
             <Typography variant="body2" color="text.secondary">
@@ -104,16 +104,16 @@ const MasterDataMenu = () => {
           </div>
           <h2 className="master-data__header-title">{title}</h2>
           <div className="master-data__header-count">
-            <Chip 
-              label={`${data.length} item${data.length !== 1 ? 's' : ''}`} 
-              size="small" 
-              sx={{ bgcolor: `${color}15`, color }} 
+            <Chip
+              label={`${data.length} item${data.length !== 1 ? "s" : ""}`}
+              size="small"
+              sx={{ bgcolor: `${color}15`, color }}
             />
           </div>
         </div>
 
         {data.length === 0 ? (
-          <Box sx={{ textAlign: 'center', py: 6, color: 'var(--text-secondary)' }}>
+          <Box sx={{ textAlign: "center", py: 6, color: "var(--text-secondary)" }}>
             <FiDatabase size={48} style={{ marginBottom: 16, opacity: 0.5 }} />
             <Typography variant="h6" gutterBottom>No Data Available</Typography>
             <Typography variant="body2">

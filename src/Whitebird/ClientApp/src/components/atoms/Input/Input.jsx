@@ -42,11 +42,11 @@ const Input = memo(forwardRef(({
   const mergeRefs = useCallback((element) => {
     internalRef.current = element;
     if (registerProps.ref) {
-      if (typeof registerProps.ref === 'function') registerProps.ref(element);
+      if (typeof registerProps.ref === "function") registerProps.ref(element);
       else registerProps.ref.current = element;
     }
     if (ref) {
-      if (typeof ref === 'function') ref(element);
+      if (typeof ref === "function") ref(element);
       else ref.current = element;
     }
   }, [registerProps.ref, ref]);
@@ -87,8 +87,6 @@ const Input = memo(forwardRef(({
         multiline={multiline}
         rows={multiline ? rows : undefined}
         autoComplete={autoComplete}
-        // FIX: Always set shrink to true when value exists or focused
-        // This fixes the autofill issue where label doesn't float up
         InputLabelProps={{
           shrink: focused || hasValue || true,
           ...InputLabelProps,

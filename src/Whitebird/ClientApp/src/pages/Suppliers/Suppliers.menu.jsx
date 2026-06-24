@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Grid, Chip } from "@mui/material";
+import { Grid } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
 import SuppliersData from "./Suppliers.data";
 import GridView from "../../components/organisms/GridView/GridView";
@@ -9,7 +9,9 @@ import Input from "../../components/atoms/Input/Input";
 import Spinner from "../../components/atoms/Spinner/Spinner";
 import FileUploader from "../../components/molecules/FileUploader/FileUploader";
 import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
-import { getStatusChipStyles } from "../../core/constants/statusColors";
+import StatusChip from "../../components/atoms/StatusChip/StatusChip";
+import Button from "../../components/atoms/Button/Button";
+import { FiCheckSquare } from "react-icons/fi";
 import { ACTION_TYPES, useGridActions } from "../../hooks/useGridActions";
 import { useBulkSelection } from "../../hooks/useBulkSelection";
 import { useSweetAlert } from "../../hooks/useSweetAlert";
@@ -21,12 +23,12 @@ import "./Suppliers.scss";
 const suppliersData = new SuppliersData();
 suppliersData.transformFormData = cleanSupplierFormData;
 
-const INITIAL_FORM_DATA = { 
-  supplierName: "", 
-  contactPerson: "", 
-  phoneNumber: "", 
-  email: "", 
-  address: "" 
+const INITIAL_FORM_DATA = {
+  supplierName: "",
+  contactPerson: "",
+  phoneNumber: "",
+  email: "",
+  address: ""
 };
 
 const TABS = [
@@ -53,13 +55,13 @@ const SuppliersMenu = () => {
     handleClose,
     handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, suppliersData, {
-    idField: 'supplierId',
+    idField: "supplierId",
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] });
+      queryClient.invalidateQueries({ queryKey: ["reference", "suppliers"] });
     },
   });
 
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } = useBulkSelection({ idField: 'supplierId' });
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } = useBulkSelection({ idField: "supplierId" });
 
   const showCheckbox = activeTab === "active" || activeTab === "inactive";
 
@@ -97,7 +99,7 @@ const SuppliersMenu = () => {
     pageSize,
     setPageSize,
     reload
-  } = useGridData(['suppliers', activeTab, searchTerm], fetchGridData);
+  } = useGridData(["suppliers", activeTab, searchTerm], fetchGridData);
 
   useEffect(() => {
     reload();
@@ -111,26 +113,26 @@ const SuppliersMenu = () => {
   }, [setPage, clearSelection]);
 
   const handleDelete = useCallback(async (sup) => {
-    const confirmed = await confirmDelete('Delete Supplier', `Are you sure you want to delete "${sup.supplierName}"?`);
+    const confirmed = await confirmDelete("Delete Supplier", `Are you sure you want to delete "${sup.supplierName}"?`);
     if (!confirmed) return;
     const r = await suppliersData.delete(sup.supplierId);
     if (r.success) {
-      toast.success('Supplier deleted successfully');
-      queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] });
+      toast.success("Supplier deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["reference", "suppliers"] });
       reload();
       clearSelection();
     }
   }, [reload, queryClient, toast, confirmDelete, clearSelection]);
 
   const handleBulkActivate = useCallback(async (ids, activate) => {
-    const actionText = activate ? 'activate' : 'deactivate';
+    const actionText = activate ? "activate" : "deactivate";
     const confirmed = await confirm({
-      title: activate ? 'Activate Suppliers' : 'Deactivate Suppliers',
+      title: activate ? "Activate Suppliers" : "Deactivate Suppliers",
       text: `Are you sure you want to ${actionText} ${ids.length} supplier(s)?`,
-      confirmButtonText: activate ? 'Yes, Activate' : 'Yes, Deactivate',
+      confirmButtonText: activate ? "Yes, Activate" : "Yes, Deactivate",
     });
     if (!confirmed) return;
-    
+
     let successCount = 0;
     for (const id of ids) {
       const result = await suppliersData.fetchById(id);
@@ -142,27 +144,27 @@ const SuppliersMenu = () => {
     }
     if (successCount > 0) {
       toast.success(`${successCount} supplier(s) ${actionText}d successfully`);
-      queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] });
+      queryClient.invalidateQueries({ queryKey: ["reference", "suppliers"] });
       reload();
       clearSelection();
     }
   }, [reload, queryClient, toast, confirm, clearSelection]);
 
   const onSubmit = useCallback(async () => {
-    const submitData = { 
-      ...formData, 
-      isActive: editingSupplier ? editingSupplier.isActive : true 
+    const submitData = {
+      ...formData,
+      isActive: editingSupplier ? editingSupplier.isActive : true
     };
-    if (submitData.contactPerson === '') submitData.contactPerson = null;
-    if (submitData.phoneNumber === '') submitData.phoneNumber = null;
-    if (submitData.email === '') submitData.email = null;
-    if (submitData.address === '') submitData.address = null;
+    if (submitData.contactPerson === "") submitData.contactPerson = null;
+    if (submitData.phoneNumber === "") submitData.phoneNumber = null;
+    if (submitData.email === "") submitData.email = null;
+    if (submitData.address === "") submitData.address = null;
     Object.keys(submitData).forEach(key => {
       setFormField(key)(submitData[key]);
     });
     const success = await crudHandleSubmit();
     if (success) {
-      toast.success(editingSupplier ? 'Supplier updated successfully' : 'Supplier created successfully');
+      toast.success(editingSupplier ? "Supplier updated successfully" : "Supplier created successfully");
       reload();
       clearSelection();
     }
@@ -197,7 +199,7 @@ const SuppliersMenu = () => {
     actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
     onAction: handleGridAction,
     getConditionalActions,
-    rowIdField: 'supplierId',
+    rowIdField: "supplierId",
   });
 
   const columns = useMemo(() => [
@@ -206,13 +208,13 @@ const SuppliersMenu = () => {
     { field: "phoneNumber", headerName: "Phone", width: 140 },
     { field: "email", headerName: "Email", width: 200 },
     { field: "assetCount", headerName: "Assets", width: 90 },
-    { 
-      field: "isActive", 
-      headerName: "Status", 
-      width: 110, 
+    {
+      field: "isActive",
+      headerName: "Status",
+      width: 110,
       renderCell: (p) => {
-        const status = p?.value ? 'Active' : 'Inactive';
-        return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
+        const status = p?.value ? "Active" : "Inactive";
+        return <StatusChip status={status} />;
       },
     },
     actionColumn,
@@ -221,9 +223,9 @@ const SuppliersMenu = () => {
   const extraActions = (
     <>
       {hasSelection && showCheckbox && (
-        <button className="btn btn--primary btn--sm" onClick={() => setShowBulkActivateModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-          {activeTab === "active" ? "Deactivate" : "Activate"} ({selectionCount})
-        </button>
+        <Button variant="primary" size="sm" onClick={() => setShowBulkActivateModal(true)} className="u-inline-flex u-btn-gap">
+          <FiCheckSquare size={16} /> {activeTab === "active" ? "Deactivate" : "Activate"} ({selectionCount})
+        </Button>
       )}
     </>
   );
@@ -272,18 +274,18 @@ const SuppliersMenu = () => {
         <FormSection title="Basic Information" description="Supplier name and contact person">
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <Input 
-                label="Supplier Name" 
-                value={formData.supplierName || ""} 
-                onChange={(e) => setFormField('supplierName')(e.target.value)} 
-                required 
+              <Input
+                label="Supplier Name"
+                value={formData.supplierName || ""}
+                onChange={(e) => setFormField("supplierName")(e.target.value)}
+                required
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Input 
-                label="Contact Person" 
-                value={formData.contactPerson || ""} 
-                onChange={(e) => setFormField('contactPerson')(e.target.value)} 
+              <Input
+                label="Contact Person"
+                value={formData.contactPerson || ""}
+                onChange={(e) => setFormField("contactPerson")(e.target.value)}
               />
             </Grid>
           </Grid>
@@ -292,34 +294,34 @@ const SuppliersMenu = () => {
         <FormSection title="Contact Information" description="Phone, email, and address">
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <Input 
-                label="Phone Number" 
-                value={formData.phoneNumber || ""} 
-                onChange={(e) => setFormField('phoneNumber')(e.target.value)} 
+              <Input
+                label="Phone Number"
+                value={formData.phoneNumber || ""}
+                onChange={(e) => setFormField("phoneNumber")(e.target.value)}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Input 
-                label="Email" 
-                type="email" 
-                value={formData.email || ""} 
-                onChange={(e) => setFormField('email')(e.target.value)} 
+              <Input
+                label="Email"
+                type="email"
+                value={formData.email || ""}
+                onChange={(e) => setFormField("email")(e.target.value)}
               />
             </Grid>
             <Grid item xs={12}>
-              <Input 
-                label="Address" 
-                value={formData.address || ""} 
-                onChange={(e) => setFormField('address')(e.target.value)} 
-                multiline 
-                rows={2} 
+              <Input
+                label="Address"
+                value={formData.address || ""}
+                onChange={(e) => setFormField("address")(e.target.value)}
+                multiline
+                rows={2}
               />
             </Grid>
           </Grid>
         </FormSection>
 
         <FormSection title="Attachments" description="Supporting documents">
-          <FileUploader 
+          <FileUploader
             referenceTable="Supplier"
             referenceId={editingSupplier?.supplierId}
             onUploadComplete={reload}
