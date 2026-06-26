@@ -11,13 +11,14 @@ class AssetTransactionsData extends BaseData {
     try {
       const result = await this.api.approve(id, { assetTransactionId: id, isApproved, approvalNotes });
       if (result.isSuccess) {
-        ConfirmDialog.toast.success(isApproved ? 'Transaction approved' : 'Transaction rejected');
+        await ConfirmDialog.showSuccess('Success', isApproved ? 'Transaction approved' : 'Transaction rejected');
         return { success: true };
       }
-      ConfirmDialog.toast.error(result.message || 'Failed to process');
+      await ConfirmDialog.showError('Failed', result.message || 'Failed to process');
       return { success: false };
-    } catch {
-      ConfirmDialog.toast.error('Failed to process');
+    } catch (error) {
+      console.error('approve error:', error);
+      await ConfirmDialog.showError('Failed', 'Failed to process');
       return { success: false };
     }
   }
@@ -31,13 +32,14 @@ class AssetTransactionsData extends BaseData {
         notes
       });
       if (result.isSuccess) {
-        ConfirmDialog.toast.success('Asset returned successfully');
+        await ConfirmDialog.showSuccess('Success', 'Asset returned successfully');
         return { success: true };
       }
-      ConfirmDialog.toast.error(result.message || 'Failed to return asset');
+      await ConfirmDialog.showError('Failed', result.message || 'Failed to return asset');
       return { success: false };
-    } catch {
-      ConfirmDialog.toast.error('Failed to return asset');
+    } catch (error) {
+      console.error('returnAsset error:', error);
+      await ConfirmDialog.showError('Failed', 'Failed to return asset');
       return { success: false };
     }
   }
@@ -54,13 +56,14 @@ class AssetTransactionsData extends BaseData {
     try {
       const result = await this.api.cancel(id);
       if (result.isSuccess) {
-        ConfirmDialog.toast.success('Transaction cancelled');
+        await ConfirmDialog.showSuccess('Success', 'Transaction cancelled');
         return { success: true };
       }
-      ConfirmDialog.toast.error(result.message || 'Failed to cancel');
+      await ConfirmDialog.showError('Failed', result.message || 'Failed to cancel');
       return { success: false };
-    } catch {
-      ConfirmDialog.toast.error('Failed to cancel');
+    } catch (error) {
+      console.error('cancel error:', error);
+      await ConfirmDialog.showError('Failed', 'Failed to cancel');
       return { success: false };
     }
   }
@@ -71,16 +74,17 @@ class AssetTransactionsData extends BaseData {
       if (result.isSuccess && result.data) {
         const importResult = result.data;
         if (importResult.errorCount > 0) {
-          ConfirmDialog.toast.warning(`Import completed: ${importResult.successCount} success, ${importResult.errorCount} errors`);
+          await ConfirmDialog.showWarning('Import Completed', `${importResult.successCount} success, ${importResult.errorCount} errors`);
         } else {
-          ConfirmDialog.toast.success(`Import completed: ${importResult.successCount} transactions imported successfully`);
+          await ConfirmDialog.showSuccess('Import Completed', `${importResult.successCount} transactions imported successfully`);
         }
         return { success: true, data: importResult };
       }
-      ConfirmDialog.toast.error(result.message || 'Import failed');
+      await ConfirmDialog.showError('Failed', result.message || 'Import failed');
       return { success: false };
-    } catch {
-      ConfirmDialog.toast.error('Failed to import');
+    } catch (error) {
+      console.error('importTransactions error:', error);
+      await ConfirmDialog.showError('Failed', 'Failed to import');
       return { success: false };
     }
   }
@@ -96,10 +100,11 @@ class AssetTransactionsData extends BaseData {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      ConfirmDialog.toast.success('Template downloaded');
+      await ConfirmDialog.showSuccess('Success', 'Template downloaded successfully');
       return { success: true };
-    } catch {
-      ConfirmDialog.toast.error('Failed to download template');
+    } catch (error) {
+      console.error('downloadTemplate error:', error);
+      await ConfirmDialog.showError('Failed', 'Failed to download template');
       return { success: false };
     }
   }

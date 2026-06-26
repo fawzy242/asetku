@@ -313,11 +313,19 @@ img {
 // SWEETALERT2 OVERRIDES - Full Theming
 // ============================================================
 
-.swal-container {
-  z-index: $z-index-modal !important;
+.swal2-container {
+  z-index: 99999 !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
-.swal-popup {
+.swal2-popup {
   border-radius: $radius-xl !important;
   background-color: var(--card-bg) !important;
   color: var(--text-primary) !important;
@@ -326,45 +334,39 @@ img {
   padding: $spacing-xl !important;
   width: 420px !important;
   max-width: 90vw !important;
+  animation: slideInModal 0.25s ease-out !important;
+  position: relative !important;
+  z-index: 100000 !important;
 }
 
-.swal-title {
+.swal2-title {
   color: var(--text-primary) !important;
   font-size: $font-size-xl !important;
   font-weight: 700 !important;
   margin-bottom: $spacing-md !important;
 }
 
-.swal-html {
+.swal2-html-container {
   color: var(--text-secondary) !important;
   font-size: $font-size-sm !important;
   text-align: center !important;
 }
 
-.swal-text {
-  color: var(--text-secondary) !important;
-  font-size: $font-size-sm !important;
-  text-align: center !important;
-}
-
-.swal-actions {
+.swal2-actions {
   gap: $spacing-md !important;
   padding: $spacing-md 0 0 0 !important;
   justify-content: center !important;
 }
 
-// REMOVE garis footer
-.swal-footer {
+.swal2-footer {
   border-top: none !important;
   padding: 0 !important;
-  display: flex !important;
-  justify-content: center !important;
-  gap: $spacing-md !important;
+  margin: 0 !important;
   background: transparent !important;
 }
 
 // Confirm Button
-.swal-confirm-btn {
+.swal2-confirm {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -381,16 +383,23 @@ img {
   height: 38px !important;
   background-color: var(--primary) !important;
   color: white !important;
+  min-width: 100px !important;
+  pointer-events: auto !important;
 
   &:hover:not(:disabled) {
     background-color: var(--primary-hover) !important;
     transform: translateY(-1px) !important;
     box-shadow: $shadow-md !important;
   }
+
+  &:focus {
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.3) !important;
+  }
 }
 
 // Cancel Button
-.swal-cancel-btn {
+.swal2-cancel {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -407,92 +416,97 @@ img {
   height: 38px !important;
   background-color: transparent !important;
   color: var(--text-primary) !important;
+  min-width: 100px !important;
+  pointer-events: auto !important;
 
   &:hover:not(:disabled) {
     background-color: var(--surface) !important;
     border-color: var(--primary) !important;
     color: var(--primary) !important;
   }
+
+  &:focus {
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2) !important;
+  }
+}
+
+// HIDE CANCEL BUTTON - ONLY FOR SUCCESS/ERROR/INFO/WARNING MODALS
+// TAPI TIDAK UNTUK CONFIRM/DELETE
+.swal2-popup.swal2-success .swal2-cancel,
+.swal2-popup.swal2-error .swal2-cancel,
+.swal2-popup.swal2-info .swal2-cancel,
+.swal2-popup.swal2-warning .swal2-cancel {
+  display: none !important;
 }
 
 // Icons - Themed
-.swal-icon {
+.swal2-icon {
   margin-bottom: $spacing-md !important;
-
-  &--success {
-    .swal-icon--success__ring {
-      border-color: var(--success) !important;
-    }
-
-    .swal-icon--success__line {
-      background-color: var(--success) !important;
-    }
-  }
-
-  &--warning {
-    border-color: var(--warning) !important;
-    color: var(--warning) !important;
-  }
-
-  &--error {
-    border-color: var(--error) !important;
-    color: var(--error) !important;
-  }
-
-  &--info {
-    border-color: var(--info) !important;
-    color: var(--info) !important;
-  }
-
-  &--question {
-    border-color: var(--primary) !important;
-    color: var(--primary) !important;
-  }
 }
 
-.swal-icon--success__ring {
+.swal2-icon.swal2-success {
+  border-color: var(--success) !important;
+  color: var(--success) !important;
+}
+
+.swal2-icon.swal2-success .swal2-success-ring {
   border-color: var(--success) !important;
 }
 
-.swal-icon--success__line {
+.swal2-icon.swal2-success [class^='swal2-success-line'] {
   background-color: var(--success) !important;
 }
 
-.swal-icon--warning {
+.swal2-icon.swal2-warning {
   border-color: var(--warning) !important;
   color: var(--warning) !important;
 }
 
-.swal-icon--error {
+.swal2-icon.swal2-error {
   border-color: var(--error) !important;
   color: var(--error) !important;
 }
 
-.swal-icon--info {
+.swal2-icon.swal2-info {
   border-color: var(--info) !important;
   color: var(--info) !important;
 }
 
-// Dark mode SweetAlert2 fixes
+.swal2-icon.swal2-question {
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
+}
+
+// Animation
+@keyframes slideInModal {
+  from {
+    opacity: 0;
+    transform: translateY(-15px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Dark mode
 [data-theme='dark'] {
-  .swal-popup {
+  .swal2-popup {
     background-color: #1f2937 !important;
     border-color: #374151 !important;
   }
 
-  .swal-title {
+  .swal2-title {
     color: #f9fafb !important;
   }
 
-  .swal-html {
+  .swal2-html-container {
     color: #9ca3af !important;
   }
 
-  .swal-text {
-    color: #9ca3af !important;
-  }
-
-  .swal-confirm-btn {
+  .swal2-confirm {
     background-color: #ef4444 !important;
 
     &:hover {
@@ -500,7 +514,7 @@ img {
     }
   }
 
-  .swal-cancel-btn {
+  .swal2-cancel {
     border-color: #4b5563 !important;
     color: #f9fafb !important;
 

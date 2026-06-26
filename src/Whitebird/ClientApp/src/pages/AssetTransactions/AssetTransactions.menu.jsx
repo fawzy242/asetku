@@ -117,7 +117,7 @@ const AssetTransactionsMenu = () => {
 
   const isMountedRef = useRef(true);
   const queryClient = useQueryClient();
-  const { toast, confirm, confirmDelete } = useSweetAlert();
+  const { confirm, modal } = useSweetAlert(); // HAPUS confirmDelete
 
   const { employees, offices, assets: refAssets, assetConditions } = useReferenceData();
 
@@ -313,12 +313,12 @@ const AssetTransactionsMenu = () => {
     if (!confirmed) return;
     const r = await transactionsData.approve(tx.assetTransactionId, true);
     if (r.success && isMountedRef.current) {
-      toast.success("Transaction approved");
+      // SUDAH DI HANDLE DI AssetTransactions.data - tidak perlu toast/modal lagi
       reload();
       clearPrimarySelection();
       clearSecondarySelection();
     }
-  }, [reload, toast, confirm, clearPrimarySelection, clearSecondarySelection]);
+  }, [reload, confirm, clearPrimarySelection, clearSecondarySelection]);
 
   const handleReject = useCallback(async (tx) => {
     const confirmed = await confirm({
@@ -331,24 +331,23 @@ const AssetTransactionsMenu = () => {
     if (!confirmed) return;
     const r = await transactionsData.approve(tx.assetTransactionId, false);
     if (r.success && isMountedRef.current) {
-      toast.success("Transaction rejected");
+      // SUDAH DI HANDLE DI AssetTransactions.data - tidak perlu toast/modal lagi
       reload();
       clearPrimarySelection();
       clearSecondarySelection();
     }
-  }, [reload, toast, confirm, clearPrimarySelection, clearSecondarySelection]);
+  }, [reload, confirm, clearPrimarySelection, clearSecondarySelection]);
 
+  // HAPUS confirmDelete - BaseData yang handle
   const handleCancel = useCallback(async (tx) => {
-    const confirmed = await confirmDelete("Cancel Transaction", `Are you sure you want to cancel transaction for ${tx.assetCode}?`);
-    if (!confirmed) return;
     const r = await transactionsData.cancel(tx.assetTransactionId);
     if (r.success && isMountedRef.current) {
-      toast.success("Transaction cancelled");
+      // SUDAH DI HANDLE DI AssetTransactions.data - tidak perlu toast/modal lagi
       reload();
       clearPrimarySelection();
       clearSecondarySelection();
     }
-  }, [reload, toast, confirmDelete, clearPrimarySelection, clearSecondarySelection]);
+  }, [reload, clearPrimarySelection, clearSecondarySelection]);
 
   const handleReturnShortcut = useCallback((tx) => {
     setSelectedTransaction(tx);
@@ -380,15 +379,15 @@ const AssetTransactionsMenu = () => {
     });
     setIsReturnSubmitting(false);
     if (r.isSuccess && isMountedRef.current) {
-      toast.success("Return transaction created");
+      // SUDAH DI HANDLE DI AssetTransactions.data - tidak perlu toast/modal lagi
       setShowReturnModal(false);
       reload();
       clearPrimarySelection();
       clearSecondarySelection();
     } else {
-      toast.error(r.message || "Failed to create return transaction");
+      await modal.error("Failed", r.message || "Failed to create return transaction");
     }
-  }, [selectedTransaction, isReturnSubmitting, returnData, reload, toast, clearPrimarySelection, clearSecondarySelection]);
+  }, [selectedTransaction, isReturnSubmitting, returnData, reload, clearPrimarySelection, clearSecondarySelection, modal]);
 
   const handlePostMaintenanceSubmit = useCallback(async () => {
     if (!selectedTransaction || isPostMaintenanceSubmitting) return;
@@ -400,15 +399,15 @@ const AssetTransactionsMenu = () => {
     });
     setIsPostMaintenanceSubmitting(false);
     if (r.isSuccess && isMountedRef.current) {
-      toast.success("Post-maintenance transaction created");
+      // SUDAH DI HANDLE DI AssetTransactions.data - tidak perlu toast/modal lagi
       setShowPostMaintenanceModal(false);
       reload();
       clearPrimarySelection();
       clearSecondarySelection();
     } else {
-      toast.error(r.message || "Failed to create post-maintenance transaction");
+      await modal.error("Failed", r.message || "Failed to create post-maintenance transaction");
     }
-  }, [selectedTransaction, isPostMaintenanceSubmitting, postMaintenanceData, reload, toast, clearPrimarySelection, clearSecondarySelection]);
+  }, [selectedTransaction, isPostMaintenanceSubmitting, postMaintenanceData, reload, clearPrimarySelection, clearSecondarySelection, modal]);
 
   const handleBulkAction = useCallback(async (ids, action, gridType = "primary") => {
     const actionText = action === "approve" ? "approve" : "reject";
@@ -426,7 +425,7 @@ const AssetTransactionsMenu = () => {
       if (result.success) successCount++;
     }
     if (successCount > 0 && isMountedRef.current) {
-      toast.success(`${successCount} transaction(s) ${actionText}d successfully`);
+      // SUDAH DI HANDLE DI AssetTransactions.data - tidak perlu toast/modal lagi
       if (gridType === "primary") {
         clearPrimarySelection();
       } else {
@@ -434,18 +433,18 @@ const AssetTransactionsMenu = () => {
       }
       reload();
     }
-  }, [reload, toast, confirm, clearPrimarySelection, clearSecondarySelection]);
+  }, [reload, confirm, clearPrimarySelection, clearSecondarySelection]);
 
   const onSubmit = useCallback(async () => {
     const success = await crudHandleSubmit();
     if (success && isMountedRef.current) {
-      toast.success(editingTransaction ? "Transaction updated successfully" : "Transaction created successfully (Pending approval)");
+      // SUDAH DI HANDLE DI BaseData - tidak perlu toast/modal lagi
       reload();
       clearPrimarySelection();
       clearSecondarySelection();
     }
     return success;
-  }, [crudHandleSubmit, reload, toast, editingTransaction, clearPrimarySelection, clearSecondarySelection]);
+  }, [crudHandleSubmit, reload, clearPrimarySelection, clearSecondarySelection]);
 
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
@@ -463,16 +462,12 @@ const AssetTransactionsMenu = () => {
     setIsImporting(false);
     if (r.success && isMountedRef.current) {
       setImportResult(r.data);
-      if (r.data.errorCount === 0) {
-        toast.success(`Import completed: ${r.data.successCount} transactions imported`);
-      } else {
-        toast.warning(`Import completed: ${r.data.successCount} success, ${r.data.errorCount} errors`);
-      }
+      // SUDAH DI HANDLE DI AssetTransactions.data - tidak perlu toast/modal lagi
       reload();
       clearPrimarySelection();
       clearSecondarySelection();
     }
-  }, [reload, toast, clearPrimarySelection, clearSecondarySelection]);
+  }, [reload, clearPrimarySelection, clearSecondarySelection]);
 
   const handleDownloadTemplate = useCallback(async () => {
     await transactionsData.downloadTemplate();

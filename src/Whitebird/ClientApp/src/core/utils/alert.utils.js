@@ -17,6 +17,7 @@ export const showDialog = {
   success: (title, text) => alertUtils.success(title, text),
   error: (title, text) => alertUtils.error(title, text),
   info: (title, text) => alertUtils.info(title, text),
+  warning: (title, text) => alertUtils.warning(title, text),
 };
 
 // For backward compatibility dengan kode existing

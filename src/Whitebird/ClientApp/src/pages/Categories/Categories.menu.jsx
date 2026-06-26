@@ -10,6 +10,8 @@ import Select from "../../components/atoms/Select/Select";
 import Spinner from "../../components/atoms/Spinner/Spinner";
 import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
 import StatusChip from "../../components/atoms/StatusChip/StatusChip";
+import Button from "../../components/atoms/Button/Button";
+import { FiCheckSquare } from "react-icons/fi";
 import { ACTION_TYPES, useGridActions } from "../../hooks/useGridActions";
 import { useBulkSelection } from "../../hooks/useBulkSelection";
 import { useSweetAlert } from "../../hooks/useSweetAlert";
@@ -40,7 +42,7 @@ const CategoriesMenu = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const queryClient = useQueryClient();
-  const { toast, confirmDelete, confirm } = useSweetAlert();
+  const { confirm, modal } = useSweetAlert(); // HAPUS confirmDelete
   const { categories: parentCategories } = useReferenceData();
 
   const {
@@ -111,17 +113,15 @@ const CategoriesMenu = () => {
     clearSelection();
   }, [setPage, clearSelection]);
 
+  // HAPUS confirmDelete - BaseData yang handle
   const handleDelete = useCallback(async (cat) => {
-    const confirmed = await confirmDelete("Delete Category", `Are you sure you want to delete "${cat.categoryName}"?`);
-    if (!confirmed) return;
     const r = await categoriesData.delete(cat.categoryId);
     if (r.success) {
-      toast.success("Category deleted successfully");
       queryClient.invalidateQueries({ queryKey: ["reference", "categories"] });
       reload();
       clearSelection();
     }
-  }, [reload, queryClient, toast, confirmDelete, clearSelection]);
+  }, [reload, queryClient, clearSelection]);
 
   const handleBulkActivate = useCallback(async (ids, activate) => {
     const actionText = activate ? "activate" : "deactivate";
@@ -142,12 +142,11 @@ const CategoriesMenu = () => {
       }
     }
     if (successCount > 0) {
-      toast.success(`${successCount} categor(ies) ${actionText}d successfully`);
       queryClient.invalidateQueries({ queryKey: ["reference", "categories"] });
       reload();
       clearSelection();
     }
-  }, [reload, queryClient, toast, confirm, clearSelection]);
+  }, [reload, queryClient, confirm, clearSelection]);
 
   const onSubmit = useCallback(async () => {
     const submitData = {
@@ -162,12 +161,11 @@ const CategoriesMenu = () => {
     });
     const success = await crudHandleSubmit();
     if (success) {
-      toast.success(editingCategory ? "Category updated successfully" : "Category created successfully");
       reload();
       clearSelection();
     }
     return success;
-  }, [formData, editingCategory, crudHandleSubmit, setFormField, reload, toast, clearSelection]);
+  }, [formData, editingCategory, crudHandleSubmit, setFormField, reload, clearSelection]);
 
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);

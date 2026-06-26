@@ -19,13 +19,14 @@ class AssetsData extends BaseData {
     try {
       const result = await this.api.bulkActivate(ids, activate);
       if (result.isSuccess) {
-        ConfirmDialog.toast.success(`${result.data} asset(s) ${activate ? 'activated' : 'deactivated'} successfully`);
+        await ConfirmDialog.showSuccess('Success', `${result.data} asset(s) ${activate ? 'activated' : 'deactivated'} successfully`);
         return { success: true };
       }
-      ConfirmDialog.toast.error(result.message || 'Failed');
+      await ConfirmDialog.showError('Failed', result.message || 'Failed');
       return { success: false };
-    } catch {
-      ConfirmDialog.toast.error('Failed to process');
+    } catch (error) {
+      console.error('bulkActivate error:', error);
+      await ConfirmDialog.showError('Failed', 'Failed to process');
       return { success: false };
     }
   }
@@ -36,16 +37,17 @@ class AssetsData extends BaseData {
       if (result.isSuccess && result.data) {
         const importResult = result.data;
         if (importResult.errorCount > 0) {
-          ConfirmDialog.toast.warning(`Import completed: ${importResult.successCount} success, ${importResult.errorCount} errors`);
+          await ConfirmDialog.showWarning('Import Completed', `${importResult.successCount} success, ${importResult.errorCount} errors`);
         } else {
-          ConfirmDialog.toast.success(`Import completed: ${importResult.successCount} assets imported successfully`);
+          await ConfirmDialog.showSuccess('Import Completed', `${importResult.successCount} assets imported successfully`);
         }
         return { success: true, data: importResult };
       }
-      ConfirmDialog.toast.error(result.message || 'Import failed');
+      await ConfirmDialog.showError('Failed', result.message || 'Import failed');
       return { success: false };
-    } catch {
-      ConfirmDialog.toast.error('Failed to import');
+    } catch (error) {
+      console.error('importAssets error:', error);
+      await ConfirmDialog.showError('Failed', 'Failed to import');
       return { success: false };
     }
   }
@@ -61,10 +63,11 @@ class AssetsData extends BaseData {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      ConfirmDialog.toast.success('Template downloaded');
+      await ConfirmDialog.showSuccess('Success', 'Template downloaded successfully');
       return { success: true };
-    } catch {
-      ConfirmDialog.toast.error('Failed to download template');
+    } catch (error) {
+      console.error('downloadTemplate error:', error);
+      await ConfirmDialog.showError('Failed', 'Failed to download template');
       return { success: false };
     }
   }

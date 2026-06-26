@@ -14,6 +14,7 @@ import FileUploader from "../../components/molecules/FileUploader/FileUploader";
 import ImportModal from "../../components/molecules/ImportModal/ImportModal";
 import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
 import StatusChip from "../../components/atoms/StatusChip/StatusChip";
+import Button from "../../components/atoms/Button/Button";
 import { FiUpload, FiCheckSquare } from "react-icons/fi";
 import { ASSET_GRID_TABS } from "../../core/constants/assetStatuses";
 import { ACTION_TYPES, useGridActions } from "../../hooks/useGridActions";
@@ -48,7 +49,7 @@ const AssetsMenu = () => {
   const [importResult, setImportResult] = useState(null);
   const isMountedRef = useRef(true);
   const queryClient = useQueryClient();
-  const { toast, confirmDelete, confirm } = useSweetAlert();
+  const { confirm, modal } = useSweetAlert(); // HAPUS confirmDelete
 
   const { categories, suppliers, offices, assetConditions } = useReferenceData();
 
@@ -138,30 +139,27 @@ const AssetsMenu = () => {
   }, [setPage, clearSelection]);
 
   const handleDelete = useCallback(async (asset) => {
-    const confirmed = await confirmDelete("Delete Asset", `Are you sure you want to delete "${asset.assetName}"?`);
-    if (!confirmed) return;
+    // TIDAK ADA confirmDelete DI SINI - BaseData yang handle
     const r = await assetsData.delete(asset.assetId);
     if (r.success && isMountedRef.current) {
-      toast.success("Asset deleted successfully");
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       reload();
     }
-  }, [reload, queryClient, toast, confirmDelete]);
+  }, [reload, queryClient]);
 
   const onSubmit = useCallback(async () => {
     if (formData.operasionalOffice === true && !formData.officeId) {
-      toast.error("Office is required when Operational Office is enabled");
+      await modal.warning("Validation Error", "Office is required when Operational Office is enabled");
       return false;
     }
 
     const success = await crudHandleSubmit();
     if (success && isMountedRef.current) {
-      toast.success(editingAsset ? "Asset updated successfully" : "Asset created successfully");
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       reload();
     }
     return success;
-  }, [crudHandleSubmit, reload, queryClient, toast, editingAsset, formData]);
+  }, [crudHandleSubmit, reload, queryClient, editingAsset, formData, modal]);
 
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
@@ -180,12 +178,11 @@ const AssetsMenu = () => {
     if (!confirmed) return;
     const r = await assetsData.bulkActivate(ids, activate);
     if (r.success && isMountedRef.current) {
-      toast.success(`${r.data || ids.length} asset(s) ${actionText}d successfully`);
       clearSelection();
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       reload();
     }
-  }, [reload, queryClient, toast, confirm, clearSelection]);
+  }, [reload, queryClient, confirm, clearSelection]);
 
   const handleImport = useCallback(async (file) => {
     setIsImporting(true);
@@ -193,15 +190,10 @@ const AssetsMenu = () => {
     setIsImporting(false);
     if (r.success && isMountedRef.current) {
       setImportResult(r.data);
-      if (r.data.errorCount === 0) {
-        toast.success(`Import completed: ${r.data.successCount} assets imported`);
-      } else {
-        toast.warning(`Import completed: ${r.data.successCount} success, ${r.data.errorCount} errors`);
-      }
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       reload();
     }
-  }, [reload, queryClient, toast]);
+  }, [reload, queryClient]);
 
   const handleDownloadTemplate = useCallback(async () => {
     await assetsData.downloadTemplate();
@@ -231,7 +223,6 @@ const AssetsMenu = () => {
     rowIdField: "assetId",
   });
 
-  // Use centralized useOptions hook
   const categoryOptions = useOptions(categories, "Select Category");
   const supplierOptions = useOptions(suppliers, "Select Supplier");
   const officeOptions = useOptions(offices, "Select Office");
@@ -287,13 +278,13 @@ const AssetsMenu = () => {
 
   const extraActions = (
     <>
-      <button className="btn btn--outline btn--sm u-inline-flex u-btn-gap" onClick={() => setShowImportModal(true)}>
+      <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)} className="u-inline-flex u-btn-gap">
         <FiUpload size={16} /> Import
-      </button>
+      </Button>
       {hasSelection && showCheckbox && (
-        <button className="btn btn--primary btn--sm u-inline-flex u-btn-gap" onClick={() => setShowBulkActivateModal(true)}>
+        <Button variant="primary" size="sm" onClick={() => setShowBulkActivateModal(true)} className="u-inline-flex u-btn-gap">
           <FiCheckSquare size={16} /> {activeTab === "Active" ? "Deactivate" : "Activate"} ({selectionCount})
-        </button>
+        </Button>
       )}
     </>
   );

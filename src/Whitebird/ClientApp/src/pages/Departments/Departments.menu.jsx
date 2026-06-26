@@ -39,7 +39,7 @@ const DepartmentsMenu = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const queryClient = useQueryClient();
-  const { toast, confirmDelete, confirm } = useSweetAlert();
+  const { confirm, modal } = useSweetAlert(); // HAPUS confirmDelete
 
   const {
     showModal,
@@ -109,17 +109,15 @@ const DepartmentsMenu = () => {
     clearSelection();
   }, [setPage, clearSelection]);
 
+  // HAPUS confirmDelete - BaseData yang handle
   const handleDelete = useCallback(async (dept) => {
-    const confirmed = await confirmDelete("Delete Department", `Are you sure you want to delete "${dept.departmentName}"? This may affect employees assigned to it.`);
-    if (!confirmed) return;
     const r = await departmentsData.delete(dept.departmentId);
     if (r.success) {
-      toast.success("Department deleted successfully");
       queryClient.invalidateQueries({ queryKey: ["reference", "departments"] });
       reload();
       clearSelection();
     }
-  }, [reload, queryClient, toast, confirmDelete, clearSelection]);
+  }, [reload, queryClient, clearSelection]);
 
   const handleBulkActivate = useCallback(async (ids, activate) => {
     const actionText = activate ? "activate" : "deactivate";
@@ -140,12 +138,11 @@ const DepartmentsMenu = () => {
       }
     }
     if (successCount > 0) {
-      toast.success(`${successCount} department(s) ${actionText}d successfully`);
       queryClient.invalidateQueries({ queryKey: ["reference", "departments"] });
       reload();
       clearSelection();
     }
-  }, [reload, queryClient, toast, confirm, clearSelection]);
+  }, [reload, queryClient, confirm, clearSelection]);
 
   const onSubmit = useCallback(async () => {
     const submitData = {
@@ -157,12 +154,11 @@ const DepartmentsMenu = () => {
     });
     const success = await crudHandleSubmit();
     if (success) {
-      toast.success(editingDepartment ? "Department updated successfully" : "Department created successfully");
       reload();
       clearSelection();
     }
     return success;
-  }, [formData, editingDepartment, crudHandleSubmit, setFormField, reload, toast, clearSelection]);
+  }, [formData, editingDepartment, crudHandleSubmit, setFormField, reload, clearSelection]);
 
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);

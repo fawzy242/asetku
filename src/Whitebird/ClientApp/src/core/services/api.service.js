@@ -50,6 +50,7 @@ class ApiService {
           if (window.location.pathname !== '/login') {
             window.location.href = '/login';
           }
+          // Toast untuk session expired (non-blocking)
           toast.error('Session expired. Please login again.');
           break;
         case 403:
@@ -59,14 +60,19 @@ class ApiService {
           toast.error('Server error. Please try again later.');
           break;
         default:
+          // Untuk error API, gunakan toast (non-blocking)
           if (data?.errors?.length > 0) {
-            toast.error(data.errors.join('\n'));
+            toast.error(data.errors[0]);
           } else if (data?.message) {
             toast.error(data.message);
+          } else {
+            toast.error('An error occurred. Please try again.');
           }
       }
     } else if (error.request) {
       toast.error('Network error. Please check your connection.');
+    } else {
+      toast.error('An unexpected error occurred.');
     }
   }
 

@@ -1,15 +1,11 @@
-import React, { useState, useCallback, createContext, useContext } from 'react';
+import React, { useCallback, createContext, useContext } from 'react';
 import { alertUtils, toastr } from '../../../lib/sweetAlert';
 
-// ============================================================
-// CONFIRM CONTEXT - Using SweetAlert2
-// ============================================================
 const ConfirmContext = createContext(null);
 
 export const useConfirm = () => {
   const context = useContext(ConfirmContext);
   if (!context) {
-    // Fallback: return function that uses SweetAlert2 directly
     return {
       show: (options) => alertUtils.confirm(options),
     };
@@ -31,9 +27,6 @@ export const ConfirmDialogProvider = ({ children }) => {
   );
 };
 
-// ============================================================
-// STATIC API (Backward compatible)
-// ============================================================
 class ConfirmDialog {
   static show(options = {}) {
     return alertUtils.confirm(options);
@@ -55,6 +48,12 @@ class ConfirmDialog {
   static showError = (title, text) =>
     alertUtils.error(title, text);
 
+  static showInfo = (title, text) =>
+    alertUtils.info(title, text);
+
+  static showWarning = (title, text) =>
+    alertUtils.warning(title, text);
+
   static toast = {
     success: (msg) => toastr.success(msg),
     error: (msg) => toastr.error(msg),
@@ -62,7 +61,9 @@ class ConfirmDialog {
     warn: (msg) => toastr.warning(msg),
   };
 
-  static close = () => {};
+  static close = () => {
+    Swal.close();
+  };
 }
 
 export default ConfirmDialog;

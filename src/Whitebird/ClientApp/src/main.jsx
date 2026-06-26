@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
+import { Toaster } from 'react-hot-toast';
 import App from './app';
 import { useUIStore } from './stores/uiStore';
 import { createAppTheme } from './core/theme/muiThemeFactory';
@@ -47,6 +48,36 @@ root.render(
     <QueryClientProvider client={queryClient}>
       <DynamicMuiThemeProvider>
         <App />
+        {/* Toaster untuk react-hot-toast - HANYA UNTUK NOTIFIKASI RINGAN */}
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            duration: 3000,
+            style: {
+              background: 'var(--card-bg)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              padding: '12px 16px',
+            },
+            success: {
+              icon: '✅',
+              style: {
+                background: 'var(--card-bg)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--success)',
+              },
+            },
+            error: {
+              icon: '❌',
+              style: {
+                background: 'var(--card-bg)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--error)',
+              },
+            },
+          }}
+        />
       </DynamicMuiThemeProvider>
     </QueryClientProvider>
   </React.StrictMode>
