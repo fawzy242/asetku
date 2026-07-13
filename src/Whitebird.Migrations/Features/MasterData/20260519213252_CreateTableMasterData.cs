@@ -20,15 +20,16 @@ namespace Whitebird.Migrations.Features.MasterData
                 [CreatedBy] NVARCHAR(50) NOT NULL CONSTRAINT [DF_MasterData_CreatedBy] DEFAULT 'System',
                 [ModifiedDate] DATETIME NULL,
                 [ModifiedBy] NVARCHAR(50) NULL,
-                [ReferenceCode] NVARCHAR(100) NOT NULL,
+                [ReferenceCode] INT NOT NULL,
                 [ReferenceName] NVARCHAR(200) NOT NULL,
+                [MasterDataCode] NVARCHAR(200) NULL,
                 [MasterDataName] NVARCHAR(200) NULL,
                 CONSTRAINT [PK_MasterData] PRIMARY KEY ([MasterDataId])
             );
         END
 
         -- ============================================================
-        -- CREATE INDEXES (menggunakan OBJECT_ID yang lebih aman)
+        -- CREATE INDEXES
         -- ============================================================
         IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_MasterData_ReferenceCode_ReferenceName' AND object_id = OBJECT_ID('MasterData'))
             CREATE INDEX [IX_MasterData_ReferenceCode_ReferenceName]

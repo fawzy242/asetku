@@ -32,8 +32,6 @@ namespace Whitebird.Migrations.Features.User
                 [ResetToken] NVARCHAR(255) NULL,
                 [ResetTokenExpiry] DATETIME NULL,
                 [LastLoginDate] DATETIME NULL,
-                [ProfilePhotoPath] NVARCHAR(1000) NULL,
-                [ProfilePhotoFileName] NVARCHAR(255) NULL,
                 CONSTRAINT [PK_Users] PRIMARY KEY ([UserId]),
                 CONSTRAINT [UQ_Users_Username] UNIQUE ([Username]),
                 CONSTRAINT [UQ_Users_Email] UNIQUE ([Email])

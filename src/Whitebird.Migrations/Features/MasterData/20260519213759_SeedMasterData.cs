@@ -43,6 +43,7 @@ namespace Whitebird.Migrations.Features.MasterData
 
                 /* TRANSACTION TYPE */
                 (1, 'TransactionType', 'HANDOVER'),
+                (9, 'TransactionType', 'OPERATIONAL OFFICE'),
                 (2, 'TransactionType', 'TRANSFER'),
                 (3, 'TransactionType', 'LOAN'),
                 (4, 'TransactionType', 'RETURN'),
@@ -50,6 +51,7 @@ namespace Whitebird.Migrations.Features.MasterData
                 (6, 'TransactionType', 'MAINTENANCE'),
                 (7, 'TransactionType', 'POST MAINTENANCE'),
                 (8, 'TransactionType', 'DISPOSAL'),
+                
 
                 /* MAINTENANCE TYPE */
                 (1, 'MaintenanceType', 'PREVENTIVE MAINTENANCE'),

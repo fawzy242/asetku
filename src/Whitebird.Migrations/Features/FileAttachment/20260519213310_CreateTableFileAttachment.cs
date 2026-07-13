@@ -20,8 +20,6 @@ namespace Whitebird.Migrations.Features.FileAttachment
                 [CreatedBy] NVARCHAR(50) NOT NULL CONSTRAINT [DF_FileAttachment_CreatedBy] DEFAULT 'System',
                 [ModifiedDate] DATETIME NULL,
                 [ModifiedBy] NVARCHAR(50) NULL,
-                [ReferenceTable] NVARCHAR(100) NOT NULL,
-                [ReferenceId] INT NOT NULL,
                 [FileCategory] NVARCHAR(50) NULL,
                 [FileName] NVARCHAR(255) NOT NULL,
                 [OriginalFileName] NVARCHAR(255) NOT NULL,
@@ -38,15 +36,12 @@ namespace Whitebird.Migrations.Features.FileAttachment
         END
 
         -- ============================================================
-        -- CREATE INDEXES (menggunakan OBJECT_ID yang lebih aman)
+        -- CREATE INDEXES
         -- ============================================================
-        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_FileAttachment_ReferenceTable_ReferenceId' AND object_id = OBJECT_ID('FileAttachment'))
-            CREATE INDEX [IX_FileAttachment_ReferenceTable_ReferenceId]
-            ON [dbo].[FileAttachment]([ReferenceTable], [ReferenceId]);
-
         IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_FileAttachment_FileHash' AND object_id = OBJECT_ID('FileAttachment'))
             CREATE INDEX [IX_FileAttachment_FileHash]
-            ON [dbo].[FileAttachment]([FileHash]);
+            ON [dbo].[FileAttachment]([FileHash])
+            WHERE [FileHash] IS NOT NULL;
 
         IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_FileAttachment_CreatedDate' AND object_id = OBJECT_ID('FileAttachment'))
             CREATE INDEX [IX_FileAttachment_CreatedDate]
@@ -54,16 +49,22 @@ namespace Whitebird.Migrations.Features.FileAttachment
 
         IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_FileAttachment_FileCategory' AND object_id = OBJECT_ID('FileAttachment'))
             CREATE INDEX [IX_FileAttachment_FileCategory]
-            ON [dbo].[FileAttachment]([FileCategory]);
+            ON [dbo].[FileAttachment]([FileCategory])
+            WHERE [FileCategory] IS NOT NULL;
 
         IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_FileAttachment_FileExtension' AND object_id = OBJECT_ID('FileAttachment'))
             CREATE INDEX [IX_FileAttachment_FileExtension]
-            ON [dbo].[FileAttachment]([FileExtension]);
+            ON [dbo].[FileAttachment]([FileExtension])
+            WHERE [FileExtension] IS NOT NULL;
 
-        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_FileAttachment_IsPrimary' AND object_id = OBJECT_ID('FileAttachment'))
-            CREATE INDEX [IX_FileAttachment_IsPrimary]
-            ON [dbo].[FileAttachment]([ReferenceTable], [ReferenceId], [IsPrimary])
-            WHERE [IsPrimary] = 1;
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_FileAttachment_FileName' AND object_id = OBJECT_ID('FileAttachment'))
+            CREATE INDEX [IX_FileAttachment_FileName]
+            ON [dbo].[FileAttachment]([FileName]);
+
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_FileAttachment_IsActive' AND object_id = OBJECT_ID('FileAttachment'))
+            CREATE INDEX [IX_FileAttachment_IsActive]
+            ON [dbo].[FileAttachment]([IsActive])
+            WHERE [IsActive] = 1;
     ");
         }
 
@@ -73,8 +74,11 @@ namespace Whitebird.Migrations.Features.FileAttachment
         -- ============================================================
         -- DROP INDEXES
         -- ============================================================
-        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_FileAttachment_IsPrimary' AND object_id = OBJECT_ID('FileAttachment'))
-            DROP INDEX [IX_FileAttachment_IsPrimary] ON [dbo].[FileAttachment];
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_FileAttachment_IsActive' AND object_id = OBJECT_ID('FileAttachment'))
+            DROP INDEX [IX_FileAttachment_IsActive] ON [dbo].[FileAttachment];
+
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_FileAttachment_FileName' AND object_id = OBJECT_ID('FileAttachment'))
+            DROP INDEX [IX_FileAttachment_FileName] ON [dbo].[FileAttachment];
 
         IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_FileAttachment_FileExtension' AND object_id = OBJECT_ID('FileAttachment'))
             DROP INDEX [IX_FileAttachment_FileExtension] ON [dbo].[FileAttachment];
@@ -87,9 +91,6 @@ namespace Whitebird.Migrations.Features.FileAttachment
 
         IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_FileAttachment_FileHash' AND object_id = OBJECT_ID('FileAttachment'))
             DROP INDEX [IX_FileAttachment_FileHash] ON [dbo].[FileAttachment];
-
-        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_FileAttachment_ReferenceTable_ReferenceId' AND object_id = OBJECT_ID('FileAttachment'))
-            DROP INDEX [IX_FileAttachment_ReferenceTable_ReferenceId] ON [dbo].[FileAttachment];
 
         -- ============================================================
         -- DROP TABLE
