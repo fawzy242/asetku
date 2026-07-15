@@ -31,7 +31,10 @@ public class SupplierService : BaseService, ISupplierService
         _activityLogService = activityLogService;
     }
 
-    /// <inheritdoc />
+    // ============================================================
+    // BASIC CRUD
+    // ============================================================
+
     public async Task<ServiceResult<SupplierDetailView>> GetByIdAsync(int id)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -45,7 +48,6 @@ public class SupplierService : BaseService, ISupplierService
         }, "get supplier by id");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult<IEnumerable<SupplierListView>>> GetAllAsync()
     {
         return await ExecuteSafelyAsync(async () =>
@@ -55,17 +57,6 @@ public class SupplierService : BaseService, ISupplierService
         }, "get all suppliers");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<SupplierListView>>> GetActiveOnlyAsync()
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var suppliers = await _supplierReps.GetActiveOnlyListViewAsync();
-            return ServiceResult<IEnumerable<SupplierListView>>.Success(suppliers);
-        }, "get active suppliers");
-    }
-
-    /// <inheritdoc />
     public async Task<ServiceResult<SupplierDetailView>> CreateAsync(SupplierCreateViewModel model)
     {
         if (string.IsNullOrWhiteSpace(model.SupplierName))
@@ -101,13 +92,9 @@ public class SupplierService : BaseService, ISupplierService
             return created == null
                 ? ServiceResult<SupplierDetailView>.Failure("Failed to retrieve created supplier")
                 : ServiceResult<SupplierDetailView>.Success(created, "Supplier created successfully");
-        }, "create supplier", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Supplier, 0, "Create Supplier", ex, _currentUserService.GetDisplayName());
-        });
+        }, "create supplier");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult<SupplierDetailView>> UpdateAsync(int id, SupplierUpdateViewModel model)
     {
         var nameExists = await _supplierReps.IsSupplierNameExistsAsync(model.SupplierName, id);
@@ -146,13 +133,9 @@ public class SupplierService : BaseService, ISupplierService
                 _currentUserService.GetDisplayName());
 
             return ServiceResult<SupplierDetailView>.Success(updated!, "Supplier updated successfully");
-        }, "update supplier", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Supplier, id, "Update Supplier", ex, _currentUserService.GetDisplayName());
-        });
+        }, "update supplier");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -183,13 +166,9 @@ public class SupplierService : BaseService, ISupplierService
             return result <= 0
                 ? ServiceResult.Failure("Failed to delete supplier")
                 : ServiceResult.Success("Supplier deleted successfully");
-        }, "delete supplier", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Supplier, id, "Delete Supplier", ex, _currentUserService.GetDisplayName());
-        });
+        }, "delete supplier");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult> SoftDeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -218,39 +197,26 @@ public class SupplierService : BaseService, ISupplierService
             return result <= 0
                 ? ServiceResult.Failure("Failed to soft delete supplier")
                 : ServiceResult.Success("Supplier soft deleted successfully");
-        }, "soft delete supplier", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Supplier, id, "Soft Delete Supplier", ex, _currentUserService.GetDisplayName());
-        });
+        }, "soft delete supplier");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<PaginatedResult<SupplierListView>>> GetGridDataAsync(
-        int page, int pageSize, string? search = null, bool? isActive = null, Dictionary<string, object>? filters = null)
+    // ============================================================
+    // GRID
+    // ============================================================
+
+    public async Task<ServiceResult<PaginatedResult<SupplierListView>>> GetGridDataAsync(SupplierGridRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            if (filters == null)
-            {
-                filters = new Dictionary<string, object>();
-            }
-            
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                filters["search"] = search;
-            }
-            
-            if (isActive.HasValue)
-            {
-                filters["isActive"] = isActive.Value;
-            }
-
-            var result = await _supplierReps.GetPagedListAsync(page, pageSize, search, "SupplierName", false, filters);
+            var result = await _supplierReps.GetPagedListAsync(request);
             return ServiceResult<PaginatedResult<SupplierListView>>.Success(result);
         }, "get supplier grid data");
     }
 
-    /// <inheritdoc />
+    // ============================================================
+    // DROPDOWN
+    // ============================================================
+
     public async Task<ServiceResult<IEnumerable<SupplierDropdownView>>> GetDropdownListAsync()
     {
         return await ExecuteSafelyAsync(async () =>
@@ -258,5 +224,88 @@ public class SupplierService : BaseService, ISupplierService
             var suppliers = await _supplierReps.GetDropdownListAsync();
             return ServiceResult<IEnumerable<SupplierDropdownView>>.Success(suppliers);
         }, "get supplier dropdown list");
+    }
+
+    // ============================================================
+    // BULK OPERATIONS
+    // ============================================================
+
+    public async Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request)
+    {
+        if (request.Ids == null || !request.Ids.Any())
+        {
+            return ServiceResult<int>.BadRequest("No supplier IDs provided");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var activatedCount = 0;
+
+            foreach (var id in request.Ids)
+            {
+                var supplier = await _supplierReps.GetByIdRawAsync(id);
+                if (supplier != null && !supplier.IsActive)
+                {
+                    supplier.IsActive = true;
+                    supplier.ModifiedDate = DateTime.Now;
+                    supplier.ModifiedBy = _currentUserService.GetDisplayName();
+                    await _repository.UpdateAsync(supplier);
+                    activatedCount++;
+
+                    await _activityLogService.LogUpdateAsync(
+                        TableNames.Supplier,
+                        id,
+                        $"Supplier '{supplier.SupplierName}' activated via bulk operation",
+                        _currentUserService.GetDisplayName());
+                }
+            }
+
+            return ServiceResult<int>.Success(activatedCount,
+                $"{activatedCount} supplier(s) activated successfully");
+        }, "bulk activate suppliers");
+    }
+
+    public async Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request)
+    {
+        if (request.Ids == null || !request.Ids.Any())
+        {
+            return ServiceResult<int>.BadRequest("No supplier IDs provided");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var deactivatedCount = 0;
+
+            foreach (var id in request.Ids)
+            {
+                var supplier = await _supplierReps.GetByIdRawAsync(id);
+                if (supplier != null && supplier.IsActive)
+                {
+                    var assetCount = await _supplierReps.GetAssetCountAsync(id);
+                    if (assetCount > 0)
+                    {
+                        continue;
+                    }
+
+                    supplier.IsActive = false;
+                    supplier.ModifiedDate = DateTime.Now;
+                    supplier.ModifiedBy = _currentUserService.GetDisplayName();
+                    await _repository.UpdateAsync(supplier);
+                    deactivatedCount++;
+
+                    await _activityLogService.LogUpdateAsync(
+                        TableNames.Supplier,
+                        id,
+                        $"Supplier '{supplier.SupplierName}' deactivated via bulk operation",
+                        _currentUserService.GetDisplayName());
+                }
+            }
+
+            var message = deactivatedCount > 0
+                ? $"{deactivatedCount} supplier(s) deactivated successfully"
+                : "No suppliers were deactivated. Suppliers with associated assets cannot be deactivated.";
+
+            return ServiceResult<int>.Success(deactivatedCount, message);
+        }, "bulk deactivate suppliers");
     }
 }

@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Whitebird.App.Features.Auth;
 using Whitebird.Domain.Features.Common;
 using Whitebird.Features.Common;
-using Whitebird.App.Features.Auth;
 
-namespace Whitebird.App.Features.Auth;
+namespace Whitebird.Features.Auth;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -48,10 +48,12 @@ public class AuthController : ControllerBase
         var sessionToken = GetSessionToken();
         if (string.IsNullOrEmpty(sessionToken)) return Unauthorized();
 
-        var user = await _authService.GetUserBySessionTokenAsync(sessionToken);
-        if (!user.IsSuccess || user.Data == null) return Unauthorized();
+        // Get user via UserService
+        // Untuk sementara, kita perlu UserService di sini
+        // Atau menggunakan AuthService dengan parameter userId
 
-        return this.HandleResult(await _authService.ResetPasswordAsync(user.Data.UserId, request));
+        // Sementara return Unauthorized
+        return Unauthorized();
     }
 
     [HttpPost("reset-password-with-token")]
@@ -62,29 +64,6 @@ public class AuthController : ControllerBase
         return this.HandleResult(await _authService.ResetPasswordWithTokenAsync(request));
     }
 
-    [HttpGet("me")]
-    public async Task<IActionResult> GetCurrentUser()
-    {
-        var sessionToken = GetSessionToken();
-        if (string.IsNullOrEmpty(sessionToken)) return Unauthorized();
-        return this.HandleResult(await _authService.GetUserBySessionTokenAsync(sessionToken));
-    }
-
-    [HttpPost("change-password")]
-    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
-    {
-        var validation = this.HandleModelState();
-        if (validation != null) return validation;
-
-        var sessionToken = GetSessionToken();
-        if (string.IsNullOrEmpty(sessionToken)) return Unauthorized();
-
-        var user = await _authService.GetUserBySessionTokenAsync(sessionToken);
-        if (!user.IsSuccess || user.Data == null) return Unauthorized();
-
-        return this.HandleResult(await _authService.ChangePasswordAsync(user.Data.UserId, request));
-    }
-
     [HttpGet("validate-session")]
     public async Task<IActionResult> ValidateSession()
     {
@@ -92,65 +71,6 @@ public class AuthController : ControllerBase
         if (string.IsNullOrEmpty(sessionToken)) return Ok(new { isValid = false });
         var result = await _authService.ValidateSessionAsync(sessionToken);
         return Ok(new { isValid = result.IsSuccess });
-    }
-
-    [HttpPost("profile-photo")]
-    public async Task<IActionResult> UploadProfilePhoto(IFormFile file)
-    {
-        var sessionToken = GetSessionToken();
-        if (string.IsNullOrEmpty(sessionToken))
-            return Unauthorized();
-
-        var user = await _authService.GetUserBySessionTokenAsync(sessionToken);
-        if (!user.IsSuccess || user.Data == null)
-            return Unauthorized();
-
-        if (file == null || file.Length == 0)
-            return BadRequest("No file provided");
-
-        var result = await _authService.UploadProfilePhotoAsync(user.Data.UserId, file);
-        return this.HandleResult(result);
-    }
-
-    [HttpGet("profile-photo/{userId:int}")]
-    public async Task<IActionResult> GetProfilePhoto(int userId)
-    {
-        var result = await _authService.GetProfilePhotoAsync(userId);
-        if (!result.IsSuccess || result.Data == null)
-            return this.HandleResult(result);
-
-        return File(result.Data, "image/jpeg");
-    }
-
-    [HttpDelete("profile-photo")]
-    public async Task<IActionResult> DeleteProfilePhoto()
-    {
-        var sessionToken = GetSessionToken();
-        if (string.IsNullOrEmpty(sessionToken))
-            return Unauthorized();
-
-        var user = await _authService.GetUserBySessionTokenAsync(sessionToken);
-        if (!user.IsSuccess || user.Data == null)
-            return Unauthorized();
-
-        var result = await _authService.DeleteProfilePhotoAsync(user.Data.UserId);
-        return this.HandleResult(result);
-    }
-
-    // ========== PROFILE UPDATE ENDPOINT ==========
-    [HttpPut("profile")]
-    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
-    {
-        var validation = this.HandleModelState();
-        if (validation != null) return validation;
-
-        var sessionToken = GetSessionToken();
-        if (string.IsNullOrEmpty(sessionToken)) return Unauthorized();
-
-        var userResult = await _authService.GetUserBySessionTokenAsync(sessionToken);
-        if (!userResult.IsSuccess || userResult.Data == null) return Unauthorized();
-
-        return this.HandleResult(await _authService.UpdateProfileAsync(userResult.Data.UserId, request));
     }
 
     private string? GetSessionToken()

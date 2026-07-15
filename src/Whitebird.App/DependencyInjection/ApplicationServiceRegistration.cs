@@ -46,6 +46,19 @@ public static class ApplicationServiceRegistration
         services.AddScoped<AssetImportService>();
         services.AddScoped<EmployeeImportService>();
         services.AddScoped<TransactionImportService>();
+        services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IScheduleHandoverService, ScheduleHandoverService>();
+services.AddScoped<IScheduleReturnService, ScheduleReturnService>();
+services.AddScoped<IScheduleMaintenanceService, ScheduleMaintenanceService>();
+services.AddScoped<IDashboardService, DashboardService>();
+services.AddScoped<IAssetTrackingService, AssetTrackingService>();
+services.AddScoped<IEmployeeSummaryService, EmployeeSummaryService>();
+services.AddScoped<DrawReportAssetTransaction>();
+services.AddScoped<DrawReportAssetInventory>();
+services.AddScoped<DrawReportEmployeeAsset>();
+services.AddScoped<DrawReportMaintenance>();
+services.AddScoped<DrawReportFinancial>();
+services.AddScoped<IHomeService, HomeService>();
         return services;
     }
 }

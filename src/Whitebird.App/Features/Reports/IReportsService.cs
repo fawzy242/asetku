@@ -1,5 +1,11 @@
 using Whitebird.App.Features.Common;
+using Whitebird.Domain.Features.Department;
+using Whitebird.Domain.Features.Employee;
+using Whitebird.Domain.Features.MasterData;
+using Whitebird.Domain.Features.Office;
 using Whitebird.Domain.Features.Reports;
+using Whitebird.Domain.Features.Supplier;
+using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.App.Features.Reports;
 
@@ -9,49 +15,24 @@ namespace Whitebird.App.Features.Reports;
 public interface IReportsService
 {
     // ============================================================
-    // DATA QUERIES
+    // LIST ENDPOINTS (for dropdown parameters)
     // ============================================================
 
-    Task<ServiceResult<IEnumerable<ReportsAssetTransactionViewModel>>> GetAssetTransactionReportsAsync(
-        DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null);
-
-    Task<ServiceResult<IEnumerable<ReportsAssetInventoryViewModel>>> GetAssetInventoryReportsAsync(
-        string? status = null, int? categoryId = null, int? supplierId = null);
-
-    Task<ServiceResult<IEnumerable<ReportsEmployeeAssetViewModel>>> GetEmployeeAssetReportsAsync(
-        int? employeeId = null);
-
-    Task<ServiceResult<IEnumerable<ReportsMaintenanceViewModel>>> GetMaintenanceReportsAsync(
-        DateTime? startDate = null, DateTime? endDate = null, bool? isUpcoming = null);
-
-    Task<ServiceResult<IEnumerable<ReportsFinancialViewModel>>> GetFinancialReportsAsync(
-        DateTime? startDate = null, DateTime? endDate = null);
+    Task<ServiceResult<IEnumerable<EmployeeDropdownView>>> GetEmployeeListAsync();
+    Task<ServiceResult<IEnumerable<CategoryDropdownView>>> GetCategoryListAsync();
+    Task<ServiceResult<IEnumerable<SupplierDropdownView>>> GetSupplierListAsync();
+    Task<ServiceResult<IEnumerable<MasterDataDto>>> GetTransactionTypeListAsync();
+    Task<ServiceResult<IEnumerable<MasterDataDto>>> GetMaintenanceTypeListAsync();
+    Task<ServiceResult<IEnumerable<MasterDataDto>>> GetConditionListAsync();
+    Task<ServiceResult<IEnumerable<StatusListDto>>> GetStatusListAsync();
 
     // ============================================================
-    // DASHBOARD - COMPLETE
+    // EXPORT ENDPOINTS
     // ============================================================
 
-    Task<ServiceResult<DashboardStatsViewModel>> GetDashboardStatsAsync();
-    Task<ServiceResult<IEnumerable<MonthlyStatDto>>> GetMonthlyStatsAsync(int year);
-    Task<ServiceResult<IEnumerable<CategoryBreakdownDto>>> GetCategoryBreakdownAsync();
-    Task<ServiceResult<IEnumerable<RecentTransactionDto>>> GetRecentTransactionsAsync(int limit = 10);
-
-    // ============================================================
-    // EXCEL EXPORTS
-    // ============================================================
-
-    Task<ServiceResult<byte[]>> GenerateAssetTransactionExcelAsync(
-        DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null);
-
-    Task<ServiceResult<byte[]>> GenerateAssetInventoryExcelAsync(
-        string? status = null, int? categoryId = null, int? supplierId = null);
-
-    Task<ServiceResult<byte[]>> GenerateEmployeeAssetExcelAsync(
-        int? employeeId = null);
-
-    Task<ServiceResult<byte[]>> GenerateMaintenanceExcelAsync(
-        DateTime? startDate = null, DateTime? endDate = null, bool? isUpcoming = null);
-
-    Task<ServiceResult<byte[]>> GenerateFinancialExcelAsync(
-        DateTime? startDate = null, DateTime? endDate = null);
+    Task<ServiceResult<byte[]>> ExportAssetTransactionAsync(string format, DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null);
+    Task<ServiceResult<byte[]>> ExportAssetInventoryAsync(string format, string? status = null, int? categoryId = null, int? supplierId = null);
+    Task<ServiceResult<byte[]>> ExportEmployeeAssetAsync(string format, int? employeeId = null);
+    Task<ServiceResult<byte[]>> ExportMaintenanceAsync(string format, DateTime? startDate = null, DateTime? endDate = null, bool? isUpcoming = null);
+    Task<ServiceResult<byte[]>> ExportFinancialAsync(string format, DateTime? startDate = null, DateTime? endDate = null);
 }

@@ -5,45 +5,48 @@ namespace Whitebird.Domain.Features.AssetTransaction;
 public class AssetTransactionListViewModel
 {
     public int AssetTransactionId { get; set; }
+    public string? AssetTransactionCode { get; set; }
     public int AssetId { get; set; }
     public string AssetCode { get; set; } = default!;
     public string AssetName { get; set; } = default!;
     public int TransactionType { get; set; }
     public string TransactionTypeName { get; set; } = default!;
-    public string? FromEmployeeName { get; set; }
-    public string? ToEmployeeName { get; set; }
-    public string? ToLocationName { get; set; }
+    public string? EmployeeName { get; set; }
+    public string? OfficeName { get; set; }
     public DateTime TransactionDate { get; set; }
     public bool? Approved { get; set; }
-    public DateTime? ExpectedReturnDate { get; set; }
+    public DateTime? ExpectedLoanReturnDate { get; set; }
     public int? FromAssetTransactionId { get; set; }
     public bool IsOverdue { get; set; }
+    public bool CanEdit { get; set; }
+    public bool CanDelete { get; set; }
+    public bool CanReturn { get; set; }
+    public bool CanPost { get; set; }
 }
 
 public class AssetTransactionDetailViewModel
 {
     public int AssetTransactionId { get; set; }
+    public string? AssetTransactionCode { get; set; }
     public int AssetId { get; set; }
     public string AssetCode { get; set; } = default!;
     public string AssetName { get; set; } = default!;
     public int TransactionType { get; set; }
     public string TransactionTypeName { get; set; } = default!;
-    public int? FromEmployeeId { get; set; }
-    public string? FromEmployeeName { get; set; }
-    public int? ToEmployeeId { get; set; }
-    public string? ToEmployeeName { get; set; }
-    public int? ToLocationId { get; set; }
-    public string? ToLocationName { get; set; }
+    public int? EmployeeId { get; set; }
+    public string? EmployeeName { get; set; }
+    public string? EmployeeCode { get; set; }
+    public int? OfficeId { get; set; }
+    public string? OfficeName { get; set; }
     public DateTime TransactionDate { get; set; }
-    public DateTime? ExpectedReturnDate { get; set; }
-    public DateTime? ActualReturnDate { get; set; }
+    public DateTime? ExpectedLoanReturnDate { get; set; }
     public string? Notes { get; set; }
-    public int? ConditionBefore { get; set; }
-    public string? ConditionBeforeName { get; set; }
-    public int? ConditionAfter { get; set; }
-    public string? ConditionAfterName { get; set; }
+    public int? Condition { get; set; }
+    public string? ConditionName { get; set; }
     public bool? Approved { get; set; }
     public string? ApprovedBy { get; set; }
+    public bool? Completed { get; set; }
+    public string? CompletedBy { get; set; }
     public int? MaintenanceType { get; set; }
     public string? MaintenanceTypeName { get; set; }
     public decimal? MaintenanceCost { get; set; }
@@ -64,20 +67,18 @@ public class AssetTransactionCreateViewModel
     [Required(ErrorMessage = "TransactionType is required")]
     public int TransactionType { get; set; }
 
-    public int? FromEmployeeId { get; set; }
-    public int? ToEmployeeId { get; set; }
-    public int? ToLocationId { get; set; }
+    public int? EmployeeId { get; set; }
+    public int? OfficeId { get; set; }
 
     [Required(ErrorMessage = "TransactionDate is required")]
     public DateTime TransactionDate { get; set; }
 
-    public DateTime? ExpectedReturnDate { get; set; }
+    public DateTime? ExpectedLoanReturnDate { get; set; }
 
     [StringLength(500, ErrorMessage = "Notes cannot exceed 500 characters")]
     public string? Notes { get; set; }
 
-    public int? ConditionBefore { get; set; }
-    public int? ConditionAfter { get; set; }
+    public int? Condition { get; set; }
 
     public int? MaintenanceType { get; set; }
 
@@ -96,49 +97,41 @@ public class AssetTransactionUpdateViewModel
     [Required(ErrorMessage = "TransactionType is required")]
     public int TransactionType { get; set; }
 
-    public int? FromEmployeeId { get; set; }
-    public int? ToEmployeeId { get; set; }
-    public int? ToLocationId { get; set; }
+    public int? EmployeeId { get; set; }
+    public int? OfficeId { get; set; }
 
     [Required(ErrorMessage = "TransactionDate is required")]
     public DateTime TransactionDate { get; set; }
 
-    public DateTime? ExpectedReturnDate { get; set; }
-    public DateTime? ActualReturnDate { get; set; }
+    public DateTime? ExpectedLoanReturnDate { get; set; }
 
     [StringLength(500, ErrorMessage = "Notes cannot exceed 500 characters")]
     public string? Notes { get; set; }
 
-    public int? ConditionBefore { get; set; }
-    public int? ConditionAfter { get; set; }
+    public int? Condition { get; set; }
 
     public bool? Approved { get; set; }
     public string? ApprovedBy { get; set; }
+    public bool? Completed { get; set; }
+    public string? CompletedBy { get; set; }
 
     public int? MaintenanceType { get; set; }
     public decimal? MaintenanceCost { get; set; }
 }
 
-public class AssetTransactionApproveViewModel
+public class BulkApprovalRequest
 {
-    public int AssetTransactionId { get; set; }
-
-    [Required(ErrorMessage = "Approval decision is required")]
-    public bool IsApproved { get; set; }
-
-    [StringLength(500, ErrorMessage = "Approval notes cannot exceed 500 characters")]
-    public string? ApprovalNotes { get; set; }
+    [Required(ErrorMessage = "Ids are required")]
+    public List<int> Ids { get; set; } = new();
 }
 
-public class AssetReturnViewModel
+public class ApproveAttachmentActionDto
 {
-    [Required(ErrorMessage = "AssetTransactionId is required")]
-    public int AssetTransactionId { get; set; }
+    [Required(ErrorMessage = "AttachmentId is required")]
+    public int AttachmentId { get; set; }
 
-    [Required(ErrorMessage = "ActualReturnDate is required")]
-    public DateTime ActualReturnDate { get; set; }
-
-    public int? ConditionAfter { get; set; }
+    [Required(ErrorMessage = "Action is required")]
+    public string Action { get; set; } = string.Empty;
 
     [StringLength(500, ErrorMessage = "Notes cannot exceed 500 characters")]
     public string? Notes { get; set; }

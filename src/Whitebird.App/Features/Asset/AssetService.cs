@@ -1,18 +1,15 @@
 using Mapster;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Common;
+using Whitebird.App.Features.FileAttachment;
 using Whitebird.App.Features.MasterData;
 using Whitebird.Domain.Features.Asset;
-using Whitebird.Domain.Features.AssetTransaction;
 using Whitebird.Domain.Features.Common;
-using Whitebird.Domain.Features.MasterData;
-using Whitebird.Domain.Features.Reports;
+using Whitebird.Domain.Features.FileAttachment;
 using Whitebird.Infra.Features.Asset;
-using Whitebird.Infra.Features.AssetTransaction;
 using Whitebird.Infra.Features.Category;
 using Whitebird.Infra.Features.Common;
-using Whitebird.Infra.Features.Employee;
-using Whitebird.Infra.Features.Office;
 using Whitebird.Infra.Features.Supplier;
 
 namespace Whitebird.App.Features.Asset;
@@ -24,44 +21,47 @@ public class AssetService : BaseService, IAssetService
 {
     private readonly IGenericRepository<AssetEntity> _repository;
     private readonly IAssetReps _assetReps;
-    private readonly IAssetTransactionReps _transactionReps;
     private readonly ICategoryReps _categoryReps;
     private readonly ISupplierReps _supplierReps;
-    private readonly IOfficeReps _officeReps;
-    private readonly IEmployeeReps _employeeReps;
     private readonly IMasterDataService _masterDataService;
     private readonly IMasterDataLookupService _masterDataLookupService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
+    private readonly IStorageService _storageService;
+    private readonly IFileAttachmentService _fileAttachmentService;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public AssetService(
         IGenericRepository<AssetEntity> repository,
         IAssetReps assetReps,
-        IAssetTransactionReps transactionReps,
         ICategoryReps categoryReps,
         ISupplierReps supplierReps,
-        IOfficeReps officeReps,
-        IEmployeeReps employeeReps,
         IMasterDataService masterDataService,
         IMasterDataLookupService masterDataLookupService,
         ICurrentUserService currentUserService,
         IActivityLogService activityLogService,
+        IStorageService storageService,
+        IFileAttachmentService fileAttachmentService,
+        IHttpContextAccessor httpContextAccessor,
         ILogger<AssetService> logger) : base(logger)
     {
         _repository = repository;
         _assetReps = assetReps;
-        _transactionReps = transactionReps;
         _categoryReps = categoryReps;
         _supplierReps = supplierReps;
-        _officeReps = officeReps;
-        _employeeReps = employeeReps;
         _masterDataService = masterDataService;
         _masterDataLookupService = masterDataLookupService;
         _currentUserService = currentUserService;
         _activityLogService = activityLogService;
+        _storageService = storageService;
+        _fileAttachmentService = fileAttachmentService;
+        _httpContextAccessor = httpContextAccessor;
     }
 
-    /// <inheritdoc />
+    // ============================================================
+    // BASIC CRUD
+    // ============================================================
+
     public async Task<ServiceResult<AssetDetailView>> GetByIdAsync(int id)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -71,11 +71,38 @@ public class AssetService : BaseService, IAssetService
             {
                 return ServiceResult<AssetDetailView>.NotFound($"Asset with id {id} not found");
             }
+
+            var software = await _assetReps.GetSoftwareInstallationByAssetIdAsync(id);
+            if (software != null)
+            {
+                asset.SoftwareInstallation = software.Adapt<SoftwareInstallationView>();
+                
+                if (software.OperatingSystem.HasValue)
+                {
+                    var os = await _masterDataLookupService.GetPositionNameAsync(software.OperatingSystem.Value);
+                    if (os.IsSuccess) asset.SoftwareInstallation.OperatingSystemName = os.Data;
+                }
+                if (software.MicrosoftOffice.HasValue)
+                {
+                    var office = await _masterDataLookupService.GetPositionNameAsync(software.MicrosoftOffice.Value);
+                    if (office.IsSuccess) asset.SoftwareInstallation.MicrosoftOfficeName = office.Data;
+                }
+                if (software.VisualStudio.HasValue)
+                {
+                    var vs = await _masterDataLookupService.GetPositionNameAsync(software.VisualStudio.Value);
+                    if (vs.IsSuccess) asset.SoftwareInstallation.VisualStudioName = vs.Data;
+                }
+                if (software.DBMS.HasValue)
+                {
+                    var dbms = await _masterDataLookupService.GetPositionNameAsync(software.DBMS.Value);
+                    if (dbms.IsSuccess) asset.SoftwareInstallation.DBMSName = dbms.Data;
+                }
+            }
+
             return ServiceResult<AssetDetailView>.Success(asset);
         }, "get asset by id");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult<IEnumerable<AssetListView>>> GetAllAsync()
     {
         return await ExecuteSafelyAsync(async () =>
@@ -85,7 +112,6 @@ public class AssetService : BaseService, IAssetService
         }, "get all assets");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult<IEnumerable<AssetListView>>> GetByCategoryAsync(int categoryId)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -101,23 +127,6 @@ public class AssetService : BaseService, IAssetService
         }, "get assets by category");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<AssetListView>>> GetByOfficeAsync(int officeId)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var office = await _officeReps.GetByIdRawAsync(officeId);
-            if (office == null)
-            {
-                return ServiceResult<IEnumerable<AssetListView>>.NotFound($"Office with id {officeId} not found");
-            }
-
-            var assets = await _assetReps.GetByOfficeListViewAsync(officeId);
-            return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
-        }, "get assets by office");
-    }
-
-    /// <inheritdoc />
     public async Task<ServiceResult<AssetDetailView>> CreateAsync(AssetCreateViewModel model)
     {
         if (string.IsNullOrWhiteSpace(model.AssetCode))
@@ -133,12 +142,6 @@ public class AssetService : BaseService, IAssetService
         if (model.CategoryId <= 0)
         {
             return ServiceResult<AssetDetailView>.BadRequest("Valid category is required");
-        }
-
-        // Operational Office Rule: If OperasionalOffice = true, OfficeId is required
-        if (model.OperasionalOffice == true && !model.OfficeId.HasValue)
-        {
-            return ServiceResult<AssetDetailView>.BadRequest("Office is required when Operational Office is enabled");
         }
 
         var codeExists = await _assetReps.IsAssetCodeExistsAsync(model.AssetCode);
@@ -162,15 +165,6 @@ public class AssetService : BaseService, IAssetService
             }
         }
 
-        if (model.OfficeId.HasValue && model.OfficeId.Value > 0)
-        {
-            var office = await _officeReps.GetByIdRawAsync(model.OfficeId.Value);
-            if (office == null)
-            {
-                return ServiceResult<AssetDetailView>.BadRequest($"Office with id {model.OfficeId} does not exist");
-            }
-        }
-
         return await ExecuteWithTransactionAsync(async () =>
         {
             var entity = model.Adapt<AssetEntity>();
@@ -179,7 +173,19 @@ public class AssetService : BaseService, IAssetService
             entity.CreatedBy = _currentUserService.GetDisplayName();
 
             var id = await _repository.InsertAsync(entity);
-            var created = await _assetReps.GetDetailByIdAsync(Convert.ToInt32(id));
+            var assetId = Convert.ToInt32(id);
+
+            if (model.SoftwareInstallation != null)
+            {
+                var softwareEntity = model.SoftwareInstallation.Adapt<SoftwareInstallationEntity>();
+                softwareEntity.AssetId = assetId;
+                softwareEntity.CreatedBy = _currentUserService.GetDisplayName();
+                softwareEntity.CreatedDate = DateTime.Now;
+                softwareEntity.IsActive = true;
+                await _assetReps.InsertSoftwareInstallationAsync(softwareEntity);
+            }
+
+            var created = await _assetReps.GetDetailByIdAsync(assetId);
 
             if (created != null)
             {
@@ -193,21 +199,11 @@ public class AssetService : BaseService, IAssetService
             return created == null
                 ? ServiceResult<AssetDetailView>.Failure("Failed to retrieve created asset")
                 : ServiceResult<AssetDetailView>.Success(created, "Asset created successfully");
-        }, "create asset", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Asset, 0, "Create Asset", ex, _currentUserService.GetDisplayName());
-        });
+        }, "create asset");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult<AssetDetailView>> UpdateAsync(int id, AssetUpdateViewModel model)
     {
-        // Operational Office Rule: If OperasionalOffice = true, OfficeId is required
-        if (model.OperasionalOffice == true && !model.OfficeId.HasValue)
-        {
-            return ServiceResult<AssetDetailView>.BadRequest("Office is required when Operational Office is enabled");
-        }
-
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _assetReps.GetByIdRawAsync(id);
@@ -235,6 +231,28 @@ public class AssetService : BaseService, IAssetService
                 return ServiceResult<AssetDetailView>.Failure("Failed to update asset");
             }
 
+            if (model.SoftwareInstallation != null)
+            {
+                var existingSoftware = await _assetReps.GetSoftwareInstallationByAssetIdAsync(id);
+                
+                if (existingSoftware != null)
+                {
+                    model.SoftwareInstallation.Adapt(existingSoftware);
+                    existingSoftware.ModifiedDate = DateTime.Now;
+                    existingSoftware.ModifiedBy = _currentUserService.GetDisplayName();
+                    await _assetReps.UpdateSoftwareInstallationAsync(existingSoftware);
+                }
+                else
+                {
+                    var softwareEntity = model.SoftwareInstallation.Adapt<SoftwareInstallationEntity>();
+                    softwareEntity.AssetId = id;
+                    softwareEntity.CreatedBy = _currentUserService.GetDisplayName();
+                    softwareEntity.CreatedDate = DateTime.Now;
+                    softwareEntity.IsActive = true;
+                    await _assetReps.InsertSoftwareInstallationAsync(softwareEntity);
+                }
+            }
+
             var updated = await _assetReps.GetDetailByIdAsync(id);
 
             await _activityLogService.LogUpdateAsync(
@@ -244,13 +262,9 @@ public class AssetService : BaseService, IAssetService
                 _currentUserService.GetDisplayName());
 
             return ServiceResult<AssetDetailView>.Success(updated!, "Asset updated successfully");
-        }, "update asset", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Asset, id, "Update Asset", ex, _currentUserService.GetDisplayName());
-        });
+        }, "update asset");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -261,12 +275,7 @@ public class AssetService : BaseService, IAssetService
                 return ServiceResult.NotFound($"Asset with id {id} not found");
             }
 
-            var activeTransaction = await _transactionReps.GetActiveTransactionByAssetIdAsync(id);
-            if (activeTransaction != null)
-            {
-                return ServiceResult.BadRequest("Cannot delete asset with active transaction");
-            }
-
+            await _assetReps.DeleteSoftwareInstallationByAssetIdAsync(id);
             var result = await _repository.DeleteAsync(id);
 
             if (result > 0)
@@ -281,13 +290,9 @@ public class AssetService : BaseService, IAssetService
             return result <= 0
                 ? ServiceResult.Failure("Failed to delete asset")
                 : ServiceResult.Success("Asset deleted successfully");
-        }, "delete asset", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Asset, id, "Delete Asset", ex, _currentUserService.GetDisplayName());
-        });
+        }, "delete asset");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult> SoftDeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -297,6 +302,8 @@ public class AssetService : BaseService, IAssetService
             {
                 return ServiceResult.NotFound($"Asset with id {id} not found");
             }
+
+            await _assetReps.DeleteSoftwareInstallationByAssetIdAsync(id);
 
             existing.IsActive = false;
             existing.ModifiedDate = DateTime.Now;
@@ -316,241 +323,41 @@ public class AssetService : BaseService, IAssetService
             return result <= 0
                 ? ServiceResult.Failure("Failed to soft delete asset")
                 : ServiceResult.Success("Asset soft deleted successfully");
-        }, "soft delete asset", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Asset, id, "Soft Delete Asset", ex, _currentUserService.GetDisplayName());
-        });
+        }, "soft delete asset");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<PaginatedResult<AssetListView>>> GetGridDataAsync(
-        int page, int pageSize, string? search = null, string? sortBy = null,
-        bool sortDescending = false, Dictionary<string, object>? filters = null)
+    // ============================================================
+    // GRID
+    // ============================================================
+
+    public async Task<ServiceResult<PaginatedResult<AssetListView>>> GetGridDataAsync(AssetGridRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var result = await _assetReps.GetPagedListAsync(page, pageSize, search, sortBy, sortDescending, filters);
+            var filters = new Dictionary<string, object>();
+
+            if (!string.IsNullOrEmpty(request.Status)) filters["status"] = request.Status;
+            if (request.CategoryId.HasValue) filters["categoryId"] = request.CategoryId.Value;
+            if (request.OfficeId.HasValue) filters["officeId"] = request.OfficeId.Value;
+            if (request.SupplierId.HasValue) filters["supplierId"] = request.SupplierId.Value;
+            if (request.IsActive.HasValue) filters["isActive"] = request.IsActive.Value;
+
+            var result = await _assetReps.GetPagedListAsync(
+                request.Page,
+                request.PageSize,
+                request.Search,
+                request.SortBy,
+                request.SortDescending,
+                filters);
+
             return ServiceResult<PaginatedResult<AssetListView>>.Success(result);
         }, "get asset grid data");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<AssetListView>>> SearchAsync(string keyword)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            if (string.IsNullOrWhiteSpace(keyword) || keyword.Length < 2)
-            {
-                return ServiceResult<IEnumerable<AssetListView>>.Success(new List<AssetListView>());
-            }
+    // ============================================================
+    // BULK OPERATIONS
+    // ============================================================
 
-            var assets = await _assetReps.SearchAssetsAsync(keyword, 10);
-            return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
-        }, "search assets");
-    }
-
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<AssetListView>>> GetExpiredWarrantyAsync()
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var assets = await _assetReps.GetExpiredWarrantyListViewAsync();
-            return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
-        }, "get expired warranty");
-    }
-
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<AssetListView>>> GetUpcomingMaintenanceAsync(int daysAhead = 30)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var assets = await _assetReps.GetUpcomingMaintenanceListViewAsync(daysAhead);
-            return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
-        }, "get upcoming maintenance");
-    }
-
-    /// <inheritdoc />
-    public async Task<ServiceResult<DashboardStatsViewModel>> GetDashboardStatsAsync()
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var stats = new DashboardStatsViewModel
-            {
-                TotalAssets = await _assetReps.GetTotalAssetsCountAsync(),
-                AvailableAssets = await _assetReps.GetAvailableAssetsCountAsync(),
-                AssignedAssets = await _assetReps.GetAssignedAssetsCountAsync(),
-                AssetsOnLoan = await _assetReps.GetAssetsOnLoanCountAsync(),
-                AssetsInMaintenance = await _assetReps.GetAssetsInMaintenanceCountAsync(),
-                ExpiredWarrantyCount = await _assetReps.GetExpiredWarrantyCountAsync(),
-                UpcomingMaintenanceCount = await _assetReps.GetUpcomingMaintenanceCountAsync(30),
-                TotalAssetValue = await _assetReps.GetTotalAssetValueAsync(),
-                OverdueLoanCount = (await _transactionReps.GetOverdueLoansListViewAsync()).Count(),
-                PendingApprovals = (await _transactionReps.GetPendingApprovalsListViewAsync()).Count()
-            };
-            return ServiceResult<DashboardStatsViewModel>.Success(stats);
-        }, "get dashboard stats");
-    }
-
-    /// <inheritdoc />
-    public async Task<ServiceResult<AssetTrackingViewModel>> GetAssetTrackingAsync(int assetId)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var asset = await _assetReps.GetDetailByIdAsync(assetId);
-            if (asset == null)
-            {
-                return ServiceResult<AssetTrackingViewModel>.NotFound($"Asset with id {assetId} not found");
-            }
-
-            var history = await _transactionReps.GetAssetTransactionHistoryAsync(assetId);
-            var activeTransaction = await _transactionReps.GetActiveTransactionByAssetIdAsync(assetId);
-
-            var currentStatus = DeriveAssetStatus(activeTransaction);
-            var isOnLoan = activeTransaction?.TransactionType == TransactionTypeConstants.LOAN;
-            var isInMaintenance = activeTransaction?.TransactionType == TransactionTypeConstants.MAINTENANCE;
-            var isOverdue = activeTransaction?.TransactionType == TransactionTypeConstants.LOAN
-                && activeTransaction.ExpectedReturnDate.HasValue
-                && activeTransaction.ExpectedReturnDate.Value < DateTime.Now;
-
-            string? currentHolderName = null;
-            if (activeTransaction?.ToEmployeeId.HasValue == true)
-            {
-                var employee = await _employeeReps.GetByIdRawAsync(activeTransaction.ToEmployeeId.Value);
-                currentHolderName = employee?.FullName;
-            }
-
-            var timeline = new List<AssetTimelineEntry>();
-            foreach (var txn in history.OrderByDescending(t => t.TransactionDate))
-            {
-                // Get transaction type name
-                var transactionTypeName = txn.TransactionTypeName ?? txn.TransactionType.ToString();
-
-                timeline.Add(new AssetTimelineEntry
-                {
-                    Id = txn.AssetTransactionId,
-                    Date = txn.TransactionDate,
-                    ActivityType = transactionTypeName,
-                    Description = txn.Notes ?? $"Transaction: {transactionTypeName}",
-                    PreviousHolder = txn.FromEmployeeName ?? "-",
-                    NewHolder = txn.ToEmployeeName ?? "-",
-                    PreviousStatus = txn.ConditionBeforeName ?? "-",
-                    NewStatus = txn.ConditionAfterName ?? "-",
-                    Notes = txn.Notes ?? "-"
-                });
-            }
-
-            var tracking = new AssetTrackingViewModel
-            {
-                AssetId = asset.AssetId,
-                AssetCode = asset.AssetCode ?? "-",
-                AssetName = asset.AssetName ?? "-",
-                CurrentStatus = currentStatus ?? "Available",
-                CategoryName = asset.CategoryName ?? "-",
-                CurrentHolderName = currentHolderName ?? "-",
-                CurrentLocation = asset.OfficeName ?? "-",
-                Condition = asset.AssetConditionName ?? "-",
-                IsOnLoan = isOnLoan,
-                IsInMaintenance = isInMaintenance,
-                IsOverdue = isOverdue,
-                LoanDueDate = activeTransaction?.ExpectedReturnDate,
-                TotalTransactions = history.Count(),
-                Timeline = timeline
-            };
-
-            return ServiceResult<AssetTrackingViewModel>.Success(tracking);
-        }, "get asset tracking");
-    }
-
-    /// <inheritdoc />
-    public async Task<ServiceResult<AssetCurrentStatusDto>> GetCurrentStatusAsync(int assetId)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var asset = await _assetReps.GetDetailByIdAsync(assetId);
-            if (asset == null)
-            {
-                return ServiceResult<AssetCurrentStatusDto>.NotFound($"Asset with id {assetId} not found");
-            }
-
-            var activeTransaction = await _transactionReps.GetActiveTransactionByAssetIdAsync(assetId);
-            var currentStatus = DeriveAssetStatus(activeTransaction);
-
-            string? currentHolderName = null;
-            if (activeTransaction?.ToEmployeeId.HasValue == true)
-            {
-                var employee = await _employeeReps.GetByIdRawAsync(activeTransaction.ToEmployeeId.Value);
-                currentHolderName = employee?.FullName;
-            }
-
-            var dto = new AssetCurrentStatusDto
-            {
-                AssetId = asset.AssetId,
-                AssetCode = asset.AssetCode,
-                AssetName = asset.AssetName,
-                CurrentStatus = currentStatus,
-                CurrentStatusType = activeTransaction?.TransactionType,
-                CurrentHolderName = currentHolderName,
-                CurrentHolderId = activeTransaction?.ToEmployeeId,
-                CurrentOfficeName = asset.OfficeName,
-                CurrentOfficeId = asset.OfficeId,
-                ExpectedReturnDate = activeTransaction?.ExpectedReturnDate,
-                IsOverdue = activeTransaction?.TransactionType == TransactionTypeConstants.LOAN
-                    && activeTransaction.ExpectedReturnDate.HasValue
-                    && activeTransaction.ExpectedReturnDate.Value < DateTime.Now,
-                ConditionName = asset.AssetConditionName,
-                ConditionCode = asset.AssetCondition
-            };
-
-            return ServiceResult<AssetCurrentStatusDto>.Success(dto);
-        }, "get asset current status");
-    }
-
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<AssetTransactionDto>>> GetAssetTransactionHistoryAsync(int assetId)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var asset = await _assetReps.GetByIdRawAsync(assetId);
-            if (asset == null)
-            {
-                return ServiceResult<IEnumerable<AssetTransactionDto>>.NotFound($"Asset with id {assetId} not found");
-            }
-
-            var history = await _transactionReps.GetAssetTransactionHistoryAsync(assetId);
-            var dtos = new List<AssetTransactionDto>();
-
-            foreach (var txn in history)
-            {
-                dtos.Add(new AssetTransactionDto
-                {
-                    AssetTransactionId = txn.AssetTransactionId,
-                    TransactionType = txn.TransactionType,
-                    TransactionTypeName = txn.TransactionTypeName,
-                    FromEmployeeId = txn.FromEmployeeId,
-                    FromEmployeeName = txn.FromEmployeeName,
-                    ToEmployeeId = txn.ToEmployeeId,
-                    ToEmployeeName = txn.ToEmployeeName,
-                    ToOfficeId = txn.ToLocationId,
-                    ToOfficeName = txn.ToLocationName,
-                    TransactionDate = txn.TransactionDate,
-                    ExpectedReturnDate = txn.ExpectedReturnDate,
-                    ActualReturnDate = txn.ActualReturnDate,
-                    Notes = txn.Notes,
-                    ConditionBefore = txn.ConditionBefore,
-                    ConditionBeforeName = txn.ConditionBeforeName,
-                    ConditionAfter = txn.ConditionAfter,
-                    ConditionAfterName = txn.ConditionAfterName,
-                    Approved = txn.Approved,
-                    ApprovedBy = txn.ApprovedBy,
-                    FromAssetTransactionId = txn.FromAssetTransactionId
-                });
-            }
-
-            return ServiceResult<IEnumerable<AssetTransactionDto>>.Success(dtos.OrderByDescending(d => d.TransactionDate));
-        }, "get asset transaction history");
-    }
-
-    /// <inheritdoc />
     public async Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request)
     {
         if (request.Ids == null || !request.Ids.Any())
@@ -565,9 +372,9 @@ public class AssetService : BaseService, IAssetService
             foreach (var id in request.Ids)
             {
                 var asset = await _assetReps.GetByIdRawAsync(id);
-                if (asset != null && asset.IsActive != request.Activate)
+                if (asset != null && !asset.IsActive)
                 {
-                    asset.IsActive = request.Activate;
+                    asset.IsActive = true;
                     asset.ModifiedDate = DateTime.Now;
                     asset.ModifiedBy = _currentUserService.GetDisplayName();
                     await _repository.UpdateAsync(asset);
@@ -576,103 +383,187 @@ public class AssetService : BaseService, IAssetService
                     await _activityLogService.LogUpdateAsync(
                         TableNames.Asset,
                         id,
-                        $"Asset '{asset.AssetCode}' {(request.Activate ? "activated" : "deactivated")} via bulk operation",
+                        $"Asset '{asset.AssetCode}' activated via bulk operation",
                         _currentUserService.GetDisplayName());
                 }
             }
 
             return ServiceResult<int>.Success(activatedCount,
-                $"{activatedCount} asset(s) {(request.Activate ? "activated" : "deactivated")} successfully");
-        }, "bulk activate assets", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Asset, 0, "Bulk Activate Assets", ex, _currentUserService.GetDisplayName());
-        });
+                $"{activatedCount} asset(s) activated successfully");
+        }, "bulk activate assets");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<AssetDropdownView>>> GetDropdownListAsync()
+    public async Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request)
+    {
+        if (request.Ids == null || !request.Ids.Any())
+        {
+            return ServiceResult<int>.BadRequest("No asset IDs provided");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var deactivatedCount = 0;
+
+            foreach (var id in request.Ids)
+            {
+                var asset = await _assetReps.GetByIdRawAsync(id);
+                if (asset != null && asset.IsActive)
+                {
+                    asset.IsActive = false;
+                    asset.ModifiedDate = DateTime.Now;
+                    asset.ModifiedBy = _currentUserService.GetDisplayName();
+                    await _repository.UpdateAsync(asset);
+                    deactivatedCount++;
+
+                    await _activityLogService.LogUpdateAsync(
+                        TableNames.Asset,
+                        id,
+                        $"Asset '{asset.AssetCode}' deactivated via bulk operation",
+                        _currentUserService.GetDisplayName());
+                }
+            }
+
+            return ServiceResult<int>.Success(deactivatedCount,
+                $"{deactivatedCount} asset(s) deactivated successfully");
+        }, "bulk deactivate assets");
+    }
+
+    // ============================================================
+    // DROPDOWN
+    // ============================================================
+
+    public async Task<ServiceResult<IEnumerable<AssetDropdownView>>> GetDropdownListByTransactionTypeAsync(int transactionType)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var assets = await _assetReps.GetDropdownListAsync();
+            var assets = await _assetReps.GetDropdownListByTransactionTypeAsync(transactionType);
             return ServiceResult<IEnumerable<AssetDropdownView>>.Success(assets);
-        }, "get asset dropdown list");
+        }, "get asset dropdown by transaction type");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<AssetDropdownView>>> GetAvailableAssetsForTransactionAsync()
+    // ============================================================
+    // PHOTO PROFILE
+    // ============================================================
+
+    public async Task<ServiceResult> AddPhotoProfileAsync(int assetId, IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return ServiceResult.BadRequest("No file provided");
+        }
+
+        var asset = await _assetReps.GetByIdRawAsync(assetId);
+        if (asset == null)
+        {
+            return ServiceResult.NotFound($"Asset with id {assetId} not found");
+        }
+
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!FileSizeConstants.IsAllowedProfilePhotoExtension(extension))
+        {
+            return ServiceResult.BadRequest($"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedProfilePhotoExtensions)}");
+        }
+
+        if (file.Length > FileSizeConstants.MaxProfilePhotoBytes)
+        {
+            return ServiceResult.BadRequest($"File size exceeds {FileSizeConstants.MaxProfilePhotoMB}MB limit");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("AssetPhotoProfile", assetId);
+            if (existingPhotos.IsSuccess && existingPhotos.Data != null && existingPhotos.Data.Any())
+            {
+                foreach (var photo in existingPhotos.Data)
+                {
+                    await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
+                }
+            }
+
+            var subDirectory = Path.Combine("Asset", assetId.ToString(), "Profile");
+            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
+            var fileHash = _storageService.ComputeFileHash(file);
+
+            var uploadModel = new FileAttachmentUploadViewModel
+            {
+                File = file,
+                FileCategory = "ProfilePhoto",
+                Description = $"Profile photo for Asset {asset.AssetCode}",
+                IsPrimary = true
+            };
+
+            var result = await _fileAttachmentService.UploadAsync("AssetPhotoProfile", assetId, uploadModel);
+            if (!result.IsSuccess)
+            {
+                return ServiceResult.Failure("Failed to upload photo profile");
+            }
+
+            await _activityLogService.LogUpdateAsync(
+                TableNames.Asset,
+                assetId,
+                $"Profile photo uploaded for Asset '{asset.AssetCode}'",
+                _currentUserService.GetDisplayName());
+
+            return ServiceResult.Success("Profile photo uploaded successfully");
+        }, "add asset photo profile");
+    }
+
+    public async Task<ServiceResult> DeletePhotoProfileAsync(int assetId)
+    {
+        var asset = await _assetReps.GetByIdRawAsync(assetId);
+        if (asset == null)
+        {
+            return ServiceResult.NotFound($"Asset with id {assetId} not found");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("AssetPhotoProfile", assetId);
+            if (!existingPhotos.IsSuccess || existingPhotos.Data == null || !existingPhotos.Data.Any())
+            {
+                return ServiceResult.Success("No profile photo to delete");
+            }
+
+            foreach (var photo in existingPhotos.Data)
+            {
+                await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
+            }
+
+            await _activityLogService.LogUpdateAsync(
+                TableNames.Asset,
+                assetId,
+                $"Profile photo deleted for Asset '{asset.AssetCode}'",
+                _currentUserService.GetDisplayName());
+
+            return ServiceResult.Success("Profile photo deleted successfully");
+        }, "delete asset photo profile");
+    }
+
+    public async Task<ServiceResult<byte[]>> GetPhotoProfileAsync(int assetId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var assets = await _assetReps.GetAvailableAssetsForTransactionAsync();
-            return ServiceResult<IEnumerable<AssetDropdownView>>.Success(assets);
-        }, "get available assets for transaction");
+            var asset = await _assetReps.GetByIdRawAsync(assetId);
+            if (asset == null)
+            {
+                return ServiceResult<byte[]>.NotFound($"Asset with id {assetId} not found");
+            }
+
+            var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("AssetPhotoProfile", assetId);
+            if (!existingPhotos.IsSuccess || existingPhotos.Data == null || !existingPhotos.Data.Any())
+            {
+                return ServiceResult<byte[]>.NotFound("Profile photo not found");
+            }
+
+            var primaryPhoto = existingPhotos.Data.FirstOrDefault(p => p.IsPrimary) ?? existingPhotos.Data.First();
+            var fileEntity = await _fileAttachmentService.GetByIdAsync(primaryPhoto.FileAttachmentId);
+            if (!fileEntity.IsSuccess || fileEntity.Data == null)
+            {
+                return ServiceResult<byte[]>.NotFound("Profile photo not found");
+            }
+
+            var fileBytes = await _storageService.ReadFileAsync(fileEntity.Data.FilePath);
+            return ServiceResult<byte[]>.Success(fileBytes);
+        }, "get asset photo profile");
     }
-
-    /// <inheritdoc />
-    public async Task<ServiceResult<bool>> IsAssetAvailableForTransactionAsync(int assetId)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var isAvailable = await _assetReps.IsAssetAvailableForTransactionAsync(assetId);
-            return ServiceResult<bool>.Success(isAvailable);
-        }, "check asset availability");
-    }
-
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<AssetListView>>> GetDamagedAssetsAsync()
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var assets = await _assetReps.GetDamagedAssetsListViewAsync();
-            return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
-        }, "get damaged assets");
-    }
-
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<AssetListView>>> GetInactiveAssetsAsync()
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var assets = await _assetReps.GetInactiveAssetsListViewAsync();
-            return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
-        }, "get inactive assets");
-    }
-
-    #region Private Helpers
-
-    private string DeriveAssetStatus(AssetTransactionListView? activeTransaction)
-    {
-        if (activeTransaction == null)
-        {
-            return "Available";
-        }
-
-        if (activeTransaction.ActualReturnDate.HasValue)
-        {
-            return "Available";
-        }
-
-        if (activeTransaction.Approved == false)
-        {
-            return "Rejected";
-        }
-
-        if (activeTransaction.Approved == null)
-        {
-            return "Pending Approval";
-        }
-
-        return activeTransaction.TransactionType switch
-        {
-            TransactionTypeConstants.HANDOVER or TransactionTypeConstants.TRANSFER => "Assigned",
-            TransactionTypeConstants.LOAN => "On Loan",
-            TransactionTypeConstants.MAINTENANCE => "In Maintenance",
-            TransactionTypeConstants.LOAN_RETURN => "Returned",
-            TransactionTypeConstants.DISPOSAL => "Disposed",
-            _ => "Available"
-        };
-    }
-
-    #endregion
 }

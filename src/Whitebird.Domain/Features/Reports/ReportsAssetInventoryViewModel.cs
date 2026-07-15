@@ -7,6 +7,7 @@ namespace Whitebird.Domain.Features.Reports;
 /// </summary>
 public class ReportsAssetInventoryViewModel
 {
+    [Display(Name = "Asset ID")]
     public int AssetId { get; set; }
 
     [Display(Name = "Asset Code")]
@@ -57,29 +58,11 @@ public class ReportsAssetInventoryViewModel
     [DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}")]
     public DateTime? WarrantyExpiryDate { get; set; }
 
-    [Display(Name = "Last Maintenance")]
-    [DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}")]
-    public DateTime? LastMaintenanceDate { get; set; }
-
-    [Display(Name = "Next Maintenance")]
-    [DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}")]
-    public DateTime? NextMaintenanceDate { get; set; }
-
     [Display(Name = "Hostname")]
     public string? Hostname { get; set; }
 
     [Display(Name = "IP Address")]
     public string? IpAddress { get; set; }
-
-    [Display(Name = "Operasional Office")]
-    public string? OperasionalOffice { get; set; }
-
-    [Display(Name = "Residual Value")]
-    [DisplayFormat(DataFormatString = "{0:C}")]
-    public decimal? ResidualValue { get; set; }
-
-    [Display(Name = "Useful Life (Years)")]
-    public int? UsefulLife { get; set; }
 
     [Display(Name = "Notes")]
     public string? Notes { get; set; }

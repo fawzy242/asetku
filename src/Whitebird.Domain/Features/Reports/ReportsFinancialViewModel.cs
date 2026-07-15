@@ -43,25 +43,6 @@ public class ReportsFinancialViewModel
     [Display(Name = "Is Warranty Expired")]
     public string IsWarrantyExpired { get; set; } = "No";
 
-    [Display(Name = "Residual Value")]
-    [DisplayFormat(DataFormatString = "{0:C}")]
-    public decimal? ResidualValue { get; set; }
-
-    [Display(Name = "Useful Life (Years)")]
-    public int? UsefulLife { get; set; }
-
-    [Display(Name = "Depreciation Start")]
-    [DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}")]
-    public DateTime? DepreciationStartDate { get; set; }
-
-    [Display(Name = "Annual Depreciation")]
-    [DisplayFormat(DataFormatString = "{0:C}")]
-    public decimal? AnnualDepreciation { get; set; }
-
-    [Display(Name = "Current Book Value")]
-    [DisplayFormat(DataFormatString = "{0:C}")]
-    public decimal? CurrentBookValue { get; set; }
-
     [Display(Name = "Maintenance Count")]
     public int MaintenanceCount { get; set; }
 

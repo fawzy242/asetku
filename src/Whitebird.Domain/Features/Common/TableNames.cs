@@ -13,4 +13,7 @@ public static class TableNames
     public const string Supplier = "Supplier";
     public const string Users = "Users";
     public const string ActivityLogs = "ActivityLogs";
+    public const string ScheduleHandover = "ScheduleHandover";
+    public const string ScheduleReturn = "ScheduleReturn";
+    public const string ScheduleMaintenance = "ScheduleMaintenance";
 }

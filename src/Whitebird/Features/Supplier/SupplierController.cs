@@ -13,40 +13,22 @@ public class SupplierController : ControllerBase
 {
     private readonly ISupplierService _supplierService;
 
-    public SupplierController(ISupplierService supplierService) => _supplierService = supplierService;
-
-    [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetById(int id) => this.HandleResult(await _supplierService.GetByIdAsync(id));
-
-    [HttpGet]
-    public async Task<IActionResult> GetAll() => this.HandleResult(await _supplierService.GetAllAsync());
-
-    [HttpGet("active")]
-    public async Task<IActionResult> GetActiveOnly() => this.HandleResult(await _supplierService.GetActiveOnlyAsync());
-
-    [HttpGet("grid")]
-    public async Task<IActionResult> GetGridData(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string? search = null,
-        [FromQuery] bool? isActive = null)
+    public SupplierController(ISupplierService supplierService)
     {
-        var filters = new Dictionary<string, object>();
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            filters["search"] = search;
-        }
-        if (isActive.HasValue)
-        {
-            filters["isActive"] = isActive.Value;
-        }
-
-        return this.HandleResult(await _supplierService.GetGridDataAsync(page, pageSize, search, isActive, filters));
+        _supplierService = supplierService;
     }
 
-    [HttpGet("dropdown")]
-    public async Task<IActionResult> GetDropdownList()
-        => this.HandleResult(await _supplierService.GetDropdownListAsync());
+    // ============================================================
+    // CRUD
+    // ============================================================
+
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> GetById(int id)
+        => this.HandleResult(await _supplierService.GetByIdAsync(id));
+
+    [HttpGet]
+    public async Task<IActionResult> GetAll()
+        => this.HandleResult(await _supplierService.GetAllAsync());
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] SupplierCreateViewModel model)
@@ -65,8 +47,46 @@ public class SupplierController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete(int id) => this.HandleResult(await _supplierService.DeleteAsync(id));
+    public async Task<IActionResult> Delete(int id)
+        => this.HandleResult(await _supplierService.DeleteAsync(id));
 
     [HttpDelete("{id:int}/soft")]
-    public async Task<IActionResult> SoftDelete(int id) => this.HandleResult(await _supplierService.SoftDeleteAsync(id));
+    public async Task<IActionResult> SoftDelete(int id)
+        => this.HandleResult(await _supplierService.SoftDeleteAsync(id));
+
+    // ============================================================
+    // GRID
+    // ============================================================
+
+    [HttpGet("grid")]
+    public async Task<IActionResult> GetGridData([FromQuery] SupplierGridRequest request)
+        => this.HandleResult(await _supplierService.GetGridDataAsync(request));
+
+    // ============================================================
+    // DROPDOWN
+    // ============================================================
+
+    [HttpGet("dropdown")]
+    public async Task<IActionResult> GetDropdownList()
+        => this.HandleResult(await _supplierService.GetDropdownListAsync());
+
+    // ============================================================
+    // BULK OPERATIONS
+    // ============================================================
+
+    [HttpPost("activate")]
+    public async Task<IActionResult> BulkActivate([FromBody] BulkActivateRequest request)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _supplierService.BulkActivateAsync(request));
+    }
+
+    [HttpPost("deactivate")]
+    public async Task<IActionResult> BulkDeactivate([FromBody] BulkActivateRequest request)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _supplierService.BulkDeactivateAsync(request));
+    }
 }

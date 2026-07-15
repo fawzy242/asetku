@@ -72,14 +72,6 @@ public class ReportsEmployeeAssetViewModel
     [Display(Name = "Is Overdue")]
     public string IsOverdue { get; set; } = "No";
 
-    [Display(Name = "Last Maintenance")]
-    [DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}")]
-    public DateTime? LastMaintenanceDate { get; set; }
-
-    [Display(Name = "Next Maintenance")]
-    [DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}")]
-    public DateTime? NextMaintenanceDate { get; set; }
-
     [Display(Name = "Notes")]
     public string? Notes { get; set; }
 }

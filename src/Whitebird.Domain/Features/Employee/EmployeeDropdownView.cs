@@ -1,7 +1,7 @@
 namespace Whitebird.Domain.Features.Employee;
 
 /// <summary>
-/// View model untuk employee dropdown (minimal data)
+/// View model untuk Employee dropdown (minimal data)
 /// </summary>
 public class EmployeeDropdownView
 {

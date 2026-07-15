@@ -22,25 +22,17 @@ public class AssetDetailView
     public string? SupplierName { get; set; }
     public int? WarrantyPeriod { get; set; }
     public DateTime? WarrantyExpiryDate { get; set; }
-    public int? AssetCondition { get; set; }
-    public string? AssetConditionName { get; set; }
     public int? AssetConditionPurchase { get; set; }
     public string? AssetConditionPurchaseName { get; set; }
-    public decimal? ResidualValue { get; set; }
-    public int? UsefulLife { get; set; }
-    public DateTime? DepreciationStartDate { get; set; }
     public string? Notes { get; set; }
     public bool IsActive { get; set; }
-    public DateTime? LastMaintenanceDate { get; set; }
-    public DateTime? NextMaintenanceDate { get; set; }
-    public int? OfficeId { get; set; }
-    public string? OfficeName { get; set; }
     public string? Hostname { get; set; }
     public string? IpAddress { get; set; }
-    public bool? OperasionalOffice { get; set; }
-    public string? CurrentStatus { get; set; }
     public DateTime CreatedDate { get; set; }
     public string CreatedBy { get; set; } = "System";
     public DateTime? ModifiedDate { get; set; }
     public string? ModifiedBy { get; set; }
+    
+    // Software Installation
+    public SoftwareInstallationView? SoftwareInstallation { get; set; }
 }

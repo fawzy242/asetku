@@ -7,25 +7,19 @@ namespace Whitebird.Infra.Features.Reports;
 /// </summary>
 public interface IReportsReps
 {
-    // Report data
-    Task<IEnumerable<ReportsAssetTransactionViewModel>> GetAssetTransactionReportsAsync(DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null);
-    Task<IEnumerable<ReportsAssetInventoryViewModel>> GetAssetInventoryReportsAsync(string? status = null, int? categoryId = null, int? supplierId = null);
-    Task<IEnumerable<ReportsEmployeeAssetViewModel>> GetEmployeeAssetReportsAsync(int? employeeId = null);
-    Task<IEnumerable<ReportsMaintenanceViewModel>> GetMaintenanceReportsAsync(DateTime? startDate = null, DateTime? endDate = null, bool? isUpcoming = null);
-    Task<IEnumerable<ReportsFinancialViewModel>> GetFinancialReportsAsync(DateTime? startDate = null, DateTime? endDate = null);
+    // Data queries for export
+    Task<IEnumerable<ReportsAssetTransactionViewModel>> GetAssetTransactionDataAsync(
+        DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null);
 
-    // Dashboard stats - COMPLETE
-    Task<DashboardStatsViewModel> GetDashboardStatsAsync();
-    Task<IEnumerable<MonthlyStatDto>> GetMonthlyStatsAsync(int year);
-    Task<IEnumerable<CategoryBreakdownDto>> GetCategoryBreakdownAsync();
-    Task<IEnumerable<RecentTransactionDto>> GetRecentTransactionsAsync(int limit = 10);
-    Task<int> GetPendingApprovalsCountAsync();
-    Task<int> GetDamagedAssetsCountAsync();
+    Task<IEnumerable<ReportsAssetInventoryViewModel>> GetAssetInventoryDataAsync(
+        string? status = null, int? categoryId = null, int? supplierId = null);
 
-    // Excel export
-    Task<IEnumerable<ReportsAssetTransactionViewModel>> ExportAssetTransactionReportsAsync(DateTime? startDate = null, DateTime? endDate = null, string? transactionType = null);
-    Task<IEnumerable<ReportsAssetInventoryViewModel>> ExportAssetInventoryReportsAsync(string? status = null, int? categoryId = null, int? supplierId = null);
-    Task<IEnumerable<ReportsEmployeeAssetViewModel>> ExportEmployeeAssetReportsAsync(int? employeeId = null);
-    Task<IEnumerable<ReportsMaintenanceViewModel>> ExportMaintenanceReportsAsync(DateTime? startDate = null, DateTime? endDate = null, bool? isUpcoming = null);
-    Task<IEnumerable<ReportsFinancialViewModel>> ExportFinancialReportsAsync(DateTime? startDate = null, DateTime? endDate = null);
+    Task<IEnumerable<ReportsEmployeeAssetViewModel>> GetEmployeeAssetDataAsync(
+        int? employeeId = null);
+
+    Task<IEnumerable<ReportsMaintenanceViewModel>> GetMaintenanceDataAsync(
+        DateTime? startDate = null, DateTime? endDate = null, bool? isUpcoming = null);
+
+    Task<IEnumerable<ReportsFinancialViewModel>> GetFinancialDataAsync(
+        DateTime? startDate = null, DateTime? endDate = null);
 }

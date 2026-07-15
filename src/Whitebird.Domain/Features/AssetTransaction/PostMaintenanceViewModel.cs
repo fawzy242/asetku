@@ -16,8 +16,14 @@ public class PostMaintenanceViewModel
     /// <summary>
     /// Asset condition after maintenance
     /// </summary>
-    [Range(1, 3, ErrorMessage = "Condition after must be between 1 and 3")]
-    public int? ConditionAfter { get; set; }
+    [Range(1, 3, ErrorMessage = "Condition must be between 1 and 3")]
+    public int? Condition { get; set; }
+
+    /// <summary>
+    /// Maintenance cost
+    /// </summary>
+    [Range(0, double.MaxValue, ErrorMessage = "Maintenance cost must be positive")]
+    public decimal? MaintenanceCost { get; set; }
 
     /// <summary>
     /// Additional notes about the maintenance

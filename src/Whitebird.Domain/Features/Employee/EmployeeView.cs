@@ -34,7 +34,6 @@ public class EmployeeDetailViewModel
     public DateTime? JoinDate { get; set; }
     public DateTime? ResignDate { get; set; }
     public bool IsActive { get; set; }
-    public int ActiveAssetsCount { get; set; }
     public DateTime CreatedDate { get; set; }
     public string CreatedBy { get; set; } = default!;
     public DateTime? ModifiedDate { get; set; }
@@ -103,51 +102,4 @@ public class EmployeeUpdateViewModel
 
     [Required(ErrorMessage = "IsActive is required")]
     public bool IsActive { get; set; }
-}
-
-public class EmployeeAssetSummaryViewModel
-{
-    public int EmployeeId { get; set; }
-    public string EmployeeCode { get; set; } = default!;
-    public string FullName { get; set; } = default!;
-    public string? DepartmentName { get; set; }
-    public string? EmploymentStatusName { get; set; }
-
-    public int CurrentlyHeldAssets { get; set; }
-    public int AssetsOnLoan { get; set; }
-    public int OverdueLoans { get; set; }
-    public int TotalHistoricalAssets { get; set; }
-    public int ReturnedAssets { get; set; }
-    public int DamagedReturns { get; set; }
-
-    public List<EmployeeAssetDetail> CurrentAssets { get; set; } = new();
-    public List<EmployeeAssetHistory> AssetHistory { get; set; } = new();
-}
-
-public class EmployeeAssetDetail
-{
-    public int AssetId { get; set; }
-    public string AssetCode { get; set; } = default!;
-    public string AssetName { get; set; } = default!;
-    public string CategoryName { get; set; } = default!;
-    public string Status { get; set; } = default!;
-    public string AssociationType { get; set; } = default!;
-    public DateTime SinceDate { get; set; }
-    public DateTime? ExpectedReturnDate { get; set; }
-    public bool IsOverdue { get; set; }
-    public string? ConditionName { get; set; }
-}
-
-public class EmployeeAssetHistory
-{
-    public int AssetTransactionId { get; set; }
-    public int AssetId { get; set; }
-    public string AssetCode { get; set; } = default!;
-    public string AssetName { get; set; } = default!;
-    public string TransactionTypeName { get; set; } = default!;
-    public DateTime TransactionDate { get; set; }
-    public string? FromEmployeeName { get; set; }
-    public string? ToEmployeeName { get; set; }
-    public string? ConditionAfterName { get; set; }
-    public string? Notes { get; set; }
 }

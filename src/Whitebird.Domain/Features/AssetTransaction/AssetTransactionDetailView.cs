@@ -11,22 +11,21 @@ public class AssetTransactionDetailView
     public string AssetName { get; set; } = string.Empty;
     public int TransactionType { get; set; }
     public string TransactionTypeName { get; set; } = string.Empty;
-    public int? FromEmployeeId { get; set; }
-    public string? FromEmployeeName { get; set; }
-    public int? ToEmployeeId { get; set; }
-    public string? ToEmployeeName { get; set; }
-    public int? ToLocationId { get; set; }
-    public string? ToLocationName { get; set; }
+    public int? EmployeeId { get; set; }
+    public string? EmployeeName { get; set; }
+    public string? EmployeeCode { get; set; }
+    public int? OfficeId { get; set; }
+    public string? OfficeName { get; set; }
     public DateTime TransactionDate { get; set; }
-    public DateTime? ExpectedReturnDate { get; set; }
-    public DateTime? ActualReturnDate { get; set; }
+    public DateTime? ExpectedLoanReturnDate { get; set; }
     public string? Notes { get; set; }
-    public int? ConditionBefore { get; set; }
-    public string? ConditionBeforeName { get; set; }
-    public int? ConditionAfter { get; set; }
-    public string? ConditionAfterName { get; set; }
+    public int? Condition { get; set; }
+    public string? ConditionName { get; set; }
     public bool? Approved { get; set; }
     public string? ApprovedBy { get; set; }
+    public bool? Completed { get; set; }
+    public string? CompletedBy { get; set; }
+    public string? AssetTransactionCode { get; set; }
     public int? MaintenanceType { get; set; }
     public string? MaintenanceTypeName { get; set; }
     public decimal? MaintenanceCost { get; set; }

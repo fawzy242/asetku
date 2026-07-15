@@ -1,17 +1,16 @@
 using Mapster;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Common;
+using Whitebird.App.Features.Department;
+using Whitebird.App.Features.FileAttachment;
 using Whitebird.App.Features.MasterData;
-using Whitebird.Domain.Features.Employee;
-using Whitebird.Domain.Features.AssetTransaction;
+using Whitebird.App.Features.Office;
 using Whitebird.Domain.Features.Common;
+using Whitebird.Domain.Features.Employee;
 using Whitebird.Domain.Features.MasterData;
 using Whitebird.Infra.Features.Common;
-using Whitebird.Infra.Features.Department;
 using Whitebird.Infra.Features.Employee;
-using Whitebird.Infra.Features.Office;
-using Whitebird.Infra.Features.Asset;
-using Whitebird.Infra.Features.AssetTransaction;
 
 namespace Whitebird.App.Features.Employee;
 
@@ -22,41 +21,44 @@ public class EmployeeService : BaseService, IEmployeeService
 {
     private readonly IGenericRepository<EmployeeEntity> _repository;
     private readonly IEmployeeReps _employeeReps;
-    private readonly IDepartmentReps _departmentReps;
-    private readonly IOfficeReps _officeReps;
-    private readonly IAssetReps _assetReps;
-    private readonly IAssetTransactionReps _transactionReps;
+    private readonly IOfficeService _officeService;
+    private readonly IDepartmentService _departmentService;
     private readonly IMasterDataService _masterDataService;
-    private readonly IMasterDataLookupService _masterDataLookupService;
+    private readonly IStorageService _storageService;
+    private readonly IFileAttachmentService _fileAttachmentService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public EmployeeService(
         IGenericRepository<EmployeeEntity> repository,
         IEmployeeReps employeeReps,
-        IDepartmentReps departmentReps,
-        IOfficeReps officeReps,
-        IAssetReps assetReps,
-        IAssetTransactionReps transactionReps,
+        IOfficeService officeService,
+        IDepartmentService departmentService,
         IMasterDataService masterDataService,
-        IMasterDataLookupService masterDataLookupService,
+        IStorageService storageService,
+        IFileAttachmentService fileAttachmentService,
         ICurrentUserService currentUserService,
         IActivityLogService activityLogService,
+        IHttpContextAccessor httpContextAccessor,
         ILogger<EmployeeService> logger) : base(logger)
     {
         _repository = repository;
         _employeeReps = employeeReps;
-        _departmentReps = departmentReps;
-        _officeReps = officeReps;
-        _assetReps = assetReps;
-        _transactionReps = transactionReps;
+        _officeService = officeService;
+        _departmentService = departmentService;
         _masterDataService = masterDataService;
-        _masterDataLookupService = masterDataLookupService;
+        _storageService = storageService;
+        _fileAttachmentService = fileAttachmentService;
         _currentUserService = currentUserService;
         _activityLogService = activityLogService;
+        _httpContextAccessor = httpContextAccessor;
     }
 
-    /// <inheritdoc />
+    // ============================================================
+    // BASIC CRUD
+    // ============================================================
+
     public async Task<ServiceResult<EmployeeDetailView>> GetByIdAsync(int id)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -66,13 +68,10 @@ public class EmployeeService : BaseService, IEmployeeService
             {
                 return ServiceResult<EmployeeDetailView>.NotFound($"Employee with id {id} not found");
             }
-
-            employee.ActiveAssetsCount = await _employeeReps.GetActiveAssetsCountAsync(id);
             return ServiceResult<EmployeeDetailView>.Success(employee);
         }, "get employee by id");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult<IEnumerable<EmployeeListView>>> GetAllAsync()
     {
         return await ExecuteSafelyAsync(async () =>
@@ -82,39 +81,6 @@ public class EmployeeService : BaseService, IEmployeeService
         }, "get all employees");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<EmployeeListView>>> GetByDepartmentAsync(int departmentId)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var department = await _departmentReps.GetByIdRawAsync(departmentId);
-            if (department == null)
-            {
-                return ServiceResult<IEnumerable<EmployeeListView>>.NotFound($"Department with id {departmentId} not found");
-            }
-
-            var employees = await _employeeReps.GetByDepartmentIdListViewAsync(departmentId);
-            return ServiceResult<IEnumerable<EmployeeListView>>.Success(employees);
-        }, "get employees by department");
-    }
-
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<EmployeeListView>>> GetByStatusAsync(int employmentStatus)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var statusExists = await _masterDataLookupService.GetEmployeeStatusNameAsync(employmentStatus);
-            if (!statusExists.IsSuccess || statusExists.Data == null)
-            {
-                return ServiceResult<IEnumerable<EmployeeListView>>.BadRequest($"Invalid employment status: {employmentStatus}");
-            }
-
-            var employees = await _employeeReps.GetByEmploymentStatusListViewAsync(employmentStatus);
-            return ServiceResult<IEnumerable<EmployeeListView>>.Success(employees);
-        }, "get employees by status");
-    }
-
-    /// <inheritdoc />
     public async Task<ServiceResult<EmployeeDetailView>> CreateAsync(EmployeeCreateViewModel model)
     {
         if (string.IsNullOrWhiteSpace(model.FullName))
@@ -135,8 +101,8 @@ public class EmployeeService : BaseService, IEmployeeService
 
         if (model.DepartmentId.HasValue && model.DepartmentId.Value > 0)
         {
-            var department = await _departmentReps.GetByIdRawAsync(model.DepartmentId.Value);
-            if (department == null)
+            var department = await _departmentService.GetByIdAsync(model.DepartmentId.Value);
+            if (!department.IsSuccess || department.Data == null)
             {
                 return ServiceResult<EmployeeDetailView>.BadRequest($"Department with id {model.DepartmentId} does not exist");
             }
@@ -144,8 +110,8 @@ public class EmployeeService : BaseService, IEmployeeService
 
         if (model.OfficeId.HasValue && model.OfficeId.Value > 0)
         {
-            var office = await _officeReps.GetByIdRawAsync(model.OfficeId.Value);
-            if (office == null)
+            var office = await _officeService.GetByIdAsync(model.OfficeId.Value);
+            if (!office.IsSuccess || office.Data == null)
             {
                 return ServiceResult<EmployeeDetailView>.BadRequest($"Office with id {model.OfficeId} does not exist");
             }
@@ -153,7 +119,7 @@ public class EmployeeService : BaseService, IEmployeeService
 
         if (model.Position.HasValue)
         {
-            var positionExists = await _masterDataLookupService.GetPositionNameAsync(model.Position.Value);
+            var positionExists = await _masterDataService.GetValueAsync("Position", model.Position.Value);
             if (!positionExists.IsSuccess || positionExists.Data == null)
             {
                 return ServiceResult<EmployeeDetailView>.BadRequest($"Invalid Position value: {model.Position}");
@@ -162,7 +128,7 @@ public class EmployeeService : BaseService, IEmployeeService
 
         if (model.EmploymentStatus.HasValue)
         {
-            var statusExists = await _masterDataLookupService.GetEmployeeStatusNameAsync(model.EmploymentStatus.Value);
+            var statusExists = await _masterDataService.GetValueAsync("EmployeeStatus", model.EmploymentStatus.Value);
             if (!statusExists.IsSuccess || statusExists.Data == null)
             {
                 return ServiceResult<EmployeeDetailView>.BadRequest($"Invalid EmploymentStatus value: {model.EmploymentStatus}");
@@ -191,13 +157,9 @@ public class EmployeeService : BaseService, IEmployeeService
             return created == null
                 ? ServiceResult<EmployeeDetailView>.Failure("Failed to retrieve created employee")
                 : ServiceResult<EmployeeDetailView>.Success(created, "Employee created successfully");
-        }, "create employee", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Employee, 0, "Create Employee", ex, _currentUserService.GetDisplayName());
-        });
+        }, "create employee");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult<EmployeeDetailView>> UpdateAsync(int id, EmployeeUpdateViewModel model)
     {
         var codeExists = await _employeeReps.IsEmployeeCodeExistsAsync(model.EmployeeCode, id);
@@ -237,13 +199,9 @@ public class EmployeeService : BaseService, IEmployeeService
                 _currentUserService.GetDisplayName());
 
             return ServiceResult<EmployeeDetailView>.Success(updated!, "Employee updated successfully");
-        }, "update employee", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Employee, id, "Update Employee", ex, _currentUserService.GetDisplayName());
-        });
+        }, "update employee");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -252,12 +210,6 @@ public class EmployeeService : BaseService, IEmployeeService
             if (existing == null)
             {
                 return ServiceResult.NotFound($"Employee with id {id} not found");
-            }
-
-            var activeAssets = await _employeeReps.GetActiveAssetsCountAsync(id);
-            if (activeAssets > 0)
-            {
-                return ServiceResult.BadRequest($"Cannot delete employee with {activeAssets} active assets assigned");
             }
 
             var result = await _repository.DeleteAsync(id);
@@ -274,13 +226,9 @@ public class EmployeeService : BaseService, IEmployeeService
             return result <= 0
                 ? ServiceResult.Failure("Failed to delete employee")
                 : ServiceResult.Success("Employee deleted successfully");
-        }, "delete employee", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Employee, id, "Delete Employee", ex, _currentUserService.GetDisplayName());
-        });
+        }, "delete employee");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult> SoftDeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -309,41 +257,74 @@ public class EmployeeService : BaseService, IEmployeeService
             return result <= 0
                 ? ServiceResult.Failure("Failed to soft delete employee")
                 : ServiceResult.Success("Employee soft deleted successfully");
-        }, "soft delete employee", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Employee, id, "Soft Delete Employee", ex, _currentUserService.GetDisplayName());
-        });
+        }, "soft delete employee");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<PaginatedResult<EmployeeListView>>> GetGridDataAsync(
-        int page, int pageSize, string? search = null, string? sortBy = null,
-        bool sortDescending = false, Dictionary<string, object>? filters = null)
+    // ============================================================
+    // GRID
+    // ============================================================
+
+    public async Task<ServiceResult<PaginatedResult<EmployeeListView>>> GetGridDataAsync(EmployeeGridRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var result = await _employeeReps.GetPagedListAsync(page, pageSize, search, sortBy, sortDescending, filters);
+            var result = await _employeeReps.GetPagedListAsync(request);
             return ServiceResult<PaginatedResult<EmployeeListView>>.Success(result);
         }, "get employee grid data");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<EmployeeAssetSummaryViewModel>> GetAssetSummaryAsync(int employeeId)
+    // ============================================================
+    // DROPDOWN
+    // ============================================================
+
+    public async Task<ServiceResult<IEnumerable<EmployeeDropdownView>>> GetDropdownListAsync()
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var summary = await _employeeReps.GetAssetSummaryByEmployeeIdAsync(employeeId);
-            if (summary == null)
-            {
-                return ServiceResult<EmployeeAssetSummaryViewModel>.NotFound($"Employee with id {employeeId} not found");
-            }
-
-            var result = summary.Adapt<EmployeeAssetSummaryViewModel>();
-            return ServiceResult<EmployeeAssetSummaryViewModel>.Success(result);
-        }, "get employee asset summary");
+            var employees = await _employeeReps.GetDropdownListAsync();
+            return ServiceResult<IEnumerable<EmployeeDropdownView>>.Success(employees);
+        }, "get employee dropdown list");
     }
 
-    /// <inheritdoc />
+    public async Task<ServiceResult<IEnumerable<OfficeDropdownView>>> GetOfficeListAsync()
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            return await _officeService.GetDropdownListAsync();
+        }, "get office list for employee form");
+    }
+
+    public async Task<ServiceResult<IEnumerable<DepartmentDropdownView>>> GetDepartmentListAsync()
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            return await _departmentService.GetDropdownListAsync();
+        }, "get department list for employee form");
+    }
+
+    public async Task<ServiceResult<IEnumerable<MasterDataDto>>> GetMasterDataListAsync(string referenceName)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            if (string.IsNullOrWhiteSpace(referenceName))
+            {
+                return ServiceResult<IEnumerable<MasterDataDto>>.BadRequest("referenceName is required");
+            }
+
+            var validReferences = new[] { "Position", "EmployeeStatus" };
+            if (!validReferences.Contains(referenceName))
+            {
+                return ServiceResult<IEnumerable<MasterDataDto>>.BadRequest($"Invalid referenceName: {referenceName}. Valid: {string.Join(", ", validReferences)}");
+            }
+
+            return await _masterDataService.GetByReferenceNameAsync(referenceName);
+        }, "get masterdata list for employee form");
+    }
+
+    // ============================================================
+    // BULK OPERATIONS
+    // ============================================================
+
     public async Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request)
     {
         if (request.Ids == null || !request.Ids.Any())
@@ -358,9 +339,9 @@ public class EmployeeService : BaseService, IEmployeeService
             foreach (var id in request.Ids)
             {
                 var employee = await _employeeReps.GetByIdRawAsync(id);
-                if (employee != null && employee.IsActive != request.Activate)
+                if (employee != null && !employee.IsActive)
                 {
-                    employee.IsActive = request.Activate;
+                    employee.IsActive = true;
                     employee.ModifiedDate = DateTime.Now;
                     employee.ModifiedBy = _currentUserService.GetDisplayName();
                     await _repository.UpdateAsync(employee);
@@ -369,26 +350,174 @@ public class EmployeeService : BaseService, IEmployeeService
                     await _activityLogService.LogUpdateAsync(
                         TableNames.Employee,
                         id,
-                        $"Employee '{employee.EmployeeCode}' {(request.Activate ? "activated" : "deactivated")} via bulk operation",
+                        $"Employee '{employee.EmployeeCode}' activated via bulk operation",
                         _currentUserService.GetDisplayName());
                 }
             }
 
             return ServiceResult<int>.Success(activatedCount,
-                $"{activatedCount} employee(s) {(request.Activate ? "activated" : "deactivated")} successfully");
-        }, "bulk activate employees", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Employee, 0, "Bulk Activate Employees", ex, _currentUserService.GetDisplayName());
-        });
+                $"{activatedCount} employee(s) activated successfully");
+        }, "bulk activate employees");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<EmployeeDropdownView>>> GetDropdownListAsync()
+    public async Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request)
+    {
+        if (request.Ids == null || !request.Ids.Any())
+        {
+            return ServiceResult<int>.BadRequest("No employee IDs provided");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var deactivatedCount = 0;
+
+            foreach (var id in request.Ids)
+            {
+                var employee = await _employeeReps.GetByIdRawAsync(id);
+                if (employee != null && employee.IsActive)
+                {
+                    employee.IsActive = false;
+                    employee.ModifiedDate = DateTime.Now;
+                    employee.ModifiedBy = _currentUserService.GetDisplayName();
+                    await _repository.UpdateAsync(employee);
+                    deactivatedCount++;
+
+                    await _activityLogService.LogUpdateAsync(
+                        TableNames.Employee,
+                        id,
+                        $"Employee '{employee.EmployeeCode}' deactivated via bulk operation",
+                        _currentUserService.GetDisplayName());
+                }
+            }
+
+            return ServiceResult<int>.Success(deactivatedCount,
+                $"{deactivatedCount} employee(s) deactivated successfully");
+        }, "bulk deactivate employees");
+    }
+
+    // ============================================================
+    // PHOTO PROFILE
+    // ============================================================
+
+    public async Task<ServiceResult> AddPhotoProfileAsync(int employeeId, IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return ServiceResult.BadRequest("No file provided");
+        }
+
+        var employee = await _employeeReps.GetByIdRawAsync(employeeId);
+        if (employee == null)
+        {
+            return ServiceResult.NotFound($"Employee with id {employeeId} not found");
+        }
+
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!FileSizeConstants.IsAllowedProfilePhotoExtension(extension))
+        {
+            return ServiceResult.BadRequest($"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedProfilePhotoExtensions)}");
+        }
+
+        if (file.Length > FileSizeConstants.MaxProfilePhotoBytes)
+        {
+            return ServiceResult.BadRequest($"File size exceeds {FileSizeConstants.MaxProfilePhotoMB}MB limit");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("EmployeePhotoProfile", employeeId);
+            if (existingPhotos.IsSuccess && existingPhotos.Data != null && existingPhotos.Data.Any())
+            {
+                foreach (var photo in existingPhotos.Data)
+                {
+                    await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
+                }
+            }
+
+            var subDirectory = Path.Combine("Employee", employeeId.ToString(), "Profile");
+            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
+            var fileHash = _storageService.ComputeFileHash(file);
+
+            var uploadModel = new FileAttachmentUploadViewModel
+            {
+                File = file,
+                FileCategory = "ProfilePhoto",
+                Description = $"Profile photo for Employee {employee.EmployeeCode}",
+                IsPrimary = true
+            };
+
+            var result = await _fileAttachmentService.UploadAsync("EmployeePhotoProfile", employeeId, uploadModel);
+            if (!result.IsSuccess)
+            {
+                return ServiceResult.Failure("Failed to upload photo profile");
+            }
+
+            await _activityLogService.LogUpdateAsync(
+                TableNames.Employee,
+                employeeId,
+                $"Profile photo uploaded for Employee '{employee.EmployeeCode}'",
+                _currentUserService.GetDisplayName());
+
+            return ServiceResult.Success("Profile photo uploaded successfully");
+        }, "add employee photo profile");
+    }
+
+    public async Task<ServiceResult> DeletePhotoProfileAsync(int employeeId)
+    {
+        var employee = await _employeeReps.GetByIdRawAsync(employeeId);
+        if (employee == null)
+        {
+            return ServiceResult.NotFound($"Employee with id {employeeId} not found");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("EmployeePhotoProfile", employeeId);
+            if (!existingPhotos.IsSuccess || existingPhotos.Data == null || !existingPhotos.Data.Any())
+            {
+                return ServiceResult.Success("No profile photo to delete");
+            }
+
+            foreach (var photo in existingPhotos.Data)
+            {
+                await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
+            }
+
+            await _activityLogService.LogUpdateAsync(
+                TableNames.Employee,
+                employeeId,
+                $"Profile photo deleted for Employee '{employee.EmployeeCode}'",
+                _currentUserService.GetDisplayName());
+
+            return ServiceResult.Success("Profile photo deleted successfully");
+        }, "delete employee photo profile");
+    }
+
+    public async Task<ServiceResult<byte[]>> GetPhotoProfileAsync(int employeeId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var employees = await _employeeReps.GetDropdownListAsync();
-            return ServiceResult<IEnumerable<EmployeeDropdownView>>.Success(employees);
-        }, "get employee dropdown list");
+            var employee = await _employeeReps.GetByIdRawAsync(employeeId);
+            if (employee == null)
+            {
+                return ServiceResult<byte[]>.NotFound($"Employee with id {employeeId} not found");
+            }
+
+            var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("EmployeePhotoProfile", employeeId);
+            if (!existingPhotos.IsSuccess || existingPhotos.Data == null || !existingPhotos.Data.Any())
+            {
+                return ServiceResult<byte[]>.NotFound("Profile photo not found");
+            }
+
+            var primaryPhoto = existingPhotos.Data.FirstOrDefault(p => p.IsPrimary) ?? existingPhotos.Data.First();
+            var fileEntity = await _fileAttachmentService.GetByIdAsync(primaryPhoto.FileAttachmentId);
+            if (!fileEntity.IsSuccess || fileEntity.Data == null)
+            {
+                return ServiceResult<byte[]>.NotFound("Profile photo not found");
+            }
+
+            var fileBytes = await _storageService.ReadFileAsync(fileEntity.Data.FilePath);
+            return ServiceResult<byte[]>.Success(fileBytes);
+        }, "get employee photo profile");
     }
 }

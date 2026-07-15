@@ -31,7 +31,10 @@ public class DepartmentService : BaseService, IDepartmentService
         _activityLogService = activityLogService;
     }
 
-    /// <inheritdoc />
+    // ============================================================
+    // BASIC CRUD
+    // ============================================================
+
     public async Task<ServiceResult<DepartmentDetailView>> GetByIdAsync(int id)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -45,7 +48,6 @@ public class DepartmentService : BaseService, IDepartmentService
         }, "get department by id");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult<IEnumerable<DepartmentListView>>> GetAllAsync()
     {
         return await ExecuteSafelyAsync(async () =>
@@ -55,17 +57,6 @@ public class DepartmentService : BaseService, IDepartmentService
         }, "get all departments");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<DepartmentListView>>> GetActiveOnlyAsync()
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var departments = await _departmentReps.GetActiveOnlyListViewAsync();
-            return ServiceResult<IEnumerable<DepartmentListView>>.Success(departments);
-        }, "get active departments");
-    }
-
-    /// <inheritdoc />
     public async Task<ServiceResult<DepartmentDetailView>> CreateAsync(DepartmentCreateViewModel model)
     {
         if (string.IsNullOrWhiteSpace(model.DepartmentName))
@@ -110,13 +101,9 @@ public class DepartmentService : BaseService, IDepartmentService
             return created == null
                 ? ServiceResult<DepartmentDetailView>.Failure("Failed to retrieve created department")
                 : ServiceResult<DepartmentDetailView>.Success(created, "Department created successfully");
-        }, "create department", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Department, 0, "Create Department", ex, _currentUserService.GetDisplayName());
-        });
+        }, "create department");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult<DepartmentDetailView>> UpdateAsync(int id, DepartmentUpdateViewModel model)
     {
         var nameExists = await _departmentReps.IsDepartmentNameExistsAsync(model.DepartmentName, id);
@@ -164,13 +151,9 @@ public class DepartmentService : BaseService, IDepartmentService
                 _currentUserService.GetDisplayName());
 
             return ServiceResult<DepartmentDetailView>.Success(updated!, "Department updated successfully");
-        }, "update department", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Department, id, "Update Department", ex, _currentUserService.GetDisplayName());
-        });
+        }, "update department");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -201,13 +184,9 @@ public class DepartmentService : BaseService, IDepartmentService
             return result <= 0
                 ? ServiceResult.Failure("Failed to delete department")
                 : ServiceResult.Success("Department deleted successfully");
-        }, "delete department", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Department, id, "Delete Department", ex, _currentUserService.GetDisplayName());
-        });
+        }, "delete department");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult> SoftDeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -236,39 +215,26 @@ public class DepartmentService : BaseService, IDepartmentService
             return result <= 0
                 ? ServiceResult.Failure("Failed to soft delete department")
                 : ServiceResult.Success("Department soft deleted successfully");
-        }, "soft delete department", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Department, id, "Soft Delete Department", ex, _currentUserService.GetDisplayName());
-        });
+        }, "soft delete department");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<PaginatedResult<DepartmentListView>>> GetGridDataAsync(
-        int page, int pageSize, string? search = null, bool? isActive = null, Dictionary<string, object>? filters = null)
+    // ============================================================
+    // GRID
+    // ============================================================
+
+    public async Task<ServiceResult<PaginatedResult<DepartmentListView>>> GetGridDataAsync(DepartmentGridRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            if (filters == null)
-            {
-                filters = new Dictionary<string, object>();
-            }
-            
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                filters["search"] = search;
-            }
-            
-            if (isActive.HasValue)
-            {
-                filters["isActive"] = isActive.Value;
-            }
-
-            var result = await _departmentReps.GetPagedListAsync(page, pageSize, search, "DepartmentName", false, filters);
+            var result = await _departmentReps.GetPagedListAsync(request);
             return ServiceResult<PaginatedResult<DepartmentListView>>.Success(result);
         }, "get department grid data");
     }
 
-    /// <inheritdoc />
+    // ============================================================
+    // DROPDOWN
+    // ============================================================
+
     public async Task<ServiceResult<IEnumerable<DepartmentDropdownView>>> GetDropdownListAsync()
     {
         return await ExecuteSafelyAsync(async () =>
@@ -276,5 +242,88 @@ public class DepartmentService : BaseService, IDepartmentService
             var departments = await _departmentReps.GetDropdownListAsync();
             return ServiceResult<IEnumerable<DepartmentDropdownView>>.Success(departments);
         }, "get department dropdown list");
+    }
+
+    // ============================================================
+    // BULK OPERATIONS
+    // ============================================================
+
+    public async Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request)
+    {
+        if (request.Ids == null || !request.Ids.Any())
+        {
+            return ServiceResult<int>.BadRequest("No department IDs provided");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var activatedCount = 0;
+
+            foreach (var id in request.Ids)
+            {
+                var department = await _departmentReps.GetByIdRawAsync(id);
+                if (department != null && !department.IsActive)
+                {
+                    department.IsActive = true;
+                    department.ModifiedDate = DateTime.Now;
+                    department.ModifiedBy = _currentUserService.GetDisplayName();
+                    await _repository.UpdateAsync(department);
+                    activatedCount++;
+
+                    await _activityLogService.LogUpdateAsync(
+                        TableNames.Department,
+                        id,
+                        $"Department '{department.DepartmentName}' activated via bulk operation",
+                        _currentUserService.GetDisplayName());
+                }
+            }
+
+            return ServiceResult<int>.Success(activatedCount,
+                $"{activatedCount} department(s) activated successfully");
+        }, "bulk activate departments");
+    }
+
+    public async Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request)
+    {
+        if (request.Ids == null || !request.Ids.Any())
+        {
+            return ServiceResult<int>.BadRequest("No department IDs provided");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var deactivatedCount = 0;
+
+            foreach (var id in request.Ids)
+            {
+                var department = await _departmentReps.GetByIdRawAsync(id);
+                if (department != null && department.IsActive)
+                {
+                    var employeeCount = await _departmentReps.GetEmployeeCountAsync(id);
+                    if (employeeCount > 0)
+                    {
+                        continue;
+                    }
+
+                    department.IsActive = false;
+                    department.ModifiedDate = DateTime.Now;
+                    department.ModifiedBy = _currentUserService.GetDisplayName();
+                    await _repository.UpdateAsync(department);
+                    deactivatedCount++;
+
+                    await _activityLogService.LogUpdateAsync(
+                        TableNames.Department,
+                        id,
+                        $"Department '{department.DepartmentName}' deactivated via bulk operation",
+                        _currentUserService.GetDisplayName());
+                }
+            }
+
+            var message = deactivatedCount > 0
+                ? $"{deactivatedCount} department(s) deactivated successfully"
+                : "No departments were deactivated. Departments with employees cannot be deactivated.";
+
+            return ServiceResult<int>.Success(deactivatedCount, message);
+        }, "bulk deactivate departments");
     }
 }

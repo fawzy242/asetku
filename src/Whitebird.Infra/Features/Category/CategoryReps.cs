@@ -101,151 +101,68 @@ public class CategoryReps : ICategoryReps
         return await _context.QueryAsync<CategoryListView>(sql);
     }
 
-    public async Task<IEnumerable<CategoryListView>> GetActiveOnlyListViewAsync()
-    {
-        const string sql = @"
-            SELECT 
-                c.CategoryId, c.CategoryCode, c.CategoryName, c.Description,
-                c.ParentCategoryId, p.CategoryName as ParentCategoryName,
-                (SELECT COUNT(*) FROM Category WHERE ParentCategoryId = c.CategoryId AND IsActive = 1) as ChildCount,
-                c.IsActive, c.CreatedDate, c.CreatedBy, c.ModifiedDate, c.ModifiedBy
-            FROM Category c
-            LEFT JOIN Category p ON c.ParentCategoryId = p.CategoryId
-            WHERE c.IsActive = 1
-            ORDER BY c.CategoryName";
-        
-        return await _context.QueryAsync<CategoryListView>(sql);
-    }
-
-    public async Task<IEnumerable<CategoryListView>> GetSubCategoryListViewAsync(int parentCategoryId)
-    {
-        const string sql = @"
-            SELECT 
-                c.CategoryId, c.CategoryCode, c.CategoryName, c.Description,
-                c.ParentCategoryId, p.CategoryName as ParentCategoryName,
-                (SELECT COUNT(*) FROM Category WHERE ParentCategoryId = c.CategoryId AND IsActive = 1) as ChildCount,
-                c.IsActive, c.CreatedDate, c.CreatedBy, c.ModifiedDate, c.ModifiedBy
-            FROM Category c
-            LEFT JOIN Category p ON c.ParentCategoryId = p.CategoryId
-            WHERE c.ParentCategoryId = @ParentCategoryId AND c.IsActive = 1
-            ORDER BY c.CategoryName";
-        
-        return await _context.QueryAsync<CategoryListView>(sql, new { ParentCategoryId = parentCategoryId });
-    }
-
     // ============================================================
-    // GRID/LIST METHODS
+    // PAGINATION
     // ============================================================
 
-    private string BuildBaseCategoryQueryWithPagination(string selectClause, string whereClause, string orderBy, int offset, int pageSize)
-    {
-        return $@"
-            {selectClause}
-            FROM Category c
-            LEFT JOIN Category p ON c.ParentCategoryId = p.CategoryId
-            {whereClause}
-            {orderBy}
-            OFFSET @Offset ROWS
-            FETCH NEXT @PageSize ROWS ONLY";
-    }
-
-    private string BuildCategoryListViewSelectClause()
-    {
-        return @"
-            SELECT 
-                c.CategoryId,
-                c.CategoryCode,
-                c.CategoryName,
-                c.Description,
-                c.ParentCategoryId,
-                p.CategoryName as ParentCategoryName,
-                (SELECT COUNT(*) FROM Category WHERE ParentCategoryId = c.CategoryId AND IsActive = 1) as ChildCount,
-                c.IsActive,
-                c.CreatedDate,
-                c.CreatedBy,
-                c.ModifiedDate,
-                c.ModifiedBy";
-    }
-
-    private (string WhereClause, DynamicParameters Parameters) BuildCategoryWhereClause(
-        string? search = null,
-        bool? isActive = null,
-        Dictionary<string, object>? additionalFilters = null)
+    public async Task<PaginatedResult<CategoryListView>> GetPagedListAsync(CategoryGridRequest request)
     {
         var conditions = new List<string>();
         var parameters = new DynamicParameters();
 
-        // Handle isActive filter
-        if (isActive.HasValue)
-        {
-            conditions.Add($"c.IsActive = {(isActive.Value ? 1 : 0)}");
-        }
-        // No default - show all categories if not specified
+        // IsActive filter
+        GridQueryBuilder.AddEqualsFilter(conditions, parameters, "c.IsActive", request.IsActive);
 
-        if (!string.IsNullOrWhiteSpace(search))
+        // Search
+        if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            conditions.Add(@"(c.CategoryName LIKE @Search OR c.CategoryCode LIKE @Search OR c.Description LIKE @Search)");
-            parameters.Add("@Search", $"%{search}%");
+            var searchColumns = new[] { "c.CategoryName", "c.CategoryCode", "c.Description" };
+            GridQueryBuilder.AddSearchCondition(conditions, parameters, request.Search, searchColumns);
         }
 
-        if (additionalFilters != null)
+        // ParentCategoryId filter
+        if (request.ParentCategoryId.HasValue)
         {
-            foreach (var filter in additionalFilters.Where(f => f.Value != null && !string.IsNullOrEmpty(f.Value.ToString())))
+            if (request.ParentCategoryId.Value == 0)
             {
-                conditions.Add($"c.{filter.Key} = @{filter.Key}");
-                parameters.Add($"@{filter.Key}", filter.Value);
+                conditions.Add("c.ParentCategoryId IS NULL");
+            }
+            else
+            {
+                conditions.Add("c.ParentCategoryId = @ParentCategoryId");
+                parameters.Add("@ParentCategoryId", request.ParentCategoryId.Value);
             }
         }
 
-        var whereClause = conditions.Any() ? $"WHERE {string.Join(" AND ", conditions)}" : "";
-        return (whereClause, parameters);
-    }
+        var whereClause = GridQueryBuilder.BuildWhereClause(conditions, parameters);
+        var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "c.CategoryName", false);
+        var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
-    public async Task<PaginatedResult<CategoryListView>> GetPagedListAsync(
-        int page, int pageSize, string? search = null, string? sortBy = null,
-        bool sortDescending = false, Dictionary<string, object>? filters = null)
-    {
-        bool? isActiveFilter = null;
-
-        if (filters != null)
-        {
-            if (filters.ContainsKey("isActive") && bool.TryParse(filters["isActive"]?.ToString(), out bool isActive))
-            {
-                isActiveFilter = isActive;
-            }
-            filters?.Remove("isActive");
-        }
-
-        var (whereClause, parameters) = BuildCategoryWhereClause(search, isActiveFilter, filters);
-
-        if (string.IsNullOrEmpty(sortBy))
-        {
-            sortBy = "c.CategoryName";
-            sortDescending = false;
-        }
-        else
-        {
-            if (!sortBy.StartsWith("c.") && !sortBy.StartsWith("p."))
-            {
-                sortBy = $"c.{sortBy}";
-            }
-        }
-        
-        var orderBy = $"ORDER BY {sortBy} {(sortDescending ? "DESC" : "ASC")}";
-
+        // Count
         var countSql = $@"
             SELECT COUNT(*) 
             FROM Category c
             {whereClause}";
-        
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        var selectClause = BuildCategoryListViewSelectClause();
-        var offset = (page - 1) * pageSize;
-        var dataSql = BuildBaseCategoryQueryWithPagination(selectClause, whereClause, orderBy, offset, pageSize);
+        // Data
+        var selectClause = @"
+            SELECT 
+                c.CategoryId, c.CategoryCode, c.CategoryName, c.Description,
+                c.ParentCategoryId, p.CategoryName as ParentCategoryName,
+                (SELECT COUNT(*) FROM Category WHERE ParentCategoryId = c.CategoryId AND IsActive = 1) as ChildCount,
+                c.IsActive, c.CreatedDate, c.CreatedBy, c.ModifiedDate, c.ModifiedBy";
 
-        parameters.Add("@Offset", offset);
-        parameters.Add("@PageSize", pageSize);
+        var fromClause = @"
+            FROM Category c
+            LEFT JOIN Category p ON c.ParentCategoryId = p.CategoryId";
+
+        var dataSql = $@"
+            {selectClause}
+            {fromClause}
+            {whereClause}
+            {orderBy}
+            {pagination}";
 
         var data = await _context.QueryAsync<CategoryListView>(dataSql, parameters);
 
@@ -253,14 +170,15 @@ public class CategoryReps : ICategoryReps
         {
             Data = data.ToList(),
             TotalCount = totalCount,
-            PageNumber = page,
-            PageSize = pageSize,
-            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize),
-            Filters = filters,
-            SortBy = sortBy,
-            SortDescending = sortDescending
+            PageNumber = request.Page,
+            PageSize = request.PageSize,
+            TotalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize)
         };
     }
+
+    // ============================================================
+    // DROPDOWN
+    // ============================================================
 
     public async Task<IEnumerable<CategoryDropdownView>> GetDropdownListAsync()
     {

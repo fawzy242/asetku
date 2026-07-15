@@ -5,8 +5,6 @@ namespace Whitebird.Domain.Features.FileAttachment;
 public class FileAttachmentEntity : AuditableEntity
 {
     public int FileAttachmentId { get; set; }
-    public string ReferenceTable { get; set; } = default!;
-    public int ReferenceId { get; set; }
     public string? FileCategory { get; set; }
     public string FileName { get; set; } = default!;
     public string OriginalFileName { get; set; } = default!;

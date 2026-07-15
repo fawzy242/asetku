@@ -19,4 +19,5 @@ public class UsersEntity : AuditableEntity
     public DateTime? LastLoginDate { get; set; }
     public string? ProfilePhotoPath { get; set; }
     public string? ProfilePhotoFileName { get; set; }
+    public bool MustChangePassword { get; set; }
 }

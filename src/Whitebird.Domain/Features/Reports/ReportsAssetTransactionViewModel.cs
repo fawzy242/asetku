@@ -41,7 +41,7 @@ public class ReportsAssetTransactionViewModel
     public string? Model { get; set; }
 
     [Display(Name = "Condition")]
-    public string? AssetConditionName { get; set; }
+    public string? ConditionName { get; set; }
 
     [Display(Name = "Purchase Date")]
     [DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}")]
@@ -66,12 +66,11 @@ public class ReportsAssetTransactionViewModel
 
     [Display(Name = "Expected Return Date")]
     [DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}")]
-    public DateTime? ExpectedReturnDate { get; set; }
-
-    [Display(Name = "Actual Return Date")]
-    [DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}")]
-    public DateTime? ActualReturnDate { get; set; }
+    public DateTime? ExpectedLoanReturnDate { get; set; }
 
     [Display(Name = "Office")]
     public string? OfficeName { get; set; }
+
+    [Display(Name = "Employee ID")]
+    public int? EmployeeId { get; set; }
 }

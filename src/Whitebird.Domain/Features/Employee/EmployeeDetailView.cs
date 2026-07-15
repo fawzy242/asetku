@@ -22,7 +22,6 @@ public class EmployeeDetailView
     public DateTime? JoinDate { get; set; }
     public DateTime? ResignDate { get; set; }
     public bool IsActive { get; set; }
-    public int ActiveAssetsCount { get; set; }
     public DateTime CreatedDate { get; set; }
     public string CreatedBy { get; set; } = "System";
     public DateTime? ModifiedDate { get; set; }

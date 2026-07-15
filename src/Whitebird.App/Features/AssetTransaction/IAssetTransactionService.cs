@@ -1,5 +1,10 @@
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.AssetTransaction;
+using Whitebird.Domain.Features.Department;
+using Whitebird.Domain.Features.Employee;
+using Whitebird.Domain.Features.MasterData;
+using Whitebird.Domain.Features.Office;
+using Whitebird.Domain.Features.Supplier;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.App.Features.AssetTransaction;
@@ -10,56 +15,81 @@ namespace Whitebird.App.Features.AssetTransaction;
 public interface IAssetTransactionService
 {
     // ============================================================
-    // BASIC CRUD
+    // CRUD
     // ============================================================
 
     Task<ServiceResult<AssetTransactionDetailView>> GetByIdAsync(int id);
     Task<ServiceResult<IEnumerable<AssetTransactionListView>>> GetAllAsync();
-    Task<ServiceResult<IEnumerable<AssetTransactionListView>>> GetByAssetIdAsync(int assetId);
-    Task<ServiceResult<IEnumerable<AssetTransactionListView>>> GetByEmployeeIdAsync(int employeeId);
-    Task<ServiceResult<IEnumerable<AssetTransactionListView>>> GetByApprovalStatusAsync(bool? approved);
-    Task<ServiceResult<IEnumerable<AssetTransactionListView>>> GetPendingApprovalsAsync();
-
-    // ============================================================
-    // CREATE/UPDATE/DELETE
-    // ============================================================
-
     Task<ServiceResult<AssetTransactionDetailView>> CreateAsync(AssetTransactionCreateViewModel model);
     Task<ServiceResult<AssetTransactionDetailView>> UpdateAsync(int id, AssetTransactionUpdateViewModel model);
-    Task<ServiceResult> ApproveAsync(int id, AssetTransactionApproveViewModel model);
-    Task<ServiceResult> ReturnAssetAsync(AssetReturnViewModel model);
-    Task<ServiceResult> CancelAsync(int id);
+    Task<ServiceResult> DeleteAsync(int id);
+    Task<ServiceResult> SoftDeleteAsync(int id);
 
     // ============================================================
-    // NEW: SHORTCUT METHODS
+    // BULK APPROVAL
     // ============================================================
 
-    /// <summary>
-    /// Creates a RETURN transaction as a shortcut (for HANDOVER, LOAN, MAINTENANCE)
-    /// </summary>
-    Task<ServiceResult<AssetTransactionDetailView>> CreateReturnTransactionAsync(int sourceTransactionId, AssetReturnViewModel model);
-    
-    /// <summary>
-    /// Creates a POST_MAINTENANCE transaction as a shortcut (for MAINTENANCE)
-    /// </summary>
-    Task<ServiceResult<AssetTransactionDetailView>> CreatePostMaintenanceTransactionAsync(int sourceTransactionId, PostMaintenanceViewModel model);
+    Task<ServiceResult<int>> BulkApprovedAsync(BulkApprovalRequest request);
+    Task<ServiceResult<int>> BulkPendingAsync(BulkApprovalRequest request);
+    Task<ServiceResult<int>> BulkRejectedAsync(BulkApprovalRequest request);
 
     // ============================================================
-    // GRID & TRACKING
+    // COMPLETE / UNCOMPLETE
     // ============================================================
 
-    Task<ServiceResult<PaginatedResult<AssetTransactionListView>>> GetGridDataAsync(int page, int pageSize, string? search = null, bool? approved = null, int? assetId = null, DateTime? startDate = null, DateTime? endDate = null);
+    Task<ServiceResult> CompleteAsync(int id);
+    Task<ServiceResult> UncompleteAsync(int id);
 
     // ============================================================
-    // ACTIVE LOANS
+    // GRID
     // ============================================================
 
-    Task<ServiceResult<IEnumerable<AssetTransactionListView>>> GetActiveLoansAsync();
-    Task<ServiceResult<IEnumerable<AssetTransactionListView>>> GetOverdueLoansAsync();
-    
+    Task<ServiceResult<PaginatedResult<AssetTransactionListView>>> GetGridAddAsync(AssetTransactionGridRequest request);
+    Task<ServiceResult<PaginatedResult<AssetTransactionListView>>> GetGridReturnAsync(AssetTransactionGridRequest request);
+    Task<ServiceResult<PaginatedResult<AssetTransactionPendingApprovalView>>> GetGridPendingApprovalAsync(AssetTransactionGridRequest request);
+
     // ============================================================
-    // PAIRED TRANSACTIONS
+    // OUTSTANDING (VIEW ONLY)
     // ============================================================
 
-    Task<ServiceResult<IEnumerable<AssetTransactionDropdownView>>> GetAvailablePairedTransactionsAsync(int assetId, int transactionType);
+    Task<ServiceResult<PaginatedResult<AssetTransactionListView>>> GetActiveLoansAsync(AssetTransactionGridRequest request);
+    Task<ServiceResult<PaginatedResult<AssetTransactionListView>>> GetOverdueLoansAsync(AssetTransactionGridRequest request);
+    Task<ServiceResult<PaginatedResult<AssetTransactionListView>>> GetUnderMaintenanceAsync(AssetTransactionGridRequest request);
+
+    // ============================================================
+    // SHORTCUT
+    // ============================================================
+
+    Task<ServiceResult<AssetTransactionDetailView>> CreateReturnAsync(int sourceTransactionId, AssetReturnViewModel model);
+    Task<ServiceResult<AssetTransactionDetailView>> CreatePostMaintenanceAsync(int sourceTransactionId, PostMaintenanceViewModel model);
+
+    // ============================================================
+    // ATTACHMENT (UMUM)
+    // ============================================================
+
+    Task<ServiceResult<AssetTransactionAttachmentView>> UploadAttachmentAsync(int transactionId, AssetTransactionAttachmentUploadDto model);
+    Task<ServiceResult<IEnumerable<AssetTransactionAttachmentView>>> GetAttachmentsAsync(int transactionId);
+    Task<ServiceResult> DeleteAttachmentAsync(int transactionId, int attachmentId);
+
+    // ============================================================
+    // APPROVE ATTACHMENT
+    // ============================================================
+
+    Task<ServiceResult<AssetTransactionApproveAttachmentView>> UploadApproveAttachmentAsync(int transactionId, AssetTransactionApproveAttachmentUploadDto model);
+    Task<ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>> GetApproveAttachmentsAsync(int transactionId);
+    Task<ServiceResult> DeleteApproveAttachmentAsync(int transactionId, int attachmentId);
+    Task<ServiceResult> ApproveAttachmentActionAsync(int transactionId, int attachmentId, ApproveAttachmentActionDto model);
+    Task<ServiceResult<IEnumerable<RequiredDocumentTypeDto>>> GetRequiredDocumentTypesAsync(int transactionId);
+
+    // ============================================================
+    // DROPDOWN
+    // ============================================================
+
+    Task<ServiceResult<IEnumerable<MasterDataDto>>> GetTransactionTypeAddListAsync();
+    Task<ServiceResult<IEnumerable<MasterDataDto>>> GetTransactionTypeReturnListAsync();
+    Task<ServiceResult<IEnumerable<MasterDataDto>>> GetMaintenanceTypeListAsync();
+    Task<ServiceResult<IEnumerable<MasterDataDto>>> GetConditionListAsync();
+    Task<ServiceResult<IEnumerable<ApproveDocumentTypeDto>>> GetApproveDocumentTypeListAsync();
+    Task<ServiceResult<IEnumerable<EmployeeDropdownView>>> GetEmployeeListAsync();
+    Task<ServiceResult<IEnumerable<AssetTransactionAssetDto>>> GetAssetListAsync();
 }

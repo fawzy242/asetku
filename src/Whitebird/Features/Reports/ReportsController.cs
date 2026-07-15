@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.Reports;
-using Whitebird.Domain.Features.Reports;
 using Whitebird.Features.Common;
 
 namespace Whitebird.Features.Reports;
@@ -11,153 +10,135 @@ namespace Whitebird.Features.Reports;
 [Produces("application/json")]
 public class ReportsController : ControllerBase
 {
-    private readonly IReportsService _reportService;
+    private readonly IReportsService _reportsService;
 
-    public ReportsController(IReportsService reportService)
+    public ReportsController(IReportsService reportsService)
     {
-        _reportService = reportService;
+        _reportsService = reportsService;
     }
 
     // ============================================================
-    // DASHBOARD - COMPLETE
+    // LIST ENDPOINTS (for dropdown parameters)
     // ============================================================
 
-    [HttpGet("dashboard/stats")]
-    public async Task<IActionResult> GetDashboardStats()
-        => this.HandleResult(await _reportService.GetDashboardStatsAsync());
+    [HttpGet("employee-list")]
+    public async Task<IActionResult> GetEmployeeList()
+        => this.HandleResult(await _reportsService.GetEmployeeListAsync());
 
-    [HttpGet("dashboard/monthly-stats")]
-    public async Task<IActionResult> GetMonthlyStats([FromQuery] int year = 0)
-    {
-        if (year <= 0) year = DateTime.Now.Year;
-        return this.HandleResult(await _reportService.GetMonthlyStatsAsync(year));
-    }
+    [HttpGet("category-list")]
+    public async Task<IActionResult> GetCategoryList()
+        => this.HandleResult(await _reportsService.GetCategoryListAsync());
 
-    [HttpGet("dashboard/category-breakdown")]
-    public async Task<IActionResult> GetCategoryBreakdown()
-        => this.HandleResult(await _reportService.GetCategoryBreakdownAsync());
+    [HttpGet("supplier-list")]
+    public async Task<IActionResult> GetSupplierList()
+        => this.HandleResult(await _reportsService.GetSupplierListAsync());
 
-    [HttpGet("dashboard/recent-transactions")]
-    public async Task<IActionResult> GetRecentTransactions([FromQuery] int limit = 10)
-        => this.HandleResult(await _reportService.GetRecentTransactionsAsync(limit));
+    [HttpGet("transaction-type-list")]
+    public async Task<IActionResult> GetTransactionTypeList()
+        => this.HandleResult(await _reportsService.GetTransactionTypeListAsync());
+
+    [HttpGet("maintenance-type-list")]
+    public async Task<IActionResult> GetMaintenanceTypeList()
+        => this.HandleResult(await _reportsService.GetMaintenanceTypeListAsync());
+
+    [HttpGet("condition-list")]
+    public async Task<IActionResult> GetConditionList()
+        => this.HandleResult(await _reportsService.GetConditionListAsync());
+
+    [HttpGet("status-list")]
+    public async Task<IActionResult> GetStatusList()
+        => this.HandleResult(await _reportsService.GetStatusListAsync());
 
     // ============================================================
-    // ASSET TRANSACTION REPORT
+    // EXPORT ENDPOINTS
     // ============================================================
 
-    [HttpGet("asset-transaction/data")]
-    public async Task<IActionResult> GetAssetTransactionData(
+    [HttpGet("asset-transaction/export")]
+    public async Task<IActionResult> ExportAssetTransaction(
+        [FromQuery] string format,
         [FromQuery] DateTime? startDate = null,
         [FromQuery] DateTime? endDate = null,
         [FromQuery] string? transactionType = null)
-        => this.HandleResult(await _reportService.GetAssetTransactionReportsAsync(startDate, endDate, transactionType));
-
-    [HttpGet("asset-transaction/excel")]
-    public async Task<IActionResult> ExportAssetTransactionExcel(
-        [FromQuery] DateTime? startDate = null,
-        [FromQuery] DateTime? endDate = null,
-        [FromQuery] string? transactionType = null)
     {
-        var result = await _reportService.GenerateAssetTransactionExcelAsync(startDate, endDate, transactionType);
+        var result = await _reportsService.ExportAssetTransactionAsync(format, startDate, endDate, transactionType);
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
 
-        var fileName = $"Asset_Transaction_Report_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
-        return File(result.Data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        var fileName = $"Asset_Transaction_Report_{DateTime.Now:yyyyMMdd_HHmmss}.{GetFileExtension(format)}";
+        return File(result.Data, GetContentType(format), fileName);
     }
 
-    // ============================================================
-    // ASSET INVENTORY REPORT
-    // ============================================================
-
-    [HttpGet("asset-inventory/data")]
-    public async Task<IActionResult> GetAssetInventoryData(
-        [FromQuery] string? status = null,
-        [FromQuery] int? categoryId = null,
-        [FromQuery] int? supplierId = null)
-        => this.HandleResult(await _reportService.GetAssetInventoryReportsAsync(status, categoryId, supplierId));
-
-    [HttpGet("asset-inventory/excel")]
-    public async Task<IActionResult> ExportAssetInventoryExcel(
+    [HttpGet("asset-inventory/export")]
+    public async Task<IActionResult> ExportAssetInventory(
+        [FromQuery] string format,
         [FromQuery] string? status = null,
         [FromQuery] int? categoryId = null,
         [FromQuery] int? supplierId = null)
     {
-        var result = await _reportService.GenerateAssetInventoryExcelAsync(status, categoryId, supplierId);
+        var result = await _reportsService.ExportAssetInventoryAsync(format, status, categoryId, supplierId);
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
 
-        var fileName = $"Asset_Inventory_Report_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
-        return File(result.Data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        var fileName = $"Asset_Inventory_Report_{DateTime.Now:yyyyMMdd_HHmmss}.{GetFileExtension(format)}";
+        return File(result.Data, GetContentType(format), fileName);
     }
 
-    // ============================================================
-    // EMPLOYEE ASSET REPORT
-    // ============================================================
-
-    [HttpGet("employee-asset/data")]
-    public async Task<IActionResult> GetEmployeeAssetData(
-        [FromQuery] int? employeeId = null)
-        => this.HandleResult(await _reportService.GetEmployeeAssetReportsAsync(employeeId));
-
-    [HttpGet("employee-asset/excel")]
-    public async Task<IActionResult> ExportEmployeeAssetExcel(
+    [HttpGet("employee-asset/export")]
+    public async Task<IActionResult> ExportEmployeeAsset(
+        [FromQuery] string format,
         [FromQuery] int? employeeId = null)
     {
-        var result = await _reportService.GenerateEmployeeAssetExcelAsync(employeeId);
+        var result = await _reportsService.ExportEmployeeAssetAsync(format, employeeId);
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
 
-        var fileName = $"Employee_Asset_Report_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
-        return File(result.Data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        var fileName = $"Employee_Asset_Report_{DateTime.Now:yyyyMMdd_HHmmss}.{GetFileExtension(format)}";
+        return File(result.Data, GetContentType(format), fileName);
     }
 
-    // ============================================================
-    // MAINTENANCE REPORT
-    // ============================================================
-
-    [HttpGet("maintenance/data")]
-    public async Task<IActionResult> GetMaintenanceData(
-        [FromQuery] DateTime? startDate = null,
-        [FromQuery] DateTime? endDate = null,
-        [FromQuery] bool? isUpcoming = null)
-        => this.HandleResult(await _reportService.GetMaintenanceReportsAsync(startDate, endDate, isUpcoming));
-
-    [HttpGet("maintenance/excel")]
-    public async Task<IActionResult> ExportMaintenanceExcel(
+    [HttpGet("maintenance/export")]
+    public async Task<IActionResult> ExportMaintenance(
+        [FromQuery] string format,
         [FromQuery] DateTime? startDate = null,
         [FromQuery] DateTime? endDate = null,
         [FromQuery] bool? isUpcoming = null)
     {
-        var result = await _reportService.GenerateMaintenanceExcelAsync(startDate, endDate, isUpcoming);
+        var result = await _reportsService.ExportMaintenanceAsync(format, startDate, endDate, isUpcoming);
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
 
         var reportType = isUpcoming == true ? "Upcoming_Maintenance" : "Maintenance_History";
-        var fileName = $"{reportType}_Report_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
-        return File(result.Data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        var fileName = $"{reportType}_Report_{DateTime.Now:yyyyMMdd_HHmmss}.{GetFileExtension(format)}";
+        return File(result.Data, GetContentType(format), fileName);
     }
 
-    // ============================================================
-    // FINANCIAL REPORT
-    // ============================================================
-
-    [HttpGet("financial/data")]
-    public async Task<IActionResult> GetFinancialData(
-        [FromQuery] DateTime? startDate = null,
-        [FromQuery] DateTime? endDate = null)
-        => this.HandleResult(await _reportService.GetFinancialReportsAsync(startDate, endDate));
-
-    [HttpGet("financial/excel")]
-    public async Task<IActionResult> ExportFinancialExcel(
+    [HttpGet("financial/export")]
+    public async Task<IActionResult> ExportFinancial(
+        [FromQuery] string format,
         [FromQuery] DateTime? startDate = null,
         [FromQuery] DateTime? endDate = null)
     {
-        var result = await _reportService.GenerateFinancialExcelAsync(startDate, endDate);
+        var result = await _reportsService.ExportFinancialAsync(format, startDate, endDate);
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
 
-        var fileName = $"Financial_Report_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
-        return File(result.Data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        var fileName = $"Financial_Report_{DateTime.Now:yyyyMMdd_HHmmss}.{GetFileExtension(format)}";
+        return File(result.Data, GetContentType(format), fileName);
+    }
+
+    // ============================================================
+    // PRIVATE HELPERS
+    // ============================================================
+
+    private string GetFileExtension(string format)
+    {
+        return format.ToLower() == "pdf" ? "pdf" : "xlsx";
+    }
+
+    private string GetContentType(string format)
+    {
+        return format.ToLower() == "pdf"
+            ? "application/pdf"
+            : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     }
 }

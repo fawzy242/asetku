@@ -15,19 +15,27 @@ public interface IOfficeService
 
     Task<ServiceResult<OfficeDetailView>> GetByIdAsync(int id);
     Task<ServiceResult<IEnumerable<OfficeListView>>> GetAllAsync();
-    Task<ServiceResult<IEnumerable<OfficeListView>>> GetActiveOnlyAsync();
-    Task<ServiceResult<IEnumerable<OfficeListView>>> GetSubOfficesAsync(int parentId);
     Task<ServiceResult<OfficeDetailView>> CreateAsync(OfficeCreateViewModel model);
     Task<ServiceResult<OfficeDetailView>> UpdateAsync(int id, OfficeUpdateViewModel model);
     Task<ServiceResult> DeleteAsync(int id);
     Task<ServiceResult> SoftDeleteAsync(int id);
 
     // ============================================================
-    // GRID & DROPDOWN
+    // GRID
     // ============================================================
 
-    Task<ServiceResult<PaginatedResult<OfficeListView>>> GetGridDataAsync(
-        int page, int pageSize, string? search = null, bool? isActive = null, Dictionary<string, object>? filters = null);
-    
+    Task<ServiceResult<PaginatedResult<OfficeListView>>> GetGridDataAsync(OfficeGridRequest request);
+
+    // ============================================================
+    // DROPDOWN
+    // ============================================================
+
     Task<ServiceResult<IEnumerable<OfficeDropdownView>>> GetDropdownListAsync();
+
+    // ============================================================
+    // BULK OPERATIONS
+    // ============================================================
+
+    Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request);
+    Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request);
 }

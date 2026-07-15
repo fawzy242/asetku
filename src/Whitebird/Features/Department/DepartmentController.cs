@@ -18,6 +18,10 @@ public class DepartmentController : ControllerBase
         _departmentService = departmentService;
     }
 
+    // ============================================================
+    // CRUD
+    // ============================================================
+
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
         => this.HandleResult(await _departmentService.GetByIdAsync(id));
@@ -26,34 +30,6 @@ public class DepartmentController : ControllerBase
     public async Task<IActionResult> GetAll()
         => this.HandleResult(await _departmentService.GetAllAsync());
 
-    [HttpGet("active")]
-    public async Task<IActionResult> GetActiveOnly()
-        => this.HandleResult(await _departmentService.GetActiveOnlyAsync());
-
-    [HttpGet("grid")]
-    public async Task<IActionResult> GetGridData(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string? search = null,
-        [FromQuery] bool? isActive = null)
-    {
-        var filters = new Dictionary<string, object>();
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            filters["search"] = search;
-        }
-        if (isActive.HasValue)
-        {
-            filters["isActive"] = isActive.Value;
-        }
-
-        return this.HandleResult(await _departmentService.GetGridDataAsync(page, pageSize, search, isActive, filters));
-    }
-
-    [HttpGet("dropdown")]
-    public async Task<IActionResult> GetDropdownList()
-        => this.HandleResult(await _departmentService.GetDropdownListAsync());
-        
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] DepartmentCreateViewModel model)
     {
@@ -77,4 +53,40 @@ public class DepartmentController : ControllerBase
     [HttpDelete("{id:int}/soft")]
     public async Task<IActionResult> SoftDelete(int id)
         => this.HandleResult(await _departmentService.SoftDeleteAsync(id));
+
+    // ============================================================
+    // GRID
+    // ============================================================
+
+    [HttpGet("grid")]
+    public async Task<IActionResult> GetGridData([FromQuery] DepartmentGridRequest request)
+        => this.HandleResult(await _departmentService.GetGridDataAsync(request));
+
+    // ============================================================
+    // DROPDOWN
+    // ============================================================
+
+    [HttpGet("dropdown")]
+    public async Task<IActionResult> GetDropdownList()
+        => this.HandleResult(await _departmentService.GetDropdownListAsync());
+
+    // ============================================================
+    // BULK OPERATIONS
+    // ============================================================
+
+    [HttpPost("activate")]
+    public async Task<IActionResult> BulkActivate([FromBody] BulkActivateRequest request)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _departmentService.BulkActivateAsync(request));
+    }
+
+    [HttpPost("deactivate")]
+    public async Task<IActionResult> BulkDeactivate([FromBody] BulkActivateRequest request)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _departmentService.BulkDeactivateAsync(request));
+    }
 }

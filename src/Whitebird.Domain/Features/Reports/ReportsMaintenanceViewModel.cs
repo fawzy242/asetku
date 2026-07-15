@@ -37,34 +37,27 @@ public class ReportsMaintenanceViewModel
     [Display(Name = "Condition")]
     public string? AssetConditionName { get; set; }
 
-    [Display(Name = "Last Maintenance Date")]
+    [Display(Name = "Maintenance Date")]
     [DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}")]
-    public DateTime? LastMaintenanceDate { get; set; }
+    public DateTime? MaintenanceDate { get; set; }
 
-    [Display(Name = "Next Maintenance Date")]
-    [DisplayFormat(DataFormatString = "{0:yyyy-MM-dd}")]
-    public DateTime? NextMaintenanceDate { get; set; }
+    [Display(Name = "Maintenance Type")]
+    public string? MaintenanceTypeName { get; set; }
 
-    [Display(Name = "Maintenance Count")]
-    public int MaintenanceCount { get; set; }
-
-    [Display(Name = "Last Maintenance Type")]
-    public string? LastMaintenanceTypeName { get; set; }
-
-    [Display(Name = "Last Maintenance Cost")]
+    [Display(Name = "Maintenance Cost")]
     [DisplayFormat(DataFormatString = "{0:C}")]
-    public decimal? LastMaintenanceCost { get; set; }
+    public decimal? MaintenanceCost { get; set; }
 
-    [Display(Name = "Last Maintenance Vendor")]
-    public string? LastMaintenanceVendor { get; set; }
-
-    [Display(Name = "Last Maintenance Notes")]
-    public string? LastMaintenanceNotes { get; set; }
+    [Display(Name = "Notes")]
+    public string? Notes { get; set; }
 
     [Display(Name = "Total Maintenance Cost")]
     [DisplayFormat(DataFormatString = "{0:C}")]
     public decimal? TotalMaintenanceCost { get; set; }
 
-    [Display(Name = "Status")]
+    [Display(Name = "Maintenance Count")]
+    public int MaintenanceCount { get; set; }
+
+    [Display(Name = "Current Status")]
     public string CurrentStatus { get; set; } = default!;
 }

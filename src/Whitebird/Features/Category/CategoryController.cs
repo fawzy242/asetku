@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Whitebird.App.Features.Common;
 using Whitebird.App.Features.Category;
 using Whitebird.Domain.Features.Category;
 using Whitebird.Features.Common;
@@ -12,43 +13,22 @@ public class CategoryController : ControllerBase
 {
     private readonly ICategoryService _categoryService;
 
-    public CategoryController(ICategoryService categoryService) => _categoryService = categoryService;
-
-    [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetById(int id) => this.HandleResult(await _categoryService.GetByIdAsync(id));
-
-    [HttpGet]
-    public async Task<IActionResult> GetAll() => this.HandleResult(await _categoryService.GetAllAsync());
-
-    [HttpGet("active")]
-    public async Task<IActionResult> GetActiveOnly() => this.HandleResult(await _categoryService.GetActiveOnlyAsync());
-
-    [HttpGet("subcategories/{parentId:int}")]
-    public async Task<IActionResult> GetSubCategories(int parentId) => this.HandleResult(await _categoryService.GetSubCategoriesAsync(parentId));
-
-    [HttpGet("grid")]
-    public async Task<IActionResult> GetGridData(
-        [FromQuery] int page = 1, 
-        [FromQuery] int pageSize = 10, 
-        [FromQuery] string? search = null,
-        [FromQuery] bool? isActive = null)
+    public CategoryController(ICategoryService categoryService)
     {
-        var filters = new Dictionary<string, object>();
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            filters["search"] = search;
-        }
-        if (isActive.HasValue)
-        {
-            filters["isActive"] = isActive.Value;
-        }
-
-        return this.HandleResult(await _categoryService.GetGridDataAsync(page, pageSize, search, isActive, filters));
+        _categoryService = categoryService;
     }
 
-    [HttpGet("dropdown")]
-    public async Task<IActionResult> GetDropdownList()
-        => this.HandleResult(await _categoryService.GetDropdownListAsync());
+    // ============================================================
+    // CRUD
+    // ============================================================
+
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> GetById(int id)
+        => this.HandleResult(await _categoryService.GetByIdAsync(id));
+
+    [HttpGet]
+    public async Task<IActionResult> GetAll()
+        => this.HandleResult(await _categoryService.GetAllAsync());
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CategoryCreateViewModel model)
@@ -67,8 +47,46 @@ public class CategoryController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete(int id) => this.HandleResult(await _categoryService.DeleteAsync(id));
+    public async Task<IActionResult> Delete(int id)
+        => this.HandleResult(await _categoryService.DeleteAsync(id));
 
     [HttpDelete("{id:int}/soft")]
-    public async Task<IActionResult> SoftDelete(int id) => this.HandleResult(await _categoryService.SoftDeleteAsync(id));
+    public async Task<IActionResult> SoftDelete(int id)
+        => this.HandleResult(await _categoryService.SoftDeleteAsync(id));
+
+    // ============================================================
+    // GRID
+    // ============================================================
+
+    [HttpGet("grid")]
+    public async Task<IActionResult> GetGridData([FromQuery] CategoryGridRequest request)
+        => this.HandleResult(await _categoryService.GetGridDataAsync(request));
+
+    // ============================================================
+    // DROPDOWN
+    // ============================================================
+
+    [HttpGet("dropdown")]
+    public async Task<IActionResult> GetDropdownList()
+        => this.HandleResult(await _categoryService.GetDropdownListAsync());
+
+    // ============================================================
+    // BULK OPERATIONS
+    // ============================================================
+
+    [HttpPost("activate")]
+    public async Task<IActionResult> BulkActivate([FromBody] BulkActivateRequest request)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _categoryService.BulkActivateAsync(request));
+    }
+
+    [HttpPost("deactivate")]
+    public async Task<IActionResult> BulkDeactivate([FromBody] BulkActivateRequest request)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _categoryService.BulkDeactivateAsync(request));
+    }
 }

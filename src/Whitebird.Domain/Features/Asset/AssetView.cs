@@ -10,8 +10,7 @@ public class AssetListViewModel
     public string CategoryName { get; set; } = default!;
     public string? Brand { get; set; }
     public string? Model { get; set; }
-    public string? AssetConditionName { get; set; }
-    public string? OfficeName { get; set; }
+    public string? AssetConditionPurchaseName { get; set; }
     public DateTime? PurchaseDate { get; set; }
     public decimal? PurchasePrice { get; set; }
     public bool IsActive { get; set; }
@@ -36,26 +35,19 @@ public class AssetDetailViewModel
     public string? SupplierName { get; set; }
     public int? WarrantyPeriod { get; set; }
     public DateTime? WarrantyExpiryDate { get; set; }
-    public int? AssetCondition { get; set; }
-    public string? AssetConditionName { get; set; }
     public int? AssetConditionPurchase { get; set; }
     public string? AssetConditionPurchaseName { get; set; }
-    public decimal? ResidualValue { get; set; }
-    public int? UsefulLife { get; set; }
-    public DateTime? DepreciationStartDate { get; set; }
     public string? Notes { get; set; }
     public bool IsActive { get; set; }
-    public DateTime? LastMaintenanceDate { get; set; }
-    public DateTime? NextMaintenanceDate { get; set; }
-    public int? OfficeId { get; set; }
-    public string? OfficeName { get; set; }
     public string? Hostname { get; set; }
     public string? IpAddress { get; set; }
-    public bool? OperasionalOffice { get; set; }
     public DateTime CreatedDate { get; set; }
     public string CreatedBy { get; set; } = default!;
     public DateTime? ModifiedDate { get; set; }
     public string? ModifiedBy { get; set; }
+    
+    // Software Installation
+    public SoftwareInstallationView? SoftwareInstallation { get; set; }
 }
 
 public class AssetCreateViewModel
@@ -101,10 +93,7 @@ public class AssetCreateViewModel
     [Range(0, int.MaxValue, ErrorMessage = "WarrantyPeriod must be positive")]
     public int? WarrantyPeriod { get; set; }
 
-    public int? AssetCondition { get; set; }
     public int? AssetConditionPurchase { get; set; }
-
-    public int? OfficeId { get; set; }
 
     [StringLength(50, ErrorMessage = "Hostname cannot exceed 50 characters")]
     public string? Hostname { get; set; }
@@ -112,18 +101,11 @@ public class AssetCreateViewModel
     [StringLength(50, ErrorMessage = "IpAddress cannot exceed 50 characters")]
     public string? IpAddress { get; set; }
 
-    public bool? OperasionalOffice { get; set; }
-
-    [Range(0, double.MaxValue, ErrorMessage = "ResidualValue must be positive")]
-    public decimal? ResidualValue { get; set; }
-
-    [Range(1, int.MaxValue, ErrorMessage = "UsefulLife must be greater than 0")]
-    public int? UsefulLife { get; set; }
-
-    public DateTime? DepreciationStartDate { get; set; }
-
     [StringLength(500, ErrorMessage = "Notes cannot exceed 500 characters")]
     public string? Notes { get; set; }
+
+    // Software Installation
+    public SoftwareInstallationDto? SoftwareInstallation { get; set; }
 }
 
 public class AssetUpdateViewModel
@@ -169,10 +151,7 @@ public class AssetUpdateViewModel
     [Range(0, int.MaxValue, ErrorMessage = "WarrantyPeriod must be positive")]
     public int? WarrantyPeriod { get; set; }
 
-    public int? AssetCondition { get; set; }
     public int? AssetConditionPurchase { get; set; }
-
-    public int? OfficeId { get; set; }
 
     [StringLength(50, ErrorMessage = "Hostname cannot exceed 50 characters")]
     public string? Hostname { get; set; }
@@ -180,70 +159,12 @@ public class AssetUpdateViewModel
     [StringLength(50, ErrorMessage = "IpAddress cannot exceed 50 characters")]
     public string? IpAddress { get; set; }
 
-    public bool? OperasionalOffice { get; set; }
-
-    [Range(0, double.MaxValue, ErrorMessage = "ResidualValue must be positive")]
-    public decimal? ResidualValue { get; set; }
-
-    [Range(1, int.MaxValue, ErrorMessage = "UsefulLife must be greater than 0")]
-    public int? UsefulLife { get; set; }
-
-    public DateTime? DepreciationStartDate { get; set; }
-
     [StringLength(500, ErrorMessage = "Notes cannot exceed 500 characters")]
     public string? Notes { get; set; }
 
     [Required(ErrorMessage = "IsActive is required")]
     public bool IsActive { get; set; }
 
-    public DateTime? LastMaintenanceDate { get; set; }
-    public DateTime? NextMaintenanceDate { get; set; }
-}
-
-public class AssetTrackingViewModel
-{
-    public int AssetId { get; set; }
-    public string AssetCode { get; set; } = default!;
-    public string AssetName { get; set; } = default!;
-    public string CurrentStatus { get; set; } = default!;
-    public string? CategoryName { get; set; }
-    public string? CurrentHolderName { get; set; }
-    public string? CurrentLocation { get; set; }
-    public string? Condition { get; set; }
-    public bool IsOnLoan { get; set; }
-    public bool IsInMaintenance { get; set; }
-    public bool IsOverdue { get; set; }
-    public DateTime? LoanDueDate { get; set; }
-    public int TotalTransactions { get; set; }
-    public List<AssetTimelineEntry> Timeline { get; set; } = new();
-}
-
-public class AssetTimelineEntry
-{
-    public int? Id { get; set; }
-    public DateTime Date { get; set; }
-    public string ActivityType { get; set; } = default!;
-    public string Description { get; set; } = default!;
-    public string? PreviousHolder { get; set; }
-    public string? NewHolder { get; set; }
-    public string? PreviousStatus { get; set; }
-    public string? NewStatus { get; set; }
-    public string? Notes { get; set; }
-}
-
-public class AssetCurrentStatusDto
-{
-    public int AssetId { get; set; }
-    public string AssetCode { get; set; } = default!;
-    public string AssetName { get; set; } = default!;
-    public string CurrentStatus { get; set; } = default!;
-    public int? CurrentStatusType { get; set; }
-    public string? CurrentHolderName { get; set; }
-    public int? CurrentHolderId { get; set; }
-    public string? CurrentOfficeName { get; set; }
-    public int? CurrentOfficeId { get; set; }
-    public DateTime? ExpectedReturnDate { get; set; }
-    public bool IsOverdue { get; set; }
-    public string? ConditionName { get; set; }
-    public int? ConditionCode { get; set; }
+    // Software Installation
+    public SoftwareInstallationDto? SoftwareInstallation { get; set; }
 }

@@ -20,6 +20,10 @@ public class EmployeeController : ControllerBase
         _employeeImportService = employeeImportService;
     }
 
+    // ============================================================
+    // CRUD
+    // ============================================================
+
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
         => this.HandleResult(await _employeeService.GetByIdAsync(id));
@@ -27,39 +31,6 @@ public class EmployeeController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll()
         => this.HandleResult(await _employeeService.GetAllAsync());
-
-    [HttpGet("department/{departmentId:int}")]
-    public async Task<IActionResult> GetByDepartment(int departmentId)
-        => this.HandleResult(await _employeeService.GetByDepartmentAsync(departmentId));
-
-    [HttpGet("status/{employmentStatus:int}")]
-    public async Task<IActionResult> GetByStatus(int employmentStatus)
-        => this.HandleResult(await _employeeService.GetByStatusAsync(employmentStatus));
-
-    [HttpGet("{id:int}/asset-summary")]
-    public async Task<IActionResult> GetAssetSummary(int id)
-        => this.HandleResult(await _employeeService.GetAssetSummaryAsync(id));
-
-    [HttpGet("dropdown")]
-    public async Task<IActionResult> GetDropdownList()
-        => this.HandleResult(await _employeeService.GetDropdownListAsync());
-
-    [HttpGet("grid")]
-    public async Task<IActionResult> GetGridData(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string? search = null,
-        [FromQuery] string? sortBy = null,
-        [FromQuery] bool sortDescending = false,
-        [FromQuery] bool? isActive = null,
-        [FromQuery] int? departmentId = null)
-    {
-        var filters = new Dictionary<string, object>();
-        if (isActive.HasValue) filters["isActive"] = isActive.Value;
-        if (departmentId.HasValue) filters["departmentId"] = departmentId;
-
-        return this.HandleResult(await _employeeService.GetGridDataAsync(page, pageSize, search, sortBy, sortDescending, filters));
-    }
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] EmployeeCreateViewModel model)
@@ -85,6 +56,38 @@ public class EmployeeController : ControllerBase
     public async Task<IActionResult> SoftDelete(int id)
         => this.HandleResult(await _employeeService.SoftDeleteAsync(id));
 
+    // ============================================================
+    // GRID
+    // ============================================================
+
+    [HttpGet("grid")]
+    public async Task<IActionResult> GetGridData([FromQuery] EmployeeGridRequest request)
+        => this.HandleResult(await _employeeService.GetGridDataAsync(request));
+
+    // ============================================================
+    // DROPDOWN
+    // ============================================================
+
+    [HttpGet("dropdown")]
+    public async Task<IActionResult> GetDropdownList()
+        => this.HandleResult(await _employeeService.GetDropdownListAsync());
+
+    [HttpGet("office-list")]
+    public async Task<IActionResult> GetOfficeList()
+        => this.HandleResult(await _employeeService.GetOfficeListAsync());
+
+    [HttpGet("department-list")]
+    public async Task<IActionResult> GetDepartmentList()
+        => this.HandleResult(await _employeeService.GetDepartmentListAsync());
+
+    [HttpGet("masterdata-list")]
+    public async Task<IActionResult> GetMasterDataList([FromQuery] string referenceName)
+        => this.HandleResult(await _employeeService.GetMasterDataListAsync(referenceName));
+
+    // ============================================================
+    // BULK OPERATIONS
+    // ============================================================
+
     [HttpPost("activate")]
     public async Task<IActionResult> BulkActivate([FromBody] BulkActivateRequest request)
     {
@@ -92,6 +95,18 @@ public class EmployeeController : ControllerBase
         if (validation != null) return validation;
         return this.HandleResult(await _employeeService.BulkActivateAsync(request));
     }
+
+    [HttpPost("deactivate")]
+    public async Task<IActionResult> BulkDeactivate([FromBody] BulkActivateRequest request)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _employeeService.BulkDeactivateAsync(request));
+    }
+
+    // ============================================================
+    // IMPORT
+    // ============================================================
 
     [HttpPost("import")]
     public async Task<IActionResult> Import(IFormFile file)
@@ -112,5 +127,32 @@ public class EmployeeController : ControllerBase
             return this.HandleResult(result);
 
         return File(result.Data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Employee_Import_Template.xlsx");
+    }
+
+    // ============================================================
+    // PHOTO PROFILE
+    // ============================================================
+
+    [HttpPost("{id:int}/photo")]
+    public async Task<IActionResult> AddPhotoProfile(int id, IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("No file provided");
+
+        return this.HandleResult(await _employeeService.AddPhotoProfileAsync(id, file));
+    }
+
+    [HttpDelete("{id:int}/photo")]
+    public async Task<IActionResult> DeletePhotoProfile(int id)
+        => this.HandleResult(await _employeeService.DeletePhotoProfileAsync(id));
+
+    [HttpGet("{id:int}/photo")]
+    public async Task<IActionResult> GetPhotoProfile(int id)
+    {
+        var result = await _employeeService.GetPhotoProfileAsync(id);
+        if (!result.IsSuccess || result.Data == null)
+            return this.HandleResult(result);
+
+        return File(result.Data, "image/jpeg");
     }
 }

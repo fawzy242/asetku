@@ -4,7 +4,6 @@ using Whitebird.App.Features.Common;
 using Whitebird.App.Features.MasterData;
 using Whitebird.Domain.Features.Office;
 using Whitebird.Domain.Features.Common;
-using Whitebird.Domain.Features.MasterData;
 using Whitebird.Infra.Features.Common;
 using Whitebird.Infra.Features.Office;
 
@@ -39,7 +38,10 @@ public class OfficeService : BaseService, IOfficeService
         _activityLogService = activityLogService;
     }
 
-    /// <inheritdoc />
+    // ============================================================
+    // BASIC CRUD
+    // ============================================================
+
     public async Task<ServiceResult<OfficeDetailView>> GetByIdAsync(int id)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -53,7 +55,6 @@ public class OfficeService : BaseService, IOfficeService
         }, "get office by id");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult<IEnumerable<OfficeListView>>> GetAllAsync()
     {
         return await ExecuteSafelyAsync(async () =>
@@ -63,33 +64,6 @@ public class OfficeService : BaseService, IOfficeService
         }, "get all offices");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<OfficeListView>>> GetActiveOnlyAsync()
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var offices = await _officeReps.GetActiveOnlyListViewAsync();
-            return ServiceResult<IEnumerable<OfficeListView>>.Success(offices);
-        }, "get active offices");
-    }
-
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<OfficeListView>>> GetSubOfficesAsync(int parentId)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var parent = await _officeReps.GetByIdRawAsync(parentId);
-            if (parent == null)
-            {
-                return ServiceResult<IEnumerable<OfficeListView>>.NotFound($"Parent office with id {parentId} not found");
-            }
-
-            var offices = await _officeReps.GetSubOfficesListViewAsync(parentId);
-            return ServiceResult<IEnumerable<OfficeListView>>.Success(offices);
-        }, "get sub offices");
-    }
-
-    /// <inheritdoc />
     public async Task<ServiceResult<OfficeDetailView>> CreateAsync(OfficeCreateViewModel model)
     {
         if (string.IsNullOrWhiteSpace(model.OfficeName))
@@ -152,13 +126,9 @@ public class OfficeService : BaseService, IOfficeService
             return created == null
                 ? ServiceResult<OfficeDetailView>.Failure("Failed to retrieve created office")
                 : ServiceResult<OfficeDetailView>.Success(created, "Office created successfully");
-        }, "create office", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Office, 0, "Create Office", ex, _currentUserService.GetDisplayName());
-        });
+        }, "create office");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult<OfficeDetailView>> UpdateAsync(int id, OfficeUpdateViewModel model)
     {
         var nameExists = await _officeReps.IsOfficeNameExistsAsync(model.OfficeName, id);
@@ -197,8 +167,8 @@ public class OfficeService : BaseService, IOfficeService
                     return ServiceResult<OfficeDetailView>.BadRequest($"Parent office with id {model.ParentOfficeId} does not exist");
                 }
 
-                var children = await _officeReps.GetSubOfficesListViewAsync(id);
-                if (children.Any(c => c.OfficeId == model.ParentOfficeId.Value))
+                var children = await _officeReps.GetAllListViewAsync();
+                if (children.Any(c => c.OfficeId == model.ParentOfficeId.Value && c.ParentOfficeId == id))
                 {
                     return ServiceResult<OfficeDetailView>.BadRequest("Circular reference detected: child cannot become parent");
                 }
@@ -228,13 +198,9 @@ public class OfficeService : BaseService, IOfficeService
                 _currentUserService.GetDisplayName());
 
             return ServiceResult<OfficeDetailView>.Success(updated!, "Office updated successfully");
-        }, "update office", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Office, id, "Update Office", ex, _currentUserService.GetDisplayName());
-        });
+        }, "update office");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -265,13 +231,9 @@ public class OfficeService : BaseService, IOfficeService
             return result <= 0
                 ? ServiceResult.Failure("Failed to delete office")
                 : ServiceResult.Success("Office deleted successfully");
-        }, "delete office", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Office, id, "Delete Office", ex, _currentUserService.GetDisplayName());
-        });
+        }, "delete office");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult> SoftDeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -300,39 +262,26 @@ public class OfficeService : BaseService, IOfficeService
             return result <= 0
                 ? ServiceResult.Failure("Failed to soft delete office")
                 : ServiceResult.Success("Office soft deleted successfully");
-        }, "soft delete office", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Office, id, "Soft Delete Office", ex, _currentUserService.GetDisplayName());
-        });
+        }, "soft delete office");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<PaginatedResult<OfficeListView>>> GetGridDataAsync(
-        int page, int pageSize, string? search = null, bool? isActive = null, Dictionary<string, object>? filters = null)
+    // ============================================================
+    // GRID
+    // ============================================================
+
+    public async Task<ServiceResult<PaginatedResult<OfficeListView>>> GetGridDataAsync(OfficeGridRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            if (filters == null)
-            {
-                filters = new Dictionary<string, object>();
-            }
-            
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                filters["search"] = search;
-            }
-            
-            if (isActive.HasValue)
-            {
-                filters["isActive"] = isActive.Value;
-            }
-
-            var result = await _officeReps.GetPagedListAsync(page, pageSize, search, "OfficeName", false, filters);
+            var result = await _officeReps.GetPagedListAsync(request);
             return ServiceResult<PaginatedResult<OfficeListView>>.Success(result);
         }, "get office grid data");
     }
 
-    /// <inheritdoc />
+    // ============================================================
+    // DROPDOWN
+    // ============================================================
+
     public async Task<ServiceResult<IEnumerable<OfficeDropdownView>>> GetDropdownListAsync()
     {
         return await ExecuteSafelyAsync(async () =>
@@ -340,5 +289,88 @@ public class OfficeService : BaseService, IOfficeService
             var offices = await _officeReps.GetDropdownListAsync();
             return ServiceResult<IEnumerable<OfficeDropdownView>>.Success(offices);
         }, "get office dropdown list");
+    }
+
+    // ============================================================
+    // BULK OPERATIONS
+    // ============================================================
+
+    public async Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request)
+    {
+        if (request.Ids == null || !request.Ids.Any())
+        {
+            return ServiceResult<int>.BadRequest("No office IDs provided");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var activatedCount = 0;
+
+            foreach (var id in request.Ids)
+            {
+                var office = await _officeReps.GetByIdRawAsync(id);
+                if (office != null && !office.IsActive)
+                {
+                    office.IsActive = true;
+                    office.ModifiedDate = DateTime.Now;
+                    office.ModifiedBy = _currentUserService.GetDisplayName();
+                    await _repository.UpdateAsync(office);
+                    activatedCount++;
+
+                    await _activityLogService.LogUpdateAsync(
+                        TableNames.Office,
+                        id,
+                        $"Office '{office.OfficeName}' activated via bulk operation",
+                        _currentUserService.GetDisplayName());
+                }
+            }
+
+            return ServiceResult<int>.Success(activatedCount,
+                $"{activatedCount} office(s) activated successfully");
+        }, "bulk activate offices");
+    }
+
+    public async Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request)
+    {
+        if (request.Ids == null || !request.Ids.Any())
+        {
+            return ServiceResult<int>.BadRequest("No office IDs provided");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var deactivatedCount = 0;
+
+            foreach (var id in request.Ids)
+            {
+                var office = await _officeReps.GetByIdRawAsync(id);
+                if (office != null && office.IsActive)
+                {
+                    var childCount = await _officeReps.GetChildCountAsync(id);
+                    if (childCount > 0)
+                    {
+                        continue;
+                    }
+
+                    office.IsActive = false;
+                    office.ModifiedDate = DateTime.Now;
+                    office.ModifiedBy = _currentUserService.GetDisplayName();
+                    await _repository.UpdateAsync(office);
+                    deactivatedCount++;
+
+                    await _activityLogService.LogUpdateAsync(
+                        TableNames.Office,
+                        id,
+                        $"Office '{office.OfficeName}' deactivated via bulk operation",
+                        _currentUserService.GetDisplayName());
+                }
+            }
+
+            var message = deactivatedCount > 0
+                ? $"{deactivatedCount} office(s) deactivated successfully"
+                : "No offices were deactivated. Offices with child offices cannot be deactivated.";
+
+            return ServiceResult<int>.Success(deactivatedCount, message);
+        }, "bulk deactivate offices");
     }
 }

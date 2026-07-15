@@ -16,7 +16,4 @@ public class EmployeeEntity : AuditableEntity
     public int? OfficeId { get; set; }
     public DateTime? JoinDate { get; set; }
     public DateTime? ResignDate { get; set; }
-    
-    // NOTE: Semua NotMapped properties telah dihapus.
-    // Untuk query dengan JOIN, gunakan EmployeeListView atau EmployeeDetailView.
 }

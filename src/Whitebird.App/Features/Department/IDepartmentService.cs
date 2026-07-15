@@ -15,18 +15,27 @@ public interface IDepartmentService
 
     Task<ServiceResult<DepartmentDetailView>> GetByIdAsync(int id);
     Task<ServiceResult<IEnumerable<DepartmentListView>>> GetAllAsync();
-    Task<ServiceResult<IEnumerable<DepartmentListView>>> GetActiveOnlyAsync();
     Task<ServiceResult<DepartmentDetailView>> CreateAsync(DepartmentCreateViewModel model);
     Task<ServiceResult<DepartmentDetailView>> UpdateAsync(int id, DepartmentUpdateViewModel model);
     Task<ServiceResult> DeleteAsync(int id);
     Task<ServiceResult> SoftDeleteAsync(int id);
 
     // ============================================================
-    // GRID & DROPDOWN
+    // GRID
     // ============================================================
 
-    Task<ServiceResult<PaginatedResult<DepartmentListView>>> GetGridDataAsync(
-        int page, int pageSize, string? search = null, bool? isActive = null, Dictionary<string, object>? filters = null);
-    
+    Task<ServiceResult<PaginatedResult<DepartmentListView>>> GetGridDataAsync(DepartmentGridRequest request);
+
+    // ============================================================
+    // DROPDOWN
+    // ============================================================
+
     Task<ServiceResult<IEnumerable<DepartmentDropdownView>>> GetDropdownListAsync();
+
+    // ============================================================
+    // BULK OPERATIONS
+    // ============================================================
+
+    Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request);
+    Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request);
 }

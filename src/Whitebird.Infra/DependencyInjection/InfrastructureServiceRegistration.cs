@@ -53,7 +53,14 @@ public static class InfrastructureServiceRegistration
         services.AddScoped<IDepartmentReps, DepartmentReps>();
         services.AddScoped<IOfficeReps, OfficeReps>();
         services.AddScoped<IFileAttachmentReps, FileAttachmentReps>();
-
+services.AddScoped<IUserReps, UserReps>();
+services.AddScoped<IScheduleHandoverReps, ScheduleHandoverReps>();
+services.AddScoped<IScheduleReturnReps, ScheduleReturnReps>();
+services.AddScoped<IScheduleMaintenanceReps, ScheduleMaintenanceReps>();
+services.AddScoped<IDashboardReps, DashboardReps>();
+services.AddScoped<IAssetTrackingReps, AssetTrackingReps>();
+services.AddScoped<IEmployeeSummaryReps, EmployeeSummaryReps>();
+services.AddScoped<IHomeReps, HomeReps>();
         return services;
     }
 }

@@ -5,6 +5,7 @@ public class MasterDataListViewModel
     public int MasterDataId { get; set; }
     public int ReferenceCode { get; set; }
     public string ReferenceName { get; set; } = default!;
+    public string? MasterDataCode { get; set; }
     public string MasterDataName { get; set; } = default!;
     public bool IsActive { get; set; }
 }
@@ -14,6 +15,7 @@ public class MasterDataDetailViewModel
     public int MasterDataId { get; set; }
     public int ReferenceCode { get; set; }
     public string ReferenceName { get; set; } = default!;
+    public string? MasterDataCode { get; set; }
     public string MasterDataName { get; set; } = default!;
     public bool IsActive { get; set; }
     public DateTime CreatedDate { get; set; }

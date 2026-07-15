@@ -5,8 +5,6 @@ namespace Whitebird.Domain.Features.FileAttachment;
 public class FileAttachmentListViewModel
 {
     public int FileAttachmentId { get; set; }
-    public string ReferenceTable { get; set; } = default!;
-    public int ReferenceId { get; set; }
     public string? FileCategory { get; set; }
     public string FileName { get; set; } = default!;
     public string OriginalFileName { get; set; } = default!;
@@ -23,8 +21,6 @@ public class FileAttachmentListViewModel
 public class FileAttachmentDetailViewModel
 {
     public int FileAttachmentId { get; set; }
-    public string ReferenceTable { get; set; } = default!;
-    public int ReferenceId { get; set; }
     public string? FileCategory { get; set; }
     public string FileName { get; set; } = default!;
     public string OriginalFileName { get; set; } = default!;

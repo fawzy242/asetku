@@ -18,6 +18,10 @@ public class OfficeController : ControllerBase
         _officeService = officeService;
     }
 
+    // ============================================================
+    // CRUD
+    // ============================================================
+
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
         => this.HandleResult(await _officeService.GetByIdAsync(id));
@@ -25,38 +29,6 @@ public class OfficeController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll()
         => this.HandleResult(await _officeService.GetAllAsync());
-
-    [HttpGet("active")]
-    public async Task<IActionResult> GetActiveOnly()
-        => this.HandleResult(await _officeService.GetActiveOnlyAsync());
-
-    [HttpGet("suboffices/{parentId:int}")]
-    public async Task<IActionResult> GetSubOffices(int parentId)
-        => this.HandleResult(await _officeService.GetSubOfficesAsync(parentId));
-
-    [HttpGet("grid")]
-    public async Task<IActionResult> GetGridData(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string? search = null,
-        [FromQuery] bool? isActive = null)
-    {
-        var filters = new Dictionary<string, object>();
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            filters["search"] = search;
-        }
-        if (isActive.HasValue)
-        {
-            filters["isActive"] = isActive.Value;
-        }
-
-        return this.HandleResult(await _officeService.GetGridDataAsync(page, pageSize, search, isActive, filters));
-    }
-
-    [HttpGet("dropdown")]
-    public async Task<IActionResult> GetDropdownList()
-        => this.HandleResult(await _officeService.GetDropdownListAsync());
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] OfficeCreateViewModel model)
@@ -81,4 +53,40 @@ public class OfficeController : ControllerBase
     [HttpDelete("{id:int}/soft")]
     public async Task<IActionResult> SoftDelete(int id)
         => this.HandleResult(await _officeService.SoftDeleteAsync(id));
+
+    // ============================================================
+    // GRID
+    // ============================================================
+
+    [HttpGet("grid")]
+    public async Task<IActionResult> GetGridData([FromQuery] OfficeGridRequest request)
+        => this.HandleResult(await _officeService.GetGridDataAsync(request));
+
+    // ============================================================
+    // DROPDOWN
+    // ============================================================
+
+    [HttpGet("dropdown")]
+    public async Task<IActionResult> GetDropdownList()
+        => this.HandleResult(await _officeService.GetDropdownListAsync());
+
+    // ============================================================
+    // BULK OPERATIONS
+    // ============================================================
+
+    [HttpPost("activate")]
+    public async Task<IActionResult> BulkActivate([FromBody] BulkActivateRequest request)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _officeService.BulkActivateAsync(request));
+    }
+
+    [HttpPost("deactivate")]
+    public async Task<IActionResult> BulkDeactivate([FromBody] BulkActivateRequest request)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _officeService.BulkDeactivateAsync(request));
+    }
 }

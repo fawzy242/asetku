@@ -31,7 +31,10 @@ public class CategoryService : BaseService, ICategoryService
         _activityLogService = activityLogService;
     }
 
-    /// <inheritdoc />
+    // ============================================================
+    // BASIC CRUD
+    // ============================================================
+
     public async Task<ServiceResult<CategoryDetailView>> GetByIdAsync(int id)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -45,7 +48,6 @@ public class CategoryService : BaseService, ICategoryService
         }, "get category by id");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult<IEnumerable<CategoryListView>>> GetAllAsync()
     {
         return await ExecuteSafelyAsync(async () =>
@@ -55,33 +57,6 @@ public class CategoryService : BaseService, ICategoryService
         }, "get all categories");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<CategoryListView>>> GetActiveOnlyAsync()
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var categories = await _categoryReps.GetActiveOnlyListViewAsync();
-            return ServiceResult<IEnumerable<CategoryListView>>.Success(categories);
-        }, "get active categories");
-    }
-
-    /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<CategoryListView>>> GetSubCategoriesAsync(int parentId)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var parent = await _categoryReps.GetByIdRawAsync(parentId);
-            if (parent == null)
-            {
-                return ServiceResult<IEnumerable<CategoryListView>>.NotFound($"Parent category with id {parentId} not found");
-            }
-
-            var categories = await _categoryReps.GetSubCategoryListViewAsync(parentId);
-            return ServiceResult<IEnumerable<CategoryListView>>.Success(categories);
-        }, "get subcategories");
-    }
-
-    /// <inheritdoc />
     public async Task<ServiceResult<CategoryDetailView>> CreateAsync(CategoryCreateViewModel model)
     {
         if (string.IsNullOrWhiteSpace(model.CategoryName))
@@ -121,29 +96,23 @@ public class CategoryService : BaseService, ICategoryService
             entity.CreatedBy = _currentUserService.GetDisplayName();
 
             var id = await _repository.InsertAsync(entity);
-            entity.CategoryId = Convert.ToInt32(id);
-
-            var created = await _categoryReps.GetDetailByIdAsync(entity.CategoryId);
+            var created = await _categoryReps.GetDetailByIdAsync(Convert.ToInt32(id));
 
             if (created != null)
             {
                 await _activityLogService.LogCreateAsync(
                     TableNames.Category,
-                    entity.CategoryId,
-                    $"Category '{entity.CategoryName}' created successfully",
+                    created.CategoryId,
+                    $"Category '{created.CategoryName}' created successfully",
                     _currentUserService.GetDisplayName());
             }
 
             return created == null
                 ? ServiceResult<CategoryDetailView>.Failure("Failed to retrieve created category")
                 : ServiceResult<CategoryDetailView>.Success(created, "Category created successfully");
-        }, "create category", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Category, 0, "Create Category", ex, _currentUserService.GetDisplayName());
-        });
+        }, "create category");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult<CategoryDetailView>> UpdateAsync(int id, CategoryUpdateViewModel model)
     {
         if (model.ParentCategoryId.HasValue && model.ParentCategoryId.Value > 0)
@@ -201,17 +170,13 @@ public class CategoryService : BaseService, ICategoryService
             await _activityLogService.LogUpdateAsync(
                 TableNames.Category,
                 id,
-                $"Category updated: Name '{oldName}' -> '{existing.CategoryName}', ParentId '{oldParentId}' -> '{existing.ParentCategoryId}'",
+                $"Category updated: Name '{oldName}' -> '{model.CategoryName}', ParentId '{oldParentId}' -> '{model.ParentCategoryId}'",
                 _currentUserService.GetDisplayName());
 
             return ServiceResult<CategoryDetailView>.Success(updated!, "Category updated successfully");
-        }, "update category", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Category, id, "Update Category", ex, _currentUserService.GetDisplayName());
-        });
+        }, "update category");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -242,13 +207,9 @@ public class CategoryService : BaseService, ICategoryService
             return result <= 0
                 ? ServiceResult.Failure("Failed to delete category")
                 : ServiceResult.Success("Category deleted successfully");
-        }, "delete category", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Category, id, "Delete Category", ex, _currentUserService.GetDisplayName());
-        });
+        }, "delete category");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult> SoftDeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -277,39 +238,26 @@ public class CategoryService : BaseService, ICategoryService
             return result <= 0
                 ? ServiceResult.Failure("Failed to soft delete category")
                 : ServiceResult.Success("Category soft deleted successfully");
-        }, "soft delete category", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.Category, id, "Soft Delete Category", ex, _currentUserService.GetDisplayName());
-        });
+        }, "soft delete category");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<PaginatedResult<CategoryListView>>> GetGridDataAsync(
-        int page, int pageSize, string? search = null, bool? isActive = null, Dictionary<string, object>? filters = null)
+    // ============================================================
+    // GRID
+    // ============================================================
+
+    public async Task<ServiceResult<PaginatedResult<CategoryListView>>> GetGridDataAsync(CategoryGridRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            if (filters == null)
-            {
-                filters = new Dictionary<string, object>();
-            }
-            
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                filters["search"] = search;
-            }
-            
-            if (isActive.HasValue)
-            {
-                filters["isActive"] = isActive.Value;
-            }
-
-            var result = await _categoryReps.GetPagedListAsync(page, pageSize, search, "CategoryName", false, filters);
+            var result = await _categoryReps.GetPagedListAsync(request);
             return ServiceResult<PaginatedResult<CategoryListView>>.Success(result);
         }, "get category grid data");
     }
 
-    /// <inheritdoc />
+    // ============================================================
+    // DROPDOWN
+    // ============================================================
+
     public async Task<ServiceResult<IEnumerable<CategoryDropdownView>>> GetDropdownListAsync()
     {
         return await ExecuteSafelyAsync(async () =>
@@ -317,5 +265,88 @@ public class CategoryService : BaseService, ICategoryService
             var categories = await _categoryReps.GetDropdownListAsync();
             return ServiceResult<IEnumerable<CategoryDropdownView>>.Success(categories);
         }, "get category dropdown list");
+    }
+
+    // ============================================================
+    // BULK OPERATIONS
+    // ============================================================
+
+    public async Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request)
+    {
+        if (request.Ids == null || !request.Ids.Any())
+        {
+            return ServiceResult<int>.BadRequest("No category IDs provided");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var activatedCount = 0;
+
+            foreach (var id in request.Ids)
+            {
+                var category = await _categoryReps.GetByIdRawAsync(id);
+                if (category != null && !category.IsActive)
+                {
+                    category.IsActive = true;
+                    category.ModifiedDate = DateTime.Now;
+                    category.ModifiedBy = _currentUserService.GetDisplayName();
+                    await _repository.UpdateAsync(category);
+                    activatedCount++;
+
+                    await _activityLogService.LogUpdateAsync(
+                        TableNames.Category,
+                        id,
+                        $"Category '{category.CategoryName}' activated via bulk operation",
+                        _currentUserService.GetDisplayName());
+                }
+            }
+
+            return ServiceResult<int>.Success(activatedCount,
+                $"{activatedCount} category(s) activated successfully");
+        }, "bulk activate categories");
+    }
+
+    public async Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request)
+    {
+        if (request.Ids == null || !request.Ids.Any())
+        {
+            return ServiceResult<int>.BadRequest("No category IDs provided");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var deactivatedCount = 0;
+
+            foreach (var id in request.Ids)
+            {
+                var category = await _categoryReps.GetByIdRawAsync(id);
+                if (category != null && category.IsActive)
+                {
+                    var childCount = await _categoryReps.GetChildCountAsync(id);
+                    if (childCount > 0)
+                    {
+                        continue;
+                    }
+
+                    category.IsActive = false;
+                    category.ModifiedDate = DateTime.Now;
+                    category.ModifiedBy = _currentUserService.GetDisplayName();
+                    await _repository.UpdateAsync(category);
+                    deactivatedCount++;
+
+                    await _activityLogService.LogUpdateAsync(
+                        TableNames.Category,
+                        id,
+                        $"Category '{category.CategoryName}' deactivated via bulk operation",
+                        _currentUserService.GetDisplayName());
+                }
+            }
+
+            var message = deactivatedCount > 0
+                ? $"{deactivatedCount} category(s) deactivated successfully"
+                : "No categories were deactivated. Categories with subcategories cannot be deactivated.";
+
+            return ServiceResult<int>.Success(deactivatedCount, message);
+        }, "bulk deactivate categories");
     }
 }

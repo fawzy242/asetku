@@ -15,19 +15,27 @@ public interface ICategoryService
 
     Task<ServiceResult<CategoryDetailView>> GetByIdAsync(int id);
     Task<ServiceResult<IEnumerable<CategoryListView>>> GetAllAsync();
-    Task<ServiceResult<IEnumerable<CategoryListView>>> GetActiveOnlyAsync();
-    Task<ServiceResult<IEnumerable<CategoryListView>>> GetSubCategoriesAsync(int parentId);
     Task<ServiceResult<CategoryDetailView>> CreateAsync(CategoryCreateViewModel model);
     Task<ServiceResult<CategoryDetailView>> UpdateAsync(int id, CategoryUpdateViewModel model);
     Task<ServiceResult> DeleteAsync(int id);
     Task<ServiceResult> SoftDeleteAsync(int id);
 
     // ============================================================
-    // GRID & DROPDOWN
+    // GRID
     // ============================================================
 
-    Task<ServiceResult<PaginatedResult<CategoryListView>>> GetGridDataAsync(
-        int page, int pageSize, string? search = null, bool? isActive = null, Dictionary<string, object>? filters = null);
-    
+    Task<ServiceResult<PaginatedResult<CategoryListView>>> GetGridDataAsync(CategoryGridRequest request);
+
+    // ============================================================
+    // DROPDOWN
+    // ============================================================
+
     Task<ServiceResult<IEnumerable<CategoryDropdownView>>> GetDropdownListAsync();
+
+    // ============================================================
+    // BULK OPERATIONS
+    // ============================================================
+
+    Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request);
+    Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request);
 }

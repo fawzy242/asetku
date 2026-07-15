@@ -3,7 +3,7 @@ using System;
 namespace Whitebird.Domain.Features.AssetTransaction;
 
 /// <summary>
-/// View model untuk AssetTransaction dropdown (minimal data untuk pairing)
+/// View model untuk AssetTransaction dropdown
 /// </summary>
 public class AssetTransactionDropdownView
 {
