@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.Dashboard;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Dashboard;
 using Whitebird.Infra.Features.Common;
 
@@ -97,10 +98,10 @@ public class DashboardService : BaseService, IDashboardService
     }
 
     // ============================================================
-    // DETAIL STATS (DRILLDOWN)
+    // DETAIL STATS (Drilldown) - Using GridRequest
     // ============================================================
 
-    public async Task<ServiceResult<DetailStatsResponse>> GetDetailStatsAsync(DetailStatsRequest request)
+    public async Task<ServiceResult<DetailStatsResponse>> GetDetailStatsAsync(DashboardDetailStatsRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
@@ -109,138 +110,41 @@ public class DashboardService : BaseService, IDashboardService
                 return ServiceResult<DetailStatsResponse>.BadRequest("Type is required");
             }
 
-            PaginatedResult<object>? result = null;
-            string title = string.Empty;
-            int totalCount = 0;
-
-            var page = request.Page <= 0 ? 1 : request.Page;
-            var pageSize = request.PageSize <= 0 ? 10 : request.PageSize;
-
-            switch (request.Type.ToLower())
+            var validTypes = new[] { "available", "assigned", "onloan", "inmaintenance", "disposed", "damaged", "expiredwarranty", "overdueloans" };
+            if (!validTypes.Contains(request.Type.ToLower()))
             {
-                case "available":
-                    var available = await _dashboardReps.GetAvailableAssetsDetailAsync(page, pageSize, request.Search, request.SortBy, request.SortDescending);
-                    result = new PaginatedResult<object>
-                    {
-                        Data = available.Data.Cast<object>().ToList(),
-                        TotalCount = available.TotalCount,
-                        PageNumber = available.PageNumber,
-                        PageSize = available.PageSize,
-                        TotalPages = available.TotalPages
-                    };
-                    title = "Available Assets";
-                    totalCount = available.TotalCount;
-                    break;
-
-                case "assigned":
-                    var assigned = await _dashboardReps.GetAssignedAssetsDetailAsync(page, pageSize, request.Search, request.SortBy, request.SortDescending);
-                    result = new PaginatedResult<object>
-                    {
-                        Data = assigned.Data.Cast<object>().ToList(),
-                        TotalCount = assigned.TotalCount,
-                        PageNumber = assigned.PageNumber,
-                        PageSize = assigned.PageSize,
-                        TotalPages = assigned.TotalPages
-                    };
-                    title = "Assigned Assets";
-                    totalCount = assigned.TotalCount;
-                    break;
-
-                case "onloan":
-                    var onLoan = await _dashboardReps.GetOnLoanAssetsDetailAsync(page, pageSize, request.Search, request.SortBy, request.SortDescending);
-                    result = new PaginatedResult<object>
-                    {
-                        Data = onLoan.Data.Cast<object>().ToList(),
-                        TotalCount = onLoan.TotalCount,
-                        PageNumber = onLoan.PageNumber,
-                        PageSize = onLoan.PageSize,
-                        TotalPages = onLoan.TotalPages
-                    };
-                    title = "Assets On Loan";
-                    totalCount = onLoan.TotalCount;
-                    break;
-
-                case "inmaintenance":
-                    var inMaintenance = await _dashboardReps.GetInMaintenanceAssetsDetailAsync(page, pageSize, request.Search, request.SortBy, request.SortDescending);
-                    result = new PaginatedResult<object>
-                    {
-                        Data = inMaintenance.Data.Cast<object>().ToList(),
-                        TotalCount = inMaintenance.TotalCount,
-                        PageNumber = inMaintenance.PageNumber,
-                        PageSize = inMaintenance.PageSize,
-                        TotalPages = inMaintenance.TotalPages
-                    };
-                    title = "Assets In Maintenance";
-                    totalCount = inMaintenance.TotalCount;
-                    break;
-
-                case "disposed":
-                    var disposed = await _dashboardReps.GetDisposedAssetsDetailAsync(page, pageSize, request.Search, request.SortBy, request.SortDescending);
-                    result = new PaginatedResult<object>
-                    {
-                        Data = disposed.Data.Cast<object>().ToList(),
-                        TotalCount = disposed.TotalCount,
-                        PageNumber = disposed.PageNumber,
-                        PageSize = disposed.PageSize,
-                        TotalPages = disposed.TotalPages
-                    };
-                    title = "Disposed Assets";
-                    totalCount = disposed.TotalCount;
-                    break;
-
-                case "damaged":
-                    var damaged = await _dashboardReps.GetDamagedAssetsDetailAsync(page, pageSize, request.Search, request.SortBy, request.SortDescending);
-                    result = new PaginatedResult<object>
-                    {
-                        Data = damaged.Data.Cast<object>().ToList(),
-                        TotalCount = damaged.TotalCount,
-                        PageNumber = damaged.PageNumber,
-                        PageSize = damaged.PageSize,
-                        TotalPages = damaged.TotalPages
-                    };
-                    title = "Damaged Assets";
-                    totalCount = damaged.TotalCount;
-                    break;
-
-                case "expiredwarranty":
-                    var expiredWarranty = await _dashboardReps.GetExpiredWarrantyDetailAsync(page, pageSize, request.Search, request.SortBy, request.SortDescending);
-                    result = new PaginatedResult<object>
-                    {
-                        Data = expiredWarranty.Data.Cast<object>().ToList(),
-                        TotalCount = expiredWarranty.TotalCount,
-                        PageNumber = expiredWarranty.PageNumber,
-                        PageSize = expiredWarranty.PageSize,
-                        TotalPages = expiredWarranty.TotalPages
-                    };
-                    title = "Expired Warranty Assets";
-                    totalCount = expiredWarranty.TotalCount;
-                    break;
-
-                case "overdueloans":
-                    var overdueLoans = await _dashboardReps.GetOverdueLoansDetailAsync(page, pageSize, request.Search, request.SortBy, request.SortDescending);
-                    result = new PaginatedResult<object>
-                    {
-                        Data = overdueLoans.Data.Cast<object>().ToList(),
-                        TotalCount = overdueLoans.TotalCount,
-                        PageNumber = overdueLoans.PageNumber,
-                        PageSize = overdueLoans.PageSize,
-                        TotalPages = overdueLoans.TotalPages
-                    };
-                    title = "Overdue Loans";
-                    totalCount = overdueLoans.TotalCount;
-                    break;
-
-                default:
-                    return ServiceResult<DetailStatsResponse>.BadRequest(
-                        $"Invalid type: {request.Type}. Valid types: Available, Assigned, OnLoan, InMaintenance, Disposed, Damaged, ExpiredWarranty, OverdueLoans");
+                return ServiceResult<DetailStatsResponse>.BadRequest(
+                    $"Invalid type: {request.Type}. Valid types: Available, Assigned, OnLoan, InMaintenance, Disposed, Damaged, ExpiredWarranty, OverdueLoans");
             }
+
+            var result = await _dashboardReps.GetDetailStatsAsync(request);
+
+            var title = request.Type switch
+            {
+                "Available" or "available" => "Available Assets",
+                "Assigned" or "assigned" => "Assigned Assets",
+                "OnLoan" or "onloan" => "Assets On Loan",
+                "InMaintenance" or "inmaintenance" => "Assets In Maintenance",
+                "Disposed" or "disposed" => "Disposed Assets",
+                "Damaged" or "damaged" => "Damaged Assets",
+                "ExpiredWarranty" or "expiredwarranty" => "Expired Warranty Assets",
+                "OverdueLoans" or "overdueloans" => "Overdue Loans",
+                _ => request.Type
+            };
 
             var response = new DetailStatsResponse
             {
                 Type = request.Type,
                 Title = title,
-                TotalCount = totalCount,
-                Data = result!
+                TotalCount = result.TotalCount,
+                Data = new PaginatedResult<object>
+                {
+                    Data = result.Data.Cast<object>().ToList(),
+                    TotalCount = result.TotalCount,
+                    PageNumber = result.PageNumber,
+                    PageSize = result.PageSize,
+                    TotalPages = result.TotalPages
+                }
             };
 
             return ServiceResult<DetailStatsResponse>.Success(response);

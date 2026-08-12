@@ -1,6 +1,7 @@
 using Dapper;
 using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.Department;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.Department;
@@ -79,7 +80,7 @@ public class DepartmentReps : IDepartmentReps
                 (SELECT COUNT(*) FROM Employee WHERE DepartmentId = d.DepartmentId AND IsActive = 1) as EmployeeCount
             FROM Department d
             WHERE d.DepartmentId = @DepartmentId AND d.IsActive = 1";
-        
+
         return await _context.QueryFirstOrDefaultAsync<DepartmentDetailView>(sql, new { DepartmentId = departmentId });
     }
 
@@ -93,12 +94,12 @@ public class DepartmentReps : IDepartmentReps
             FROM Department d
             WHERE d.IsActive = 1
             ORDER BY d.DepartmentName";
-        
+
         return await _context.QueryAsync<DepartmentListView>(sql);
     }
 
     // ============================================================
-    // PAGINATION
+    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
     // ============================================================
 
     public async Task<PaginatedResult<DepartmentListView>> GetPagedListAsync(DepartmentGridRequest request)
@@ -106,10 +107,8 @@ public class DepartmentReps : IDepartmentReps
         var conditions = new List<string>();
         var parameters = new DynamicParameters();
 
-        // IsActive filter
         GridQueryBuilder.AddEqualsFilter(conditions, parameters, "d.IsActive", request.IsActive);
 
-        // Search
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var searchColumns = new[] { "d.DepartmentName", "d.DepartmentCode", "d.Description" };
@@ -120,19 +119,19 @@ public class DepartmentReps : IDepartmentReps
         var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "d.DepartmentName", false);
         var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
-        // Count
         var countSql = $@"
             SELECT COUNT(*) 
             FROM Department d
             {whereClause}";
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        // Data
         var selectClause = @"
             SELECT 
                 d.DepartmentId, d.DepartmentCode, d.DepartmentName, d.Description,
                 d.IsActive, d.CreatedDate, d.CreatedBy, d.ModifiedDate, d.ModifiedBy,
-                (SELECT COUNT(*) FROM Employee WHERE DepartmentId = d.DepartmentId AND IsActive = 1) as EmployeeCount";
+                (SELECT COUNT(*) FROM Employee WHERE DepartmentId = d.DepartmentId AND IsActive = 1) as EmployeeCount,
+                1 as CanEdit,
+                1 as CanDelete";
 
         var dataSql = $@"
             {selectClause}

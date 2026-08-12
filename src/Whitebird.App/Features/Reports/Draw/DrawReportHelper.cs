@@ -13,7 +13,7 @@ public static class DrawReportHelper
 {
     static DrawReportHelper()
     {
-        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        OfficeOpenXml.ExcelPackage.LicenseContext = OfficeOpenXml.LicenseContext.NonCommercial;
     }
 
     /// <summary>

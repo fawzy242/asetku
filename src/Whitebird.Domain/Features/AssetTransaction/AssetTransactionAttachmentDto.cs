@@ -2,11 +2,11 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Whitebird.Domain.Features.AssetTransaction;
 
-public class AssetTransactionAttachmentUploadDto
+/// <summary>
+/// DTO for asset transaction attachment (Domain layer - no IFormFile)
+/// </summary>
+public class AssetTransactionAttachmentDto
 {
-    [Required(ErrorMessage = "File is required")]
-    public IFormFile File { get; set; } = default!;
-
     [StringLength(50, ErrorMessage = "FileCategory cannot exceed 50 characters")]
     public string? FileCategory { get; set; }
 

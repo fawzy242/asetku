@@ -1,4 +1,4 @@
-using Whitebird.Infra.Features.Common;
+using Whitebird.Domain.Features.Common;
 
 namespace Whitebird.Domain.Features.Dashboard;
 

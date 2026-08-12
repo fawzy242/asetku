@@ -1,5 +1,6 @@
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.Department;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.App.Features.Department;

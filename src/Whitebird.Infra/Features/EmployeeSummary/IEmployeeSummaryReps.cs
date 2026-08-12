@@ -1,4 +1,5 @@
 using Whitebird.Domain.Features.EmployeeSummary;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.EmployeeSummary;
@@ -8,39 +9,69 @@ namespace Whitebird.Infra.Features.EmployeeSummary;
 /// </summary>
 public interface IEmployeeSummaryReps
 {
-    // Lookup/Dropdown
+    // ============================================================
+    // LOOKUP
+    // ============================================================
+
     Task<EmployeeSummaryGetDataDto?> GetEmployeeDataAsync(int employeeId);
 
-    // Complete Summary
+    // ============================================================
+    // COMPLETE SUMMARY
+    // ============================================================
+
     Task<EmployeeSummaryView?> GetSummaryAsync(int employeeId);
 
-    // Statistics
+    // ============================================================
+    // STATISTICS
+    // ============================================================
+
     Task<EmployeeSummaryStatsDto> GetStatsAsync(int employeeId);
 
-    // Current Holding
-    Task<PaginatedResult<EmployeeCurrentHoldingDto>> GetCurrentHoldingAsync(
-        int employeeId, int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false);
+    // ============================================================
+    // CURRENT HOLDING - Using GridRequest
+    // ============================================================
 
-    // Assets History (previously held, now with another employee)
-    Task<PaginatedResult<EmployeeAssetsHistoryDto>> GetAssetsHistoryAsync(
-        int employeeId, int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false);
+    Task<PaginatedResult<EmployeeCurrentHoldingDto>> GetCurrentHoldingAsync(EmployeeSummaryGridRequest request);
 
-    // Transaction History
-    Task<PaginatedResult<EmployeeTransactionHistoryDto>> GetTransactionHistoryAsync(
-        int employeeId, int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false);
+    // ============================================================
+    // ASSETS HISTORY - Using GridRequest
+    // ============================================================
 
-    // Current Holding Stats (Category breakdown)
+    Task<PaginatedResult<EmployeeAssetsHistoryDto>> GetAssetsHistoryAsync(EmployeeSummaryGridRequest request);
+
+    // ============================================================
+    // TRANSACTION HISTORY - Using GridRequest
+    // ============================================================
+
+    Task<PaginatedResult<EmployeeTransactionHistoryDto>> GetTransactionHistoryAsync(EmployeeSummaryGridRequest request);
+
+    // ============================================================
+    // CURRENT HOLDING STATS (Category breakdown)
+    // ============================================================
+
     Task<EmployeeCategoryStatsResponse> GetCurrentHoldingStatsAsync(int employeeId);
 
-    // Transaction Stats
+    // ============================================================
+    // TRANSACTION STATS
+    // ============================================================
+
     Task<EmployeeTransactionStatsResponse> GetTransactionStatsAsync(int employeeId);
 
-    // Schedule Stats
+    // ============================================================
+    // SCHEDULE STATS
+    // ============================================================
+
     Task<EmployeeScheduleStatsDto> GetScheduleStatsAsync(int employeeId);
 
-    // Attachments
+    // ============================================================
+    // ATTACHMENTS
+    // ============================================================
+
     Task<IEnumerable<EmployeeSummaryAttachmentDto>> GetAttachmentsByEmployeeIdAsync(int employeeId);
 
-    // Photo Profile
+    // ============================================================
+    // PHOTO PROFILE
+    // ============================================================
+
     Task<EmployeeSummaryAttachmentDto?> GetPhotoProfileByEmployeeIdAsync(int employeeId);
 }

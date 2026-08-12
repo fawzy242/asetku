@@ -2,6 +2,7 @@ using Dapper;
 using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.Schedule;
 using Whitebird.Domain.Features.MasterData;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.Schedule;
@@ -34,7 +35,7 @@ public class ScheduleMaintenanceReps : IScheduleMaintenanceReps
             LEFT JOIN Asset a ON sm.AssetId = a.AssetId
             LEFT JOIN MasterData md ON sm.MaintenanceType = md.ReferenceCode AND md.ReferenceName = 'MaintenanceType' AND md.IsActive = 1
             WHERE sm.ScheduleMaintenanceId = @Id";
-        
+
         return await _context.QueryFirstOrDefaultAsync<ScheduleMaintenanceView>(sql, new { Id = id });
     }
 
@@ -52,7 +53,7 @@ public class ScheduleMaintenanceReps : IScheduleMaintenanceReps
             LEFT JOIN MasterData md ON sm.MaintenanceType = md.ReferenceCode AND md.ReferenceName = 'MaintenanceType' AND md.IsActive = 1
             WHERE sm.IsActive = 1
             ORDER BY sm.ScheduleDate DESC";
-        
+
         return await _context.QueryAsync<ScheduleMaintenanceListView>(sql);
     }
 
@@ -70,7 +71,7 @@ public class ScheduleMaintenanceReps : IScheduleMaintenanceReps
             LEFT JOIN MasterData md ON sm.MaintenanceType = md.ReferenceCode AND md.ReferenceName = 'MaintenanceType' AND md.IsActive = 1
             WHERE sm.AssetId = @AssetId AND sm.IsActive = 1
             ORDER BY sm.ScheduleDate DESC";
-        
+
         return await _context.QueryAsync<ScheduleMaintenanceListView>(sql, new { AssetId = assetId });
     }
 
@@ -88,7 +89,7 @@ public class ScheduleMaintenanceReps : IScheduleMaintenanceReps
             LEFT JOIN MasterData md ON sm.MaintenanceType = md.ReferenceCode AND md.ReferenceName = 'MaintenanceType' AND md.IsActive = 1
             WHERE sm.MaintenanceType = @MaintenanceType AND sm.IsActive = 1
             ORDER BY sm.ScheduleDate DESC";
-        
+
         return await _context.QueryAsync<ScheduleMaintenanceListView>(sql, new { MaintenanceType = maintenanceType });
     }
 
@@ -106,7 +107,7 @@ public class ScheduleMaintenanceReps : IScheduleMaintenanceReps
             LEFT JOIN MasterData md ON sm.MaintenanceType = md.ReferenceCode AND md.ReferenceName = 'MaintenanceType' AND md.IsActive = 1
             WHERE sm.ScheduleDate BETWEEN @StartDate AND @EndDate AND sm.IsActive = 1
             ORDER BY sm.ScheduleDate ASC";
-        
+
         return await _context.QueryAsync<ScheduleMaintenanceListView>(sql, new { StartDate = startDate, EndDate = endDate });
     }
 
@@ -134,7 +135,7 @@ public class ScheduleMaintenanceReps : IScheduleMaintenanceReps
             WHERE ScheduleDate BETWEEN @StartDate AND @EndDate 
               AND AssetId = @AssetId 
               AND IsActive = 1";
-        
+
         var result = await _context.QueryAsync<DateTime>(sql, new { StartDate = startDate.Date, EndDate = endDate.Date, AssetId = assetId });
         return result;
     }
@@ -152,7 +153,7 @@ public class ScheduleMaintenanceReps : IScheduleMaintenanceReps
                 @IsActive, GETDATE(), @CreatedBy
             );
             SELECT CAST(SCOPE_IDENTITY() AS INT);";
-        
+
         return await _context.ExecuteScalarAsync<int>(sql, entity);
     }
 
@@ -169,7 +170,7 @@ public class ScheduleMaintenanceReps : IScheduleMaintenanceReps
                 ModifiedDate = GETDATE(),
                 ModifiedBy = @ModifiedBy
             WHERE ScheduleMaintenanceId = @ScheduleMaintenanceId";
-        
+
         return await _context.ExecuteAsync(sql, entity);
     }
 
@@ -184,6 +185,10 @@ public class ScheduleMaintenanceReps : IScheduleMaintenanceReps
         const string sql = "UPDATE ScheduleMaintenance SET IsActive = 0, ModifiedDate = GETDATE() WHERE ScheduleMaintenanceId = @Id";
         return await _context.ExecuteAsync(sql, new { Id = id });
     }
+
+    // ============================================================
+    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
+    // ============================================================
 
     public async Task<PaginatedResult<ScheduleMaintenanceListView>> GetPagedListAsync(ScheduleGridRequest request)
     {
@@ -226,7 +231,9 @@ public class ScheduleMaintenanceReps : IScheduleMaintenanceReps
                 sm.MaintenanceType, sm.MaintenanceAssetTransactionId, sm.PostAssetTransactionId,
                 sm.IsActive, sm.CreatedDate, sm.CreatedBy,
                 a.AssetCode, a.AssetName,
-                md.MasterDataName as MaintenanceTypeName";
+                md.MasterDataName as MaintenanceTypeName,
+                1 as CanEdit,
+                1 as CanDelete";
 
         var fromClause = @"
             FROM ScheduleMaintenance sm

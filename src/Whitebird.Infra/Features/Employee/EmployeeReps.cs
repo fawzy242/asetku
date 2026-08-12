@@ -1,6 +1,7 @@
 using Dapper;
 using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.Employee;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.Employee;
@@ -64,7 +65,7 @@ public class EmployeeReps : IEmployeeReps
             LEFT JOIN MasterData md1 ON e.Position = md1.ReferenceCode AND md1.ReferenceName = 'Position' AND md1.IsActive = 1
             LEFT JOIN MasterData md2 ON e.EmploymentStatus = md2.ReferenceCode AND md2.ReferenceName = 'EmployeeStatus' AND md2.IsActive = 1
             WHERE e.EmployeeId = @EmployeeId";
-        
+
         return await _context.QueryFirstOrDefaultAsync<EmployeeDetailView>(sql, new { EmployeeId = employeeId });
     }
 
@@ -86,12 +87,12 @@ public class EmployeeReps : IEmployeeReps
             LEFT JOIN MasterData md1 ON e.Position = md1.ReferenceCode AND md1.ReferenceName = 'Position' AND md1.IsActive = 1
             LEFT JOIN MasterData md2 ON e.EmploymentStatus = md2.ReferenceCode AND md2.ReferenceName = 'EmployeeStatus' AND md2.IsActive = 1
             ORDER BY e.FullName";
-        
+
         return await _context.QueryAsync<EmployeeListView>(sql);
     }
 
     // ============================================================
-    // PAGINATION
+    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
     // ============================================================
 
     public async Task<PaginatedResult<EmployeeListView>> GetPagedListAsync(EmployeeGridRequest request)
@@ -99,37 +100,28 @@ public class EmployeeReps : IEmployeeReps
         var conditions = new List<string>();
         var parameters = new DynamicParameters();
 
-        // IsActive filter
         GridQueryBuilder.AddEqualsFilter(conditions, parameters, "e.IsActive", request.IsActive);
 
-        // Search
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var searchColumns = new[] { "e.EmployeeCode", "e.FullName", "e.Email", "e.PhoneNumber" };
             GridQueryBuilder.AddSearchCondition(conditions, parameters, request.Search, searchColumns);
         }
 
-        // DepartmentId filter
         GridQueryBuilder.AddEqualsFilter(conditions, parameters, "e.DepartmentId", request.DepartmentId);
-
-        // OfficeId filter
         GridQueryBuilder.AddEqualsFilter(conditions, parameters, "e.OfficeId", request.OfficeId);
-
-        // EmploymentStatus filter
         GridQueryBuilder.AddEqualsFilter(conditions, parameters, "e.EmploymentStatus", request.EmploymentStatus);
 
         var whereClause = GridQueryBuilder.BuildWhereClause(conditions, parameters);
         var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "e.FullName", false);
         var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
-        // Count
         var countSql = $@"
             SELECT COUNT(*) 
             FROM Employee e
             {whereClause}";
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        // Data
         var selectClause = @"
             SELECT 
                 e.EmployeeId, e.EmployeeCode, e.FullName, e.Address,
@@ -139,7 +131,9 @@ public class EmployeeReps : IEmployeeReps
                 e.PhoneNumber, e.Email,
                 e.OfficeId, o.OfficeName,
                 e.JoinDate, e.ResignDate,
-                e.IsActive, e.CreatedDate, e.CreatedBy, e.ModifiedDate, e.ModifiedBy";
+                e.IsActive, e.CreatedDate, e.CreatedBy, e.ModifiedDate, e.ModifiedBy,
+                1 as CanEdit,
+                1 as CanDelete";
 
         var fromClause = @"
             FROM Employee e

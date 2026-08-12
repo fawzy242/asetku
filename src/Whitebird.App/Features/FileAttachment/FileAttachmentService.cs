@@ -60,7 +60,7 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
     }
 
     /// <inheritdoc />
-    public async Task<ServiceResult<FileAttachmentResponseDto>> UploadAsync(string referenceTable, int referenceId, FileAttachmentUploadViewModel model)
+    public async Task<ServiceResult<FileAttachmentResponseDto>> UploadAsync(string referenceTable, int referenceId, FileAttachmentUploadDto model)
     {
         if (model.File == null || model.File.Length == 0)
         {
@@ -84,18 +84,8 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
             var savedPath = await _storageService.SaveFileAsync(model.File, subDirectory);
             var fileHash = _storageService.ComputeFileHash(model.File);
 
-            var existingCount = await _fileAttachmentReps.GetCountByReferenceAsync(referenceTable, referenceId);
-            var shouldBePrimary = model.IsPrimary || existingCount == 0;
-
-            if (shouldBePrimary)
-            {
-                await _fileAttachmentReps.SetPrimaryAsync(0, referenceTable, referenceId);
-            }
-
             var entity = new FileAttachmentEntity
             {
-                ReferenceTable = referenceTable,
-                ReferenceId = referenceId,
                 FileCategory = model.FileCategory,
                 FileName = Path.GetFileName(savedPath),
                 OriginalFileName = model.File.FileName,
@@ -106,7 +96,7 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
                 FileHash = fileHash,
                 Description = model.Description,
                 VersionNumber = 1,
-                IsPrimary = shouldBePrimary,
+                IsPrimary = model.IsPrimary,
                 IsActive = true,
                 CreatedDate = DateTime.Now,
                 CreatedBy = _currentUserService.GetDisplayName()
@@ -139,10 +129,7 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
                 _currentUserService.GetDisplayName());
 
             return ServiceResult<FileAttachmentResponseDto>.Success(response, "File uploaded successfully");
-        }, "upload file", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(referenceTable, referenceId, "Upload File", ex, _currentUserService.GetDisplayName());
-        });
+        }, "upload file");
     }
 
     /// <inheritdoc />
@@ -158,7 +145,7 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
 
         foreach (var file in model.Files)
         {
-            var uploadModel = new FileAttachmentUploadViewModel
+            var uploadModel = new FileAttachmentUploadDto
             {
                 File = file,
                 FileCategory = model.FileCategory,
@@ -205,11 +192,6 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
             existing.ModifiedDate = DateTime.Now;
             existing.ModifiedBy = _currentUserService.GetDisplayName();
 
-            if (model.IsPrimary && !oldIsPrimary)
-            {
-                await _fileAttachmentReps.SetPrimaryAsync(id, existing.ReferenceTable, existing.ReferenceId);
-            }
-
             var result = await _fileAttachmentReps.UpdateAsync(existing);
             if (result <= 0)
             {
@@ -232,16 +214,13 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
             };
 
             await _activityLogService.LogUpdateAsync(
-                existing.ReferenceTable,
-                existing.ReferenceId,
+                "FileAttachment",
+                id,
                 $"File attachment updated: '{existing.OriginalFileName}' - IsPrimary: {oldIsPrimary} -> {model.IsPrimary}",
                 _currentUserService.GetDisplayName());
 
             return ServiceResult<FileAttachmentResponseDto>.Success(response, "Attachment updated successfully");
-        }, "update file attachment", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.FileAttachment, id, "Update Attachment", ex, _currentUserService.GetDisplayName());
-        });
+        }, "update file attachment");
     }
 
     /// <inheritdoc />
@@ -261,8 +240,8 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
             if (result > 0)
             {
                 await _activityLogService.LogDeleteAsync(
-                    existing.ReferenceTable,
-                    existing.ReferenceId,
+                    "FileAttachment",
+                    id,
                     $"File attachment deleted: '{existing.OriginalFileName}'",
                     _currentUserService.GetDisplayName());
             }
@@ -270,10 +249,7 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
             return result <= 0
                 ? ServiceResult.Failure("Failed to delete attachment")
                 : ServiceResult.Success("Attachment deleted successfully");
-        }, "delete file attachment", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync(TableNames.FileAttachment, id, "Delete Attachment", ex, _currentUserService.GetDisplayName());
-        });
+        }, "delete file attachment");
     }
 
     /// <inheritdoc />

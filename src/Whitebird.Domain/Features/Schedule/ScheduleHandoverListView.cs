@@ -13,4 +13,8 @@ public class ScheduleHandoverListView
     public bool IsActive { get; set; }
     public DateTime CreatedDate { get; set; }
     public string CreatedBy { get; set; } = "System";
+
+    // Action flags untuk grid
+    public bool CanEdit { get; set; }
+    public bool CanDelete { get; set; }
 }

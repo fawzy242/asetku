@@ -13,15 +13,13 @@ using Whitebird.Infra.Features.Supplier;
 
 namespace Whitebird.App.Features.Asset;
 
-public class AssetImportService : ImportServiceBase<AssetImportDto, AssetEntity>
+public class AssetImportService : ImportService<AssetImportDto, AssetEntity>
 {
     private readonly IAssetReps _assetReps;
     private readonly ICategoryReps _categoryReps;
     private readonly ISupplierReps _supplierReps;
     private readonly IOfficeReps _officeReps;
     private readonly IMasterDataService _masterDataService;
-    private readonly ICurrentUserService _currentUserService;
-    private readonly IActivityLogService _activityLogService;
 
     private readonly Dictionary<string, string> _templateColumns = new()
     {
@@ -39,15 +37,9 @@ public class AssetImportService : ImportServiceBase<AssetImportDto, AssetEntity>
         { "InvoiceNumber", "Optional. Invoice reference (max 50 chars)" },
         { "SupplierName", "Optional. Supplier name - will lookup or create" },
         { "WarrantyPeriod", "Optional. Warranty period in months" },
-        { "AssetCondition", "Optional. Values: Good, Normal, Damaged" },
         { "AssetConditionPurchase", "Optional. Values: New, Second Hand" },
-        { "OfficeName", "Optional. Office name - will lookup" },
         { "Hostname", "Optional. Hostname (max 50 chars)" },
         { "IpAddress", "Optional. IP address (max 50 chars)" },
-        { "OperasionalOffice", "Optional. TRUE/FALSE" },
-        { "ResidualValue", "Optional. Numeric value" },
-        { "UsefulLife", "Optional. Useful life in years" },
-        { "DepreciationStartDate", "Optional. Format: YYYY-MM-DD" },
         { "Notes", "Optional. Additional notes (max 500 chars)" }
     };
 
@@ -68,8 +60,6 @@ public class AssetImportService : ImportServiceBase<AssetImportDto, AssetEntity>
         _supplierReps = supplierReps;
         _officeReps = officeReps;
         _masterDataService = masterDataService;
-        _currentUserService = currentUserService;
-        _activityLogService = activityLogService;
     }
 
     protected override Dictionary<string, string> GetTemplateColumns() => _templateColumns;
@@ -100,15 +90,6 @@ public class AssetImportService : ImportServiceBase<AssetImportDto, AssetEntity>
         }
         cache["Offices"] = officeDict;
 
-        var conditionCache = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var conditions = await _masterDataService.GetAssetConditionsAsync();
-        if (conditions.IsSuccess && conditions.Data != null)
-        {
-            foreach (var c in conditions.Data)
-                conditionCache[c.Name] = c.Code;
-        }
-        cache["Conditions"] = conditionCache;
-
         var conditionPurchaseCache = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var conditionPurchases = await _masterDataService.GetAssetConditionPurchasesAsync();
         if (conditionPurchases.IsSuccess && conditionPurchases.Data != null)
@@ -137,22 +118,15 @@ public class AssetImportService : ImportServiceBase<AssetImportDto, AssetEntity>
             MacAddress = ExcelDataReader.GetString(row, "MacAddress"),
             InvoiceNumber = ExcelDataReader.GetString(row, "InvoiceNumber"),
             SupplierName = ExcelDataReader.GetString(row, "SupplierName"),
-            OfficeName = ExcelDataReader.GetString(row, "OfficeName"),
             Hostname = ExcelDataReader.GetString(row, "Hostname"),
             IpAddress = ExcelDataReader.GetString(row, "IpAddress"),
             Notes = ExcelDataReader.GetString(row, "Notes"),
-            AssetCondition = ExcelDataReader.GetString(row, "AssetCondition"),
             AssetConditionPurchase = ExcelDataReader.GetString(row, "AssetConditionPurchase"),
             CategoryId = ExcelDataReader.GetInt(row, "CategoryId"),
             CategoryName = ExcelDataReader.GetString(row, "CategoryName"),
             WarrantyPeriod = ExcelDataReader.GetNullableInt(row, "WarrantyPeriod"),
             PurchasePrice = ExcelDataReader.GetNullableDecimal(row, "PurchasePrice"),
-            ResidualValue = ExcelDataReader.GetNullableDecimal(row, "ResidualValue"),
-            UsefulLife = ExcelDataReader.GetNullableInt(row, "UsefulLife"),
-            OperasionalOffice = ExcelDataReader.GetNullableBool(row, "OperasionalOffice"),
-            PurchaseDate = ExcelDataReader.GetNullableDateTime(row, "PurchaseDate"),
-            WarrantyExpiryDate = ExcelDataReader.GetNullableDateTime(row, "WarrantyExpiryDate"),
-            DepreciationStartDate = ExcelDataReader.GetNullableDateTime(row, "DepreciationStartDate")
+            PurchaseDate = ExcelDataReader.GetNullableDateTime(row, "PurchaseDate")
         };
 
         if (string.IsNullOrWhiteSpace(dto.AssetCode))
@@ -175,8 +149,6 @@ public class AssetImportService : ImportServiceBase<AssetImportDto, AssetEntity>
 
         var categoryDict = cache["Categories"] as Dictionary<string, int>;
         var supplierDict = cache["Suppliers"] as Dictionary<string, int>;
-        var officeDict = cache["Offices"] as Dictionary<string, int>;
-        var conditionCache = cache["Conditions"] as Dictionary<string, int>;
         var conditionPurchaseCache = cache["ConditionPurchases"] as Dictionary<string, int>;
 
         int? categoryId = null;
@@ -208,27 +180,9 @@ public class AssetImportService : ImportServiceBase<AssetImportDto, AssetEntity>
         if (!string.IsNullOrWhiteSpace(dto.SupplierName) && supplierDict != null)
         {
             if (!supplierDict.TryGetValue(dto.SupplierName, out int supId))
-                result.AddWarning(rowNumber, "SupplierName", $"Supplier '{dto.SupplierName}' not found - will be created", dto.SupplierName);
+                result.AddWarning(rowNumber, "SupplierName", $"Supplier '{dto.SupplierName}' not found", dto.SupplierName);
             else
                 supplierId = supId;
-        }
-
-        int? officeId = null;
-        if (!string.IsNullOrWhiteSpace(dto.OfficeName) && officeDict != null)
-        {
-            if (!officeDict.TryGetValue(dto.OfficeName, out int offId))
-                result.AddError(rowNumber, "OfficeName", $"Office '{dto.OfficeName}' not found", dto.OfficeName);
-            else
-                officeId = offId;
-        }
-
-        int? conditionId = null;
-        if (!string.IsNullOrWhiteSpace(dto.AssetCondition) && conditionCache != null)
-        {
-            if (!conditionCache.TryGetValue(dto.AssetCondition, out int condId))
-                result.AddError(rowNumber, "AssetCondition", $"Invalid AssetCondition '{dto.AssetCondition}'. Valid: Good, Normal, Damaged", dto.AssetCondition);
-            else
-                conditionId = condId;
         }
 
         int? conditionPurchaseId = null;
@@ -242,13 +196,6 @@ public class AssetImportService : ImportServiceBase<AssetImportDto, AssetEntity>
 
         if (result.Errors.Any(e => e.RowNumber == rowNumber))
             return null;
-
-        // Operational Office Rule: If OperasionalOffice = true, OfficeId is required
-        if (dto.OperasionalOffice == true && !officeId.HasValue)
-        {
-            result.AddError(rowNumber, "OfficeName", "Office is required when Operational Office is enabled");
-            return null;
-        }
 
         return new AssetEntity
         {
@@ -265,17 +212,10 @@ public class AssetImportService : ImportServiceBase<AssetImportDto, AssetEntity>
             InvoiceNumber = dto.InvoiceNumber,
             SupplierId = supplierId,
             WarrantyPeriod = dto.WarrantyPeriod,
-            WarrantyExpiryDate = dto.WarrantyExpiryDate,
-            AssetCondition = conditionId,
             AssetConditionPurchase = conditionPurchaseId,
-            ResidualValue = dto.ResidualValue,
-            UsefulLife = dto.UsefulLife,
-            DepreciationStartDate = dto.DepreciationStartDate,
             Notes = dto.Notes,
-            OfficeId = officeId,
             Hostname = dto.Hostname,
             IpAddress = dto.IpAddress,
-            OperasionalOffice = dto.OperasionalOffice ?? false,
             IsActive = true,
             CreatedDate = DateTime.Now,
             CreatedBy = createdBy

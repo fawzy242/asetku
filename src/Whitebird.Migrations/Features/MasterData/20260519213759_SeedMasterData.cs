@@ -51,7 +51,6 @@ namespace Whitebird.Migrations.Features.MasterData
                 (6, 'TransactionType', 'MAINTENANCE'),
                 (7, 'TransactionType', 'POST MAINTENANCE'),
                 (8, 'TransactionType', 'DISPOSAL'),
-                
 
                 /* MAINTENANCE TYPE */
                 (1, 'MaintenanceType', 'PREVENTIVE MAINTENANCE'),
@@ -61,7 +60,15 @@ namespace Whitebird.Migrations.Features.MasterData
                 (5, 'MaintenanceType', 'SOFTWARE UPDATE'),
                 (6, 'MaintenanceType', 'INSPECTION'),
                 (7, 'MaintenanceType', 'CLEANING'),
-                (8, 'MaintenanceType', 'CALIBRATION');
+                (8, 'MaintenanceType', 'CALIBRATION'),
+
+                /* APPROVE DOCUMENT TYPE */
+                (1, 'ApproveDocumentType', 'Handover Document'),
+                (2, 'ApproveDocumentType', 'Transfer Document'),
+                (3, 'ApproveDocumentType', 'Loan Agreement'),
+                (4, 'ApproveDocumentType', 'Return Receipt'),
+                (5, 'ApproveDocumentType', 'Maintenance Report'),
+                (6, 'ApproveDocumentType', 'Disposal Authorization');
         END;
     ");
         }
@@ -73,7 +80,7 @@ namespace Whitebird.Migrations.Features.MasterData
             WHERE ReferenceName IN (
                 'Position', 'EmployeeStatus', 'OfficeType', 
                 'AssetConditionPurchase', 'AssetCondition', 
-                'TransactionType', 'MaintenanceType'
+                'TransactionType', 'MaintenanceType', 'ApproveDocumentType'
             );
         ");
         }

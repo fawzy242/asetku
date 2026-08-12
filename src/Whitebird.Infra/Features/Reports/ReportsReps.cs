@@ -79,7 +79,7 @@ public class ReportsReps : IReportsReps
     // ============================================================
 
     public async Task<IEnumerable<ReportsAssetInventoryViewModel>> GetAssetInventoryDataAsync(
-        string? status = null, int? categoryId = null, int? supplierId = null)
+    string? status = null, int? categoryId = null, int? supplierId = null)
     {
         var conditions = new List<string>();
         var parameters = new DynamicParameters();
@@ -89,14 +89,14 @@ public class ReportsReps : IReportsReps
             if (status == "Available")
             {
                 conditions.Add(@"
-                    NOT EXISTS (
-                        SELECT 1 FROM AssetTransaction at 
-                        WHERE at.AssetId = a.AssetId 
-                          AND at.Approved = 1 
-                          AND at.FromAssetTransactionId IS NULL 
-                          AND at.IsActive = 1
-                          AND at.TransactionType IN (@HandoverType, @TransferType, @LoanType, @MaintenanceType)
-                    )");
+                NOT EXISTS (
+                    SELECT 1 FROM AssetTransaction at 
+                    WHERE at.AssetId = a.AssetId 
+                      AND at.Approved = 1 
+                      AND at.FromAssetTransactionId IS NULL 
+                      AND at.IsActive = 1
+                      AND at.TransactionType IN (@HandoverType, @TransferType, @LoanType, @MaintenanceType)
+                )");
                 parameters.Add("@HandoverType", TransactionTypeConstants.HANDOVER);
                 parameters.Add("@TransferType", TransactionTypeConstants.TRANSFER);
                 parameters.Add("@LoanType", TransactionTypeConstants.LOAN);
@@ -105,53 +105,53 @@ public class ReportsReps : IReportsReps
             else if (status == "Assigned")
             {
                 conditions.Add(@"
-                    EXISTS (
-                        SELECT 1 FROM AssetTransaction at 
-                        WHERE at.AssetId = a.AssetId 
-                          AND at.TransactionType IN (@HandoverType, @TransferType)
-                          AND at.Approved = 1 
-                          AND at.FromAssetTransactionId IS NULL 
-                          AND at.IsActive = 1
-                    )");
+                EXISTS (
+                    SELECT 1 FROM AssetTransaction at 
+                    WHERE at.AssetId = a.AssetId 
+                      AND at.TransactionType IN (@HandoverType, @TransferType)
+                      AND at.Approved = 1 
+                      AND at.FromAssetTransactionId IS NULL 
+                      AND at.IsActive = 1
+                )");
                 parameters.Add("@HandoverType", TransactionTypeConstants.HANDOVER);
                 parameters.Add("@TransferType", TransactionTypeConstants.TRANSFER);
             }
             else if (status == "On Loan")
             {
                 conditions.Add(@"
-                    EXISTS (
-                        SELECT 1 FROM AssetTransaction at 
-                        WHERE at.AssetId = a.AssetId 
-                          AND at.TransactionType = @LoanType
-                          AND at.Approved = 1 
-                          AND at.FromAssetTransactionId IS NULL 
-                          AND at.IsActive = 1
-                    )");
+                EXISTS (
+                    SELECT 1 FROM AssetTransaction at 
+                    WHERE at.AssetId = a.AssetId 
+                      AND at.TransactionType = @LoanType
+                      AND at.Approved = 1 
+                      AND at.FromAssetTransactionId IS NULL 
+                      AND at.IsActive = 1
+                )");
                 parameters.Add("@LoanType", TransactionTypeConstants.LOAN);
             }
             else if (status == "In Maintenance")
             {
                 conditions.Add(@"
-                    EXISTS (
-                        SELECT 1 FROM AssetTransaction at 
-                        WHERE at.AssetId = a.AssetId 
-                          AND at.TransactionType = @MaintenanceType
-                          AND at.Approved = 1 
-                          AND at.FromAssetTransactionId IS NULL 
-                          AND at.IsActive = 1
-                    )");
+                EXISTS (
+                    SELECT 1 FROM AssetTransaction at 
+                    WHERE at.AssetId = a.AssetId 
+                      AND at.TransactionType = @MaintenanceType
+                      AND at.Approved = 1 
+                      AND at.FromAssetTransactionId IS NULL 
+                      AND at.IsActive = 1
+                )");
                 parameters.Add("@MaintenanceType", TransactionTypeConstants.MAINTENANCE);
             }
             else if (status == "Damaged")
             {
                 conditions.Add(@"
-                    EXISTS (
-                        SELECT 1 FROM AssetTransaction at 
-                        WHERE at.AssetId = a.AssetId 
-                          AND at.TransactionType = @DisposalType
-                          AND at.Approved = 1 
-                          AND at.IsActive = 1
-                    )");
+                EXISTS (
+                    SELECT 1 FROM AssetTransaction at 
+                    WHERE at.AssetId = a.AssetId 
+                      AND at.TransactionType = @DisposalType
+                      AND at.Approved = 1 
+                      AND at.IsActive = 1
+                )");
                 parameters.Add("@DisposalType", TransactionTypeConstants.DISPOSAL);
             }
             else if (status == "Active")
@@ -179,37 +179,37 @@ public class ReportsReps : IReportsReps
         var whereClause = conditions.Any() ? $"WHERE {string.Join(" AND ", conditions)}" : "";
 
         var sql = $@"
-            SELECT 
-                a.AssetId, a.AssetCode, a.AssetName, a.SerialNumber, a.Brand, a.Model,
-                a.Hostname, a.IpAddress, a.Notes,
-                a.PurchaseDate, a.PurchasePrice, a.WarrantyExpiryDate,
-                CASE 
-                    WHEN at2.AssetId IS NULL THEN 'Available'
-                    WHEN at2.TransactionType = @LoanType THEN 'On Loan'
-                    WHEN at2.TransactionType IN (@HandoverType, @TransferType) THEN 'Assigned'
-                    WHEN at2.TransactionType = @MaintenanceType THEN 'In Maintenance'
-                    WHEN at2.TransactionType = @DisposalType THEN 'Disposed'
-                    ELSE 'Available'
-                END as CurrentStatus,
-                mdCondition.MasterDataName as AssetConditionName,
-                mdPurchase.MasterDataName as AssetConditionPurchaseName,
-                o.OfficeName, c.CategoryName, s.SupplierName,
-                e.FullName as CurrentHolderName
-            FROM Asset a
-            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
-            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
-            LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
-            LEFT JOIN MasterData mdPurchase ON a.AssetConditionPurchase = mdPurchase.ReferenceCode AND mdPurchase.ReferenceName = 'AssetConditionPurchase' AND mdPurchase.IsActive = 1
-            LEFT JOIN MasterData mdCondition ON at2.Condition = mdCondition.ReferenceCode AND mdCondition.ReferenceName = 'AssetCondition' AND mdCondition.IsActive = 1
-            LEFT JOIN Employee e ON at2.EmployeeId = e.EmployeeId AND e.IsActive = 1
-            LEFT JOIN (
-                SELECT AssetId, TransactionType, EmployeeId, Condition,
-                       ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
-                FROM AssetTransaction
-                WHERE Approved = 1 AND FromAssetTransactionId IS NULL AND IsActive = 1
-            ) at2 ON a.AssetId = at2.AssetId AND at2.rn = 1
-            {whereClause}
-            ORDER BY a.AssetCode";
+        SELECT 
+            a.AssetId, a.AssetCode, a.AssetName, a.SerialNumber, a.Brand, a.Model,
+            a.Hostname, a.IpAddress, a.Notes,
+            a.PurchaseDate, a.PurchasePrice, a.WarrantyExpiryDate,
+            CASE 
+                WHEN at2.AssetId IS NULL THEN 'Available'
+                WHEN at2.TransactionType = @LoanType THEN 'On Loan'
+                WHEN at2.TransactionType IN (@HandoverType, @TransferType) THEN 'Assigned'
+                WHEN at2.TransactionType = @MaintenanceType THEN 'In Maintenance'
+                WHEN at2.TransactionType = @DisposalType THEN 'Disposed'
+                ELSE 'Available'
+            END as CurrentStatus,
+            mdCondition.MasterDataName as AssetConditionName,
+            mdPurchase.MasterDataName as AssetConditionPurchaseName,
+            o.OfficeName, c.CategoryName, s.SupplierName,
+            e.FullName as CurrentHolderName
+        FROM Asset a
+        LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+        LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
+        LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
+        LEFT JOIN MasterData mdPurchase ON a.AssetConditionPurchase = mdPurchase.ReferenceCode AND mdPurchase.ReferenceName = 'AssetConditionPurchase' AND mdPurchase.IsActive = 1
+        LEFT JOIN MasterData mdCondition ON at2.Condition = mdCondition.ReferenceCode AND mdCondition.ReferenceName = 'AssetCondition' AND mdCondition.IsActive = 1
+        LEFT JOIN Employee e ON at2.EmployeeId = e.EmployeeId AND e.IsActive = 1
+        LEFT JOIN (
+            SELECT AssetId, TransactionType, EmployeeId, Condition,
+                   ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
+            FROM AssetTransaction
+            WHERE Approved = 1 AND FromAssetTransactionId IS NULL AND IsActive = 1
+        ) at2 ON a.AssetId = at2.AssetId AND at2.rn = 1
+        {whereClause}
+        ORDER BY a.AssetCode";
 
         return await _context.QueryAsync<ReportsAssetInventoryViewModel>(sql, parameters);
     }

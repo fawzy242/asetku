@@ -43,18 +43,9 @@ public static class MapsterServiceRegistration
             .Map(dest => dest.CategoryName, src => src.CategoryName ?? "Unknown")
             .Map(dest => dest.Brand, src => src.Brand)
             .Map(dest => dest.Model, src => src.Model)
-            .Map(dest => dest.AssetConditionName, src => src.AssetConditionName ?? "Unknown")
-            .Map(dest => dest.OfficeName, src => src.OfficeName ?? "Unknown")
             .Map(dest => dest.PurchaseDate, src => src.PurchaseDate)
             .Map(dest => dest.PurchasePrice, src => src.PurchasePrice)
             .Map(dest => dest.IsActive, src => src.IsActive);
-
-        TypeAdapterConfig<AssetEntity, AssetDetailViewModel>.NewConfig()
-            .Ignore(dest => dest.CategoryName)
-            .Ignore(dest => dest.SupplierName)
-            .Ignore(dest => dest.OfficeName)
-            .Ignore(dest => dest.AssetConditionName)
-            .Ignore(dest => dest.AssetConditionPurchaseName);
 
         TypeAdapterConfig<AssetCreateViewModel, AssetEntity>.NewConfig()
             .Ignore(dest => dest.AssetId)
@@ -62,9 +53,7 @@ public static class MapsterServiceRegistration
             .Ignore(dest => dest.CreatedDate)
             .Ignore(dest => dest.CreatedBy)
             .Ignore(dest => dest.ModifiedDate)
-            .Ignore(dest => dest.ModifiedBy)
-            .Ignore(dest => dest.LastMaintenanceDate)
-            .Ignore(dest => dest.NextMaintenanceDate);
+            .Ignore(dest => dest.ModifiedBy);
 
         TypeAdapterConfig<AssetUpdateViewModel, AssetEntity>.NewConfig()
             .Ignore(dest => dest.CreatedDate)
@@ -78,19 +67,21 @@ public static class MapsterServiceRegistration
             .Map(dest => dest.AssetName, src => src.AssetName ?? "Unknown")
             .Map(dest => dest.TransactionType, src => src.TransactionType)
             .Map(dest => dest.TransactionTypeName, src => src.TransactionTypeName ?? "Unknown")
-            .Map(dest => dest.FromEmployeeName, src => src.FromEmployeeName)
-            .Map(dest => dest.ToEmployeeName, src => src.ToEmployeeName)
-            .Map(dest => dest.ToLocationName, src => src.ToLocationName)
+            .Map(dest => dest.EmployeeName, src => src.EmployeeName)
+            .Map(dest => dest.OfficeName, src => src.OfficeName)
             .Map(dest => dest.TransactionDate, src => src.TransactionDate)
             .Map(dest => dest.Approved, src => src.Approved)
-            .Map(dest => dest.ExpectedReturnDate, src => src.ExpectedReturnDate)
-            .Map(dest => dest.FromAssetTransactionId, src => src.FromAssetTransactionId);
+            .Map(dest => dest.ExpectedLoanReturnDate, src => src.ExpectedLoanReturnDate)
+            .Map(dest => dest.FromAssetTransactionId, src => src.FromAssetTransactionId)
+            .Map(dest => dest.IsOverdue, src => src.IsOverdue);
 
         TypeAdapterConfig<AssetTransactionCreateViewModel, AssetTransactionEntity>.NewConfig()
             .Ignore(dest => dest.AssetTransactionId)
-            .Ignore(dest => dest.ActualReturnDate)
             .Ignore(dest => dest.Approved)
             .Ignore(dest => dest.ApprovedBy)
+            .Ignore(dest => dest.Completed)
+            .Ignore(dest => dest.CompletedBy)
+            .Ignore(dest => dest.AssetTransactionCode)
             .Ignore(dest => dest.IsActive)
             .Ignore(dest => dest.CreatedDate)
             .Ignore(dest => dest.CreatedBy)
@@ -135,46 +126,6 @@ public static class MapsterServiceRegistration
             .Ignore(dest => dest.CreatedBy)
             .Ignore(dest => dest.ModifiedDate)
             .Ignore(dest => dest.ModifiedBy);
-
-        // ========== EMPLOYEE ASSET SUMMARY MAPPINGS ==========
-        TypeAdapterConfig<EmployeeAssetSummaryView, EmployeeAssetSummaryViewModel>.NewConfig()
-            .Map(dest => dest.EmployeeId, src => src.EmployeeId)
-            .Map(dest => dest.EmployeeCode, src => src.EmployeeCode ?? string.Empty)
-            .Map(dest => dest.FullName, src => src.FullName ?? string.Empty)
-            .Map(dest => dest.DepartmentName, src => src.DepartmentName)
-            .Map(dest => dest.EmploymentStatusName, src => src.EmploymentStatusName)
-            .Map(dest => dest.CurrentlyHeldAssets, src => src.CurrentlyHeldAssets)
-            .Map(dest => dest.AssetsOnLoan, src => src.AssetsOnLoan)
-            .Map(dest => dest.OverdueLoans, src => src.OverdueLoans)
-            .Map(dest => dest.TotalHistoricalAssets, src => src.TotalHistoricalAssets)
-            .Map(dest => dest.ReturnedAssets, src => src.ReturnedAssets)
-            .Map(dest => dest.DamagedReturns, src => src.DamagedReturns)
-            .Map(dest => dest.CurrentAssets, src => src.CurrentAssets)
-            .Map(dest => dest.AssetHistory, src => src.AssetHistory);
-
-        TypeAdapterConfig<EmployeeCurrentAssetView, EmployeeAssetDetail>.NewConfig()
-            .Map(dest => dest.AssetId, src => src.AssetId)
-            .Map(dest => dest.AssetCode, src => src.AssetCode ?? string.Empty)
-            .Map(dest => dest.AssetName, src => src.AssetName ?? string.Empty)
-            .Map(dest => dest.CategoryName, src => src.CategoryName ?? string.Empty)
-            .Map(dest => dest.Status, src => src.Status ?? string.Empty)
-            .Map(dest => dest.AssociationType, src => src.AssociationType ?? string.Empty)
-            .Map(dest => dest.SinceDate, src => src.SinceDate)
-            .Map(dest => dest.ExpectedReturnDate, src => src.ExpectedReturnDate)
-            .Map(dest => dest.IsOverdue, src => src.IsOverdue)
-            .Map(dest => dest.ConditionName, src => src.ConditionName);
-
-        TypeAdapterConfig<EmployeeAssetHistoryView, EmployeeAssetHistory>.NewConfig()
-            .Map(dest => dest.AssetTransactionId, src => src.AssetTransactionId)
-            .Map(dest => dest.AssetId, src => src.AssetId)
-            .Map(dest => dest.AssetCode, src => src.AssetCode ?? string.Empty)
-            .Map(dest => dest.AssetName, src => src.AssetName ?? string.Empty)
-            .Map(dest => dest.TransactionTypeName, src => src.TransactionTypeName ?? string.Empty)
-            .Map(dest => dest.TransactionDate, src => src.TransactionDate)
-            .Map(dest => dest.FromEmployeeName, src => src.FromEmployeeName)
-            .Map(dest => dest.ToEmployeeName, src => src.ToEmployeeName)
-            .Map(dest => dest.ConditionAfterName, src => src.ConditionAfterName)
-            .Map(dest => dest.Notes, src => src.Notes);
 
         // ========== SUPPLIER MAPPINGS ==========
         TypeAdapterConfig<SupplierListView, SupplierListViewModel>.NewConfig()

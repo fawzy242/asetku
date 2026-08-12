@@ -115,7 +115,7 @@ public class EmployeeController : ControllerBase
             return BadRequest("No file provided");
 
         using var stream = file.OpenReadStream();
-        var result = await _employeeImportService.ImportFromExcelAsync(stream);
+        var result = await _employeeImportService.ImportFromFileAsync(stream);
         return this.HandleResult(result);
     }
 

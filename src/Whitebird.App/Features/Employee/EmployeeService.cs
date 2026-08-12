@@ -7,8 +7,10 @@ using Whitebird.App.Features.FileAttachment;
 using Whitebird.App.Features.MasterData;
 using Whitebird.App.Features.Office;
 using Whitebird.Domain.Features.Common;
+using Whitebird.Domain.Features.Department;
 using Whitebird.Domain.Features.Employee;
 using Whitebird.Domain.Features.MasterData;
+using Whitebird.Domain.Features.Office;
 using Whitebird.Infra.Features.Common;
 using Whitebird.Infra.Features.Employee;
 
@@ -438,7 +440,7 @@ public class EmployeeService : BaseService, IEmployeeService
             var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
             var fileHash = _storageService.ComputeFileHash(file);
 
-            var uploadModel = new FileAttachmentUploadViewModel
+            var uploadModel = new FileAttachmentUploadDto
             {
                 File = file,
                 FileCategory = "ProfilePhoto",

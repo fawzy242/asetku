@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.EmployeeSummary;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.EmployeeSummary;
 using Whitebird.Infra.Features.Common;
 
@@ -21,7 +22,7 @@ public class EmployeeSummaryService : BaseService, IEmployeeSummaryService
     }
 
     // ============================================================
-    // LOOKUP / DROPDOWN
+    // LOOKUP
     // ============================================================
 
     public async Task<ServiceResult<EmployeeSummaryGetDataDto>> GetEmployeeDataAsync(int employeeId)
@@ -68,61 +69,40 @@ public class EmployeeSummaryService : BaseService, IEmployeeSummaryService
     }
 
     // ============================================================
-    // CURRENT HOLDING
+    // CURRENT HOLDING - Using GridRequest
     // ============================================================
 
-    public async Task<ServiceResult<PaginatedResult<EmployeeCurrentHoldingDto>>> GetCurrentHoldingAsync(
-        int employeeId, EmployeeSummaryRequest request)
+    public async Task<ServiceResult<PaginatedResult<EmployeeCurrentHoldingDto>>> GetCurrentHoldingAsync(EmployeeSummaryGridRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var result = await _employeeSummaryReps.GetCurrentHoldingAsync(
-                employeeId, 
-                request.Page, 
-                request.PageSize, 
-                request.Search, 
-                request.SortBy, 
-                request.SortDescending);
+            var result = await _employeeSummaryReps.GetCurrentHoldingAsync(request);
             return ServiceResult<PaginatedResult<EmployeeCurrentHoldingDto>>.Success(result);
         }, "get current holding");
     }
 
     // ============================================================
-    // ASSETS HISTORY
+    // ASSETS HISTORY - Using GridRequest
     // ============================================================
 
-    public async Task<ServiceResult<PaginatedResult<EmployeeAssetsHistoryDto>>> GetAssetsHistoryAsync(
-        int employeeId, EmployeeSummaryRequest request)
+    public async Task<ServiceResult<PaginatedResult<EmployeeAssetsHistoryDto>>> GetAssetsHistoryAsync(EmployeeSummaryGridRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var result = await _employeeSummaryReps.GetAssetsHistoryAsync(
-                employeeId, 
-                request.Page, 
-                request.PageSize, 
-                request.Search, 
-                request.SortBy, 
-                request.SortDescending);
+            var result = await _employeeSummaryReps.GetAssetsHistoryAsync(request);
             return ServiceResult<PaginatedResult<EmployeeAssetsHistoryDto>>.Success(result);
         }, "get assets history");
     }
 
     // ============================================================
-    // TRANSACTION HISTORY
+    // TRANSACTION HISTORY - Using GridRequest
     // ============================================================
 
-    public async Task<ServiceResult<PaginatedResult<EmployeeTransactionHistoryDto>>> GetTransactionHistoryAsync(
-        int employeeId, EmployeeSummaryRequest request)
+    public async Task<ServiceResult<PaginatedResult<EmployeeTransactionHistoryDto>>> GetTransactionHistoryAsync(EmployeeSummaryGridRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var result = await _employeeSummaryReps.GetTransactionHistoryAsync(
-                employeeId, 
-                request.Page, 
-                request.PageSize, 
-                request.Search, 
-                request.SortBy, 
-                request.SortDescending);
+            var result = await _employeeSummaryReps.GetTransactionHistoryAsync(request);
             return ServiceResult<PaginatedResult<EmployeeTransactionHistoryDto>>.Success(result);
         }, "get transaction history");
     }

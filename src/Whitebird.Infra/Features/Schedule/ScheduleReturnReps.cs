@@ -1,6 +1,7 @@
 using Dapper;
 using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.Schedule;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.Schedule;
@@ -35,7 +36,7 @@ public class ScheduleReturnReps : IScheduleReturnReps
             LEFT JOIN Employee e ON sr.EmployeeId = e.EmployeeId
             LEFT JOIN AssetTransaction at ON sr.ReturnAssetTransactionId = at.AssetTransactionId
             WHERE sr.ScheduleReturnId = @Id";
-        
+
         return await _context.QueryFirstOrDefaultAsync<ScheduleReturnView>(sql, new { Id = id });
     }
 
@@ -52,7 +53,7 @@ public class ScheduleReturnReps : IScheduleReturnReps
             LEFT JOIN Employee e ON sr.EmployeeId = e.EmployeeId
             WHERE sr.IsActive = 1
             ORDER BY sr.ScheduleDate DESC";
-        
+
         return await _context.QueryAsync<ScheduleReturnListView>(sql);
     }
 
@@ -69,7 +70,7 @@ public class ScheduleReturnReps : IScheduleReturnReps
             LEFT JOIN Employee e ON sr.EmployeeId = e.EmployeeId
             WHERE sr.AssetId = @AssetId AND sr.IsActive = 1
             ORDER BY sr.ScheduleDate DESC";
-        
+
         return await _context.QueryAsync<ScheduleReturnListView>(sql, new { AssetId = assetId });
     }
 
@@ -86,7 +87,7 @@ public class ScheduleReturnReps : IScheduleReturnReps
             LEFT JOIN Employee e ON sr.EmployeeId = e.EmployeeId
             WHERE sr.EmployeeId = @EmployeeId AND sr.IsActive = 1
             ORDER BY sr.ScheduleDate DESC";
-        
+
         return await _context.QueryAsync<ScheduleReturnListView>(sql, new { EmployeeId = employeeId });
     }
 
@@ -103,7 +104,7 @@ public class ScheduleReturnReps : IScheduleReturnReps
             LEFT JOIN Employee e ON sr.EmployeeId = e.EmployeeId
             WHERE sr.ScheduleDate BETWEEN @StartDate AND @EndDate AND sr.IsActive = 1
             ORDER BY sr.ScheduleDate ASC";
-        
+
         return await _context.QueryAsync<ScheduleReturnListView>(sql, new { StartDate = startDate, EndDate = endDate });
     }
 
@@ -131,7 +132,7 @@ public class ScheduleReturnReps : IScheduleReturnReps
             WHERE ScheduleDate BETWEEN @StartDate AND @EndDate 
               AND AssetId = @AssetId 
               AND IsActive = 1";
-        
+
         var result = await _context.QueryAsync<DateTime>(sql, new { StartDate = startDate.Date, EndDate = endDate.Date, AssetId = assetId });
         return result;
     }
@@ -147,7 +148,7 @@ public class ScheduleReturnReps : IScheduleReturnReps
                 @IsActive, GETDATE(), @CreatedBy
             );
             SELECT CAST(SCOPE_IDENTITY() AS INT);";
-        
+
         return await _context.ExecuteScalarAsync<int>(sql, entity);
     }
 
@@ -163,7 +164,7 @@ public class ScheduleReturnReps : IScheduleReturnReps
                 ModifiedDate = GETDATE(),
                 ModifiedBy = @ModifiedBy
             WHERE ScheduleReturnId = @ScheduleReturnId";
-        
+
         return await _context.ExecuteAsync(sql, entity);
     }
 
@@ -178,6 +179,10 @@ public class ScheduleReturnReps : IScheduleReturnReps
         const string sql = "UPDATE ScheduleReturn SET IsActive = 0, ModifiedDate = GETDATE() WHERE ScheduleReturnId = @Id";
         return await _context.ExecuteAsync(sql, new { Id = id });
     }
+
+    // ============================================================
+    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
+    // ============================================================
 
     public async Task<PaginatedResult<ScheduleReturnListView>> GetPagedListAsync(ScheduleGridRequest request)
     {
@@ -219,7 +224,9 @@ public class ScheduleReturnReps : IScheduleReturnReps
                 sr.ScheduleReturnId, sr.ScheduleDate, sr.AssetId, sr.EmployeeId,
                 sr.ReturnAssetTransactionId, sr.IsActive, sr.CreatedDate, sr.CreatedBy,
                 a.AssetCode, a.AssetName,
-                e.FullName as EmployeeName";
+                e.FullName as EmployeeName,
+                1 as CanEdit,
+                1 as CanDelete";
 
         var fromClause = @"
             FROM ScheduleReturn sr

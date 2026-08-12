@@ -5,6 +5,7 @@ using Whitebird.Domain.Features.MasterData;
 using Whitebird.Domain.Features.Office;
 using Whitebird.Domain.Features.Reports;
 using Whitebird.Domain.Features.Supplier;
+using Whitebird.Domain.Features.Category;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.App.Features.Reports;

@@ -2,23 +2,22 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
-using Whitebird.App.Features.Auth;
+using Whitebird.App.Features.User;
 
-namespace Whitebird.Api.Middleware;
+namespace Whitebird.Middleware;
 
 public class SessionAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
-    private readonly IAuthService _authService;
+    private readonly IUserService _userService;
 
     public SessionAuthenticationHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder,
-        ISystemClock clock,  // Keep for backward compatibility - will be removed in .NET 9
-        IAuthService authService)
-        : base(options, logger, encoder, clock)
+        IUserService userService)
+        : base(options, logger, encoder)
     {
-        _authService = authService;
+        _userService = userService;
     }
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -34,7 +33,7 @@ public class SessionAuthenticationHandler : AuthenticationHandler<Authentication
             return AuthenticateResult.NoResult();
         }
 
-        var userResult = await _authService.GetUserBySessionTokenAsync(sessionToken);
+        var userResult = await _userService.GetUserBySessionTokenAsync(sessionToken);
         if (!userResult.IsSuccess || userResult.Data == null)
         {
             return AuthenticateResult.Fail("Invalid or expired session token");

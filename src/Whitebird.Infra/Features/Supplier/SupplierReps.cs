@@ -1,6 +1,7 @@
 using Dapper;
 using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.Supplier;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.Supplier;
@@ -62,7 +63,7 @@ public class SupplierReps : ISupplierReps
                 (SELECT COUNT(*) FROM Asset WHERE SupplierId = s.SupplierId AND IsActive = 1) as AssetCount
             FROM Supplier s
             WHERE s.SupplierId = @SupplierId";
-        
+
         return await _context.QueryFirstOrDefaultAsync<SupplierDetailView>(sql, new { SupplierId = supplierId });
     }
 
@@ -77,12 +78,12 @@ public class SupplierReps : ISupplierReps
             FROM Supplier s
             WHERE s.IsActive = 1
             ORDER BY s.SupplierName";
-        
+
         return await _context.QueryAsync<SupplierListView>(sql);
     }
 
     // ============================================================
-    // PAGINATION
+    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
     // ============================================================
 
     public async Task<PaginatedResult<SupplierListView>> GetPagedListAsync(SupplierGridRequest request)
@@ -90,10 +91,8 @@ public class SupplierReps : ISupplierReps
         var conditions = new List<string>();
         var parameters = new DynamicParameters();
 
-        // IsActive filter
         GridQueryBuilder.AddEqualsFilter(conditions, parameters, "s.IsActive", request.IsActive);
 
-        // Search
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var searchColumns = new[] { "s.SupplierName", "s.ContactPerson", "s.Email", "s.PhoneNumber", "s.Address" };
@@ -104,20 +103,20 @@ public class SupplierReps : ISupplierReps
         var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "s.SupplierName", false);
         var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
-        // Count
         var countSql = $@"
             SELECT COUNT(*) 
             FROM Supplier s
             {whereClause}";
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        // Data
         var selectClause = @"
             SELECT 
                 s.SupplierId, s.SupplierName, s.ContactPerson,
                 s.PhoneNumber, s.Email, s.Address,
                 s.IsActive, s.CreatedDate, s.CreatedBy, s.ModifiedDate, s.ModifiedBy,
-                (SELECT COUNT(*) FROM Asset WHERE SupplierId = s.SupplierId AND IsActive = 1) as AssetCount";
+                (SELECT COUNT(*) FROM Asset WHERE SupplierId = s.SupplierId AND IsActive = 1) as AssetCount,
+                1 as CanEdit,
+                1 as CanDelete";
 
         var dataSql = $@"
             {selectClause}

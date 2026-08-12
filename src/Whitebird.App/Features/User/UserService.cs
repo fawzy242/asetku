@@ -139,10 +139,7 @@ public class UserService : BaseService, IUserService
                 Username = user.Username,
                 ProfilePhotoUrl = profilePhotoUrl
             }, "Profile updated successfully");
-        }, "update profile", async (ex) =>
-        {
-            await _activityLogService.LogErrorAsync("Users", userId, "Update Profile", ex, _currentUserService.GetDisplayName());
-        });
+        }, "update profile");
     }
 
     public async Task<ServiceResult> ChangePasswordAsync(int userId, ChangePasswordRequest request)

@@ -19,13 +19,9 @@ public class AssetTrackingController : ControllerBase
     }
 
     // ============================================================
-    // LOOKUP / DROPDOWN
+    // LOOKUP
     // ============================================================
 
-    /// <summary>
-    /// Get asset data for lookup/dropdown
-    /// </summary>
-    /// <param name="assetId">Asset ID</param>
     [HttpGet("lookup/{assetId:int}")]
     public async Task<IActionResult> GetAssetData(int assetId)
         => this.HandleResult(await _assetTrackingService.GetAssetDataAsync(assetId));
@@ -34,10 +30,6 @@ public class AssetTrackingController : ControllerBase
     // DETAIL TRACKING
     // ============================================================
 
-    /// <summary>
-    /// Get complete tracking detail (header + timeline + software + photo + attachments)
-    /// </summary>
-    /// <param name="assetId">Asset ID</param>
     [HttpGet("{assetId:int}")]
     public async Task<IActionResult> GetTrackingDetail(int assetId)
         => this.HandleResult(await _assetTrackingService.GetTrackingDetailAsync(assetId));
@@ -46,10 +38,6 @@ public class AssetTrackingController : ControllerBase
     // STATS HEADER
     // ============================================================
 
-    /// <summary>
-    /// Get asset header stats (without timeline)
-    /// </summary>
-    /// <param name="assetId">Asset ID</param>
     [HttpGet("{assetId:int}/stats")]
     public async Task<IActionResult> GetAssetStats(int assetId)
         => this.HandleResult(await _assetTrackingService.GetAssetStatsAsync(assetId));
@@ -58,67 +46,31 @@ public class AssetTrackingController : ControllerBase
     // TIMELINE
     // ============================================================
 
-    /// <summary>
-    /// Get asset timeline/transaction history (checkpoint)
-    /// </summary>
-    /// <param name="assetId">Asset ID</param>
     [HttpGet("{assetId:int}/timeline")]
     public async Task<IActionResult> GetTimeline(int assetId)
         => this.HandleResult(await _assetTrackingService.GetTimelineAsync(assetId));
 
     // ============================================================
-    // SCHEDULE STATS
+    // SCHEDULE STATS - Using GridRequest
     // ============================================================
 
-    /// <summary>
-    /// Get schedule stats for a specific asset (grid)
-    /// </summary>
-    /// <param name="assetId">Asset ID</param>
-    /// <param name="type">Schedule type: handover, return, maintenance</param>
-    /// <param name="page">Page number</param>
-    /// <param name="pageSize">Items per page</param>
-    /// <param name="search">Search keyword</param>
     [HttpGet("{assetId:int}/schedule-stats")]
-    public async Task<IActionResult> GetScheduleStats(
-        int assetId,
-        [FromQuery] string type,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string? search = null)
-    {
-        return this.HandleResult(await _assetTrackingService.GetScheduleStatsAsync(assetId, type, page, pageSize, search));
-    }
+    public async Task<IActionResult> GetScheduleStats([FromQuery] AssetTrackingGridRequest request)
+        => this.HandleResult(await _assetTrackingService.GetScheduleStatsAsync(request));
 
     // ============================================================
     // TRANSACTION TYPE STATS
     // ============================================================
 
-    /// <summary>
-    /// Get transaction type composition for a specific asset (chart)
-    /// </summary>
-    /// <param name="assetId">Asset ID</param>
     [HttpGet("{assetId:int}/transactiontype-stats")]
     public async Task<IActionResult> GetTransactionTypeStats(int assetId)
         => this.HandleResult(await _assetTrackingService.GetTransactionTypeStatsAsync(assetId));
 
     // ============================================================
-    // EMPLOYEE HISTORY
+    // EMPLOYEE HISTORY - Using GridRequest
     // ============================================================
 
-    /// <summary>
-    /// Get employee history for a specific asset (grid)
-    /// </summary>
-    /// <param name="assetId">Asset ID</param>
-    /// <param name="page">Page number</param>
-    /// <param name="pageSize">Items per page</param>
-    /// <param name="search">Search keyword</param>
     [HttpGet("{assetId:int}/employee-history")]
-    public async Task<IActionResult> GetEmployeeHistory(
-        int assetId,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string? search = null)
-    {
-        return this.HandleResult(await _assetTrackingService.GetEmployeeHistoryAsync(assetId, page, pageSize, search));
-    }
+    public async Task<IActionResult> GetEmployeeHistory([FromQuery] AssetTrackingGridRequest request)
+        => this.HandleResult(await _assetTrackingService.GetEmployeeHistoryAsync(request));
 }

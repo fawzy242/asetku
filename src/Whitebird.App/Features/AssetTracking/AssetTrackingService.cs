@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.AssetTracking;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.AssetTracking;
 using Whitebird.Infra.Features.Common;
 
@@ -21,7 +22,7 @@ public class AssetTrackingService : BaseService, IAssetTrackingService
     }
 
     // ============================================================
-    // LOOKUP / DROPDOWN
+    // LOOKUP
     // ============================================================
 
     public async Task<ServiceResult<AssetTrackingGetDataDto>> GetAssetDataAsync(int assetId)
@@ -68,7 +69,6 @@ public class AssetTrackingService : BaseService, IAssetTrackingService
                 return ServiceResult<AssetStatsView>.NotFound($"Asset with id {assetId} not found");
             }
 
-            // Get attachments and software
             result.Attachments = (await _assetTrackingReps.GetAttachmentsByAssetIdAsync(assetId)).ToList();
             result.SoftwareInstallation = await _assetTrackingReps.GetSoftwareInstallationByAssetIdAsync(assetId);
 
@@ -93,22 +93,14 @@ public class AssetTrackingService : BaseService, IAssetTrackingService
     }
 
     // ============================================================
-    // SCHEDULE STATS
+    // SCHEDULE STATS - Using GridRequest
     // ============================================================
 
-    public async Task<ServiceResult<PaginatedResult<AssetTrackingScheduleStatsDto>>> GetScheduleStatsAsync(
-        int assetId, string type, int page, int pageSize, string? search = null)
+    public async Task<ServiceResult<PaginatedResult<AssetTrackingScheduleStatsDto>>> GetScheduleStatsAsync(AssetTrackingGridRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var validTypes = new[] { "handover", "return", "maintenance" };
-            if (!validTypes.Contains(type.ToLower()))
-            {
-                return ServiceResult<PaginatedResult<AssetTrackingScheduleStatsDto>>.BadRequest(
-                    $"Invalid type: {type}. Valid types: handover, return, maintenance");
-            }
-
-            var result = await _assetTrackingReps.GetScheduleStatsAsync(assetId, type, page, pageSize, search);
+            var result = await _assetTrackingReps.GetScheduleStatsAsync(request);
             return ServiceResult<PaginatedResult<AssetTrackingScheduleStatsDto>>.Success(result);
         }, "get schedule stats");
     }
@@ -127,15 +119,14 @@ public class AssetTrackingService : BaseService, IAssetTrackingService
     }
 
     // ============================================================
-    // EMPLOYEE HISTORY
+    // EMPLOYEE HISTORY - Using GridRequest
     // ============================================================
 
-    public async Task<ServiceResult<PaginatedResult<AssetTrackingEmployeeHistoryDto>>> GetEmployeeHistoryAsync(
-        int assetId, int page, int pageSize, string? search = null)
+    public async Task<ServiceResult<PaginatedResult<AssetTrackingEmployeeHistoryDto>>> GetEmployeeHistoryAsync(AssetTrackingGridRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var result = await _assetTrackingReps.GetEmployeeHistoryAsync(assetId, page, pageSize, search);
+            var result = await _assetTrackingReps.GetEmployeeHistoryAsync(request);
             return ServiceResult<PaginatedResult<AssetTrackingEmployeeHistoryDto>>.Success(result);
         }, "get employee history");
     }

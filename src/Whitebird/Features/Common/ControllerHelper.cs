@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Whitebird.App.Features.Common;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Features.Common;

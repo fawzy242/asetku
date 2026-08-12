@@ -2,6 +2,9 @@ using Whitebird.Domain.Features.Common;
 
 namespace Whitebird.Domain.Features.Schedule;
 
+/// <summary>
+/// Entity for ScheduleHandover table
+/// </summary>
 public class ScheduleHandoverEntity : AuditableEntity
 {
     public int ScheduleHandoverId { get; set; }

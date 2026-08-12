@@ -5,6 +5,7 @@ using Whitebird.App.Features.Common.Import;
 using Whitebird.App.Features.MasterData;
 using Whitebird.Domain.Features.AssetTransaction;
 using Whitebird.Domain.Features.Common;
+using Whitebird.Domain.Features.MasterData;
 using Whitebird.Infra.Features.Asset;
 using Whitebird.Infra.Features.AssetTransaction;
 using Whitebird.Infra.Features.Common;
@@ -13,29 +14,24 @@ using Whitebird.Infra.Features.Office;
 
 namespace Whitebird.App.Features.AssetTransaction;
 
-public class TransactionImportService : ImportServiceBase<TransactionImportDto, AssetTransactionEntity>
+public class TransactionImportService : ImportService<TransactionImportDto, AssetTransactionEntity>
 {
     private readonly IAssetTransactionReps _transactionReps;
     private readonly IAssetReps _assetReps;
     private readonly IEmployeeReps _employeeReps;
     private readonly IOfficeReps _officeReps;
     private readonly IMasterDataService _masterDataService;
-    private readonly ICurrentUserService _currentUserService;
-    private readonly IActivityLogService _activityLogService;
 
     private readonly Dictionary<string, string> _templateColumns = new()
     {
         { "AssetCode", "Required. Asset code must exist in system" },
-        { "TransactionType", "Required. Values: HANDOVER, TRANSFER, LOAN, RETURN, LOAN_RETURN, MAINTENANCE, POST_MAINTENANCE, DISPOSAL" },
-        { "FromEmployeeCode", "Optional. Employee code of the sender (for TRANSFER, RETURN, LOAN_RETURN)" },
-        { "ToEmployeeCode", "Optional. Employee code of the receiver (for HANDOVER, TRANSFER, LOAN)" },
-        { "ToOfficeName", "Optional. Office name for location change" },
+        { "TransactionType", "Required. Values: HANDOVER, TRANSFER, LOAN, MAINTENANCE, DISPOSAL, OPERATIONAL OFFICE" },
+        { "EmployeeCode", "Optional. Employee code (receiver for HANDOVER/TRANSFER/LOAN)" },
+        { "OfficeName", "Optional. Office name for OPERATIONAL OFFICE" },
         { "TransactionDate", "Required. Format: YYYY-MM-DD HH:MM:SS" },
-        { "ExpectedReturnDate", "Optional. Format: YYYY-MM-DD (required for LOAN)" },
-        { "ActualReturnDate", "Optional. Format: YYYY-MM-DD" },
+        { "ExpectedLoanReturnDate", "Optional. Format: YYYY-MM-DD (required for LOAN)" },
         { "Notes", "Optional. Additional notes" },
-        { "ConditionBefore", "Optional. Values: Good, Normal, Damaged" },
-        { "ConditionAfter", "Optional. Values: Good, Normal, Damaged" },
+        { "Condition", "Optional. Values: Good, Normal, Damaged" },
         { "MaintenanceType", "Optional. Values: PREVENTIVE MAINTENANCE, CORRECTIVE MAINTENANCE, EMERGENCY REPAIR, etc" },
         { "MaintenanceCost", "Optional. Numeric value" },
         { "FromAssetTransactionId", "Optional. For pairing LOAN_RETURN or POST_MAINTENANCE" }
@@ -58,8 +54,6 @@ public class TransactionImportService : ImportServiceBase<TransactionImportDto, 
         _employeeReps = employeeReps;
         _officeReps = officeReps;
         _masterDataService = masterDataService;
-        _currentUserService = currentUserService;
-        _activityLogService = activityLogService;
     }
 
     protected override Dictionary<string, string> GetTemplateColumns() => _templateColumns;
@@ -75,7 +69,7 @@ public class TransactionImportService : ImportServiceBase<TransactionImportDto, 
         cache["Assets"] = assetCache;
 
         var employeeDict = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var allEmployees = await _employeeReps.GetActiveOnlyListViewAsync();
+        var allEmployees = await _employeeReps.GetDropdownListAsync();
         foreach (var e in allEmployees)
         {
             employeeDict[e.EmployeeCode] = e.EmployeeId;
@@ -134,16 +128,13 @@ public class TransactionImportService : ImportServiceBase<TransactionImportDto, 
 
         var assetCode = ExcelDataReader.GetString(row, "AssetCode");
         var transactionTypeName = ExcelDataReader.GetString(row, "TransactionType");
-        var fromEmployeeCode = ExcelDataReader.GetString(row, "FromEmployeeCode");
-        var toEmployeeCode = ExcelDataReader.GetString(row, "ToEmployeeCode");
-        var toOfficeName = ExcelDataReader.GetString(row, "ToOfficeName");
+        var employeeCode = ExcelDataReader.GetString(row, "EmployeeCode");
+        var officeName = ExcelDataReader.GetString(row, "OfficeName");
         var notes = ExcelDataReader.GetString(row, "Notes");
-        var conditionBeforeName = ExcelDataReader.GetString(row, "ConditionBefore");
-        var conditionAfterName = ExcelDataReader.GetString(row, "ConditionAfter");
+        var conditionName = ExcelDataReader.GetString(row, "Condition");
         var maintenanceTypeName = ExcelDataReader.GetString(row, "MaintenanceType");
         var transactionDate = ExcelDataReader.GetDateTime(row, "TransactionDate");
-        var expectedReturnDate = ExcelDataReader.GetNullableDateTime(row, "ExpectedReturnDate");
-        var actualReturnDate = ExcelDataReader.GetNullableDateTime(row, "ActualReturnDate");
+        var expectedLoanReturnDate = ExcelDataReader.GetNullableDateTime(row, "ExpectedLoanReturnDate");
         var maintenanceCost = ExcelDataReader.GetNullableDecimal(row, "MaintenanceCost");
         var fromAssetTransactionId = ExcelDataReader.GetNullableInt(row, "FromAssetTransactionId");
 
@@ -177,49 +168,80 @@ public class TransactionImportService : ImportServiceBase<TransactionImportDto, 
             return null;
         }
 
-        int? fromEmployeeId = null;
-        if (!string.IsNullOrWhiteSpace(fromEmployeeCode) && employeeDict != null)
+        // Validasi: hanya ADD type yang bisa diimport
+        var addTypes = new[] {
+            TransactionTypeConstants.HANDOVER,
+            TransactionTypeConstants.TRANSFER,
+            TransactionTypeConstants.LOAN,
+            TransactionTypeConstants.MAINTENANCE,
+            TransactionTypeConstants.DISPOSAL,
+            TransactionTypeConstants.OPERATIONAL_OFFICE
+        };
+
+        if (!addTypes.Contains(transactionTypeId))
         {
-            if (!employeeDict.TryGetValue(fromEmployeeCode, out int empId))
-                result.AddError(rowNumber, "FromEmployeeCode", $"Employee '{fromEmployeeCode}' not found", fromEmployeeCode);
-            else
-                fromEmployeeId = empId;
+            result.AddError(rowNumber, "TransactionType", $"Transaction type '{transactionTypeName}' cannot be imported. Only ADD types are allowed.");
+            return null;
         }
 
-        int? toEmployeeId = null;
-        if (!string.IsNullOrWhiteSpace(toEmployeeCode) && employeeDict != null)
+        int? employeeId = null;
+        if (!string.IsNullOrWhiteSpace(employeeCode) && employeeDict != null)
         {
-            if (!employeeDict.TryGetValue(toEmployeeCode, out int empId))
-                result.AddError(rowNumber, "ToEmployeeCode", $"Employee '{toEmployeeCode}' not found", toEmployeeCode);
+            if (!employeeDict.TryGetValue(employeeCode, out int empId))
+                result.AddError(rowNumber, "EmployeeCode", $"Employee '{employeeCode}' not found", employeeCode);
             else
-                toEmployeeId = empId;
+                employeeId = empId;
         }
 
         int? officeId = null;
-        if (!string.IsNullOrWhiteSpace(toOfficeName) && officeDict != null)
+        if (!string.IsNullOrWhiteSpace(officeName) && officeDict != null)
         {
-            if (!officeDict.TryGetValue(toOfficeName, out int offId))
-                result.AddError(rowNumber, "ToOfficeName", $"Office '{toOfficeName}' not found", toOfficeName);
+            if (!officeDict.TryGetValue(officeName, out int offId))
+                result.AddError(rowNumber, "OfficeName", $"Office '{officeName}' not found", officeName);
             else
                 officeId = offId;
         }
 
-        int? conditionBeforeId = null;
-        if (!string.IsNullOrWhiteSpace(conditionBeforeName) && conditionCache != null)
+        // Validasi berdasarkan tipe transaksi
+        if (transactionTypeId == TransactionTypeConstants.HANDOVER && !employeeId.HasValue)
         {
-            if (!conditionCache.TryGetValue(conditionBeforeName, out int condId))
-                result.AddError(rowNumber, "ConditionBefore", $"Invalid ConditionBefore '{conditionBeforeName}'. Valid: Good, Normal, Damaged", conditionBeforeName);
-            else
-                conditionBeforeId = condId;
+            result.AddError(rowNumber, "EmployeeCode", "HANDOVER requires EmployeeCode");
+            return null;
         }
 
-        int? conditionAfterId = null;
-        if (!string.IsNullOrWhiteSpace(conditionAfterName) && conditionCache != null)
+        if (transactionTypeId == TransactionTypeConstants.TRANSFER && !employeeId.HasValue)
         {
-            if (!conditionCache.TryGetValue(conditionAfterName, out int condId))
-                result.AddError(rowNumber, "ConditionAfter", $"Invalid ConditionAfter '{conditionAfterName}'. Valid: Good, Normal, Damaged", conditionAfterName);
+            result.AddError(rowNumber, "EmployeeCode", "TRANSFER requires EmployeeCode (receiver)");
+            return null;
+        }
+
+        if (transactionTypeId == TransactionTypeConstants.LOAN)
+        {
+            if (!employeeId.HasValue)
+            {
+                result.AddError(rowNumber, "EmployeeCode", "LOAN requires EmployeeCode");
+                return null;
+            }
+            if (!expectedLoanReturnDate.HasValue)
+            {
+                result.AddError(rowNumber, "ExpectedLoanReturnDate", "LOAN requires ExpectedLoanReturnDate");
+                return null;
+            }
+        }
+
+        if (transactionTypeId == TransactionTypeConstants.OPERATIONAL_OFFICE && !officeId.HasValue)
+        {
+            result.AddError(rowNumber, "OfficeName", "OPERATIONAL OFFICE requires OfficeName");
+            return null;
+        }
+
+        int? conditionId = null;
+        if (!string.IsNullOrWhiteSpace(conditionName) && conditionCache != null)
+        {
+            if (!conditionCache.TryGetValue(conditionName, out int condId))
+                result.AddError(rowNumber, "Condition", $"Invalid Condition '{conditionName}'. Valid: Good, Normal, Damaged", conditionName);
             else
-                conditionAfterId = condId;
+                conditionId = condId;
         }
 
         int? maintenanceTypeId = null;
@@ -231,59 +253,6 @@ public class TransactionImportService : ImportServiceBase<TransactionImportDto, 
                 maintenanceTypeId = maintId;
         }
 
-        var activeTransaction = await _transactionReps.GetActiveTransactionByAssetIdAsync(assetId);
-
-        if (transactionTypeId == 1) // HANDOVER
-        {
-            if (string.IsNullOrWhiteSpace(toEmployeeCode))
-            {
-                result.AddError(rowNumber, "ToEmployeeCode", "HANDOVER requires ToEmployeeCode");
-                return null;
-            }
-            if (activeTransaction != null)
-            {
-                result.AddError(rowNumber, "AssetCode", $"Asset '{assetCode}' is currently in an active transaction");
-                return null;
-            }
-        }
-
-        if (transactionTypeId == 2) // TRANSFER
-        {
-            if (string.IsNullOrWhiteSpace(fromEmployeeCode) || string.IsNullOrWhiteSpace(toEmployeeCode))
-            {
-                result.AddError(rowNumber, "FromEmployeeCode/ToEmployeeCode", "TRANSFER requires both FromEmployeeCode and ToEmployeeCode");
-                return null;
-            }
-        }
-
-        if (transactionTypeId == 3) // LOAN
-        {
-            if (string.IsNullOrWhiteSpace(toEmployeeCode))
-            {
-                result.AddError(rowNumber, "ToEmployeeCode", "LOAN requires ToEmployeeCode");
-                return null;
-            }
-            if (!expectedReturnDate.HasValue)
-            {
-                result.AddError(rowNumber, "ExpectedReturnDate", "LOAN requires ExpectedReturnDate");
-                return null;
-            }
-            if (expectedReturnDate <= transactionDate)
-            {
-                result.AddError(rowNumber, "ExpectedReturnDate", "ExpectedReturnDate must be after TransactionDate");
-                return null;
-            }
-        }
-
-        if (transactionTypeId == 4) // RETURN
-        {
-            if (string.IsNullOrWhiteSpace(fromEmployeeCode))
-            {
-                result.AddError(rowNumber, "FromEmployeeCode", "RETURN requires FromEmployeeCode");
-                return null;
-            }
-        }
-
         if (result.Errors.Any(e => e.RowNumber == rowNumber))
             return null;
 
@@ -291,15 +260,12 @@ public class TransactionImportService : ImportServiceBase<TransactionImportDto, 
         {
             AssetId = assetId,
             TransactionType = transactionTypeId,
-            FromEmployeeId = fromEmployeeId,
-            ToEmployeeId = toEmployeeId,
-            ToLocationId = officeId,
+            EmployeeId = employeeId,
+            OfficeId = officeId,
             TransactionDate = transactionDate,
-            ExpectedReturnDate = expectedReturnDate,
-            ActualReturnDate = actualReturnDate,
+            ExpectedLoanReturnDate = expectedLoanReturnDate,
             Notes = notes,
-            ConditionBefore = conditionBeforeId,
-            ConditionAfter = conditionAfterId,
+            Condition = conditionId,
             MaintenanceType = maintenanceTypeId,
             MaintenanceCost = maintenanceCost,
             FromAssetTransactionId = fromAssetTransactionId,
@@ -312,7 +278,6 @@ public class TransactionImportService : ImportServiceBase<TransactionImportDto, 
 
     protected override async Task<bool> IsEntityUniqueAsync(AssetTransactionEntity entity, ImportResult result, int rowNumber)
     {
-        // Transactions don't have unique constraint per se, but we check for duplicate reference
         if (entity.FromAssetTransactionId.HasValue)
         {
             var existing = await _transactionReps.GetByIdRawAsync(entity.FromAssetTransactionId.Value);
@@ -327,9 +292,9 @@ public class TransactionImportService : ImportServiceBase<TransactionImportDto, 
 
     protected override string GetEntityIdentifier(AssetTransactionEntity entity) => entity.AssetTransactionId.ToString();
 
-    public override async Task<ServiceResult<ImportResult>> ImportFromExcelAsync(Stream fileStream, string? createdBy = null)
+    public override async Task<ServiceResult<ImportResult>> ImportFromFileAsync(Stream fileStream, string? createdBy = null)
     {
-        var result = await base.ImportFromExcelAsync(fileStream, createdBy);
+        var result = await base.ImportFromFileAsync(fileStream, createdBy);
         if (result.IsSuccess && result.Data != null)
         {
             result.Message = $"Import completed: {result.Data.SuccessCount} successful, {result.Data.ErrorCount} errors. Transactions imported as PENDING and need approval.";

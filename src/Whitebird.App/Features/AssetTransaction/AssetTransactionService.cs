@@ -114,7 +114,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
     public async Task<ServiceResult<AssetTransactionDetailView>> CreateAsync(AssetTransactionCreateViewModel model)
     {
-        // Validasi: hanya tipe ADD yang bisa dibuat manual
         var addTypes = new[] {
             TransactionTypeConstants.HANDOVER,
             TransactionTypeConstants.TRANSFER,
@@ -130,7 +129,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 $"Transaction type {model.TransactionType} cannot be created manually. Use shortcut endpoint.");
         }
 
-        // Validasi dasar
         var validationResult = await ValidateTransactionAsync(model, null);
         if (validationResult != null)
         {
@@ -146,12 +144,10 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             entity.CreatedDate = DateTime.Now;
             entity.CreatedBy = _currentUserService.GetDisplayName();
 
-            // Generate transaction code
             entity.AssetTransactionCode = GenerateTransactionCode(model.TransactionType);
 
             var id = await _transactionReps.InsertAsync(entity);
 
-            // Jika ada FromAssetTransactionId, update source transaction
             if (entity.FromAssetTransactionId.HasValue)
             {
                 var source = await _transactionReps.GetByIdRawAsync(entity.FromAssetTransactionId.Value);
@@ -186,7 +182,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
             }
 
-            // Hanya pending yang bisa di-update
             if (existing.Approved != null)
             {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("Cannot update approved/rejected transaction");
@@ -220,7 +215,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult.NotFound($"Transaction with id {id} not found");
             }
 
-            // Cek apakah ada transaksi yang merujuk ke ini
             var paired = await _transactionReps.GetPairedTransactionAsync(id);
             if (paired != null)
             {
@@ -249,7 +243,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult.NotFound($"Transaction with id {id} not found");
             }
 
-            // Cek apakah ada transaksi yang merujuk ke ini
             var paired = await _transactionReps.GetPairedTransactionAsync(id);
             if (paired != null)
             {
@@ -285,7 +278,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             foreach (var id in request.Ids)
             {
                 var transaction = await _transactionReps.GetByIdRawAsync(id);
-                if (transaction != null && transaction.Approved == null && transaction.IsActive == 1)
+                if (transaction != null && transaction.Approved == null && transaction.IsActive == true)
                 {
                     transaction.Approved = true;
                     transaction.ApprovedBy = _currentUserService.GetDisplayName();
@@ -319,7 +312,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             foreach (var id in request.Ids)
             {
                 var transaction = await _transactionReps.GetByIdRawAsync(id);
-                if (transaction != null && transaction.Approved == true && transaction.IsActive == 1)
+                if (transaction != null && transaction.Approved == true && transaction.IsActive == true)
                 {
                     transaction.Approved = null;
                     transaction.ApprovedBy = null;
@@ -353,7 +346,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             foreach (var id in request.Ids)
             {
                 var transaction = await _transactionReps.GetByIdRawAsync(id);
-                if (transaction != null && transaction.Approved != false && transaction.IsActive == 1)
+                if (transaction != null && transaction.Approved != false && transaction.IsActive == true)
                 {
                     transaction.Approved = false;
                     transaction.ApprovedBy = _currentUserService.GetDisplayName();
@@ -388,19 +381,16 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult.NotFound($"Transaction with id {id} not found");
             }
 
-            // Validasi: harus approved
             if (transaction.Approved != true)
             {
                 return ServiceResult.BadRequest("Transaction must be approved before complete");
             }
 
-            // Validasi: belum completed
             if (transaction.Completed == true)
             {
                 return ServiceResult.BadRequest("Transaction already completed");
             }
 
-            // Validasi: semua required document sudah diupload dan approved
             var allUploaded = await _transactionReps.IsAllRequiredDocumentsUploadedAsync(id);
             if (!allUploaded)
             {
@@ -440,7 +430,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult.NotFound($"Transaction with id {id} not found");
             }
 
-            // Validasi: harus completed
             if (transaction.Completed != true)
             {
                 return ServiceResult.BadRequest("Transaction is not completed");
@@ -539,7 +528,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult<AssetTransactionDetailView>.NotFound($"Source transaction with id {sourceTransactionId} not found");
             }
 
-            // Validasi: tipe yang bisa di-return
             var returnableTypes = new[] {
                 TransactionTypeConstants.HANDOVER,
                 TransactionTypeConstants.LOAN,
@@ -562,7 +550,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("Source transaction already has a paired return");
             }
 
-            // Tentukan return type
             int returnType;
             if (source.TransactionType == TransactionTypeConstants.LOAN)
             {
@@ -573,12 +560,11 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 returnType = TransactionTypeConstants.RETURN;
             }
 
-            // Buat return transaction
             var returnEntity = new AssetTransactionEntity
             {
                 AssetId = source.AssetId,
                 TransactionType = returnType,
-                EmployeeId = source.EmployeeId, // pengembali
+                EmployeeId = source.EmployeeId,
                 TransactionDate = model.ActualReturnDate,
                 Notes = model.Notes,
                 Condition = model.Condition,
@@ -588,12 +574,10 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 CreatedBy = _currentUserService.GetDisplayName()
             };
 
-            // Generate transaction code
             returnEntity.AssetTransactionCode = GenerateTransactionCode(returnType);
 
             var id = await _transactionReps.InsertAsync(returnEntity);
 
-            // Update source
             source.FromAssetTransactionId = id;
             source.ModifiedDate = DateTime.Now;
             source.ModifiedBy = _currentUserService.GetDisplayName();
@@ -636,7 +620,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("Source transaction already has a paired post-maintenance");
             }
 
-            // Buat post-maintenance transaction
             var postEntity = new AssetTransactionEntity
             {
                 AssetId = source.AssetId,
@@ -656,7 +639,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
             var id = await _transactionReps.InsertAsync(postEntity);
 
-            // Update source
             source.FromAssetTransactionId = id;
             source.ModifiedDate = DateTime.Now;
             source.ModifiedBy = _currentUserService.GetDisplayName();
@@ -681,7 +663,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     public async Task<ServiceResult<AssetTransactionAttachmentView>> UploadAttachmentAsync(int transactionId, AssetTransactionAttachmentUploadDto model)
     {
         var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
-        if (transaction == null || transaction.IsActive == 0)
+        if (transaction == null || transaction.IsActive == false)
         {
             return ServiceResult<AssetTransactionAttachmentView>.NotFound($"Transaction with id {transactionId} not found");
         }
@@ -705,13 +687,11 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            // Upload file ke storage
             var subDirectory = Path.Combine("AssetTransaction", transactionId.ToString());
             var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
             var fileHash = _storageService.ComputeFileHash(file);
 
-            // Create file attachment entity
-            var uploadModel = new FileAttachmentUploadViewModel
+            var uploadModel = new FileAttachmentUploadDto
             {
                 File = file,
                 FileCategory = model.FileCategory ?? "AssetTransaction",
@@ -725,7 +705,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult<AssetTransactionAttachmentView>.Failure("Failed to upload file");
             }
 
-            // Create transaction attachment entity
             var attachmentEntity = new AssetTransactionAttachmentEntity
             {
                 AssetTransactionId = transactionId,
@@ -738,7 +717,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
             await _transactionReps.InsertAttachmentAsync(attachmentEntity);
 
-            // Get the attachment view
             var attachments = await _transactionReps.GetAttachmentsByTransactionIdAsync(transactionId);
             var created = attachments.FirstOrDefault(a => a.FileAttachmentId == fileResult.Data.FileAttachmentId);
 
@@ -771,7 +749,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult.NotFound($"Attachment with id {attachmentId} not found for transaction {transactionId}");
             }
 
-            // Delete from FileAttachment
             var fileResult = await _fileAttachmentService.DeleteAsync(attachment.FileAttachmentId);
             if (!fileResult.IsSuccess)
             {
@@ -798,12 +775,11 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         int transactionId, AssetTransactionApproveAttachmentUploadDto model)
     {
         var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
-        if (transaction == null || transaction.IsActive == 0)
+        if (transaction == null || transaction.IsActive == false)
         {
             return ServiceResult<AssetTransactionApproveAttachmentView>.NotFound($"Transaction with id {transactionId} not found");
         }
 
-        // Validasi: harus sudah approved
         if (transaction.Approved != true)
         {
             return ServiceResult<AssetTransactionApproveAttachmentView>.BadRequest("Transaction must be approved before uploading approve attachment");
@@ -826,7 +802,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             return ServiceResult<AssetTransactionApproveAttachmentView>.BadRequest($"File size exceeds {FileSizeConstants.MaxAssetAttachmentMB}MB limit");
         }
 
-        // Validasi DocumentType
         var docTypeExists = await _masterDataService.GetValueAsync("ApproveDocumentType", model.DocumentType);
         if (!docTypeExists.IsSuccess || docTypeExists.Data == null)
         {
@@ -835,13 +810,11 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            // Upload file ke storage
             var subDirectory = Path.Combine("AssetTransaction", transactionId.ToString(), "Approve");
             var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
             var fileHash = _storageService.ComputeFileHash(file);
 
-            // Create file attachment entity
-            var uploadModel = new FileAttachmentUploadViewModel
+            var uploadModel = new FileAttachmentUploadDto
             {
                 File = file,
                 FileCategory = "ApproveDocument",
@@ -855,7 +828,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult<AssetTransactionApproveAttachmentView>.Failure("Failed to upload file");
             }
 
-            // Create approve attachment entity
             var attachmentEntity = new AssetTransactionApproveAttachmentEntity
             {
                 AssetTransactionId = transactionId,
@@ -871,7 +843,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
             await _transactionReps.InsertApproveAttachmentAsync(attachmentEntity);
 
-            // Get the attachment view
             var attachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(transactionId);
             var created = attachments.FirstOrDefault(a => a.FileAttachmentId == fileResult.Data.FileAttachmentId);
 
@@ -904,7 +875,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult.NotFound($"Approve attachment with id {attachmentId} not found for transaction {transactionId}");
             }
 
-            // Delete from FileAttachment
             var fileResult = await _fileAttachmentService.DeleteAsync(attachment.FileAttachmentId);
             if (!fileResult.IsSuccess)
             {
@@ -1040,7 +1010,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         {
             DocumentType = d.Code,
             DocumentTypeName = d.Name,
-            IsRequired = true // Default required, bisa di custom jika ada flag Required di MasterData
+            IsRequired = true
         });
 
         return ServiceResult<IEnumerable<ApproveDocumentTypeDto>>.Success(dtos);
@@ -1051,41 +1021,18 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         return await _employeeService.GetDropdownListAsync();
     }
 
-    public async Task<ServiceResult<IEnumerable<AssetTransactionAssetDto>>> GetAssetListAsync()
+    public async Task<ServiceResult<IEnumerable<AssetTransactionAssetDto>>> GetAssetListAsync(int transactionTypeId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            // Get assets that are not in active transaction
-            const string sql = @"
-                SELECT 
-                    a.AssetId,
-                    a.AssetCode,
-                    a.AssetName,
-                    c.CategoryName
-                FROM Asset a
-                LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
-                WHERE a.IsActive = 1
-                  AND NOT EXISTS (
-                      SELECT 1 FROM AssetTransaction at 
-                      WHERE at.AssetId = a.AssetId 
-                        AND at.Approved = 1 
-                        AND at.FromAssetTransactionId IS NULL 
-                        AND at.IsActive = 1
-                        AND at.TransactionType IN (@HandoverType, @TransferType, @LoanType, @MaintenanceType, @OperationalOffice)
-                  )
-                ORDER BY a.AssetCode";
-
-            var parameters = new
+            var assets = await _assetReps.GetDropdownListByTransactionTypeAsync(transactionTypeId);
+            var result = assets.Select(a => new AssetTransactionAssetDto
             {
-                HandoverType = TransactionTypeConstants.HANDOVER,
-                TransferType = TransactionTypeConstants.TRANSFER,
-                LoanType = TransactionTypeConstants.LOAN,
-                MaintenanceType = TransactionTypeConstants.MAINTENANCE,
-                OperationalOffice = TransactionTypeConstants.OPERATIONAL_OFFICE
-            };
-
-            var assets = await _transactionReps.GetAssetListAsync(sql, parameters);
-            return ServiceResult<IEnumerable<AssetTransactionAssetDto>>.Success(assets);
+                AssetId = a.AssetId,
+                AssetCode = a.AssetCode,
+                AssetName = a.AssetName
+            });
+            return ServiceResult<IEnumerable<AssetTransactionAssetDto>>.Success(result);
         }, "get asset list");
     }
 
@@ -1096,30 +1043,25 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     private async Task<ServiceResult<AssetTransactionDetailView>?> ValidateTransactionAsync(
         AssetTransactionCreateViewModel model, AssetTransactionEntity? existing)
     {
-        // Validate Asset
         var asset = await _assetReps.GetByIdRawAsync(model.AssetId);
         if (asset == null)
         {
             return ServiceResult<AssetTransactionDetailView>.NotFound($"Asset with id {model.AssetId} not found");
         }
 
-        // Validate TransactionType
         var typeName = await _masterDataLookupService.GetTransactionTypeNameAsync(model.TransactionType);
         if (typeName.Data == null)
         {
             return ServiceResult<AssetTransactionDetailView>.BadRequest($"Invalid TransactionType: {model.TransactionType}");
         }
 
-        // Validate berdasarkan tipe
         var type = model.TransactionType;
 
-        // HANDOVER: EmployeeId required
         if (type == TransactionTypeConstants.HANDOVER && !model.EmployeeId.HasValue)
         {
             return ServiceResult<AssetTransactionDetailView>.BadRequest("HANDOVER requires EmployeeId");
         }
 
-        // TRANSFER: EmployeeId required, harus ada FromAssetTransactionId
         if (type == TransactionTypeConstants.TRANSFER)
         {
             if (!model.EmployeeId.HasValue)
@@ -1132,7 +1074,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             }
         }
 
-        // LOAN: EmployeeId required, ExpectedLoanReturnDate required
         if (type == TransactionTypeConstants.LOAN)
         {
             if (!model.EmployeeId.HasValue)
@@ -1149,7 +1090,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             }
         }
 
-        // MAINTENANCE: tidak perlu EmployeeId, OfficeId, MaintenanceCost diisi di POST
         if (type == TransactionTypeConstants.MAINTENANCE)
         {
             if (!model.MaintenanceType.HasValue)
@@ -1158,13 +1098,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             }
         }
 
-        // DISPOSAL: tidak perlu EmployeeId, OfficeId
-        if (type == TransactionTypeConstants.DISPOSAL)
-        {
-            // Tidak ada validasi khusus
-        }
-
-        // OPERATIONAL OFFICE: OfficeId required
         if (type == TransactionTypeConstants.OPERATIONAL_OFFICE)
         {
             if (!model.OfficeId.HasValue)
@@ -1173,13 +1106,11 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             }
         }
 
-        // LOAN_RETURN, POST_MAINTENANCE: tidak boleh dibuat manual
         if (type == TransactionTypeConstants.LOAN_RETURN || type == TransactionTypeConstants.POST_MAINTENANCE)
         {
             return ServiceResult<AssetTransactionDetailView>.BadRequest($"Transaction type {type} cannot be created manually. Use shortcut endpoint.");
         }
 
-        // Validate Employee jika ada
         if (model.EmployeeId.HasValue)
         {
             var employee = await _employeeService.GetByIdAsync(model.EmployeeId.Value);
@@ -1189,7 +1120,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             }
         }
 
-        // Validate Office jika ada
         if (model.OfficeId.HasValue)
         {
             var office = await _officeService.GetByIdAsync(model.OfficeId.Value);
@@ -1199,7 +1129,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             }
         }
 
-        // Validate Condition jika ada
         if (model.Condition.HasValue)
         {
             var condition = await _masterDataLookupService.GetAssetConditionNameAsync(model.Condition.Value);
@@ -1209,7 +1138,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             }
         }
 
-        // Validate MaintenanceType jika ada
         if (model.MaintenanceType.HasValue)
         {
             var maintType = await _masterDataLookupService.GetMaintenanceTypeNameAsync(model.MaintenanceType.Value);
@@ -1219,11 +1147,10 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             }
         }
 
-        // Validate FromAssetTransactionId jika ada
         if (model.FromAssetTransactionId.HasValue)
         {
             var source = await _transactionReps.GetByIdRawAsync(model.FromAssetTransactionId.Value);
-            if (source == null || source.IsActive == 0)
+            if (source == null || source.IsActive == false)
             {
                 return ServiceResult<AssetTransactionDetailView>.NotFound($"Source transaction {model.FromAssetTransactionId} not found");
             }
@@ -1237,7 +1164,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             }
         }
 
-        // Cek transaksi aktif jika tidak ada FromAssetTransactionId
         if (!model.FromAssetTransactionId.HasValue)
         {
             var active = await _transactionReps.GetActiveTransactionByAssetIdAsync(model.AssetId);

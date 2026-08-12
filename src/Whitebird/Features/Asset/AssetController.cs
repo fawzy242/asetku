@@ -82,7 +82,7 @@ public class AssetController : ControllerBase
         }
 
         using var stream = file.OpenReadStream();
-        var result = await _assetImportService.ImportFromExcelAsync(stream);
+        var result = await _assetImportService.ImportFromFileAsync(stream);
         return this.HandleResult(result);
     }
 

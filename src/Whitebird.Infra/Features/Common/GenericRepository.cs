@@ -5,6 +5,7 @@ using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Whitebird.Infra.Database;
+using Whitebird.Domain.Features.Common;
 
 namespace Whitebird.Infra.Features.Common;
 

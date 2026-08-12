@@ -1,5 +1,6 @@
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.Schedule;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.App.Features.Schedule;
@@ -20,7 +21,7 @@ public interface IScheduleReturnService
     Task<ServiceResult> SoftDeleteAsync(int id);
 
     // ============================================================
-    // GRID
+    // GRID - Using GridRequest
     // ============================================================
 
     Task<ServiceResult<PaginatedResult<ScheduleReturnListView>>> GetGridDataAsync(ScheduleGridRequest request);

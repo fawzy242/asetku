@@ -2,6 +2,7 @@ using Dapper;
 using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.AssetTracking;
 using Whitebird.Domain.Features.MasterData;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.AssetTracking;
@@ -115,11 +116,11 @@ public class AssetTrackingReps : IAssetTrackingReps
             lt.ExpectedLoanReturnDate as LoanDueDate
         FROM Asset a
         LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
-        LEFT JOIN Employee e ON lt.ToEmployeeId = e.EmployeeId
+        LEFT JOIN Employee e ON lt.EmployeeId = e.EmployeeId
         LEFT JOIN Office o ON lt.OfficeId = o.OfficeId AND o.IsActive = 1
         LEFT JOIN MasterData mdCondition ON lt.Condition = mdCondition.ReferenceCode AND mdCondition.ReferenceName = 'AssetCondition' AND mdCondition.IsActive = 1
         LEFT JOIN (
-            SELECT AssetId, TransactionType, ToEmployeeId, OfficeId, Condition, ExpectedLoanReturnDate,
+            SELECT AssetId, TransactionType, EmployeeId, OfficeId, Condition, ExpectedLoanReturnDate,
                    ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
             FROM AssetTransaction
             WHERE Approved = 1 AND IsActive = 1 AND FromAssetTransactionId IS NULL
@@ -139,7 +140,7 @@ public class AssetTrackingReps : IAssetTrackingReps
     }
 
     // ============================================================
-    // TIMELINE
+    // TIMELINE - FIXED
     // ============================================================
 
     public async Task<IEnumerable<AssetTimelineEntry>> GetTimelineAsync(int assetId)
@@ -149,18 +150,16 @@ public class AssetTrackingReps : IAssetTrackingReps
             t.AssetTransactionId as Id,
             t.TransactionDate as Date,
             mdType.MasterDataName as ActivityType,
-            t.Notes as Description,
-            fe.FullName as PreviousHolder,
-            te.FullName as NewHolder,
-            mdConditionBefore.MasterDataName as PreviousStatus,
-            mdConditionAfter.MasterDataName as NewStatus,
+            COALESCE(t.Notes, '') as Description,
+            NULL as PreviousHolder,
+            e.FullName as NewHolder,
+            NULL as PreviousStatus,
+            mdCondition.MasterDataName as NewStatus,
             t.Notes
         FROM AssetTransaction t
-        LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
-        LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
+        LEFT JOIN Employee e ON t.EmployeeId = e.EmployeeId
         LEFT JOIN MasterData mdType ON t.TransactionType = mdType.ReferenceCode AND mdType.ReferenceName = 'TransactionType' AND mdType.IsActive = 1
-        LEFT JOIN MasterData mdConditionBefore ON t.ConditionBefore = mdConditionBefore.ReferenceCode AND mdConditionBefore.ReferenceName = 'AssetCondition' AND mdConditionBefore.IsActive = 1
-        LEFT JOIN MasterData mdConditionAfter ON t.ConditionAfter = mdConditionAfter.ReferenceCode AND mdConditionAfter.ReferenceName = 'AssetCondition' AND mdConditionAfter.IsActive = 1
+        LEFT JOIN MasterData mdCondition ON t.Condition = mdCondition.ReferenceCode AND mdCondition.ReferenceName = 'AssetCondition' AND mdCondition.IsActive = 1
         WHERE t.AssetId = @AssetId AND t.IsActive = 1
         ORDER BY t.TransactionDate DESC";
 
@@ -224,70 +223,67 @@ public class AssetTrackingReps : IAssetTrackingReps
     }
 
     // ============================================================
-    // SCHEDULE STATS
+    // SCHEDULE STATS - Using GridRequest
     // ============================================================
 
-    public async Task<PaginatedResult<AssetTrackingScheduleStatsDto>> GetScheduleStatsAsync(
-        int assetId, string type, int page, int pageSize, string? search = null)
+    public async Task<PaginatedResult<AssetTrackingScheduleStatsDto>> GetScheduleStatsAsync(AssetTrackingGridRequest request)
     {
+        var conditions = new List<string>();
         var parameters = new DynamicParameters();
-        parameters.Add("@AssetId", assetId);
 
-        string tableName, idColumn, employeeColumn, typeColumn, typeValue, statusColumn;
-        string typeName = type.ToLower();
+        parameters.Add("@AssetId", request.AssetId);
 
-        if (typeName == "handover")
+        if (string.IsNullOrWhiteSpace(request.SortBy))
         {
-            tableName = "ScheduleHandover";
-            idColumn = "ScheduleHandoverId";
-            employeeColumn = "EmployeeId";
-            typeColumn = "'Handover'";
-            statusColumn = "CASE WHEN HandoverAssetTransactionId IS NOT NULL THEN 'Completed' ELSE 'Pending' END";
-        }
-        else if (typeName == "return")
-        {
-            tableName = "ScheduleReturn";
-            idColumn = "ScheduleReturnId";
-            employeeColumn = "EmployeeId";
-            typeColumn = "'Return'";
-            statusColumn = "CASE WHEN ReturnAssetTransactionId IS NOT NULL THEN 'Completed' ELSE 'Pending' END";
-        }
-        else if (typeName == "maintenance")
-        {
-            tableName = "ScheduleMaintenance";
-            idColumn = "ScheduleMaintenanceId";
-            employeeColumn = "EmployeeId";
-            typeColumn = "'Maintenance'";
-            statusColumn = "CASE WHEN MaintenanceAssetTransactionId IS NOT NULL THEN 'Completed' ELSE 'Pending' END";
-        }
-        else
-        {
-            throw new ArgumentException($"Invalid schedule type: {type}. Valid types: handover, return, maintenance");
+            request.SortBy = "s.ScheduleDate";
+            request.SortDescending = true;
         }
 
-        var conditions = new List<string> { $"s.AssetId = @AssetId", "s.IsActive = 1" };
+        string tableName, idColumn, employeeColumn, typeColumn, statusColumn;
 
-        if (!string.IsNullOrWhiteSpace(search))
+        switch (request.Search?.ToLower())
         {
-            conditions.Add($"(e.FullName LIKE @Search)");
-            parameters.Add("@Search", $"%{search}%");
+            case "handover":
+                tableName = "ScheduleHandover";
+                idColumn = "ScheduleHandoverId";
+                employeeColumn = "EmployeeId";
+                typeColumn = "'Handover'";
+                statusColumn = "CASE WHEN HandoverAssetTransactionId IS NOT NULL THEN 'Completed' ELSE 'Pending' END";
+                break;
+            case "return":
+                tableName = "ScheduleReturn";
+                idColumn = "ScheduleReturnId";
+                employeeColumn = "EmployeeId";
+                typeColumn = "'Return'";
+                statusColumn = "CASE WHEN ReturnAssetTransactionId IS NOT NULL THEN 'Completed' ELSE 'Pending' END";
+                break;
+            case "maintenance":
+                tableName = "ScheduleMaintenance";
+                idColumn = "ScheduleMaintenanceId";
+                employeeColumn = "EmployeeId";
+                typeColumn = "'Maintenance'";
+                statusColumn = "CASE WHEN MaintenanceAssetTransactionId IS NOT NULL THEN 'Completed' ELSE 'Pending' END";
+                break;
+            default:
+                return new PaginatedResult<AssetTrackingScheduleStatsDto>();
         }
 
-        var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
+        conditions.Add($"s.AssetId = @AssetId");
+        conditions.Add("s.IsActive = 1");
+
+        var whereClause = GridQueryBuilder.BuildWhereClause(conditions, parameters);
+        var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "s.ScheduleDate", true);
+        var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
         var countSql = $@"
             SELECT COUNT(*)
             FROM {tableName} s
+            LEFT JOIN Asset a ON s.AssetId = a.AssetId
             LEFT JOIN Employee e ON s.{employeeColumn} = e.EmployeeId
             {whereClause}";
-
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        var offset = (page - 1) * pageSize;
-        parameters.Add("@Offset", offset);
-        parameters.Add("@PageSize", pageSize);
-
-        var dataSql = $@"
+        var selectClause = @$"
             SELECT 
                 s.{idColumn} as ScheduleId,
                 s.ScheduleDate,
@@ -297,13 +293,19 @@ public class AssetTrackingReps : IAssetTrackingReps
                 {statusColumn} as Status,
                 {typeColumn} as Type,
                 s.{idColumn} as RelatedTransactionId,
-                s.IsActive
+                s.IsActive";
+
+        var fromClause = $@"
             FROM {tableName} s
             LEFT JOIN Asset a ON s.AssetId = a.AssetId
-            LEFT JOIN Employee e ON s.{employeeColumn} = e.EmployeeId
+            LEFT JOIN Employee e ON s.{employeeColumn} = e.EmployeeId";
+
+        var dataSql = $@"
+            {selectClause}
+            {fromClause}
             {whereClause}
-            ORDER BY s.ScheduleDate DESC
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+            {orderBy}
+            {pagination}";
 
         var data = await _context.QueryAsync<AssetTrackingScheduleStatsDto>(dataSql, parameters);
 
@@ -311,9 +313,9 @@ public class AssetTrackingReps : IAssetTrackingReps
         {
             Data = data.ToList(),
             TotalCount = totalCount,
-            PageNumber = page,
-            PageSize = pageSize,
-            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            PageNumber = request.Page,
+            PageSize = request.PageSize,
+            TotalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize)
         };
     }
 
@@ -352,24 +354,28 @@ public class AssetTrackingReps : IAssetTrackingReps
     }
 
     // ============================================================
-    // EMPLOYEE HISTORY
+    // EMPLOYEE HISTORY - Using GridRequest
     // ============================================================
 
-    public async Task<PaginatedResult<AssetTrackingEmployeeHistoryDto>> GetEmployeeHistoryAsync(
-        int assetId, int page, int pageSize, string? search = null)
+    public async Task<PaginatedResult<AssetTrackingEmployeeHistoryDto>> GetEmployeeHistoryAsync(AssetTrackingGridRequest request)
     {
+        var conditions = new List<string>
+        {
+            "t.AssetId = @AssetId",
+            "t.IsActive = 1"
+        };
         var parameters = new DynamicParameters();
-        parameters.Add("@AssetId", assetId);
+        parameters.Add("@AssetId", request.AssetId);
 
-        var conditions = new List<string> { "t.AssetId = @AssetId", "t.IsActive = 1" };
-
-        if (!string.IsNullOrWhiteSpace(search))
+        if (!string.IsNullOrWhiteSpace(request.Search))
         {
             conditions.Add(@"(e.FullName LIKE @Search OR e.EmployeeCode LIKE @Search OR d.DepartmentName LIKE @Search)");
-            parameters.Add("@Search", $"%{search}%");
+            parameters.Add("@Search", $"%{request.Search}%");
         }
 
-        var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
+        var whereClause = GridQueryBuilder.BuildWhereClause(conditions, parameters);
+        var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "MAX(t.TransactionDate)", true);
+        var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
         var countSql = $@"
             SELECT COUNT(DISTINCT e.EmployeeId)
@@ -377,14 +383,9 @@ public class AssetTrackingReps : IAssetTrackingReps
             LEFT JOIN Employee e ON t.EmployeeId = e.EmployeeId
             LEFT JOIN Department d ON e.DepartmentId = d.DepartmentId
             {whereClause}";
-
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        var offset = (page - 1) * pageSize;
-        parameters.Add("@Offset", offset);
-        parameters.Add("@PageSize", pageSize);
-
-        var dataSql = $@"
+        var selectClause = @"
             SELECT 
                 e.EmployeeId,
                 e.EmployeeCode,
@@ -393,15 +394,21 @@ public class AssetTrackingReps : IAssetTrackingReps
                 mdPos.MasterDataName as PositionName,
                 MAX(t.TransactionDate) as LastTransactionDate,
                 COUNT(t.AssetTransactionId) as TotalTransactions,
-                COUNT(DISTINCT t.AssetId) as AssetsHeld
+                COUNT(DISTINCT t.AssetId) as AssetsHeld";
+
+        var fromClause = @"
             FROM AssetTransaction t
             LEFT JOIN Employee e ON t.EmployeeId = e.EmployeeId
             LEFT JOIN Department d ON e.DepartmentId = d.DepartmentId
-            LEFT JOIN MasterData mdPos ON e.Position = mdPos.ReferenceCode AND mdPos.ReferenceName = 'Position' AND mdPos.IsActive = 1
+            LEFT JOIN MasterData mdPos ON e.Position = mdPos.ReferenceCode AND mdPos.ReferenceName = 'Position' AND mdPos.IsActive = 1";
+
+        var dataSql = $@"
+            {selectClause}
+            {fromClause}
             {whereClause}
             GROUP BY e.EmployeeId, e.EmployeeCode, e.FullName, d.DepartmentName, mdPos.MasterDataName
-            ORDER BY MAX(t.TransactionDate) DESC
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+            {orderBy}
+            {pagination}";
 
         var data = await _context.QueryAsync<AssetTrackingEmployeeHistoryDto>(dataSql, parameters);
 
@@ -409,9 +416,9 @@ public class AssetTrackingReps : IAssetTrackingReps
         {
             Data = data.ToList(),
             TotalCount = totalCount,
-            PageNumber = page,
-            PageSize = pageSize,
-            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            PageNumber = request.Page,
+            PageSize = request.PageSize,
+            TotalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize)
         };
     }
 }

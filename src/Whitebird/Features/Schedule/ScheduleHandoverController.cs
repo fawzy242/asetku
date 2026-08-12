@@ -18,6 +18,10 @@ public class ScheduleHandoverController : ControllerBase
         _service = service;
     }
 
+    // ============================================================
+    // CRUD
+    // ============================================================
+
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
         => this.HandleResult(await _service.GetByIdAsync(id));
@@ -33,10 +37,6 @@ public class ScheduleHandoverController : ControllerBase
     [HttpGet("employee/{employeeId:int}")]
     public async Task<IActionResult> GetByEmployeeId(int employeeId)
         => this.HandleResult(await _service.GetByEmployeeIdAsync(employeeId));
-
-    [HttpGet("grid")]
-    public async Task<IActionResult> GetGridData([FromQuery] ScheduleGridRequest request)
-        => this.HandleResult(await _service.GetGridDataAsync(request));
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] ScheduleHandoverCreateDto dto)
@@ -62,6 +62,18 @@ public class ScheduleHandoverController : ControllerBase
     public async Task<IActionResult> SoftDelete(int id)
         => this.HandleResult(await _service.SoftDeleteAsync(id));
 
+    // ============================================================
+    // GRID
+    // ============================================================
+
+    [HttpGet("grid")]
+    public async Task<IActionResult> GetGridData([FromQuery] ScheduleGridRequest request)
+        => this.HandleResult(await _service.GetGridDataAsync(request));
+
+    // ============================================================
+    // BULK OPERATIONS
+    // ============================================================
+
     [HttpPost("activate")]
     public async Task<IActionResult> BulkActivate([FromBody] BulkActivateRequest request)
     {
@@ -77,6 +89,10 @@ public class ScheduleHandoverController : ControllerBase
         if (validation != null) return validation;
         return this.HandleResult(await _service.BulkDeactivateAsync(request));
     }
+
+    // ============================================================
+    // GENERATE
+    // ============================================================
 
     [HttpPost("generate")]
     public async Task<IActionResult> Generate([FromBody] ScheduleHandoverGenerateDto dto)

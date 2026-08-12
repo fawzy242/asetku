@@ -2,11 +2,11 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Whitebird.Domain.Features.AssetTransaction;
 
-public class AssetTransactionApproveAttachmentUploadDto
+/// <summary>
+/// DTO for asset transaction approve attachment (Domain layer - no IFormFile)
+/// </summary>
+public class AssetTransactionApproveAttachmentDto
 {
-    [Required(ErrorMessage = "File is required")]
-    public IFormFile File { get; set; } = default!;
-
     [Required(ErrorMessage = "DocumentType is required")]
     [Range(1, int.MaxValue, ErrorMessage = "DocumentType must be greater than 0")]
     public int DocumentType { get; set; }

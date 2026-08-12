@@ -1,4 +1,5 @@
 using Whitebird.Domain.Features.AssetTracking;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.AssetTracking;
@@ -8,35 +9,63 @@ namespace Whitebird.Infra.Features.AssetTracking;
 /// </summary>
 public interface IAssetTrackingReps
 {
-    // Lookup/Dropdown
+    // ============================================================
+    // LOOKUP / DROPDOWN
+    // ============================================================
+
     Task<AssetTrackingGetDataDto?> GetAssetDataAsync(int assetId);
 
-    // Detail Tracking
+    // ============================================================
+    // DETAIL TRACKING
+    // ============================================================
+
     Task<AssetTrackingView?> GetTrackingDetailAsync(int assetId);
 
-    // Stats Header
+    // ============================================================
+    // STATS HEADER
+    // ============================================================
+
     Task<AssetStatsView?> GetAssetStatsAsync(int assetId);
 
-    // Timeline
+    // ============================================================
+    // TIMELINE
+    // ============================================================
+
     Task<IEnumerable<AssetTimelineEntry>> GetTimelineAsync(int assetId);
 
-    // Software Installation
+    // ============================================================
+    // SOFTWARE INSTALLATION
+    // ============================================================
+
     Task<AssetTrackingSoftwareInstallationDto?> GetSoftwareInstallationByAssetIdAsync(int assetId);
 
-    // Attachments
+    // ============================================================
+    // ATTACHMENTS
+    // ============================================================
+
     Task<IEnumerable<AssetTrackingAttachmentDto>> GetAttachmentsByAssetIdAsync(int assetId);
 
-    // Photo Profile
+    // ============================================================
+    // PHOTO PROFILE
+    // ============================================================
+
     Task<AssetTrackingAttachmentDto?> GetPhotoProfileByAssetIdAsync(int assetId);
 
-    // Schedule Stats
-    Task<PaginatedResult<AssetTrackingScheduleStatsDto>> GetScheduleStatsAsync(
-        int assetId, string type, int page, int pageSize, string? search = null);
+    // ============================================================
+    // SCHEDULE STATS - Using GridRequest
+    // ============================================================
 
-    // Transaction Type Stats
+    Task<PaginatedResult<AssetTrackingScheduleStatsDto>> GetScheduleStatsAsync(AssetTrackingGridRequest request);
+
+    // ============================================================
+    // TRANSACTION TYPE STATS
+    // ============================================================
+
     Task<AssetTrackingTransactionTypeStatsResponse> GetTransactionTypeStatsAsync(int assetId);
 
-    // Employee History
-    Task<PaginatedResult<AssetTrackingEmployeeHistoryDto>> GetEmployeeHistoryAsync(
-        int assetId, int page, int pageSize, string? search = null);
+    // ============================================================
+    // EMPLOYEE HISTORY - Using GridRequest
+    // ============================================================
+
+    Task<PaginatedResult<AssetTrackingEmployeeHistoryDto>> GetEmployeeHistoryAsync(AssetTrackingGridRequest request);
 }

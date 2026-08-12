@@ -480,9 +480,9 @@ public class AssetTransactionController : ControllerBase
     /// <summary>
     /// Get available assets (not in active transaction)
     /// </summary>
-    [HttpGet("list-asset")]
-    public async Task<IActionResult> GetAssetList()
-        => this.HandleResult(await _transactionService.GetAssetListAsync());
+    [HttpGet("{id:int}/list-asset")]
+    public async Task<IActionResult> GetAssetList(int id)
+        => this.HandleResult(await _transactionService.GetAssetListAsync(id));
 
     // ============================================================
     // IMPORT
@@ -504,7 +504,7 @@ public class AssetTransactionController : ControllerBase
         }
 
         using var stream = file.OpenReadStream();
-        var result = await _transactionImportService.ImportFromExcelAsync(stream);
+        var result = await _transactionImportService.ImportFromFileAsync(stream);
         return this.HandleResult(result);
     }
 

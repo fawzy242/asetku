@@ -1,14 +1,14 @@
+using Whitebird.Domain.Features.Common;
+
 namespace Whitebird.Domain.Features.Dashboard;
 
 /// <summary>
-/// Request model for detail stats (drilldown)
+/// Grid request for Dashboard detail stats (drilldown)
 /// </summary>
-public class DetailStatsRequest
+public class DashboardDetailStatsRequest : GridRequestBase
 {
+    /// <summary>
+    /// Type of detail stats: Available, Assigned, OnLoan, InMaintenance, Disposed, Damaged, ExpiredWarranty, OverdueLoans
+    /// </summary>
     public string Type { get; set; } = string.Empty;
-    public int Page { get; set; } = 1;
-    public int PageSize { get; set; } = 10;
-    public string? Search { get; set; }
-    public string? SortBy { get; set; }
-    public bool SortDescending { get; set; } = false;
 }

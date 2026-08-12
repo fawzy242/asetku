@@ -2,6 +2,7 @@ using Dapper;
 using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.EmployeeSummary;
 using Whitebird.Domain.Features.MasterData;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.EmployeeSummary;
@@ -19,7 +20,7 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
     }
 
     // ============================================================
-    // LOOKUP / DROPDOWN
+    // LOOKUP
     // ============================================================
 
     public async Task<EmployeeSummaryGetDataDto?> GetEmployeeDataAsync(int employeeId)
@@ -45,9 +46,9 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
         if (employee == null) return null;
 
         var stats = await GetStatsAsync(employeeId);
-        var currentHolding = await GetCurrentHoldingAsync(employeeId, 1, 100);
-        var assetsHistory = await GetAssetsHistoryAsync(employeeId, 1, 100);
-        var transactionHistory = await GetTransactionHistoryAsync(employeeId, 1, 100);
+        var currentHolding = await GetCurrentHoldingAsync(new EmployeeSummaryGridRequest { EmployeeId = employeeId, Page = 1, PageSize = 100 });
+        var assetsHistory = await GetAssetsHistoryAsync(new EmployeeSummaryGridRequest { EmployeeId = employeeId, Page = 1, PageSize = 100 });
+        var transactionHistory = await GetTransactionHistoryAsync(new EmployeeSummaryGridRequest { EmployeeId = employeeId, Page = 1, PageSize = 100 });
         var attachments = await GetAttachmentsByEmployeeIdAsync(employeeId);
         var photoProfile = await GetPhotoProfileByEmployeeIdAsync(employeeId);
 
@@ -167,16 +168,15 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
             DamagedCondition = AssetConditionConstants.DAMAGED
         };
 
-        return await _context.QueryFirstOrDefaultAsync<EmployeeSummaryStatsDto>(sql, parameters) 
+        return await _context.QueryFirstOrDefaultAsync<EmployeeSummaryStatsDto>(sql, parameters)
                ?? new EmployeeSummaryStatsDto();
     }
 
     // ============================================================
-    // CURRENT HOLDING
+    // CURRENT HOLDING - Using GridRequest
     // ============================================================
 
-    public async Task<PaginatedResult<EmployeeCurrentHoldingDto>> GetCurrentHoldingAsync(
-        int employeeId, int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false)
+    public async Task<PaginatedResult<EmployeeCurrentHoldingDto>> GetCurrentHoldingAsync(EmployeeSummaryGridRequest request)
     {
         var conditions = new List<string>
         {
@@ -187,24 +187,20 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
             "at.TransactionType IN (@HandoverType, @TransferType, @LoanType)"
         };
         var parameters = new DynamicParameters();
-        parameters.Add("@EmployeeId", employeeId);
+        parameters.Add("@EmployeeId", request.EmployeeId);
         parameters.Add("@HandoverType", TransactionTypeConstants.HANDOVER);
         parameters.Add("@TransferType", TransactionTypeConstants.TRANSFER);
         parameters.Add("@LoanType", TransactionTypeConstants.LOAN);
 
-        if (!string.IsNullOrWhiteSpace(search))
+        if (!string.IsNullOrWhiteSpace(request.Search))
         {
             conditions.Add(@"(a.AssetCode LIKE @Search OR a.AssetName LIKE @Search OR a.SerialNumber LIKE @Search OR c.CategoryName LIKE @Search)");
-            parameters.Add("@Search", $"%{search}%");
+            parameters.Add("@Search", $"%{request.Search}%");
         }
 
-        var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
-
-        if (string.IsNullOrEmpty(sortBy)) sortBy = "at.TransactionDate";
-        if (!sortBy.StartsWith("at.") && !sortBy.StartsWith("a.") && !sortBy.StartsWith("c."))
-            sortBy = $"at.{sortBy}";
-
-        var orderBy = $"ORDER BY {sortBy} {(sortDescending ? "DESC" : "ASC")}";
+        var whereClause = GridQueryBuilder.BuildWhereClause(conditions, parameters);
+        var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "at.TransactionDate", true);
+        var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
         var countSql = $@"
             SELECT COUNT(DISTINCT at.AssetId)
@@ -212,14 +208,9 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
             LEFT JOIN Asset a ON at.AssetId = a.AssetId
             LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
             {whereClause}";
-
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        var offset = (page - 1) * pageSize;
-        parameters.Add("@Offset", offset);
-        parameters.Add("@PageSize", pageSize);
-
-        var dataSql = $@"
+        var selectClause = @"
             SELECT DISTINCT
                 a.AssetId,
                 a.AssetCode,
@@ -239,14 +230,20 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
                     WHEN at.TransactionType = @LoanType AND at.ExpectedLoanReturnDate < GETDATE() THEN 1 
                     ELSE 0 
                 END AS IsOverdue,
-                md.MasterDataName AS ConditionName
+                md.MasterDataName AS ConditionName";
+
+        var fromClause = @"
             FROM AssetTransaction at
             LEFT JOIN Asset a ON at.AssetId = a.AssetId AND a.IsActive = 1
             LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
-            LEFT JOIN MasterData md ON at.Condition = md.ReferenceCode AND md.ReferenceName = 'AssetCondition' AND md.IsActive = 1
+            LEFT JOIN MasterData md ON at.Condition = md.ReferenceCode AND md.ReferenceName = 'AssetCondition' AND md.IsActive = 1";
+
+        var dataSql = $@"
+            {selectClause}
+            {fromClause}
             {whereClause}
             {orderBy}
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+            {pagination}";
 
         var data = await _context.QueryAsync<EmployeeCurrentHoldingDto>(dataSql, parameters);
 
@@ -254,20 +251,18 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
         {
             Data = data.ToList(),
             TotalCount = totalCount,
-            PageNumber = page,
-            PageSize = pageSize,
-            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            PageNumber = request.Page,
+            PageSize = request.PageSize,
+            TotalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize)
         };
     }
 
     // ============================================================
-    // ASSETS HISTORY (previously held, now with another employee)
+    // ASSETS HISTORY - Using GridRequest
     // ============================================================
 
-    public async Task<PaginatedResult<EmployeeAssetsHistoryDto>> GetAssetsHistoryAsync(
-        int employeeId, int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false)
+    public async Task<PaginatedResult<EmployeeAssetsHistoryDto>> GetAssetsHistoryAsync(EmployeeSummaryGridRequest request)
     {
-        // Get assets that were held by this employee but now held by someone else
         var conditions = new List<string>
         {
             "at.EmployeeId = @EmployeeId",
@@ -275,28 +270,23 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
             "at.FromAssetTransactionId IS NULL",
             "at.IsActive = 1",
             "at.TransactionType IN (@HandoverType, @TransferType, @LoanType)",
-            // Asset is not currently held by this employee
             "NOT EXISTS (SELECT 1 FROM AssetTransaction at2 WHERE at2.AssetId = at.AssetId AND at2.EmployeeId = @EmployeeId AND at2.Approved = 1 AND at2.FromAssetTransactionId IS NULL AND at2.IsActive = 1 AND at2.TransactionType IN (@HandoverType, @TransferType, @LoanType) AND at2.AssetTransactionId > at.AssetTransactionId)"
         };
         var parameters = new DynamicParameters();
-        parameters.Add("@EmployeeId", employeeId);
+        parameters.Add("@EmployeeId", request.EmployeeId);
         parameters.Add("@HandoverType", TransactionTypeConstants.HANDOVER);
         parameters.Add("@TransferType", TransactionTypeConstants.TRANSFER);
         parameters.Add("@LoanType", TransactionTypeConstants.LOAN);
 
-        if (!string.IsNullOrWhiteSpace(search))
+        if (!string.IsNullOrWhiteSpace(request.Search))
         {
             conditions.Add(@"(a.AssetCode LIKE @Search OR a.AssetName LIKE @Search OR a.SerialNumber LIKE @Search OR c.CategoryName LIKE @Search)");
-            parameters.Add("@Search", $"%{search}%");
+            parameters.Add("@Search", $"%{request.Search}%");
         }
 
-        var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
-
-        if (string.IsNullOrEmpty(sortBy)) sortBy = "at.TransactionDate";
-        if (!sortBy.StartsWith("at.") && !sortBy.StartsWith("a.") && !sortBy.StartsWith("c."))
-            sortBy = $"at.{sortBy}";
-
-        var orderBy = $"ORDER BY {sortBy} {(sortDescending ? "DESC" : "ASC")}";
+        var whereClause = GridQueryBuilder.BuildWhereClause(conditions, parameters);
+        var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "at.TransactionDate", true);
+        var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
         var countSql = $@"
             SELECT COUNT(DISTINCT at.AssetId)
@@ -304,14 +294,9 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
             LEFT JOIN Asset a ON at.AssetId = a.AssetId
             LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
             {whereClause}";
-
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        var offset = (page - 1) * pageSize;
-        parameters.Add("@Offset", offset);
-        parameters.Add("@PageSize", pageSize);
-
-        var dataSql = $@"
+        var selectClause = @"
             SELECT 
                 a.AssetId,
                 a.AssetCode,
@@ -320,7 +305,9 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
                 MAX(at.TransactionDate) AS LastHeldDate,
                 e2.FullName AS CurrentHolderName,
                 e2.EmployeeId AS CurrentHolderId,
-                md.MasterDataName AS ConditionName
+                md.MasterDataName AS ConditionName";
+
+        var fromClause = @"
             FROM AssetTransaction at
             LEFT JOIN Asset a ON at.AssetId = a.AssetId AND a.IsActive = 1
             LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
@@ -330,11 +317,15 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
                 AND at_current.IsActive = 1
                 AND at_current.TransactionType IN (@HandoverType, @TransferType, @LoanType)
             LEFT JOIN Employee e2 ON at_current.EmployeeId = e2.EmployeeId
-            LEFT JOIN MasterData md ON at.Condition = md.ReferenceCode AND md.ReferenceName = 'AssetCondition' AND md.IsActive = 1
+            LEFT JOIN MasterData md ON at.Condition = md.ReferenceCode AND md.ReferenceName = 'AssetCondition' AND md.IsActive = 1";
+
+        var dataSql = $@"
+            {selectClause}
+            {fromClause}
             {whereClause}
             GROUP BY a.AssetId, a.AssetCode, a.AssetName, c.CategoryName, e2.FullName, e2.EmployeeId, md.MasterDataName
             {orderBy}
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+            {pagination}";
 
         var data = await _context.QueryAsync<EmployeeAssetsHistoryDto>(dataSql, parameters);
 
@@ -342,18 +333,17 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
         {
             Data = data.ToList(),
             TotalCount = totalCount,
-            PageNumber = page,
-            PageSize = pageSize,
-            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            PageNumber = request.Page,
+            PageSize = request.PageSize,
+            TotalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize)
         };
     }
 
     // ============================================================
-    // TRANSACTION HISTORY
+    // TRANSACTION HISTORY - Using GridRequest
     // ============================================================
 
-    public async Task<PaginatedResult<EmployeeTransactionHistoryDto>> GetTransactionHistoryAsync(
-        int employeeId, int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false)
+    public async Task<PaginatedResult<EmployeeTransactionHistoryDto>> GetTransactionHistoryAsync(EmployeeSummaryGridRequest request)
     {
         var conditions = new List<string>
         {
@@ -361,21 +351,17 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
             "at.IsActive = 1"
         };
         var parameters = new DynamicParameters();
-        parameters.Add("@EmployeeId", employeeId);
+        parameters.Add("@EmployeeId", request.EmployeeId);
 
-        if (!string.IsNullOrWhiteSpace(search))
+        if (!string.IsNullOrWhiteSpace(request.Search))
         {
             conditions.Add(@"(a.AssetCode LIKE @Search OR a.AssetName LIKE @Search OR mdType.MasterDataName LIKE @Search)");
-            parameters.Add("@Search", $"%{search}%");
+            parameters.Add("@Search", $"%{request.Search}%");
         }
 
-        var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
-
-        if (string.IsNullOrEmpty(sortBy)) sortBy = "at.TransactionDate";
-        if (!sortBy.StartsWith("at.") && !sortBy.StartsWith("a.") && !sortBy.StartsWith("mdType."))
-            sortBy = $"at.{sortBy}";
-
-        var orderBy = $"ORDER BY {sortBy} {(sortDescending ? "DESC" : "ASC")}";
+        var whereClause = GridQueryBuilder.BuildWhereClause(conditions, parameters);
+        var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "at.TransactionDate", true);
+        var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
         var countSql = $@"
             SELECT COUNT(*)
@@ -383,14 +369,9 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
             LEFT JOIN Asset a ON at.AssetId = a.AssetId
             LEFT JOIN MasterData mdType ON at.TransactionType = mdType.ReferenceCode AND mdType.ReferenceName = 'TransactionType' AND mdType.IsActive = 1
             {whereClause}";
-
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        var offset = (page - 1) * pageSize;
-        parameters.Add("@Offset", offset);
-        parameters.Add("@PageSize", pageSize);
-
-        var dataSql = $@"
+        var selectClause = @"
             SELECT 
                 at.AssetTransactionId,
                 at.AssetId,
@@ -401,16 +382,22 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
                 fe.FullName AS FromEmployeeName,
                 te.FullName AS ToEmployeeName,
                 mdCondition.MasterDataName AS ConditionAfterName,
-                at.Notes
+                at.Notes";
+
+        var fromClause = @"
             FROM AssetTransaction at
             LEFT JOIN Asset a ON at.AssetId = a.AssetId
             LEFT JOIN Employee fe ON at.FromEmployeeId = fe.EmployeeId
             LEFT JOIN Employee te ON at.ToEmployeeId = te.EmployeeId
             LEFT JOIN MasterData mdType ON at.TransactionType = mdType.ReferenceCode AND mdType.ReferenceName = 'TransactionType' AND mdType.IsActive = 1
-            LEFT JOIN MasterData mdCondition ON at.Condition = mdCondition.ReferenceCode AND mdCondition.ReferenceName = 'AssetCondition' AND mdCondition.IsActive = 1
+            LEFT JOIN MasterData mdCondition ON at.Condition = mdCondition.ReferenceCode AND mdCondition.ReferenceName = 'AssetCondition' AND mdCondition.IsActive = 1";
+
+        var dataSql = $@"
+            {selectClause}
+            {fromClause}
             {whereClause}
             {orderBy}
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+            {pagination}";
 
         var data = await _context.QueryAsync<EmployeeTransactionHistoryDto>(dataSql, parameters);
 
@@ -418,9 +405,9 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
         {
             Data = data.ToList(),
             TotalCount = totalCount,
-            PageNumber = page,
-            PageSize = pageSize,
-            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            PageNumber = request.Page,
+            PageSize = request.PageSize,
+            TotalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize)
         };
     }
 
@@ -521,7 +508,6 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
     {
         var result = new EmployeeScheduleStatsDto();
 
-        // Handover schedules
         var handoverSql = @"
             SELECT 
                 sh.ScheduleHandoverId AS ScheduleId,
@@ -536,7 +522,6 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
 
         result.HandoverList = (await _context.QueryAsync<EmployeeScheduleItemDto>(handoverSql, new { EmployeeId = employeeId })).ToList();
 
-        // Return schedules
         var returnSql = @"
             SELECT 
                 sr.ScheduleReturnId AS ScheduleId,
@@ -551,7 +536,6 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
 
         result.ReturnList = (await _context.QueryAsync<EmployeeScheduleItemDto>(returnSql, new { EmployeeId = employeeId })).ToList();
 
-        // Totals and upcoming
         result.TotalHandover = result.HandoverList.Count;
         result.TotalReturn = result.ReturnList.Count;
         result.UpcomingHandover = result.HandoverList.Count(x => x.ScheduleDate >= DateTime.Today && x.Status == "Pending");

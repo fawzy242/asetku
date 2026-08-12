@@ -1,5 +1,5 @@
 using Whitebird.Domain.Features.Category;
-using Whitebird.Infra.Features.Common;
+using Whitebird.Domain.Features.Common;
 
 namespace Whitebird.Infra.Features.Category;
 

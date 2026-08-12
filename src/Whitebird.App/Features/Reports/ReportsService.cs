@@ -4,6 +4,7 @@ using Whitebird.App.Features.Department;
 using Whitebird.App.Features.Employee;
 using Whitebird.App.Features.MasterData;
 using Whitebird.App.Features.Office;
+using Whitebird.App.Features.Category;
 using Whitebird.App.Features.Reports.Draw;
 using Whitebird.App.Features.Supplier;
 using Whitebird.Domain.Features.Department;
@@ -11,6 +12,7 @@ using Whitebird.Domain.Features.Employee;
 using Whitebird.Domain.Features.MasterData;
 using Whitebird.Domain.Features.Office;
 using Whitebird.Domain.Features.Reports;
+using Whitebird.Domain.Features.Category;
 using Whitebird.Domain.Features.Supplier;
 using Whitebird.Infra.Features.Reports;
 

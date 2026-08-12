@@ -1,5 +1,6 @@
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.EmployeeSummary;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.App.Features.EmployeeSummary;
@@ -9,33 +10,57 @@ namespace Whitebird.App.Features.EmployeeSummary;
 /// </summary>
 public interface IEmployeeSummaryService
 {
-    // Lookup/Dropdown
+    // ============================================================
+    // LOOKUP
+    // ============================================================
+
     Task<ServiceResult<EmployeeSummaryGetDataDto>> GetEmployeeDataAsync(int employeeId);
 
-    // Complete Summary
+    // ============================================================
+    // COMPLETE SUMMARY
+    // ============================================================
+
     Task<ServiceResult<EmployeeSummaryView>> GetSummaryAsync(int employeeId);
 
-    // Statistics
+    // ============================================================
+    // STATISTICS
+    // ============================================================
+
     Task<ServiceResult<EmployeeSummaryStatsDto>> GetStatsAsync(int employeeId);
 
-    // Current Holding
-    Task<ServiceResult<PaginatedResult<EmployeeCurrentHoldingDto>>> GetCurrentHoldingAsync(
-        int employeeId, EmployeeSummaryRequest request);
+    // ============================================================
+    // CURRENT HOLDING - Using GridRequest
+    // ============================================================
 
-    // Assets History
-    Task<ServiceResult<PaginatedResult<EmployeeAssetsHistoryDto>>> GetAssetsHistoryAsync(
-        int employeeId, EmployeeSummaryRequest request);
+    Task<ServiceResult<PaginatedResult<EmployeeCurrentHoldingDto>>> GetCurrentHoldingAsync(EmployeeSummaryGridRequest request);
 
-    // Transaction History
-    Task<ServiceResult<PaginatedResult<EmployeeTransactionHistoryDto>>> GetTransactionHistoryAsync(
-        int employeeId, EmployeeSummaryRequest request);
+    // ============================================================
+    // ASSETS HISTORY - Using GridRequest
+    // ============================================================
 
-    // Current Holding Stats (Category breakdown)
+    Task<ServiceResult<PaginatedResult<EmployeeAssetsHistoryDto>>> GetAssetsHistoryAsync(EmployeeSummaryGridRequest request);
+
+    // ============================================================
+    // TRANSACTION HISTORY - Using GridRequest
+    // ============================================================
+
+    Task<ServiceResult<PaginatedResult<EmployeeTransactionHistoryDto>>> GetTransactionHistoryAsync(EmployeeSummaryGridRequest request);
+
+    // ============================================================
+    // CURRENT HOLDING STATS (Category breakdown)
+    // ============================================================
+
     Task<ServiceResult<EmployeeCategoryStatsResponse>> GetCurrentHoldingStatsAsync(int employeeId);
 
-    // Transaction Stats
+    // ============================================================
+    // TRANSACTION STATS
+    // ============================================================
+
     Task<ServiceResult<EmployeeTransactionStatsResponse>> GetTransactionStatsAsync(int employeeId);
 
-    // Schedule Stats
+    // ============================================================
+    // SCHEDULE STATS
+    // ============================================================
+
     Task<ServiceResult<EmployeeScheduleStatsDto>> GetScheduleStatsAsync(int employeeId);
 }

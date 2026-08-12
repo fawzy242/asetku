@@ -18,6 +18,10 @@ public class ScheduleMaintenanceController : ControllerBase
         _service = service;
     }
 
+    // ============================================================
+    // CRUD
+    // ============================================================
+
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
         => this.HandleResult(await _service.GetByIdAsync(id));
@@ -33,10 +37,6 @@ public class ScheduleMaintenanceController : ControllerBase
     [HttpGet("maintenance-type/{maintenanceType:int}")]
     public async Task<IActionResult> GetByMaintenanceType(int maintenanceType)
         => this.HandleResult(await _service.GetByMaintenanceTypeAsync(maintenanceType));
-
-    [HttpGet("grid")]
-    public async Task<IActionResult> GetGridData([FromQuery] ScheduleGridRequest request)
-        => this.HandleResult(await _service.GetGridDataAsync(request));
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] ScheduleMaintenanceCreateDto dto)
@@ -62,6 +62,18 @@ public class ScheduleMaintenanceController : ControllerBase
     public async Task<IActionResult> SoftDelete(int id)
         => this.HandleResult(await _service.SoftDeleteAsync(id));
 
+    // ============================================================
+    // GRID
+    // ============================================================
+
+    [HttpGet("grid")]
+    public async Task<IActionResult> GetGridData([FromQuery] ScheduleGridRequest request)
+        => this.HandleResult(await _service.GetGridDataAsync(request));
+
+    // ============================================================
+    // BULK OPERATIONS
+    // ============================================================
+
     [HttpPost("activate")]
     public async Task<IActionResult> BulkActivate([FromBody] BulkActivateRequest request)
     {
@@ -77,6 +89,10 @@ public class ScheduleMaintenanceController : ControllerBase
         if (validation != null) return validation;
         return this.HandleResult(await _service.BulkDeactivateAsync(request));
     }
+
+    // ============================================================
+    // GENERATE
+    // ============================================================
 
     [HttpPost("generate")]
     public async Task<IActionResult> Generate([FromBody] ScheduleMaintenanceGenerateDto dto)

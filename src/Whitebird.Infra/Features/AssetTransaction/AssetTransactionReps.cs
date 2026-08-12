@@ -2,7 +2,7 @@ using Dapper;
 using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.AssetTransaction;
 using Whitebird.Domain.Features.MasterData;
-using Whitebird.Infra.Features.Common;
+using Whitebird.Domain.Features.Common;
 
 namespace Whitebird.Infra.Features.AssetTransaction;
 
@@ -170,7 +170,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var orderBy = $"ORDER BY {sortBy} {(request.SortDescending ? "DESC" : "ASC")}";
 
-        // Count
         var countSql = $@"
             SELECT COUNT(*)
             FROM AssetTransaction t
@@ -180,7 +179,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        // Data
         var offset = (request.Page - 1) * request.PageSize;
         parameters.Add("@Offset", offset);
         parameters.Add("@PageSize", request.PageSize);
@@ -216,7 +214,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var data = await _context.QueryAsync<AssetTransactionListView>(dataSql, parameters);
 
-        // Calculate CanEdit, CanDelete, CanReturn, CanPost
         var result = data.ToList();
         foreach (var item in result)
         {
@@ -248,7 +245,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         if (isReturnGrid)
         {
-            // RETURN grid: hanya bisa edit/delete jika pending
             if (item.Approved == null)
             {
                 canEdit = true;
@@ -257,17 +253,14 @@ public class AssetTransactionReps : IAssetTransactionReps
         }
         else
         {
-            // ADD grid
             if (item.Approved == null && item.Completed == null)
             {
                 canEdit = true;
                 canDelete = true;
             }
 
-            // Cek apakah sudah ada transaksi pairing
             if (item.FromAssetTransactionId == null && item.Approved == true)
             {
-                // CEK APAKAH SUDAH ADA PAIRING
                 var hasReturn = await HasPairedTransactionAsync(item.AssetTransactionId, item.TransactionType);
                 var hasPost = await HasPostMaintenanceAsync(item.AssetTransactionId);
 
@@ -364,7 +357,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var orderBy = $"ORDER BY {sortBy} {(request.SortDescending ? "DESC" : "ASC")}";
 
-        // Count
         var countSql = $@"
             SELECT COUNT(*)
             FROM AssetTransaction t
@@ -374,7 +366,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        // Data
         var offset = (request.Page - 1) * request.PageSize;
         parameters.Add("@Offset", offset);
         parameters.Add("@PageSize", request.PageSize);
@@ -403,7 +394,6 @@ public class AssetTransactionReps : IAssetTransactionReps
         var result = data.ToList();
         foreach (var item in result)
         {
-            // Get attachments status
             var attachments = await GetApproveAttachmentsByTransactionIdAsync(item.AssetTransactionId);
             item.Attachments = attachments.Select(a => new ApproveAttachmentStatusDto
             {
@@ -417,7 +407,6 @@ public class AssetTransactionReps : IAssetTransactionReps
                 FileName = a.OriginalFileName
             }).ToList();
 
-            // Tambahkan required document yang belum diupload
             var requiredDocs = await GetRequiredDocumentTypesAsync(item.AssetTransactionId);
             foreach (var doc in requiredDocs.Where(d => !d.IsUploaded))
             {
@@ -435,7 +424,6 @@ public class AssetTransactionReps : IAssetTransactionReps
             item.AllAttachmentsApproved = item.Attachments.All(a => !a.IsRequired || a.Approved);
             item.HasNeedToChange = item.Attachments.Any(a => a.NeedToChange);
 
-            // Action flags
             if (item.AllAttachmentsApproved && !item.HasNeedToChange)
             {
                 item.CanEdit = false;
@@ -511,7 +499,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var orderBy = $"ORDER BY {sortBy} {(request.SortDescending ? "DESC" : "ASC")}";
 
-        // Count
         var countSql = $@"
             SELECT COUNT(*)
             FROM AssetTransaction t
@@ -521,7 +508,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        // Data
         var offset = (request.Page - 1) * request.PageSize;
         parameters.Add("@Offset", offset);
         parameters.Add("@PageSize", request.PageSize);
@@ -617,7 +603,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var orderBy = $"ORDER BY {sortBy} {(request.SortDescending ? "DESC" : "ASC")}";
 
-        // Count
         var countSql = $@"
             SELECT COUNT(*)
             FROM AssetTransaction t
@@ -627,7 +612,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        // Data
         var offset = (request.Page - 1) * request.PageSize;
         parameters.Add("@Offset", offset);
         parameters.Add("@PageSize", request.PageSize);
@@ -716,7 +700,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var orderBy = $"ORDER BY {sortBy} {(request.SortDescending ? "DESC" : "ASC")}";
 
-        // Count
         var countSql = $@"
             SELECT COUNT(*)
             FROM AssetTransaction t
@@ -725,7 +708,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        // Data
         var offset = (request.Page - 1) * request.PageSize;
         parameters.Add("@Offset", offset);
         parameters.Add("@PageSize", request.PageSize);
@@ -764,7 +746,7 @@ public class AssetTransactionReps : IAssetTransactionReps
     }
 
     // ============================================================
-    // SHORTCUT / PAIRING
+    // SHORTCUT / PAIRING - FIXED
     // ============================================================
 
     public async Task<AssetTransactionListView?> GetActiveTransactionByAssetIdAsync(int assetId)

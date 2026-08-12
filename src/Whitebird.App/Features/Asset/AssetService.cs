@@ -484,7 +484,7 @@ public class AssetService : BaseService, IAssetService
             var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
             var fileHash = _storageService.ComputeFileHash(file);
 
-            var uploadModel = new FileAttachmentUploadViewModel
+            var uploadModel = new FileAttachmentUploadDto
             {
                 File = file,
                 FileCategory = "ProfilePhoto",

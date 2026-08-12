@@ -15,6 +15,12 @@ using Whitebird.Infra.Features.Department;
 using Whitebird.Infra.Features.Office;
 using Whitebird.Infra.Features.FileAttachment;
 using Whitebird.Migrations.Features.ActivityLog;
+using Whitebird.Infra.Features.User;
+using Whitebird.Infra.Features.Schedule;
+using Whitebird.Infra.Features.Dashboard;
+using Whitebird.Infra.Features.AssetTracking;
+using Whitebird.Infra.Features.EmployeeSummary;
+using Whitebird.Infra.Features.Home;
 
 namespace Whitebird.Infra.DependencyInjection;
 
@@ -53,14 +59,14 @@ public static class InfrastructureServiceRegistration
         services.AddScoped<IDepartmentReps, DepartmentReps>();
         services.AddScoped<IOfficeReps, OfficeReps>();
         services.AddScoped<IFileAttachmentReps, FileAttachmentReps>();
-services.AddScoped<IUserReps, UserReps>();
-services.AddScoped<IScheduleHandoverReps, ScheduleHandoverReps>();
-services.AddScoped<IScheduleReturnReps, ScheduleReturnReps>();
-services.AddScoped<IScheduleMaintenanceReps, ScheduleMaintenanceReps>();
-services.AddScoped<IDashboardReps, DashboardReps>();
-services.AddScoped<IAssetTrackingReps, AssetTrackingReps>();
-services.AddScoped<IEmployeeSummaryReps, EmployeeSummaryReps>();
-services.AddScoped<IHomeReps, HomeReps>();
+        services.AddScoped<IUserReps, UserReps>();
+        services.AddScoped<IScheduleHandoverReps, ScheduleHandoverReps>();
+        services.AddScoped<IScheduleReturnReps, ScheduleReturnReps>();
+        services.AddScoped<IScheduleMaintenanceReps, ScheduleMaintenanceReps>();
+        services.AddScoped<IDashboardReps, DashboardReps>();
+        services.AddScoped<IAssetTrackingReps, AssetTrackingReps>();
+        services.AddScoped<IEmployeeSummaryReps, EmployeeSummaryReps>();
+        services.AddScoped<IHomeReps, HomeReps>();
         return services;
     }
 }

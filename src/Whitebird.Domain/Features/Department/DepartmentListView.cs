@@ -17,4 +17,8 @@ public class DepartmentListView
     public string CreatedBy { get; set; } = "System";
     public DateTime? ModifiedDate { get; set; }
     public string? ModifiedBy { get; set; }
+
+    // Action flags untuk grid
+    public bool CanEdit { get; set; }
+    public bool CanDelete { get; set; }
 }

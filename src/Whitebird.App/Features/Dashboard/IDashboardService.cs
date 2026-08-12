@@ -1,5 +1,6 @@
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.Dashboard;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.App.Features.Dashboard;
@@ -9,22 +10,40 @@ namespace Whitebird.App.Features.Dashboard;
 /// </summary>
 public interface IDashboardService
 {
-    // Main stats
+    // ============================================================
+    // MAIN STATS
+    // ============================================================
+
     Task<ServiceResult<DashboardStatsViewModel>> GetStatsAsync();
 
-    // Charts
+    // ============================================================
+    // CHARTS
+    // ============================================================
+
     Task<ServiceResult<IEnumerable<MonthlyStatDto>>> GetMonthlyStatsAsync(int year);
     Task<ServiceResult<IEnumerable<CategoryBreakdownDto>>> GetCategoryBreakdownAsync();
 
-    // Recent transactions
+    // ============================================================
+    // RECENT TRANSACTIONS
+    // ============================================================
+
     Task<ServiceResult<IEnumerable<RecentTransactionDto>>> GetRecentTransactionsAsync(int limit);
 
-    // Expired warranty
+    // ============================================================
+    // EXPIRED WARRANTY
+    // ============================================================
+
     Task<ServiceResult<IEnumerable<ExpiredWarrantyDto>>> GetExpiredWarrantyAsync();
 
-    // Schedule stats
+    // ============================================================
+    // SCHEDULE STATS
+    // ============================================================
+
     Task<ServiceResult<ScheduleStatsDto>> GetScheduleStatsAsync();
 
-    // Detail Stats (drilldown)
-    Task<ServiceResult<DetailStatsResponse>> GetDetailStatsAsync(DetailStatsRequest request);
+    // ============================================================
+    // DETAIL STATS (Drilldown) - Using GridRequest
+    // ============================================================
+
+    Task<ServiceResult<DetailStatsResponse>> GetDetailStatsAsync(DashboardDetailStatsRequest request);
 }

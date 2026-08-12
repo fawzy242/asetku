@@ -1,6 +1,7 @@
 using Dapper;
 using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.Office;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.Office;
@@ -84,7 +85,7 @@ public class OfficeReps : IOfficeReps
             LEFT JOIN Office p ON o.ParentOfficeId = p.OfficeId
             LEFT JOIN MasterData md ON o.OfficeType = md.ReferenceCode AND md.ReferenceName = 'OfficeType' AND md.IsActive = 1
             WHERE o.OfficeId = @OfficeId AND o.IsActive = 1";
-        
+
         return await _context.QueryFirstOrDefaultAsync<OfficeDetailView>(sql, new { OfficeId = officeId });
     }
 
@@ -103,12 +104,12 @@ public class OfficeReps : IOfficeReps
             LEFT JOIN MasterData md ON o.OfficeType = md.ReferenceCode AND md.ReferenceName = 'OfficeType' AND md.IsActive = 1
             WHERE o.IsActive = 1
             ORDER BY o.OfficeName";
-        
+
         return await _context.QueryAsync<OfficeListView>(sql);
     }
 
     // ============================================================
-    // PAGINATION
+    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
     // ============================================================
 
     public async Task<PaginatedResult<OfficeListView>> GetPagedListAsync(OfficeGridRequest request)
@@ -116,20 +117,16 @@ public class OfficeReps : IOfficeReps
         var conditions = new List<string>();
         var parameters = new DynamicParameters();
 
-        // IsActive filter
         GridQueryBuilder.AddEqualsFilter(conditions, parameters, "o.IsActive", request.IsActive);
 
-        // Search
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var searchColumns = new[] { "o.OfficeName", "o.OfficeCode", "o.City", "o.Address", "o.Phone" };
             GridQueryBuilder.AddSearchCondition(conditions, parameters, request.Search, searchColumns);
         }
 
-        // OfficeType filter
         GridQueryBuilder.AddEqualsFilter(conditions, parameters, "o.OfficeType", request.OfficeType);
 
-        // ParentOfficeId filter
         if (request.ParentOfficeId.HasValue)
         {
             if (request.ParentOfficeId.Value == 0)
@@ -143,21 +140,18 @@ public class OfficeReps : IOfficeReps
             }
         }
 
-        // City filter
         GridQueryBuilder.AddEqualsFilter(conditions, parameters, "o.City", request.City);
 
         var whereClause = GridQueryBuilder.BuildWhereClause(conditions, parameters);
         var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "o.OfficeName", false);
         var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
-        // Count
         var countSql = $@"
             SELECT COUNT(*) 
             FROM Office o
             {whereClause}";
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        // Data
         var selectClause = @"
             SELECT 
                 o.OfficeId, o.OfficeCode, o.OfficeName, o.OfficeType,
@@ -165,7 +159,9 @@ public class OfficeReps : IOfficeReps
                 o.City, o.Address, o.Phone,
                 o.ParentOfficeId, p.OfficeName as ParentOfficeName,
                 (SELECT COUNT(*) FROM Office WHERE ParentOfficeId = o.OfficeId AND IsActive = 1) as ChildCount,
-                o.IsActive, o.CreatedDate, o.CreatedBy, o.ModifiedDate, o.ModifiedBy";
+                o.IsActive, o.CreatedDate, o.CreatedBy, o.ModifiedDate, o.ModifiedBy,
+                1 as CanEdit,
+                1 as CanDelete";
 
         var fromClause = @"
             FROM Office o

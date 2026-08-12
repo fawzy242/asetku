@@ -3,6 +3,7 @@ using Whitebird.Domain.Features.AssetTransaction;
 using Whitebird.Domain.Features.Department;
 using Whitebird.Domain.Features.Employee;
 using Whitebird.Domain.Features.MasterData;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Domain.Features.Office;
 using Whitebird.Domain.Features.Supplier;
 using Whitebird.Infra.Features.Common;
@@ -91,5 +92,5 @@ public interface IAssetTransactionService
     Task<ServiceResult<IEnumerable<MasterDataDto>>> GetConditionListAsync();
     Task<ServiceResult<IEnumerable<ApproveDocumentTypeDto>>> GetApproveDocumentTypeListAsync();
     Task<ServiceResult<IEnumerable<EmployeeDropdownView>>> GetEmployeeListAsync();
-    Task<ServiceResult<IEnumerable<AssetTransactionAssetDto>>> GetAssetListAsync();
+    Task<ServiceResult<IEnumerable<AssetTransactionAssetDto>>> GetAssetListAsync(int transactionTypeId);
 }

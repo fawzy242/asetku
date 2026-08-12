@@ -1,4 +1,5 @@
 using Whitebird.Domain.Features.Supplier;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.Supplier;

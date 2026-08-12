@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.FileAttachment;
 
@@ -30,7 +31,7 @@ public interface IFileAttachmentService
     /// <param name="referenceId">Reference record ID</param>
     /// <param name="model">Upload data including file and metadata</param>
     /// <returns>File attachment response DTO with download URL</returns>
-    Task<ServiceResult<FileAttachmentResponseDto>> UploadAsync(string referenceTable, int referenceId, FileAttachmentUploadViewModel model);
+    Task<ServiceResult<FileAttachmentResponseDto>> UploadAsync(string referenceTable, int referenceId, FileAttachmentUploadDto model);
 
     /// <summary>
     /// Uploads multiple file attachments

@@ -3,6 +3,7 @@ using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.Dashboard;
 using Whitebird.Domain.Features.MasterData;
 using Whitebird.Infra.Features.Common;
+using Whitebird.Domain.Features.Common;
 
 namespace Whitebird.Infra.Features.Dashboard;
 
@@ -19,7 +20,7 @@ public class DashboardReps : IDashboardReps
     }
 
     // ============================================================
-    // MAIN STATS
+    // MAIN STATS - FIXED (ToEmployeeId → EmployeeId)
     // ============================================================
 
     public async Task<DashboardStatsViewModel> GetStatsAsync()
@@ -29,7 +30,7 @@ public class DashboardReps : IDashboardReps
             SELECT 
                 AssetId,
                 TransactionType,
-                ToEmployeeId,
+                EmployeeId,
                 ExpectedLoanReturnDate,
                 ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
             FROM AssetTransaction
@@ -105,7 +106,7 @@ public class DashboardReps : IDashboardReps
                 COUNT(a.AssetId) as AssetCount,
                 ISNULL(SUM(a.PurchasePrice), 0) as TotalValue
             FROM Category c
-            LEFT JOIN Asset a ON c.CategoryId = a.CategoryId AND a.IsActive = 1
+            LEFT JOIN Asset a ON c.CategoryId = c.CategoryId AND a.IsActive = 1
             WHERE c.IsActive = 1
             GROUP BY c.CategoryName
             ORDER BY AssetCount DESC";
@@ -120,25 +121,23 @@ public class DashboardReps : IDashboardReps
     public async Task<IEnumerable<RecentTransactionDto>> GetRecentTransactionsAsync(int limit)
     {
         const string sql = @"
-        SELECT TOP (@Limit)
-            t.AssetTransactionId,
-            a.AssetCode,
-            a.AssetName,
-            t.TransactionType,
-            md1.MasterDataName as TransactionTypeName,
-            fe.FullName as FromEmployeeName,
-            te.FullName as ToEmployeeName,
-            t.TransactionDate,
-            t.Approved,
-            t.ExpectedLoanReturnDate,
-            t.Notes
-        FROM AssetTransaction t
-        LEFT JOIN Asset a ON t.AssetId = a.AssetId
-        LEFT JOIN Employee fe ON t.FromEmployeeId = fe.EmployeeId
-        LEFT JOIN Employee te ON t.ToEmployeeId = te.EmployeeId
-        LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
-        WHERE t.IsActive = 1
-        ORDER BY t.TransactionDate DESC";
+    SELECT TOP (@Limit)
+        t.AssetTransactionId,
+        a.AssetCode,
+        a.AssetName,
+        t.TransactionType,
+        md1.MasterDataName as TransactionTypeName,
+        e.FullName as EmployeeName,
+        t.TransactionDate,
+        t.Approved,
+        t.ExpectedLoanReturnDate,
+        t.Notes
+    FROM AssetTransaction t
+    LEFT JOIN Asset a ON t.AssetId = a.AssetId
+    LEFT JOIN Employee e ON t.EmployeeId = e.EmployeeId
+    LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
+    WHERE t.IsActive = 1
+    ORDER BY t.TransactionDate DESC";
 
         return await _context.QueryAsync<RecentTransactionDto>(sql, new { Limit = limit });
     }
@@ -204,19 +203,17 @@ public class DashboardReps : IDashboardReps
     }
 
     // ============================================================
-    // DETAIL STATS - PRIVATE HELPERS
+    // DETAIL STATS (Drilldown) - Using GridRequest
     // ============================================================
 
-    private async Task<PaginatedResult<AssetDetailDto>> GetAssetDetailListAsync(
-        string baseWhere,
-        Dictionary<string, object>? additionalFilters,
-        int page,
-        int pageSize,
-        string? search,
-        string? sortBy,
-        bool sortDescending)
+    public async Task<PaginatedResult<AssetDetailDto>> GetDetailStatsAsync(DashboardDetailStatsRequest request)
     {
-        var conditions = new List<string> { baseWhere };
+        if (string.IsNullOrWhiteSpace(request.Type))
+        {
+            return new PaginatedResult<AssetDetailDto>();
+        }
+
+        var conditions = new List<string>();
         var parameters = new DynamicParameters();
 
         var loanType = TransactionTypeConstants.LOAN;
@@ -231,35 +228,89 @@ public class DashboardReps : IDashboardReps
         parameters.Add("@MaintenanceType", maintenanceType);
         parameters.Add("@DisposalType", disposalType);
 
-        if (!string.IsNullOrWhiteSpace(search))
+        switch (request.Type.ToLower())
         {
-            conditions.Add(@"(a.AssetCode LIKE @Search OR a.AssetName LIKE @Search OR a.SerialNumber LIKE @Search)");
-            parameters.Add("@Search", $"%{search}%");
+            case "available":
+                conditions.Add(@"a.IsActive = 1 AND NOT EXISTS (
+                    SELECT 1 FROM AssetTransaction at 
+                    WHERE at.AssetId = a.AssetId 
+                      AND at.Approved = 1 
+                      AND at.FromAssetTransactionId IS NULL 
+                      AND at.IsActive = 1
+                      AND at.TransactionType IN (@HandoverType, @TransferType, @LoanType, @MaintenanceType))");
+                break;
+            case "assigned":
+                conditions.Add(@"a.IsActive = 1 AND EXISTS (
+                    SELECT 1 FROM AssetTransaction at 
+                    WHERE at.AssetId = a.AssetId 
+                      AND at.Approved = 1 
+                      AND at.FromAssetTransactionId IS NULL 
+                      AND at.IsActive = 1
+                      AND at.TransactionType IN (@HandoverType, @TransferType))");
+                break;
+            case "onloan":
+                conditions.Add(@"a.IsActive = 1 AND EXISTS (
+                    SELECT 1 FROM AssetTransaction at 
+                    WHERE at.AssetId = a.AssetId 
+                      AND at.Approved = 1 
+                      AND at.FromAssetTransactionId IS NULL 
+                      AND at.IsActive = 1
+                      AND at.TransactionType = @LoanType)");
+                break;
+            case "inmaintenance":
+                conditions.Add(@"a.IsActive = 1 AND EXISTS (
+                    SELECT 1 FROM AssetTransaction at 
+                    WHERE at.AssetId = a.AssetId 
+                      AND at.Approved = 1 
+                      AND at.FromAssetTransactionId IS NULL 
+                      AND at.IsActive = 1
+                      AND at.TransactionType = @MaintenanceType)");
+                break;
+            case "disposed":
+                conditions.Add(@"EXISTS (
+                    SELECT 1 FROM AssetTransaction at 
+                    WHERE at.AssetId = a.AssetId 
+                      AND at.Approved = 1 
+                      AND at.IsActive = 1
+                      AND at.TransactionType = @DisposalType)");
+                break;
+            case "damaged":
+                conditions.Add(@"(a.IsActive = 0 OR EXISTS (
+                    SELECT 1 FROM AssetTransaction at 
+                    WHERE at.AssetId = a.AssetId 
+                      AND at.Approved = 1 
+                      AND at.IsActive = 1
+                      AND at.TransactionType = @DisposalType))");
+                break;
+            case "expiredwarranty":
+                conditions.Add("a.WarrantyExpiryDate < GETDATE() AND a.WarrantyExpiryDate IS NOT NULL");
+                break;
+            case "overdueloans":
+                return await GetOverdueLoansDetailAsync(request);
+            default:
+                return new PaginatedResult<AssetDetailDto>();
         }
 
-        if (additionalFilters != null)
+        if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            foreach (var filter in additionalFilters.Where(f => f.Value != null && !string.IsNullOrEmpty(f.Value.ToString())))
-            {
-                conditions.Add($"{filter.Key} = @{filter.Key}");
-                parameters.Add($"@{filter.Key}", filter.Value);
-            }
+            var searchColumns = new[] { "a.AssetCode", "a.AssetName", "a.SerialNumber" };
+            GridQueryBuilder.AddSearchCondition(conditions, parameters, request.Search, searchColumns);
         }
 
-        var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
+        if (request.IsActive.HasValue && request.Type.ToLower() != "available" && request.Type.ToLower() != "assigned")
+        {
+            GridQueryBuilder.AddEqualsFilter(conditions, parameters, "a.IsActive", request.IsActive);
+        }
 
-        if (string.IsNullOrEmpty(sortBy)) sortBy = "a.AssetCode";
-        if (!sortBy.StartsWith("a.") && !sortBy.StartsWith("c.") && !sortBy.StartsWith("e."))
-            sortBy = $"a.{sortBy}";
-
-        var orderBy = $"ORDER BY {sortBy} {(sortDescending ? "DESC" : "ASC")}";
+        var whereClause = GridQueryBuilder.BuildWhereClause(conditions, parameters);
+        var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "a.AssetCode", false);
+        var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
         var countSql = $@"
             SELECT COUNT(*) 
             FROM Asset a
             LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
             {whereClause}";
-
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
         var selectClause = @"
@@ -279,24 +330,20 @@ public class DashboardReps : IDashboardReps
         var fromClause = @"
             FROM Asset a
             LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
-            LEFT JOIN Employee e ON lt.ToEmployeeId = e.EmployeeId
+            LEFT JOIN Employee e ON lt.EmployeeId = e.EmployeeId
             LEFT JOIN (
-                SELECT AssetId, TransactionType, ToEmployeeId,
+                SELECT AssetId, TransactionType, EmployeeId,
                        ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
                 FROM AssetTransaction
                 WHERE Approved = 1 AND IsActive = 1 AND FromAssetTransactionId IS NULL
             ) lt ON a.AssetId = lt.AssetId AND lt.rn = 1";
-
-        var offset = (page - 1) * pageSize;
-        parameters.Add("@Offset", offset);
-        parameters.Add("@PageSize", pageSize);
 
         var dataSql = $@"
             {selectClause}
             {fromClause}
             {whereClause}
             {orderBy}
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+            {pagination}";
 
         var data = await _context.QueryAsync<AssetDetailDto>(dataSql, parameters);
 
@@ -304,112 +351,13 @@ public class DashboardReps : IDashboardReps
         {
             Data = data.ToList(),
             TotalCount = totalCount,
-            PageNumber = page,
-            PageSize = pageSize,
-            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            PageNumber = request.Page,
+            PageSize = request.PageSize,
+            TotalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize)
         };
     }
 
-    // ============================================================
-    // DETAIL STATS - ASSET TYPES
-    // ============================================================
-
-    public async Task<PaginatedResult<AssetDetailDto>> GetAvailableAssetsDetailAsync(
-        int page, int pageSize, string? search, string? sortBy, bool sortDescending)
-    {
-        var baseWhere = @"a.IsActive = 1 AND NOT EXISTS (
-            SELECT 1 FROM AssetTransaction at 
-            WHERE at.AssetId = a.AssetId 
-              AND at.Approved = 1 
-              AND at.FromAssetTransactionId IS NULL 
-              AND at.IsActive = 1
-              AND at.TransactionType IN (@HandoverType, @TransferType, @LoanType, @MaintenanceType))";
-
-        return await GetAssetDetailListAsync(baseWhere, null, page, pageSize, search, sortBy, sortDescending);
-    }
-
-    public async Task<PaginatedResult<AssetDetailDto>> GetAssignedAssetsDetailAsync(
-        int page, int pageSize, string? search, string? sortBy, bool sortDescending)
-    {
-        var baseWhere = @"a.IsActive = 1 AND EXISTS (
-            SELECT 1 FROM AssetTransaction at 
-            WHERE at.AssetId = a.AssetId 
-              AND at.Approved = 1 
-              AND at.FromAssetTransactionId IS NULL 
-              AND at.IsActive = 1
-              AND at.TransactionType IN (@HandoverType, @TransferType))";
-
-        return await GetAssetDetailListAsync(baseWhere, null, page, pageSize, search, sortBy, sortDescending);
-    }
-
-    public async Task<PaginatedResult<AssetDetailDto>> GetOnLoanAssetsDetailAsync(
-        int page, int pageSize, string? search, string? sortBy, bool sortDescending)
-    {
-        var baseWhere = @"a.IsActive = 1 AND EXISTS (
-            SELECT 1 FROM AssetTransaction at 
-            WHERE at.AssetId = a.AssetId 
-              AND at.Approved = 1 
-              AND at.FromAssetTransactionId IS NULL 
-              AND at.IsActive = 1
-              AND at.TransactionType = @LoanType)";
-
-        return await GetAssetDetailListAsync(baseWhere, null, page, pageSize, search, sortBy, sortDescending);
-    }
-
-    public async Task<PaginatedResult<AssetDetailDto>> GetInMaintenanceAssetsDetailAsync(
-        int page, int pageSize, string? search, string? sortBy, bool sortDescending)
-    {
-        var baseWhere = @"a.IsActive = 1 AND EXISTS (
-            SELECT 1 FROM AssetTransaction at 
-            WHERE at.AssetId = a.AssetId 
-              AND at.Approved = 1 
-              AND at.FromAssetTransactionId IS NULL 
-              AND at.IsActive = 1
-              AND at.TransactionType = @MaintenanceType)";
-
-        return await GetAssetDetailListAsync(baseWhere, null, page, pageSize, search, sortBy, sortDescending);
-    }
-
-    public async Task<PaginatedResult<AssetDetailDto>> GetDisposedAssetsDetailAsync(
-        int page, int pageSize, string? search, string? sortBy, bool sortDescending)
-    {
-        var baseWhere = @"EXISTS (
-            SELECT 1 FROM AssetTransaction at 
-            WHERE at.AssetId = a.AssetId 
-              AND at.Approved = 1 
-              AND at.IsActive = 1
-              AND at.TransactionType = @DisposalType)";
-
-        return await GetAssetDetailListAsync(baseWhere, null, page, pageSize, search, sortBy, sortDescending);
-    }
-
-    public async Task<PaginatedResult<AssetDetailDto>> GetDamagedAssetsDetailAsync(
-        int page, int pageSize, string? search, string? sortBy, bool sortDescending)
-    {
-        var baseWhere = @"(a.IsActive = 0 OR EXISTS (
-            SELECT 1 FROM AssetTransaction at 
-            WHERE at.AssetId = a.AssetId 
-              AND at.Approved = 1 
-              AND at.IsActive = 1
-              AND at.TransactionType = @DisposalType))";
-
-        return await GetAssetDetailListAsync(baseWhere, null, page, pageSize, search, sortBy, sortDescending);
-    }
-
-    public async Task<PaginatedResult<AssetDetailDto>> GetExpiredWarrantyDetailAsync(
-        int page, int pageSize, string? search, string? sortBy, bool sortDescending)
-    {
-        var baseWhere = @"a.WarrantyExpiryDate < GETDATE() AND a.WarrantyExpiryDate IS NOT NULL";
-
-        return await GetAssetDetailListAsync(baseWhere, null, page, pageSize, search, sortBy, sortDescending);
-    }
-
-    // ============================================================
-    // DETAIL STATS - OVERDUE LOANS
-    // ============================================================
-
-    public async Task<PaginatedResult<OverdueLoanDetailDto>> GetOverdueLoansDetailAsync(
-        int page, int pageSize, string? search, string? sortBy, bool sortDescending)
+    private async Task<PaginatedResult<AssetDetailDto>> GetOverdueLoansDetailAsync(DashboardDetailStatsRequest request)
     {
         var conditions = new List<string> {
             "at.TransactionType = @LoanType",
@@ -421,55 +369,53 @@ public class DashboardReps : IDashboardReps
         var parameters = new DynamicParameters();
         parameters.Add("@LoanType", TransactionTypeConstants.LOAN);
 
-        if (!string.IsNullOrWhiteSpace(search))
+        if (!string.IsNullOrWhiteSpace(request.Search))
         {
             conditions.Add(@"(a.AssetCode LIKE @Search OR a.AssetName LIKE @Search OR e.FullName LIKE @Search)");
-            parameters.Add("@Search", $"%{search}%");
+            parameters.Add("@Search", $"%{request.Search}%");
         }
 
-        var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
-
-        if (string.IsNullOrEmpty(sortBy)) sortBy = "at.ExpectedLoanReturnDate";
-        if (!sortBy.StartsWith("at.") && !sortBy.StartsWith("a.") && !sortBy.StartsWith("e."))
-            sortBy = $"at.{sortBy}";
-
-        var orderBy = $"ORDER BY {sortBy} {(sortDescending ? "DESC" : "ASC")}";
+        var whereClause = GridQueryBuilder.BuildWhereClause(conditions, parameters);
+        var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "at.ExpectedLoanReturnDate", false);
+        var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
         var countSql = $@"
             SELECT COUNT(*) 
             FROM AssetTransaction at
             LEFT JOIN Asset a ON at.AssetId = a.AssetId
-            LEFT JOIN Employee e ON at.ToEmployeeId = e.EmployeeId
+            LEFT JOIN Employee e ON at.EmployeeId = e.EmployeeId
             {whereClause}";
 
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        var offset = (page - 1) * pageSize;
-        parameters.Add("@Offset", offset);
-        parameters.Add("@PageSize", pageSize);
-
-        var dataSql = $@"
+        var selectClause = @"
             SELECT 
                 at.AssetTransactionId, at.AssetId, at.TransactionDate, at.ExpectedLoanReturnDate, at.Notes,
                 a.AssetCode, a.AssetName,
                 e.FullName as EmployeeName,
-                DATEDIFF(DAY, at.ExpectedLoanReturnDate, GETDATE()) as DaysOverdue
+                DATEDIFF(DAY, at.ExpectedLoanReturnDate, GETDATE()) as DaysOverdue";
+
+        var fromClause = @"
             FROM AssetTransaction at
             LEFT JOIN Asset a ON at.AssetId = a.AssetId
-            LEFT JOIN Employee e ON at.ToEmployeeId = e.EmployeeId
+            LEFT JOIN Employee e ON at.EmployeeId = e.EmployeeId";
+
+        var dataSql = $@"
+            {selectClause}
+            {fromClause}
             {whereClause}
             {orderBy}
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+            {pagination}";
 
-        var data = await _context.QueryAsync<OverdueLoanDetailDto>(dataSql, parameters);
+        var data = await _context.QueryAsync<AssetDetailDto>(dataSql, parameters);
 
-        return new PaginatedResult<OverdueLoanDetailDto>
+        return new PaginatedResult<AssetDetailDto>
         {
             Data = data.ToList(),
             TotalCount = totalCount,
-            PageNumber = page,
-            PageSize = pageSize,
-            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            PageNumber = request.Page,
+            PageSize = request.PageSize,
+            TotalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize)
         };
     }
 }

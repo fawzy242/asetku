@@ -2,6 +2,7 @@ using Dapper;
 using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.Category;
 using Whitebird.Infra.Features.Common;
+using Whitebird.Domain.Features.Common;
 
 namespace Whitebird.Infra.Features.Category;
 
@@ -81,7 +82,7 @@ public class CategoryReps : ICategoryReps
             FROM Category c
             LEFT JOIN Category p ON c.ParentCategoryId = p.CategoryId
             WHERE c.CategoryId = @CategoryId AND c.IsActive = 1";
-        
+
         return await _context.QueryFirstOrDefaultAsync<CategoryDetailView>(sql, new { CategoryId = categoryId });
     }
 
@@ -97,12 +98,12 @@ public class CategoryReps : ICategoryReps
             LEFT JOIN Category p ON c.ParentCategoryId = p.CategoryId
             WHERE c.IsActive = 1
             ORDER BY c.CategoryName";
-        
+
         return await _context.QueryAsync<CategoryListView>(sql);
     }
 
     // ============================================================
-    // PAGINATION
+    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
     // ============================================================
 
     public async Task<PaginatedResult<CategoryListView>> GetPagedListAsync(CategoryGridRequest request)
@@ -110,17 +111,14 @@ public class CategoryReps : ICategoryReps
         var conditions = new List<string>();
         var parameters = new DynamicParameters();
 
-        // IsActive filter
         GridQueryBuilder.AddEqualsFilter(conditions, parameters, "c.IsActive", request.IsActive);
 
-        // Search
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var searchColumns = new[] { "c.CategoryName", "c.CategoryCode", "c.Description" };
             GridQueryBuilder.AddSearchCondition(conditions, parameters, request.Search, searchColumns);
         }
 
-        // ParentCategoryId filter
         if (request.ParentCategoryId.HasValue)
         {
             if (request.ParentCategoryId.Value == 0)
@@ -138,20 +136,20 @@ public class CategoryReps : ICategoryReps
         var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "c.CategoryName", false);
         var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
-        // Count
         var countSql = $@"
             SELECT COUNT(*) 
             FROM Category c
             {whereClause}";
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        // Data
         var selectClause = @"
             SELECT 
                 c.CategoryId, c.CategoryCode, c.CategoryName, c.Description,
                 c.ParentCategoryId, p.CategoryName as ParentCategoryName,
                 (SELECT COUNT(*) FROM Category WHERE ParentCategoryId = c.CategoryId AND IsActive = 1) as ChildCount,
-                c.IsActive, c.CreatedDate, c.CreatedBy, c.ModifiedDate, c.ModifiedBy";
+                c.IsActive, c.CreatedDate, c.CreatedBy, c.ModifiedDate, c.ModifiedBy,
+                1 as CanEdit,
+                1 as CanDelete";
 
         var fromClause = @"
             FROM Category c

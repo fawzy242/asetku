@@ -1,5 +1,6 @@
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.AssetTracking;
+using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.App.Features.AssetTracking;
@@ -9,26 +10,45 @@ namespace Whitebird.App.Features.AssetTracking;
 /// </summary>
 public interface IAssetTrackingService
 {
-    // Lookup/Dropdown
+    // ============================================================
+    // LOOKUP
+    // ============================================================
+
     Task<ServiceResult<AssetTrackingGetDataDto>> GetAssetDataAsync(int assetId);
 
-    // Detail Tracking
+    // ============================================================
+    // DETAIL TRACKING
+    // ============================================================
+
     Task<ServiceResult<AssetTrackingView>> GetTrackingDetailAsync(int assetId);
 
-    // Stats Header
+    // ============================================================
+    // STATS HEADER
+    // ============================================================
+
     Task<ServiceResult<AssetStatsView>> GetAssetStatsAsync(int assetId);
 
-    // Timeline
+    // ============================================================
+    // TIMELINE
+    // ============================================================
+
     Task<ServiceResult<IEnumerable<AssetTimelineEntry>>> GetTimelineAsync(int assetId);
 
-    // Schedule Stats
-    Task<ServiceResult<PaginatedResult<AssetTrackingScheduleStatsDto>>> GetScheduleStatsAsync(
-        int assetId, string type, int page, int pageSize, string? search = null);
+    // ============================================================
+    // SCHEDULE STATS - Using GridRequest
+    // ============================================================
 
-    // Transaction Type Stats
+    Task<ServiceResult<PaginatedResult<AssetTrackingScheduleStatsDto>>> GetScheduleStatsAsync(AssetTrackingGridRequest request);
+
+    // ============================================================
+    // TRANSACTION TYPE STATS
+    // ============================================================
+
     Task<ServiceResult<AssetTrackingTransactionTypeStatsResponse>> GetTransactionTypeStatsAsync(int assetId);
 
-    // Employee History
-    Task<ServiceResult<PaginatedResult<AssetTrackingEmployeeHistoryDto>>> GetEmployeeHistoryAsync(
-        int assetId, int page, int pageSize, string? search = null);
+    // ============================================================
+    // EMPLOYEE HISTORY - Using GridRequest
+    // ============================================================
+
+    Task<ServiceResult<PaginatedResult<AssetTrackingEmployeeHistoryDto>>> GetEmployeeHistoryAsync(AssetTrackingGridRequest request);
 }

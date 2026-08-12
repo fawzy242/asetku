@@ -13,14 +13,12 @@ using Whitebird.Infra.Features.Office;
 
 namespace Whitebird.App.Features.Employee;
 
-public class EmployeeImportService : ImportServiceBase<EmployeeImportDto, EmployeeEntity>
+public class EmployeeImportService : ImportService<EmployeeImportDto, EmployeeEntity>
 {
     private readonly IEmployeeReps _employeeReps;
     private readonly IDepartmentReps _departmentReps;
     private readonly IOfficeReps _officeReps;
     private readonly IMasterDataService _masterDataService;
-    private readonly ICurrentUserService _currentUserService;
-    private readonly IActivityLogService _activityLogService;
 
     private readonly Dictionary<string, string> _templateColumns = new()
     {
@@ -52,8 +50,6 @@ public class EmployeeImportService : ImportServiceBase<EmployeeImportDto, Employ
         _departmentReps = departmentReps;
         _officeReps = officeReps;
         _masterDataService = masterDataService;
-        _currentUserService = currentUserService;
-        _activityLogService = activityLogService;
     }
 
     protected override Dictionary<string, string> GetTemplateColumns() => _templateColumns;
@@ -195,7 +191,7 @@ public class EmployeeImportService : ImportServiceBase<EmployeeImportDto, Employ
             OfficeId = officeId,
             JoinDate = joinDate,
             ResignDate = resignDate,
-            IsActive = false,
+            IsActive = true,
             CreatedDate = DateTime.Now,
             CreatedBy = createdBy
         };

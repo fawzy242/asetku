@@ -1,5 +1,6 @@
 using Whitebird.Domain.Features.Dashboard;
 using Whitebird.Infra.Features.Common;
+using Whitebird.Domain.Features.Common;
 
 namespace Whitebird.Infra.Features.Dashboard;
 
@@ -8,45 +9,40 @@ namespace Whitebird.Infra.Features.Dashboard;
 /// </summary>
 public interface IDashboardReps
 {
-    // Main stats
+    // ============================================================
+    // MAIN STATS
+    // ============================================================
+
     Task<DashboardStatsViewModel> GetStatsAsync();
 
-    // Charts
+    // ============================================================
+    // CHARTS
+    // ============================================================
+
     Task<IEnumerable<MonthlyStatDto>> GetMonthlyStatsAsync(int year);
     Task<IEnumerable<CategoryBreakdownDto>> GetCategoryBreakdownAsync();
 
-    // Recent transactions
+    // ============================================================
+    // RECENT TRANSACTIONS
+    // ============================================================
+
     Task<IEnumerable<RecentTransactionDto>> GetRecentTransactionsAsync(int limit);
 
-    // Expired warranty
+    // ============================================================
+    // EXPIRED WARRANTY
+    // ============================================================
+
     Task<IEnumerable<ExpiredWarrantyDto>> GetExpiredWarrantyAsync();
 
-    // Schedule stats
+    // ============================================================
+    // SCHEDULE STATS
+    // ============================================================
+
     Task<ScheduleStatsDto> GetScheduleStatsAsync();
 
-    // Detail Stats (drilldown) - Asset types
-    Task<PaginatedResult<AssetDetailDto>> GetAvailableAssetsDetailAsync(
-        int page, int pageSize, string? search, string? sortBy, bool sortDescending);
+    // ============================================================
+    // DETAIL STATS (Drilldown) - Using GridRequest
+    // ============================================================
 
-    Task<PaginatedResult<AssetDetailDto>> GetAssignedAssetsDetailAsync(
-        int page, int pageSize, string? search, string? sortBy, bool sortDescending);
-
-    Task<PaginatedResult<AssetDetailDto>> GetOnLoanAssetsDetailAsync(
-        int page, int pageSize, string? search, string? sortBy, bool sortDescending);
-
-    Task<PaginatedResult<AssetDetailDto>> GetInMaintenanceAssetsDetailAsync(
-        int page, int pageSize, string? search, string? sortBy, bool sortDescending);
-
-    Task<PaginatedResult<AssetDetailDto>> GetDisposedAssetsDetailAsync(
-        int page, int pageSize, string? search, string? sortBy, bool sortDescending);
-
-    Task<PaginatedResult<AssetDetailDto>> GetDamagedAssetsDetailAsync(
-        int page, int pageSize, string? search, string? sortBy, bool sortDescending);
-
-    Task<PaginatedResult<AssetDetailDto>> GetExpiredWarrantyDetailAsync(
-        int page, int pageSize, string? search, string? sortBy, bool sortDescending);
-
-    // Detail Stats (drilldown) - Overdue loans
-    Task<PaginatedResult<OverdueLoanDetailDto>> GetOverdueLoansDetailAsync(
-        int page, int pageSize, string? search, string? sortBy, bool sortDescending);
+    Task<PaginatedResult<AssetDetailDto>> GetDetailStatsAsync(DashboardDetailStatsRequest request);
 }

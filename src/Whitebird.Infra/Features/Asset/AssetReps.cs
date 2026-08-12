@@ -2,7 +2,7 @@ using Dapper;
 using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.Asset;
 using Whitebird.Domain.Features.MasterData;
-using Whitebird.Infra.Features.Common;
+using Whitebird.Domain.Features.Common;
 
 namespace Whitebird.Infra.Features.Asset;
 
@@ -66,7 +66,7 @@ public class AssetReps : IAssetReps
             LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
             LEFT JOIN MasterData md ON a.AssetConditionPurchase = md.ReferenceCode AND md.ReferenceName = 'AssetConditionPurchase' AND md.IsActive = 1
             WHERE a.AssetId = @AssetId";
-        
+
         return await _context.QueryFirstOrDefaultAsync<AssetDetailView>(sql, new { AssetId = assetId });
     }
 
@@ -88,7 +88,7 @@ public class AssetReps : IAssetReps
             LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
             LEFT JOIN MasterData md ON a.AssetConditionPurchase = md.ReferenceCode AND md.ReferenceName = 'AssetConditionPurchase' AND md.IsActive = 1
             ORDER BY a.AssetCode";
-        
+
         return await _context.QueryAsync<AssetListView>(sql);
     }
 
@@ -111,7 +111,7 @@ public class AssetReps : IAssetReps
             LEFT JOIN MasterData md ON a.AssetConditionPurchase = md.ReferenceCode AND md.ReferenceName = 'AssetConditionPurchase' AND md.IsActive = 1
             WHERE a.CategoryId = @CategoryId
             ORDER BY a.AssetCode";
-        
+
         return await _context.QueryAsync<AssetListView>(sql, new { CategoryId = categoryId });
     }
 
@@ -139,7 +139,7 @@ public class AssetReps : IAssetReps
               AND at.TransactionType IN (@HandoverType, @TransferType, @LoanType)
               AND at.IsActive = 1
             ORDER BY a.AssetCode";
-        
+
         var parameters = new
         {
             EmployeeId = employeeId,
@@ -147,7 +147,7 @@ public class AssetReps : IAssetReps
             TransferType = TransactionTypeConstants.TRANSFER,
             LoanType = TransactionTypeConstants.LOAN
         };
-        
+
         return await _context.QueryAsync<AssetListView>(sql, parameters);
     }
 
@@ -170,7 +170,7 @@ public class AssetReps : IAssetReps
             LEFT JOIN MasterData md ON a.AssetConditionPurchase = md.ReferenceCode AND md.ReferenceName = 'AssetConditionPurchase' AND md.IsActive = 1
             WHERE a.WarrantyExpiryDate < GETDATE() AND a.WarrantyExpiryDate IS NOT NULL
             ORDER BY a.WarrantyExpiryDate";
-        
+
         return await _context.QueryAsync<AssetListView>(sql);
     }
 
@@ -184,9 +184,6 @@ public class AssetReps : IAssetReps
         parameters.Add("@TransferType", TransactionTypeConstants.TRANSFER);
         parameters.Add("@MaintenanceType", TransactionTypeConstants.MAINTENANCE);
         parameters.Add("@DisposalType", TransactionTypeConstants.DISPOSAL);
-
-        var baseWhere = "a.IsActive = 1";
-        var hasStatusCondition = true;
 
         switch (status)
         {
@@ -241,11 +238,10 @@ public class AssetReps : IAssetReps
                 conditions.Add("a.IsActive = 0");
                 break;
             default:
-                hasStatusCondition = false;
                 break;
         }
 
-        var whereClause = hasStatusCondition ? $"WHERE {string.Join(" AND ", conditions)}" : "";
+        var whereClause = conditions.Any() ? $"WHERE {string.Join(" AND ", conditions)}" : "";
 
         var sql = $@"
             SELECT 
@@ -291,7 +287,7 @@ public class AssetReps : IAssetReps
                   AND at.IsActive = 1
                   AND at.TransactionType IN (@HandoverType, @TransferType, @LoanType, @MaintenanceType)
             )";
-        
+
         var parameters = new
         {
             HandoverType = TransactionTypeConstants.HANDOVER,
@@ -299,7 +295,7 @@ public class AssetReps : IAssetReps
             LoanType = TransactionTypeConstants.LOAN,
             MaintenanceType = TransactionTypeConstants.MAINTENANCE
         };
-        
+
         return await _context.ExecuteScalarAsync<int>(sql, parameters);
     }
 
@@ -312,13 +308,13 @@ public class AssetReps : IAssetReps
               AND at.Approved = 1 
               AND at.FromAssetTransactionId IS NULL 
               AND at.IsActive = 1";
-        
+
         var parameters = new
         {
             HandoverType = TransactionTypeConstants.HANDOVER,
             TransferType = TransactionTypeConstants.TRANSFER
         };
-        
+
         return await _context.ExecuteScalarAsync<int>(sql, parameters);
     }
 
@@ -331,7 +327,7 @@ public class AssetReps : IAssetReps
               AND at.Approved = 1 
               AND at.FromAssetTransactionId IS NULL 
               AND at.IsActive = 1";
-        
+
         return await _context.ExecuteScalarAsync<int>(sql, new { LoanType = TransactionTypeConstants.LOAN });
     }
 
@@ -344,7 +340,7 @@ public class AssetReps : IAssetReps
               AND at.Approved = 1 
               AND at.FromAssetTransactionId IS NULL 
               AND at.IsActive = 1";
-        
+
         return await _context.ExecuteScalarAsync<int>(sql, new { MaintenanceType = TransactionTypeConstants.MAINTENANCE });
     }
 
@@ -356,7 +352,7 @@ public class AssetReps : IAssetReps
             WHERE at.TransactionType = @DisposalType
               AND at.Approved = 1 
               AND at.IsActive = 1";
-        
+
         return await _context.ExecuteScalarAsync<int>(sql, new { DisposalType = TransactionTypeConstants.DISPOSAL });
     }
 
@@ -375,7 +371,7 @@ public class AssetReps : IAssetReps
     }
 
     // ============================================================
-    // PAGINATION
+    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
     // ============================================================
 
     public async Task<PaginatedResult<AssetListView>> GetPagedListAsync(
@@ -397,14 +393,12 @@ public class AssetReps : IAssetReps
         parameters.Add("@MaintenanceType", maintenanceType);
         parameters.Add("@DisposalType", disposalType);
 
-        // IsActive filter
         if (filters != null && filters.ContainsKey("isActive") && filters["isActive"] is bool isActive)
         {
             conditions.Add($"a.IsActive = {(isActive ? 1 : 0)}");
             filters.Remove("isActive");
         }
 
-        // Status filter
         if (filters != null && filters.ContainsKey("status") && filters["status"] is string status)
         {
             switch (status)
@@ -463,14 +457,12 @@ public class AssetReps : IAssetReps
             filters.Remove("status");
         }
 
-        // Search
         if (!string.IsNullOrWhiteSpace(search))
         {
             conditions.Add(@"(a.AssetCode LIKE @Search OR a.AssetName LIKE @Search OR a.SerialNumber LIKE @Search OR a.Brand LIKE @Search OR a.Model LIKE @Search)");
             parameters.Add("@Search", $"%{search}%");
         }
 
-        // Other filters
         if (filters != null)
         {
             foreach (var filter in filters.Where(f => f.Value != null && !string.IsNullOrEmpty(f.Value.ToString())))
@@ -483,15 +475,13 @@ public class AssetReps : IAssetReps
         var whereClause = conditions.Any() ? $"WHERE {string.Join(" AND ", conditions)}" : "";
 
         var defaultSort = "a.AssetCode";
-        var orderBy = string.IsNullOrEmpty(sortBy) 
-            ? $"ORDER BY {defaultSort} ASC" 
+        var orderBy = string.IsNullOrEmpty(sortBy)
+            ? $"ORDER BY {defaultSort} ASC"
             : $"ORDER BY a.{sortBy} {(sortDescending ? "DESC" : "ASC")}";
 
-        // Count
         var countSql = $"SELECT COUNT(*) FROM Asset a {whereClause}";
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        // Data
         var offset = (page - 1) * pageSize;
         parameters.Add("@Offset", offset);
         parameters.Add("@PageSize", pageSize);
@@ -506,7 +496,9 @@ public class AssetReps : IAssetReps
                 a.WarrantyPeriod, a.WarrantyExpiryDate,
                 a.AssetConditionPurchase, md.MasterDataName as AssetConditionPurchaseName,
                 a.Notes,
-                a.IsActive, a.CreatedDate, a.CreatedBy, a.ModifiedDate, a.ModifiedBy";
+                a.IsActive, a.CreatedDate, a.CreatedBy, a.ModifiedDate, a.ModifiedBy,
+                1 as CanEdit,
+                1 as CanDelete";
 
         var fromClause = @"
             FROM Asset a

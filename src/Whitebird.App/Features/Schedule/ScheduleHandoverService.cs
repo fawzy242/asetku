@@ -91,21 +91,18 @@ public class ScheduleHandoverService : BaseService, IScheduleHandoverService
 
     public async Task<ServiceResult<ScheduleHandoverView>> CreateAsync(ScheduleHandoverCreateDto dto)
     {
-        // Validate Asset exists
         var asset = await _assetReps.GetByIdRawAsync(dto.AssetId);
         if (asset == null)
         {
             return ServiceResult<ScheduleHandoverView>.BadRequest($"Asset with id {dto.AssetId} not found");
         }
 
-        // Validate Employee exists
         var employee = await _employeeReps.GetByIdRawAsync(dto.EmployeeId);
         if (employee == null)
         {
             return ServiceResult<ScheduleHandoverView>.BadRequest($"Employee with id {dto.EmployeeId} not found");
         }
 
-        // Check duplicate schedule
         var exists = await _scheduleReps.IsScheduleExistsAsync(dto.ScheduleDate, dto.AssetId);
         if (exists)
         {
@@ -140,21 +137,18 @@ public class ScheduleHandoverService : BaseService, IScheduleHandoverService
             return ServiceResult<ScheduleHandoverView>.NotFound($"Schedule with id {id} not found");
         }
 
-        // Validate Asset exists
         var asset = await _assetReps.GetByIdRawAsync(dto.AssetId);
         if (asset == null)
         {
             return ServiceResult<ScheduleHandoverView>.BadRequest($"Asset with id {dto.AssetId} not found");
         }
 
-        // Validate Employee exists
         var employee = await _employeeReps.GetByIdRawAsync(dto.EmployeeId);
         if (employee == null)
         {
             return ServiceResult<ScheduleHandoverView>.BadRequest($"Employee with id {dto.EmployeeId} not found");
         }
 
-        // Check duplicate schedule (exclude current)
         var exists = await _scheduleReps.IsScheduleExistsAsync(dto.ScheduleDate, dto.AssetId, id);
         if (exists)
         {
@@ -224,13 +218,11 @@ public class ScheduleHandoverService : BaseService, IScheduleHandoverService
         }, "soft delete schedule handover");
     }
 
-    public async Task<ServiceResult<PaginatedResult<ScheduleHandoverListView>>> GetGridDataAsync(
-        int page, int pageSize, string? search = null, string? sortBy = null,
-        bool sortDescending = false, Dictionary<string, object>? filters = null)
+    public async Task<ServiceResult<PaginatedResult<ScheduleHandoverListView>>> GetGridDataAsync(ScheduleGridRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var result = await _scheduleReps.GetPagedListAsync(page, pageSize, search, sortBy, sortDescending, filters);
+            var result = await _scheduleReps.GetPagedListAsync(request);
             return ServiceResult<PaginatedResult<ScheduleHandoverListView>>.Success(result);
         }, "get schedule handover grid");
     }
@@ -310,14 +302,12 @@ public class ScheduleHandoverService : BaseService, IScheduleHandoverService
             return ServiceResult<ScheduleGenerateResultDto>.BadRequest("DateFrom must be less than or equal to DateTo");
         }
 
-        // Validate Asset exists
         var asset = await _assetReps.GetByIdRawAsync(dto.AssetId);
         if (asset == null)
         {
             return ServiceResult<ScheduleGenerateResultDto>.BadRequest($"Asset with id {dto.AssetId} not found");
         }
 
-        // Validate Employee exists
         var employee = await _employeeReps.GetByIdRawAsync(dto.EmployeeId);
         if (employee == null)
         {

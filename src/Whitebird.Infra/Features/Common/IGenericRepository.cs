@@ -1,4 +1,5 @@
 using System.Data;
+using Whitebird.Domain.Features.Common;
 
 namespace Whitebird.Infra.Features.Common;
 
