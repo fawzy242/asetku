@@ -1,3 +1,4 @@
+// src/components/organisms/Topbar/Topbar.jsx
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { FiSearch, FiSun, FiMoon, FiChevronDown, FiX, FiUser, FiLogOut } from "react-icons/fi";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -6,34 +7,24 @@ import { Avatar, Box } from "@mui/material";
 import { useAuth } from "../../../context/AuthContext";
 import { useUIStore } from "../../../stores/uiStore";
 import ConfirmDialog from "../../molecules/ConfirmDialog/ConfirmDialog";
-import apiService from "../../../core/services/api.service";
+import apiClient from "../../../core/api/apiClient";
 import { useDebounce } from "../../../hooks/useDebounce";
 import "./Topbar.scss";
 
+// FIX: Gunakan endpoint /Home/search (bukan /Asset/search)
 const fetchSearchResults = async (keyword) => {
   if (!keyword || keyword.trim().length < 2) return [];
   
   try {
-    const [assetRes, employeeRes] = await Promise.all([
-      apiService.get(`/Asset/search?keyword=${encodeURIComponent(keyword)}`),
-      apiService.get(`/Employee/grid?search=${encodeURIComponent(keyword)}&pageSize=5`)
-    ]);
-    
-    const assets = (assetRes.data?.data || []).slice(0, 5).map(item => ({
-      type: "asset",
-      id: item.assetId,
-      title: item.assetName,
-      code: item.assetCode,
+    const response = await apiClient.home.search(keyword);
+    const results = response.data?.data?.results || response.data?.results || [];
+    return results.map(item => ({
+      type: item.type?.toLowerCase() || 'asset',
+      id: item.id,
+      title: item.name || item.title || '',
+      code: item.code || '',
+      additionalInfo: item.additionalInfo || '',
     }));
-    
-    const employees = (employeeRes.data?.data?.data || employeeRes.data?.data || []).slice(0, 5).map(item => ({
-      type: "employee",
-      id: item.employeeId,
-      title: item.fullName,
-      code: item.employeeCode,
-    }));
-    
-    return [...assets, ...employees];
   } catch (error) {
     console.error("Search failed:", error);
     return [];
@@ -54,10 +45,9 @@ const Topbar = ({ user = null }) => {
   const { theme, toggleTheme } = useUIStore();
 
   // Load profile photo
-  const loadProfilePhoto = useCallback(async (userId) => {
-    if (!userId) return;
+  const loadProfilePhoto = useCallback(async () => {
     try {
-      const response = await apiService.get(`/Auth/profile-photo/${userId}`, { responseType: 'blob' });
+      const response = await apiClient.user.getPhoto();
       if (response.data && response.data.size > 0) {
         const url = URL.createObjectURL(response.data);
         setProfilePhotoUrl(url);
@@ -69,10 +59,9 @@ const Topbar = ({ user = null }) => {
     }
   }, []);
 
-  // Load photo when user changes
   useEffect(() => {
     if (user?.userId) {
-      loadProfilePhoto(user.userId);
+      loadProfilePhoto();
     }
   }, [user?.userId, loadProfilePhoto]);
 
@@ -127,19 +116,6 @@ const Topbar = ({ user = null }) => {
       navigate(`/employee-summary?employeeId=${r.id}`);
     }
   };
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const assetId = params.get('assetId');
-    const employeeId = params.get('employeeId');
-    
-    if (assetId && location.pathname === '/tracking') {
-      // The AssetTracking page will handle loading the data
-    }
-    if (employeeId && location.pathname === '/employee-summary') {
-      // The EmployeeSummary page will handle loading the data
-    }
-  }, [location]);
 
   const handleLogout = async () => {
     const confirmed = await ConfirmDialog.show({

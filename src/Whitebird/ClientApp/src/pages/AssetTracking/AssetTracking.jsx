@@ -1,3 +1,4 @@
+// src/pages/AssetTracking/AssetTracking.jsx
 import React from 'react';
 import AssetTrackingMenu from './AssetTracking.menu';
 import './AssetTracking.scss';

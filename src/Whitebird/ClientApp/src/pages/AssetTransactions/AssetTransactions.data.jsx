@@ -1,93 +1,277 @@
-import AssetTransactionsApi from './AssetTransactions.api';
+// src/pages/AssetTransactions/AssetTransactions.data.js
+import apiClient from '../../core/api/apiClient';
 import BaseData from '../../core/services/BaseData';
 import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
+import { handleSuccess } from '../../core/services/successHandler';
 
 class AssetTransactionsData extends BaseData {
   constructor() {
-    super(AssetTransactionsApi);
+    super(apiClient.transaction);
+    this.setEntityName('transaction');
   }
 
-  async approve(id, isApproved, approvalNotes = '') {
+  async bulkApprove(ids) {
     try {
-      const result = await this.api.approve(id, { assetTransactionId: id, isApproved, approvalNotes });
-      if (result.isSuccess) {
-        ConfirmDialog.toast.success(isApproved ? 'Transaction approved' : 'Transaction rejected');
-        return { success: true };
+      const result = await this.api.bulkApproved({ ids });
+      
+      if (result.data?.isSuccess !== undefined) {
+        if (!result.data.isSuccess) {
+          const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Failed to approve';
+          ConfirmDialog.toast.error(errorMsg);
+          return { success: false };
+        }
+        
+        const count = result.data.data || ids.length;
+        handleSuccess({
+          operation: 'approve',
+          entityName: 'transaction',
+          message: `${count} transaction(s) approved successfully`,
+          result: result.data,
+        });
+        
+        return { success: true, data: count };
       }
-      ConfirmDialog.toast.error(result.message || 'Failed to process');
-      return { success: false };
-    } catch {
-      ConfirmDialog.toast.error('Failed to process');
-      return { success: false };
+      
+      ConfirmDialog.toast.success(`${ids.length} transaction(s) approved`);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.userMessage || error.message || 'Failed to approve',
+      };
     }
   }
 
-  async returnAsset(transactionId, actualReturnDate, conditionAfter, notes) {
+  async bulkReject(ids) {
     try {
-      const result = await this.api.returnAsset({
-        assetTransactionId: transactionId,
-        actualReturnDate,
-        conditionAfter,
-        notes
-      });
-      if (result.isSuccess) {
-        ConfirmDialog.toast.success('Asset returned successfully');
-        return { success: true };
+      const result = await this.api.bulkRejected({ ids });
+      
+      if (result.data?.isSuccess !== undefined) {
+        if (!result.data.isSuccess) {
+          const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Failed to reject';
+          ConfirmDialog.toast.error(errorMsg);
+          return { success: false };
+        }
+        
+        const count = result.data.data || ids.length;
+        handleSuccess({
+          operation: 'reject',
+          entityName: 'transaction',
+          message: `${count} transaction(s) rejected successfully`,
+          result: result.data,
+        });
+        
+        return { success: true, data: count };
       }
-      ConfirmDialog.toast.error(result.message || 'Failed to return asset');
-      return { success: false };
-    } catch {
-      ConfirmDialog.toast.error('Failed to return asset');
-      return { success: false };
+      
+      ConfirmDialog.toast.success(`${ids.length} transaction(s) rejected`);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.userMessage || error.message || 'Failed to reject',
+      };
     }
   }
 
-  async cancel(id) {
-    const confirmed = await ConfirmDialog.show({
-      title: 'Cancel Transaction',
-      text: 'Are you sure you want to cancel this transaction?',
-      icon: 'warning',
-      confirmButtonText: 'Yes, cancel'
-    });
-    if (!confirmed) return { success: false, cancelled: true };
-
+  async bulkPending(ids) {
     try {
-      const result = await this.api.cancel(id);
-      if (result.isSuccess) {
-        ConfirmDialog.toast.success('Transaction cancelled');
+      const result = await this.api.bulkPending({ ids });
+      
+      if (result.data?.isSuccess !== undefined) {
+        if (!result.data.isSuccess) {
+          const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Failed to revert to pending';
+          ConfirmDialog.toast.error(errorMsg);
+          return { success: false };
+        }
+        
+        const count = result.data.data || ids.length;
+        handleSuccess({
+          operation: 'revert',
+          entityName: 'transaction',
+          message: `${count} transaction(s) moved to pending successfully`,
+          result: result.data,
+        });
+        
+        return { success: true, data: count };
+      }
+      
+      ConfirmDialog.toast.success(`${ids.length} transaction(s) moved to pending`);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.userMessage || error.message || 'Failed to revert to pending',
+      };
+    }
+  }
+
+  async complete(id) {
+    try {
+      const result = await this.api.complete(id);
+      
+      if (result.data?.isSuccess !== undefined) {
+        if (!result.data.isSuccess) {
+          const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Failed to complete';
+          ConfirmDialog.toast.error(errorMsg);
+          return { success: false };
+        }
+        
+        handleSuccess({
+          operation: 'complete',
+          entityName: 'transaction',
+          result: result.data,
+        });
+        
         return { success: true };
       }
-      ConfirmDialog.toast.error(result.message || 'Failed to cancel');
-      return { success: false };
-    } catch {
-      ConfirmDialog.toast.error('Failed to cancel');
-      return { success: false };
+      
+      ConfirmDialog.toast.success('Transaction completed');
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.userMessage || error.message || 'Failed to complete',
+      };
+    }
+  }
+
+  async uncomplete(id) {
+    try {
+      const result = await this.api.uncomplete(id);
+      
+      if (result.data?.isSuccess !== undefined) {
+        if (!result.data.isSuccess) {
+          const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Failed to uncomplete';
+          ConfirmDialog.toast.error(errorMsg);
+          return { success: false };
+        }
+        
+        handleSuccess({
+          operation: 'uncomplete',
+          entityName: 'transaction',
+          message: 'Transaction uncompleted successfully',
+          result: result.data,
+        });
+        
+        return { success: true };
+      }
+      
+      ConfirmDialog.toast.success('Transaction uncompleted');
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.userMessage || error.message || 'Failed to uncomplete',
+      };
+    }
+  }
+
+  async createReturn(id, data) {
+    try {
+      const result = await this.api.createReturn(id, data);
+      
+      if (result.data?.isSuccess !== undefined) {
+        if (!result.data.isSuccess) {
+          const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Failed to create return';
+          ConfirmDialog.toast.error(errorMsg);
+          return { success: false };
+        }
+        
+        handleSuccess({
+          operation: 'return',
+          entityName: 'transaction',
+          message: 'Return transaction created successfully',
+          result: result.data,
+        });
+        
+        return { success: true, data: result.data.data };
+      }
+      
+      ConfirmDialog.toast.success('Return transaction created');
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.userMessage || error.message || 'Failed to create return',
+      };
+    }
+  }
+
+  async createPostMaintenance(id, data) {
+    try {
+      const result = await this.api.createPostMaintenance(id, data);
+      
+      if (result.data?.isSuccess !== undefined) {
+        if (!result.data.isSuccess) {
+          const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Failed to create post-maintenance';
+          ConfirmDialog.toast.error(errorMsg);
+          return { success: false };
+        }
+        
+        handleSuccess({
+          operation: 'post-maintenance',
+          entityName: 'transaction',
+          message: 'Post-maintenance transaction created successfully',
+          result: result.data,
+        });
+        
+        return { success: true, data: result.data.data };
+      }
+      
+      ConfirmDialog.toast.success('Post-maintenance transaction created');
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.userMessage || error.message || 'Failed to create post-maintenance',
+      };
     }
   }
 
   async importTransactions(file) {
     try {
       const result = await this.api.import(file);
-      if (result.isSuccess && result.data) {
-        const importResult = result.data;
-        if (importResult.errorCount > 0) {
-          ConfirmDialog.toast.warning(`Import completed: ${importResult.successCount} success, ${importResult.errorCount} errors`);
+      
+      if (result.data?.isSuccess !== undefined) {
+        if (!result.data.isSuccess) {
+          const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Import failed';
+          ConfirmDialog.toast.error(errorMsg);
+          return { success: false };
+        }
+        
+        const importResult = result.data.data;
+        if (importResult?.errorCount > 0) {
+          ConfirmDialog.toast.warning(
+            `Import completed: ${importResult.successCount} success, ${importResult.errorCount} errors`
+          );
         } else {
-          ConfirmDialog.toast.success(`Import completed: ${importResult.successCount} transactions imported successfully`);
+          handleSuccess({
+            operation: 'import',
+            entityName: 'transaction',
+            message: `Import completed: ${importResult?.successCount || 0} transactions imported successfully`,
+            result: result.data,
+          });
         }
         return { success: true, data: importResult };
       }
-      ConfirmDialog.toast.error(result.message || 'Import failed');
-      return { success: false };
-    } catch {
-      ConfirmDialog.toast.error('Failed to import');
-      return { success: false };
+      
+      ConfirmDialog.toast.success('Transactions imported successfully');
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.userMessage || error.message || 'Failed to import',
+      };
     }
   }
 
   async downloadTemplate() {
     try {
-      const blob = await this.api.downloadImportTemplate();
+      const blob = await this.api.getImportTemplate();
+      if (!(blob instanceof Blob) || blob.size === 0) {
+        throw new Error('Empty template');
+      }
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -98,8 +282,8 @@ class AssetTransactionsData extends BaseData {
       window.URL.revokeObjectURL(url);
       ConfirmDialog.toast.success('Template downloaded');
       return { success: true };
-    } catch {
-      ConfirmDialog.toast.error('Failed to download template');
+    } catch (error) {
+      ConfirmDialog.toast.error(error.message || 'Failed to download template');
       return { success: false };
     }
   }

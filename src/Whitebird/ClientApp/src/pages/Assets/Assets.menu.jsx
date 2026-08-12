@@ -1,47 +1,60 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { Grid, Chip } from "@mui/material";
-import { useQueryClient } from "@tanstack/react-query";
-import AssetsData from "./Assets.data";
-import GridView from "../../components/organisms/GridView/GridView";
-import CrudModal from "../../components/molecules/CrudModal/CrudModal";
-import FormSection from "../../components/atoms/FormSection/FormSection";
-import Input from "../../components/atoms/Input/Input";
-import Select from "../../components/atoms/Select/Select";
-import DatePickerInput from "../../components/atoms/Input/DatePickerInput";
-import NumberInput from "../../components/atoms/Input/NumberInput";
-import Spinner from "../../components/atoms/Spinner/Spinner";
-import FileUploader from "../../components/molecules/FileUploader/FileUploader";
-import ImportModal from "../../components/molecules/ImportModal/ImportModal";
-import BulkActivateModal from "../../components/molecules/BulkActivateModal/BulkActivateModal";
-import StatusChip from "../../components/atoms/StatusChip/StatusChip";
-import { FiUpload, FiCheckSquare } from "react-icons/fi";
-import { ASSET_GRID_TABS } from "../../core/constants/assetStatuses";
-import { ACTION_TYPES, useGridActions } from "../../hooks/useGridActions";
-import { useBulkSelection } from "../../hooks/useBulkSelection";
-import { useSweetAlert } from "../../hooks/useSweetAlert";
-import { useGridData } from "../../hooks/useGridData";
-import { useReferenceData } from "../../hooks/useReferenceData";
-import { useCrudFormBase } from "../../hooks/useCrudFormBase";
-import { useOptions } from "../../hooks/useOptions";
-import { cleanAssetFormData } from "../../core/utils/formHelpers";
-import utilsHelper from "../../core/utils/utils.helper";
-import "./Assets.scss";
+// src/pages/Assets/Assets.menu.jsx
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { Grid, Chip } from '@mui/material';
+import { useQueryClient } from '@tanstack/react-query';
+import AssetsData from './Assets.data';
+import GridView from '../../components/organisms/GridView/GridView';
+import CrudModal from '../../components/molecules/CrudModal/CrudModal';
+import FormSection from '../../components/atoms/FormSection/FormSection';
+import Input from '../../components/atoms/Input/Input';
+import Select from '../../components/atoms/Select/Select';
+import DatePickerInput from '../../components/atoms/Input/DatePickerInput';
+import NumberInput from '../../components/atoms/Input/NumberInput';
+import Spinner from '../../components/atoms/Spinner/Spinner';
+import FileUploader from '../../components/molecules/FileUploader/FileUploader';
+import ImportModal from '../../components/molecules/ImportModal/ImportModal';
+import BulkActivateModal from '../../components/molecules/BulkActivateModal/BulkActivateModal';
+import Button from '../../components/atoms/Button/Button';
+import StatusChip from '../../components/atoms/StatusChip/StatusChip';
+import { FiUpload, FiCheckSquare } from 'react-icons/fi';
+import { ASSET_GRID_TABS } from '../../core/constants/assetStatuses';
+import { ACTION_TYPES, useGridActions } from '../../hooks/useGridActions';
+import { useBulkSelection } from '../../hooks/useBulkSelection';
+import { useSweetAlert } from '../../hooks/useSweetAlert';
+import { useGridData } from '../../hooks/useGridData';
+import { useReferenceData } from '../../hooks/useReferenceData';
+import { useCrudFormBase } from '../../hooks/useCrudFormBase';
+import { useOptions } from '../../hooks/useOptions';
+import { cleanAssetFormData } from '../../core/utils/formHelpers';
+import utilsHelper from '../../core/utils/utils.helper';
+import './Assets.scss';
 
 const assetsData = new AssetsData();
 assetsData.transformFormData = cleanAssetFormData;
 
 const INITIAL_FORM_DATA = {
-  assetCode: "", assetName: "", categoryId: "", brand: "", model: "",
-  serialNumber: "", imei: "", macAddress: "", hostname: "", ipAddress: "",
-  purchaseDate: "", purchasePrice: "", invoiceNumber: "", supplierId: "",
-  warrantyPeriod: "", warrantyExpiryDate: "", assetCondition: "",
-  assetConditionPurchase: "", officeId: "", operasionalOffice: false,
-  residualValue: "", usefulLife: "", depreciationStartDate: "", notes: "",
+  assetCode: '',
+  assetName: '',
+  categoryId: '',
+  brand: '',
+  model: '',
+  serialNumber: '',
+  imei: '',
+  macAddress: '',
+  hostname: '',
+  ipAddress: '',
+  purchaseDate: '',
+  purchasePrice: '',
+  invoiceNumber: '',
+  supplierId: '',
+  warrantyPeriod: '',
+  assetConditionPurchase: '',
+  notes: '',
 };
 
 const AssetsMenu = () => {
-  const [activeTab, setActiveTab] = useState("all");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -50,7 +63,7 @@ const AssetsMenu = () => {
   const queryClient = useQueryClient();
   const { toast, confirmDelete, confirm } = useSweetAlert();
 
-  const { categories, suppliers, offices, assetConditions } = useReferenceData();
+  const { categories, suppliers, assetConditionPurchases } = useReferenceData();
 
   const {
     showModal,
@@ -63,24 +76,23 @@ const AssetsMenu = () => {
     handleClose,
     handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, assetsData, {
-    idField: "assetId",
+    idField: 'assetId',
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["assets"] });
-      queryClient.invalidateQueries({ queryKey: ["reference", "assets"] });
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      queryClient.invalidateQueries({ queryKey: ['reference', 'assets'] });
     },
   });
 
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } = useBulkSelection({ idField: "assetId" });
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
+    useBulkSelection({ idField: 'assetId' });
 
   const showCheckbox = useMemo(() => {
-    return activeTab === "Active" || activeTab === "Inactive";
+    return activeTab === 'Active' || activeTab === 'Inactive';
   }, [activeTab]);
-
-  const showOfficeField = formData.operasionalOffice === true;
 
   const buildFilters = useCallback(() => {
     const filters = {};
-    if (activeTab !== "all") {
+    if (activeTab !== 'all') {
       filters.status = activeTab;
     }
     if (searchTerm) {
@@ -89,17 +101,20 @@ const AssetsMenu = () => {
     return filters;
   }, [activeTab, searchTerm]);
 
-  const fetchGridData = useCallback(async (params) => {
-    const filters = buildFilters();
-    const requestParams = {
-      page: params.page || 1,
-      pageSize: params.pageSize || 10,
-      ...filters,
-      ...params,
-    };
-    const result = await assetsData.fetchGridData(requestParams);
-    return result;
-  }, [buildFilters]);
+  const fetchGridData = useCallback(
+    async (params) => {
+      const filters = buildFilters();
+      const requestParams = {
+        page: params.page || 1,
+        pageSize: params.pageSize || 10,
+        ...filters,
+        ...params,
+      };
+      const result = await assetsData.fetchGridData(requestParams);
+      return result;
+    },
+    [buildFilters]
+  );
 
   const {
     data: rawAssets,
@@ -109,8 +124,8 @@ const AssetsMenu = () => {
     setPage,
     pageSize,
     setPageSize,
-    reload
-  } = useGridData(["assets", activeTab, searchTerm], fetchGridData);
+    reload,
+  } = useGridData(['assets', activeTab, searchTerm], fetchGridData);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -126,183 +141,191 @@ const AssetsMenu = () => {
     return (rawAssets || []).map(asset => ({
       ...asset,
       id: asset.assetId,
-      displayStatus: asset.currentStatus || asset.status || "Available",
-      displayCondition: asset.assetConditionName || "-",
+      displayStatus: asset.currentStatus || asset.status || 'Available',
     }));
   }, [rawAssets]);
 
-  const handleSearch = useCallback((search) => {
-    setSearchTerm(search);
-    setPage(1);
-    clearSelection();
-  }, [setPage, clearSelection]);
+  const handleSearch = useCallback(
+    (search) => {
+      setSearchTerm(search);
+      setPage(1);
+      clearSelection();
+    },
+    [setPage, clearSelection]
+  );
 
-  const handleDelete = useCallback(async (asset) => {
-    const confirmed = await confirmDelete("Delete Asset", `Are you sure you want to delete "${asset.assetName}"?`);
-    if (!confirmed) return;
-    const r = await assetsData.delete(asset.assetId);
-    if (r.success && isMountedRef.current) {
-      toast.success("Asset deleted successfully");
-      queryClient.invalidateQueries({ queryKey: ["assets"] });
-      reload();
-    }
-  }, [reload, queryClient, toast, confirmDelete]);
+  const handleDelete = useCallback(
+    async (asset) => {
+      const confirmed = await confirmDelete('Delete Asset', `Are you sure you want to delete "${asset.assetName}"?`);
+      if (!confirmed) return;
+      const r = await assetsData.delete(asset.assetId);
+      if (r.success && isMountedRef.current) {
+        toast.success('Asset deleted successfully');
+        queryClient.invalidateQueries({ queryKey: ['assets'] });
+        reload();
+        clearSelection();
+      }
+    },
+    [reload, queryClient, toast, confirmDelete, clearSelection]
+  );
 
   const onSubmit = useCallback(async () => {
-    if (formData.operasionalOffice === true && !formData.officeId) {
-      toast.error("Office is required when Operational Office is enabled");
-      return false;
-    }
-
     const success = await crudHandleSubmit();
     if (success && isMountedRef.current) {
-      toast.success(editingAsset ? "Asset updated successfully" : "Asset created successfully");
-      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      toast.success(editingAsset ? 'Asset updated successfully' : 'Asset created successfully');
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
       reload();
+      clearSelection();
     }
     return success;
-  }, [crudHandleSubmit, reload, queryClient, toast, editingAsset, formData]);
+  }, [crudHandleSubmit, reload, queryClient, toast, editingAsset, clearSelection]);
 
-  const handleTabChange = useCallback((tab) => {
-    setActiveTab(tab);
-    setPage(1);
-    setSearchTerm("");
-    clearSelection();
-  }, [setPage, clearSelection]);
-
-  const handleBulkActivate = useCallback(async (ids, activate) => {
-    const actionText = activate ? "activate" : "deactivate";
-    const confirmed = await confirm({
-      title: activate ? "Activate Assets" : "Deactivate Assets",
-      text: `Are you sure you want to ${actionText} ${ids.length} asset(s)?`,
-      confirmButtonText: activate ? "Yes, Activate" : "Yes, Deactivate",
-    });
-    if (!confirmed) return;
-    const r = await assetsData.bulkActivate(ids, activate);
-    if (r.success && isMountedRef.current) {
-      toast.success(`${r.data || ids.length} asset(s) ${actionText}d successfully`);
+  const handleTabChange = useCallback(
+    (tab) => {
+      setActiveTab(tab);
+      setPage(1);
+      setSearchTerm('');
       clearSelection();
-      queryClient.invalidateQueries({ queryKey: ["assets"] });
-      reload();
-    }
-  }, [reload, queryClient, toast, confirm, clearSelection]);
+    },
+    [setPage, clearSelection]
+  );
 
-  const handleImport = useCallback(async (file) => {
-    setIsImporting(true);
-    const r = await assetsData.importAssets(file);
-    setIsImporting(false);
-    if (r.success && isMountedRef.current) {
-      setImportResult(r.data);
-      if (r.data.errorCount === 0) {
-        toast.success(`Import completed: ${r.data.successCount} assets imported`);
-      } else {
-        toast.warning(`Import completed: ${r.data.successCount} success, ${r.data.errorCount} errors`);
+  const handleBulkActivate = useCallback(
+    async (ids, activate) => {
+      const actionText = activate ? 'activate' : 'deactivate';
+      const confirmed = await confirm({
+        title: activate ? 'Activate Assets' : 'Deactivate Assets',
+        text: `Are you sure you want to ${actionText} ${ids.length} asset(s)?`,
+        confirmButtonText: activate ? 'Yes, Activate' : 'Yes, Deactivate',
+      });
+      if (!confirmed) return;
+      const r = await assetsData.bulkActivate(ids, activate);
+      if (r.success && isMountedRef.current) {
+        const count = r.data || ids.length;
+        toast.success(`${count} asset(s) ${actionText}d successfully`);
+        clearSelection();
+        queryClient.invalidateQueries({ queryKey: ['assets'] });
+        reload();
       }
-      queryClient.invalidateQueries({ queryKey: ["assets"] });
-      reload();
-    }
-  }, [reload, queryClient, toast]);
+    },
+    [reload, queryClient, toast, confirm, clearSelection]
+  );
+
+  const handleImport = useCallback(
+    async (file) => {
+      setIsImporting(true);
+      const r = await assetsData.importAssets(file);
+      setIsImporting(false);
+      if (r.success && isMountedRef.current) {
+        setImportResult(r.data);
+        if (r.data?.errorCount > 0) {
+          toast.warning(`Import completed: ${r.data.successCount} success, ${r.data.errorCount} errors`);
+        } else {
+          toast.success(`Import completed: ${r.data?.successCount || 0} assets imported`);
+        }
+        queryClient.invalidateQueries({ queryKey: ['assets'] });
+        reload();
+        clearSelection();
+      }
+    },
+    [reload, queryClient, toast, clearSelection]
+  );
 
   const handleDownloadTemplate = useCallback(async () => {
     await assetsData.downloadTemplate();
   }, []);
 
-  const handleGridAction = useCallback((actionType, row) => {
-    switch (actionType) {
-      case ACTION_TYPES.EDIT:
-        handleEdit(row);
-        break;
-      case ACTION_TYPES.DELETE:
-        handleDelete(row);
-        break;
-      default:
-        break;
-    }
-  }, [handleEdit, handleDelete]);
+  const handleGridAction = useCallback(
+    (actionType, row) => {
+      if (actionType === ACTION_TYPES.EDIT) handleEdit(row);
+      else if (actionType === ACTION_TYPES.DELETE) handleDelete(row);
+    },
+    [handleEdit, handleDelete]
+  );
 
-  const getConditionalActions = useCallback(() => {
-    return [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE];
+  const getConditionalActions = useCallback((row) => {
+    const actions = [];
+    if (row.canEdit !== false) actions.push(ACTION_TYPES.EDIT);
+    if (row.canDelete !== false) actions.push(ACTION_TYPES.DELETE);
+    return actions;
   }, []);
 
   const { actionColumn } = useGridActions({
     actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
     onAction: handleGridAction,
     getConditionalActions,
-    rowIdField: "assetId",
+    rowIdField: 'assetId',
   });
 
-  // Use centralized useOptions hook
-  const categoryOptions = useOptions(categories, "Select Category");
-  const supplierOptions = useOptions(suppliers, "Select Supplier");
-  const officeOptions = useOptions(offices, "Select Office");
-  const conditionOptions = useOptions(assetConditions, "Select Condition");
+  const categoryOptions = useOptions(categories, 'Select Category');
+  const supplierOptions = useOptions(suppliers, 'Select Supplier');
+  const conditionPurchaseOptions = useOptions(assetConditionPurchases, 'Select Purchase Condition');
 
-  const conditionPurchaseOptions = [
-    { value: "", label: "Select Purchase Condition" },
-    { value: "1", label: "New" },
-    { value: "2", label: "Second Hand" },
-  ];
-
-  const booleanOptions = [
-    { value: "false", label: "No" },
-    { value: "true", label: "Yes" },
-  ];
-
-  const columns = useMemo(() => [
-    { field: "assetCode", headerName: "Code", width: 120 },
-    { field: "assetName", headerName: "Name", flex: 1, minWidth: 180 },
-    { field: "categoryName", headerName: "Category", width: 150 },
-    { field: "brand", headerName: "Brand", width: 100 },
-    { field: "model", headerName: "Model", width: 100 },
-    {
-      field: "displayStatus",
-      headerName: "Status",
-      width: 140,
-      renderCell: (p) => {
-        const status = p?.value || "Available";
-        return <StatusChip status={status} />;
-      }
-    },
-    { field: "displayCondition", headerName: "Condition", width: 100 },
-    { field: "officeName", headerName: "Office", width: 150 },
-    {
-      field: "purchasePrice",
-      headerName: "Price",
-      width: 130,
-      renderCell: (params) => {
-        const row = params?.row || {};
-        const value = row.purchasePrice !== undefined ? row.purchasePrice : params?.value;
-        if (value === null || value === undefined || value === "") {
-          return <span className="u-text-muted">-</span>;
-        }
-        const numValue = typeof value === "string" ? parseFloat(value) : value;
-        if (isNaN(numValue)) {
-          return <span className="u-text-muted">-</span>;
-        }
-        return <span>{utilsHelper.formatCurrency(numValue)}</span>;
-      }
-    },
-    actionColumn,
-  ], [actionColumn]);
+  const columns = useMemo(
+    () => [
+      { field: 'assetCode', headerName: 'Code', width: 120 },
+      { field: 'assetName', headerName: 'Name', flex: 1, minWidth: 180 },
+      { field: 'categoryName', headerName: 'Category', width: 150 },
+      { field: 'brand', headerName: 'Brand', width: 100 },
+      { field: 'model', headerName: 'Model', width: 100 },
+      {
+        field: 'displayStatus',
+        headerName: 'Status',
+        width: 140,
+        renderCell: (p) => {
+          const status = p?.value || 'Available';
+          return <StatusChip status={status} />;
+        },
+      },
+      {
+        field: 'purchasePrice',
+        headerName: 'Price',
+        width: 130,
+        renderCell: (params) => {
+          const value = params?.row?.purchasePrice ?? params?.value;
+          if (value === null || value === undefined || value === '') {
+            return <span className="u-text-muted">-</span>;
+          }
+          const numValue = typeof value === 'string' ? parseFloat(value) : value;
+          if (isNaN(numValue)) {
+            return <span className="u-text-muted">-</span>;
+          }
+          return <span>{utilsHelper.formatCurrency(numValue)}</span>;
+        },
+      },
+      actionColumn,
+    ],
+    [actionColumn]
+  );
 
   const extraActions = (
     <>
-      <button className="btn btn--outline btn--sm u-inline-flex u-btn-gap" onClick={() => setShowImportModal(true)}>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setShowImportModal(true)}
+        className="u-inline-flex u-btn-gap"
+      >
         <FiUpload size={16} /> Import
-      </button>
+      </Button>
       {hasSelection && showCheckbox && (
-        <button className="btn btn--primary btn--sm u-inline-flex u-btn-gap" onClick={() => setShowBulkActivateModal(true)}>
-          <FiCheckSquare size={16} /> {activeTab === "Active" ? "Deactivate" : "Activate"} ({selectionCount})
-        </button>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => setShowBulkActivateModal(true)}
+          className="u-inline-flex u-btn-gap"
+        >
+          <FiCheckSquare size={16} /> {activeTab === 'Active' ? 'Deactivate' : 'Activate'} ({selectionCount})
+        </Button>
       )}
     </>
   );
 
   if (loading && !assets.length) return <div className="page-loading"><Spinner size="lg" /></div>;
 
-  const bulkActivateValue = activeTab === "Active" ? false : true;
-  const bulkTitle = bulkActivateValue ? "Activate Assets" : "Deactivate Assets";
-  const bulkDescription = `This action will ${bulkActivateValue ? "activate" : "deactivate"} the selected assets.`;
+  const bulkActivateValue = activeTab === 'Active' ? false : true;
+  const bulkTitle = bulkActivateValue ? 'Activate Assets' : 'Deactivate Assets';
+  const bulkDescription = `This action will ${bulkActivateValue ? 'activate' : 'deactivate'} the selected assets.`;
 
   return (
     <div className="assets-menu">
@@ -332,84 +355,107 @@ const AssetsMenu = () => {
       <CrudModal
         isOpen={showModal}
         onClose={handleClose}
-        title={editingAsset ? "Edit Asset" : "Add Asset"}
+        title={editingAsset ? 'Edit Asset' : 'Add Asset'}
         onSubmit={onSubmit}
         isSubmitting={isSubmitting}
-        submitText={editingAsset ? "Update" : "Create"}
+        submitText={editingAsset ? 'Update' : 'Create'}
         size="xl"
       >
         <FormSection title="Basic Information" description="Asset code, name, and category">
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <Input label="Asset Code" value={formData.assetCode || ""} onChange={(e) => setFormField("assetCode")(e.target.value)} required />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Input label="Asset Name" value={formData.assetName || ""} onChange={(e) => setFormField("assetName")(e.target.value)} required />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Select label="Category" value={formData.categoryId || ""} onChange={(e) => setFormField("categoryId")(e.target.value)} options={categoryOptions} required />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Select label="Supplier" value={formData.supplierId || ""} onChange={(e) => setFormField("supplierId")(e.target.value)} options={supplierOptions} />
-            </Grid>
-          </Grid>
-        </FormSection>
-
-        <FormSection title="Operational Office" description="Configure operational office settings">
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <Select
-                label="Operasional Office"
-                value={formData.operasionalOffice ? "true" : "false"}
-                onChange={(e) => {
-                  const val = e.target.value === "true";
-                  setFormField("operasionalOffice")(val);
-                  if (!val) {
-                    setFormField("officeId")("");
-                  }
-                }}
-                options={booleanOptions}
+              <Input
+                label="Asset Code"
+                value={formData.assetCode || ''}
+                onChange={(e) => setFormField('assetCode')(e.target.value)}
+                required
               />
             </Grid>
-            {showOfficeField && (
-              <Grid item xs={12} sm={6}>
-                <Select
-                  label="Office *"
-                  value={formData.officeId || ""}
-                  onChange={(e) => setFormField("officeId")(e.target.value)}
-                  options={officeOptions}
-                  required
-                />
-              </Grid>
-            )}
+            <Grid item xs={12} sm={6}>
+              <Input
+                label="Asset Name"
+                value={formData.assetName || ''}
+                onChange={(e) => setFormField('assetName')(e.target.value)}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Select
+                label="Category"
+                value={formData.categoryId || ''}
+                onChange={(e) => setFormField('categoryId')(e.target.value)}
+                options={categoryOptions}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Select
+                label="Supplier"
+                value={formData.supplierId || ''}
+                onChange={(e) => setFormField('supplierId')(e.target.value)}
+                options={supplierOptions}
+              />
+            </Grid>
           </Grid>
         </FormSection>
 
         <FormSection title="Technical Details" description="Brand, model, serial numbers, and network information">
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <Input label="Brand" value={formData.brand || ""} onChange={(e) => setFormField("brand")(e.target.value)} />
+              <Input
+                label="Brand"
+                value={formData.brand || ''}
+                onChange={(e) => setFormField('brand')(e.target.value)}
+              />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Input label="Model" value={formData.model || ""} onChange={(e) => setFormField("model")(e.target.value)} />
+              <Input
+                label="Model"
+                value={formData.model || ''}
+                onChange={(e) => setFormField('model')(e.target.value)}
+              />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <Input label="Serial Number" value={formData.serialNumber || ""} onChange={(e) => setFormField("serialNumber")(e.target.value)} />
+              <Input
+                label="Serial Number"
+                value={formData.serialNumber || ''}
+                onChange={(e) => setFormField('serialNumber')(e.target.value)}
+              />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <Input label="IMEI" value={formData.imei || ""} onChange={(e) => setFormField("imei")(e.target.value)} />
+              <Input
+                label="IMEI"
+                value={formData.imei || ''}
+                onChange={(e) => setFormField('imei')(e.target.value)}
+              />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <Input label="MAC Address" value={formData.macAddress || ""} onChange={(e) => setFormField("macAddress")(e.target.value)} />
+              <Input
+                label="MAC Address"
+                value={formData.macAddress || ''}
+                onChange={(e) => setFormField('macAddress')(e.target.value)}
+              />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <Input label="Hostname" value={formData.hostname || ""} onChange={(e) => setFormField("hostname")(e.target.value)} />
+              <Input
+                label="Hostname"
+                value={formData.hostname || ''}
+                onChange={(e) => setFormField('hostname')(e.target.value)}
+              />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <Input label="IP Address" value={formData.ipAddress || ""} onChange={(e) => setFormField("ipAddress")(e.target.value)} />
+              <Input
+                label="IP Address"
+                value={formData.ipAddress || ''}
+                onChange={(e) => setFormField('ipAddress')(e.target.value)}
+              />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <Input label="Invoice Number" value={formData.invoiceNumber || ""} onChange={(e) => setFormField("invoiceNumber")(e.target.value)} />
+              <Input
+                label="Invoice Number"
+                value={formData.invoiceNumber || ''}
+                onChange={(e) => setFormField('invoiceNumber')(e.target.value)}
+              />
             </Grid>
           </Grid>
         </FormSection>
@@ -417,36 +463,39 @@ const AssetsMenu = () => {
         <FormSection title="Purchase Information" description="Purchase date, price, warranty, and condition">
           <Grid container spacing={2}>
             <Grid item xs={12} sm={4}>
-              <DatePickerInput label="Purchase Date" value={formData.purchaseDate || ""} onChange={(e) => setFormField("purchaseDate")(e.target.value)} />
+              <DatePickerInput
+                label="Purchase Date"
+                value={formData.purchaseDate || ''}
+                onChange={(e) => setFormField('purchaseDate')(e.target.value)}
+              />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <NumberInput label="Purchase Price" value={formData.purchasePrice} onChange={(e) => setFormField("purchasePrice")(e.target.value)} prefix="Rp " thousandSeparator={true} decimalScale={0} />
+              <NumberInput
+                label="Purchase Price"
+                value={formData.purchasePrice}
+                onChange={(e) => setFormField('purchasePrice')(e.target.value)}
+                prefix="Rp "
+                thousandSeparator
+                decimalScale={0}
+              />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <NumberInput label="Warranty (Months)" value={formData.warrantyPeriod} onChange={(e) => setFormField("warrantyPeriod")(e.target.value)} suffix=" months" decimalScale={0} min={0} />
+              <NumberInput
+                label="Warranty (Months)"
+                value={formData.warrantyPeriod}
+                onChange={(e) => setFormField('warrantyPeriod')(e.target.value)}
+                suffix=" months"
+                decimalScale={0}
+                min={0}
+              />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <DatePickerInput label="Warranty Expiry" value={formData.warrantyExpiryDate || ""} onChange={(e) => setFormField("warrantyExpiryDate")(e.target.value)} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Select label="Condition" value={formData.assetCondition || ""} onChange={(e) => setFormField("assetCondition")(e.target.value)} options={conditionOptions} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Select label="Purchase Condition" value={formData.assetConditionPurchase || ""} onChange={(e) => setFormField("assetConditionPurchase")(e.target.value)} options={conditionPurchaseOptions} />
-            </Grid>
-          </Grid>
-        </FormSection>
-
-        <FormSection title="Depreciation" description="Financial depreciation information">
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
-              <NumberInput label="Residual Value" value={formData.residualValue} onChange={(e) => setFormField("residualValue")(e.target.value)} prefix="Rp " thousandSeparator={true} decimalScale={0} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <NumberInput label="Useful Life (Years)" value={formData.usefulLife} onChange={(e) => setFormField("usefulLife")(e.target.value)} suffix=" years" decimalScale={0} min={1} />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <DatePickerInput label="Depreciation Start" value={formData.depreciationStartDate || ""} onChange={(e) => setFormField("depreciationStartDate")(e.target.value)} />
+              <Select
+                label="Purchase Condition"
+                value={formData.assetConditionPurchase || ''}
+                onChange={(e) => setFormField('assetConditionPurchase')(e.target.value)}
+                options={conditionPurchaseOptions}
+              />
             </Grid>
           </Grid>
         </FormSection>
@@ -454,11 +503,17 @@ const AssetsMenu = () => {
         <FormSection title="Notes & Attachments" description="Additional information and file attachments">
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <Input label="Notes" value={formData.notes || ""} onChange={(e) => setFormField("notes")(e.target.value)} multiline rows={3} />
+              <Input
+                label="Notes"
+                value={formData.notes || ''}
+                onChange={(e) => setFormField('notes')(e.target.value)}
+                multiline
+                rows={3}
+              />
             </Grid>
             <Grid item xs={12}>
               <FileUploader
-                referenceTable="Asset"
+                uploadEndpoint={editingAsset?.assetId ? `/Asset/${editingAsset.assetId}/photo` : null}
                 referenceId={editingAsset?.assetId}
                 onUploadComplete={reload}
               />
@@ -469,7 +524,10 @@ const AssetsMenu = () => {
 
       <ImportModal
         isOpen={showImportModal}
-        onClose={() => { setShowImportModal(false); setImportResult(null); }}
+        onClose={() => {
+          setShowImportModal(false);
+          setImportResult(null);
+        }}
         onImport={handleImport}
         onDownloadTemplate={handleDownloadTemplate}
         isImporting={isImporting}

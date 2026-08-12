@@ -1,168 +1,97 @@
-import ReportsApi from './Reports.api';
+// src/pages/Reports/Reports.data.js
+import apiClient from '../../core/api/apiClient';
 import BaseData from '../../core/services/BaseData';
 import utilsHelper from '../../core/utils/utils.helper';
 import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
+import { handleSuccess, handleApiError } from '../../core/services';
 
 class ReportsData extends BaseData {
   constructor() {
-    super(ReportsApi);
+    super(apiClient.reports);
+    this.setEntityName('report');
   }
 
-  async fetchDashboardStats() {
+  /**
+   * Generic export method with blob download
+   */
+  async _exportReport(exportFn, params, fileNamePrefix) {
     try {
-      const r = await this.api.getDashboardStats();
-      return { success: true, data: r.data || {} };
-    } catch {
-      return { success: false, error: 'Failed to load stats' };
-    }
-  }
-
-  async fetchFilterOptions() {
-    try {
-      const [categories, suppliers, employees] = await Promise.all([
-        this.api.getCategories(),
-        this.api.getSuppliers(),
-        this.api.getEmployees()
-      ]);
-      const departments = [...new Set((employees.data || []).map(e => e.departmentName || e.department).filter(Boolean))];
-      return {
-        success: true,
-        data: {
-          categories: categories.data || [],
-          suppliers: suppliers.data || [],
-          employees: employees.data || [],
-          departments
+      const blob = await exportFn(params);
+      
+      if (!(blob instanceof Blob) || blob.size === 0) {
+        throw new Error('Empty response from server');
+      }
+      
+      const fileName = `${fileNamePrefix}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      utilsHelper.downloadFile(blob, fileName);
+      
+      handleSuccess({
+        operation: 'export',
+        entityName: 'report',
+        message: `${fileNamePrefix} exported successfully`,
+      });
+      
+      return { success: true };
+    } catch (error) {
+      // Check if it's a blob error with message
+      if (error.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const parsed = JSON.parse(text);
+          if (parsed.message) {
+            ConfirmDialog.toast.error(parsed.message);
+            return { success: false, error: parsed.message };
+          }
+        } catch {
+          // Not JSON, continue
         }
-      };
-    } catch {
-      return { success: false, error: 'Failed to load filter options' };
-    }
-  }
-
-  async fetchTransactionData(params) {
-    try {
-      const r = await this.api.getAssetTransactionData(params);
-      return { success: true, data: r.data || [] };
-    } catch {
-      return { success: false, data: [] };
-    }
-  }
-
-  async fetchInventoryData(params) {
-    try {
-      const r = await this.api.getAssetInventoryData(params);
-      return { success: true, data: r.data || [] };
-    } catch {
-      return { success: false, data: [] };
-    }
-  }
-
-  async fetchEmployeeAssetData(params) {
-    try {
-      const r = await this.api.getEmployeeAssetData(params);
-      return { success: true, data: r.data || [] };
-    } catch {
-      return { success: false, data: [] };
-    }
-  }
-
-  async fetchMaintenanceData(params) {
-    try {
-      const r = await this.api.getMaintenanceData(params);
-      return { success: true, data: r.data || [] };
-    } catch {
-      return { success: false, data: [] };
-    }
-  }
-
-  async fetchFinancialData(params) {
-    try {
-      const r = await this.api.getFinancialData(params);
-      return { success: true, data: r.data || [] };
-    } catch {
-      return { success: false, data: [] };
+      }
+      
+      const errorMsg = error.userMessage || error.message || 'Failed to export report';
+      ConfirmDialog.toast.error(errorMsg);
+      return { success: false, error: errorMsg };
     }
   }
 
   async exportTransaction(params) {
-    try {
-      const blob = await this.api.exportAssetTransactionExcel(params);
-      if (!(blob instanceof Blob) || blob.size === 0) {
-        throw new Error('Empty response from server');
-      }
-      utilsHelper.downloadFile(blob, `Transaction_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
-      ConfirmDialog.toast.success('Report exported successfully');
-      return { success: true };
-    } catch (error) {
-      console.error('Export failed:', error);
-      ConfirmDialog.toast.error(error.message || 'Failed to export report');
-      return { success: false };
-    }
+    return this._exportReport(
+      this.api.exportTransaction,
+      params,
+      'Transaction_Report'
+    );
   }
 
   async exportInventory(params) {
-    try {
-      const blob = await this.api.exportAssetInventoryExcel(params);
-      if (!(blob instanceof Blob) || blob.size === 0) {
-        throw new Error('Empty response from server');
-      }
-      utilsHelper.downloadFile(blob, `Inventory_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
-      ConfirmDialog.toast.success('Report exported successfully');
-      return { success: true };
-    } catch (error) {
-      console.error('Export failed:', error);
-      ConfirmDialog.toast.error(error.message || 'Failed to export report');
-      return { success: false };
-    }
+    return this._exportReport(
+      this.api.exportInventory,
+      params,
+      'Inventory_Report'
+    );
   }
 
   async exportEmployee(params) {
-    try {
-      const blob = await this.api.exportEmployeeAssetExcel(params);
-      if (!(blob instanceof Blob) || blob.size === 0) {
-        throw new Error('Empty response from server');
-      }
-      utilsHelper.downloadFile(blob, `Employee_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
-      ConfirmDialog.toast.success('Report exported successfully');
-      return { success: true };
-    } catch (error) {
-      console.error('Export failed:', error);
-      ConfirmDialog.toast.error(error.message || 'Failed to export report');
-      return { success: false };
-    }
+    return this._exportReport(
+      this.api.exportEmployeeAsset,
+      params,
+      'Employee_Asset_Report'
+    );
   }
 
   async exportMaintenance(params) {
-    try {
-      const blob = await this.api.exportMaintenanceExcel(params);
-      if (!(blob instanceof Blob) || blob.size === 0) {
-        throw new Error('Empty response from server');
-      }
-      const reportType = params.isUpcoming ? 'Upcoming_Maintenance' : 'Maintenance_History';
-      utilsHelper.downloadFile(blob, `${reportType}_${new Date().toISOString().split('T')[0]}.xlsx`);
-      ConfirmDialog.toast.success('Report exported successfully');
-      return { success: true };
-    } catch (error) {
-      console.error('Export failed:', error);
-      ConfirmDialog.toast.error(error.message || 'Failed to export report');
-      return { success: false };
-    }
+    const reportType = params.isUpcoming ? 'Upcoming_Maintenance' : 'Maintenance_History';
+    return this._exportReport(
+      this.api.exportMaintenance,
+      params,
+      reportType
+    );
   }
 
   async exportFinancial(params) {
-    try {
-      const blob = await this.api.exportFinancialExcel(params);
-      if (!(blob instanceof Blob) || blob.size === 0) {
-        throw new Error('Empty response from server');
-      }
-      utilsHelper.downloadFile(blob, `Financial_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
-      ConfirmDialog.toast.success('Report exported successfully');
-      return { success: true };
-    } catch (error) {
-      console.error('Export failed:', error);
-      ConfirmDialog.toast.error(error.message || 'Failed to export report');
-      return { success: false };
-    }
+    return this._exportReport(
+      this.api.exportFinancial,
+      params,
+      'Financial_Report'
+    );
   }
 }
 

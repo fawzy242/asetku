@@ -1,3 +1,4 @@
+// src/hooks/useGridActions.jsx
 import React, { useState, useCallback, useMemo } from 'react';
 import { IconButton, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
 import { FiMoreVertical, FiEye, FiEdit2, FiTrash2, FiCheck, FiX, FiRotateCcw, FiTool } from 'react-icons/fi';
@@ -27,17 +28,23 @@ export const getActionConfig = (type) => {
 
 /**
  * Hook untuk standardisasi action column dengan kebab menu
+ * 
  * @param {Object} options
- * @param {Array} options.actions - List of action types to show
+ * @param {Array} options.actions - List of action types to show (fallback jika tidak ada row data)
  * @param {Function} options.onAction - Callback when action is clicked (actionType, row)
  * @param {Function} options.getConditionalActions - Optional function to filter actions per row
  * @param {string} options.rowIdField - Field name for row ID (default: 'id')
+ * @param {Array} options.defaultActions - Default actions jika row tidak memiliki flag
+ * 
+ * PERBAIKAN: Prioritaskan row data (CanEdit, CanDelete, CanReturn, CanPost)
+ *            dari backend daripada actions default.
  */
 export const useGridActions = ({ 
   actions = [], 
   onAction, 
   getConditionalActions = null,
-  rowIdField = 'id'
+  rowIdField = 'id',
+  defaultActions = [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE]
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -71,17 +78,44 @@ export const useGridActions = ({
       sortable: false,
       renderCell: (params) => {
         const row = params.row;
-        let visibleActions = actions;
+        let visibleActions = [];
         
-        if (getConditionalActions) {
+        // ============================================================
+        // PRIORITAS: Gunakan row data dari backend terlebih dahulu
+        // Backend mengembalikan CanEdit, CanDelete, CanReturn, CanPost
+        // ============================================================
+        if (row.canEdit !== undefined || row.canDelete !== undefined || 
+            row.canReturn !== undefined || row.canPost !== undefined) {
+          
+          // Gunakan flag dari row data
+          if (row.canEdit) visibleActions.push(ACTION_TYPES.EDIT);
+          if (row.canDelete) visibleActions.push(ACTION_TYPES.DELETE);
+          if (row.canReturn) visibleActions.push(ACTION_TYPES.RETURN);
+          if (row.canPost) visibleActions.push(ACTION_TYPES.POST_MAINTENANCE);
+          
+          // Jika tidak ada action yang tersedia, tampilkan View saja sebagai fallback
+          if (visibleActions.length === 0) {
+            visibleActions.push(ACTION_TYPES.VIEW);
+          }
+        } 
+        // ============================================================
+        // FALLBACK: Gunakan getConditionalActions jika disediakan
+        // ============================================================
+        else if (getConditionalActions) {
           visibleActions = getConditionalActions(row);
+        }
+        // ============================================================
+        // FALLBACK TERAKHIR: Gunakan actions default
+        // ============================================================
+        else {
+          visibleActions = actions.length > 0 ? actions : defaultActions;
         }
         
         if (!visibleActions || visibleActions.length === 0) {
           return null;
         }
 
-        const rowId = row[rowIdField] || row.id || row.assetId || row.employeeId;
+        const rowId = row[rowIdField] || row.id || row.assetId || row.employeeId || row.assetTransactionId;
         const isMenuOpen = menuOpen && selectedRow?.[rowIdField] === rowId;
         
         return (
@@ -133,7 +167,7 @@ export const useGridActions = ({
         );
       },
     };
-  }, [actions, getConditionalActions, rowIdField, anchorEl, menuOpen, selectedRow, handleMenuOpen, handleMenuClose, handleActionClick]);
+  }, [actions, defaultActions, getConditionalActions, rowIdField, anchorEl, menuOpen, selectedRow, handleMenuOpen, handleMenuClose, handleActionClick]);
 
   return { actionColumn };
 };

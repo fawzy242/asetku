@@ -1,3 +1,4 @@
+// src/pages/AssetTransactions/AssetTransactions.jsx
 import React from 'react';
 import AssetTransactionsMenu from './AssetTransactions.menu';
 import './AssetTransactions.scss';

@@ -1,3 +1,4 @@
+// src/pages/AssetTransactions/AssetTransactions.scss
 @use '../../styles/variables' as *;
 @use '../../styles/mixins' as *;
 
@@ -21,7 +22,5 @@
         &:last-child {
             margin-bottom: 0;
         }
-
-        
     }
 }

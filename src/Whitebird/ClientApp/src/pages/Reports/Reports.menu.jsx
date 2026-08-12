@@ -1,73 +1,66 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
-import { FiDownload, FiFileText, FiBox, FiUsers, FiTool, FiTrendingUp } from "react-icons/fi";
-import { Grid, Typography, Chip } from "@mui/material";
-import ReportsData from "./Reports.data";
-import Card from "../../components/atoms/Card/Card";
-import Button from "../../components/atoms/Button/Button";
-import Select from "../../components/atoms/Select/Select";
-import DatePickerInput from "../../components/atoms/Input/DatePickerInput";
-import Spinner from "../../components/atoms/Spinner/Spinner";
-import { useReferenceData } from "../../hooks/useReferenceData";
-import { useOptions } from "../../hooks/useOptions";
-import { useSweetAlert } from "../../hooks/useSweetAlert";
-import "./Reports.scss";
+// src/pages/Reports/Reports.menu.jsx
+import React, { useState, useCallback } from 'react';
+import { FiDownload, FiFileText, FiBox, FiUsers, FiTool, FiTrendingUp } from 'react-icons/fi';
+import { Grid, Typography, Chip } from '@mui/material';
+import ReportsData from './Reports.data';
+import Card from '../../components/atoms/Card/Card';
+import Button from '../../components/atoms/Button/Button';
+import Select from '../../components/atoms/Select/Select';
+import DatePickerInput from '../../components/atoms/Input/DatePickerInput';
+import Spinner from '../../components/atoms/Spinner/Spinner';
+import { useReferenceData } from '../../hooks/useReferenceData';
+import { useOptions } from '../../hooks/useOptions';
+import { useSweetAlert } from '../../hooks/useSweetAlert';
+import './Reports.scss';
 
 const reportsData = new ReportsData();
 
 const REPORT_TYPES = [
-  { id: "transactions", label: "Transaction Report", icon: <FiFileText />, description: "Export asset transaction history", hasDateRange: true, hasTransactionTypeFilter: true },
-  { id: "inventory", label: "Inventory Report", icon: <FiBox />, description: "Export current asset inventory", hasStatusFilter: true, hasCategoryFilter: true, hasSupplierFilter: true },
-  { id: "employee", label: "Employee Asset Report", icon: <FiUsers />, description: "Export assets assigned to employees", hasEmployeeFilter: true },
-  { id: "maintenance", label: "Maintenance Report", icon: <FiTool />, description: "Export maintenance history", hasDateRange: true },
-  { id: "financial", label: "Financial Report", icon: <FiTrendingUp />, description: "Export asset financial summary", hasDateRange: true },
+  { id: 'transactions', label: 'Transaction Report', icon: <FiFileText />, description: 'Export asset transaction history', hasDateRange: true, hasTransactionTypeFilter: true },
+  { id: 'inventory', label: 'Inventory Report', icon: <FiBox />, description: 'Export current asset inventory', hasStatusFilter: true, hasCategoryFilter: true, hasSupplierFilter: true },
+  { id: 'employee', label: 'Employee Asset Report', icon: <FiUsers />, description: 'Export assets assigned to employees', hasEmployeeFilter: true },
+  { id: 'maintenance', label: 'Maintenance Report', icon: <FiTool />, description: 'Export maintenance history', hasDateRange: true },
+  { id: 'financial', label: 'Financial Report', icon: <FiTrendingUp />, description: 'Export asset financial summary', hasDateRange: true },
 ];
 
 const INVENTORY_STATUS_OPTIONS = [
-  { value: "", label: "All Statuses" },
-  { value: "Available", label: "Available" },
-  { value: "Assigned", label: "Assigned" },
-  { value: "Damaged", label: "Damaged" },
+  { value: '', label: 'All Statuses' },
+  { value: 'Available', label: 'Available' },
+  { value: 'Assigned', label: 'Assigned' },
+  { value: 'Damaged', label: 'Damaged' },
 ];
 
 const TRANSACTION_TYPE_OPTIONS = [
-  { value: "", label: "All Types" },
-  { value: "HANDOVER", label: "HANDOVER" },
-  { value: "TRANSFER", label: "TRANSFER" },
-  { value: "LOAN", label: "LOAN" },
-  { value: "RETURN", label: "RETURN" },
-  { value: "LOAN_RETURN", label: "LOAN_RETURN" },
-  { value: "MAINTENANCE", label: "MAINTENANCE" },
-  { value: "POST_MAINTENANCE", label: "POST_MAINTENANCE" },
-  { value: "DISPOSAL", label: "DISPOSAL" },
+  { value: '', label: 'All Types' },
+  { value: 'HANDOVER', label: 'HANDOVER' },
+  { value: 'TRANSFER', label: 'TRANSFER' },
+  { value: 'LOAN', label: 'LOAN' },
+  { value: 'RETURN', label: 'RETURN' },
+  { value: 'LOAN_RETURN', label: 'LOAN_RETURN' },
+  { value: 'MAINTENANCE', label: 'MAINTENANCE' },
+  { value: 'POST_MAINTENANCE', label: 'POST_MAINTENANCE' },
+  { value: 'DISPOSAL', label: 'DISPOSAL' },
+  { value: 'OPERATIONAL_OFFICE', label: 'OPERATIONAL_OFFICE' },
 ];
 
 const ReportsMenu = () => {
-  const [selectedReport, setSelectedReport] = useState("transactions");
+  const [selectedReport, setSelectedReport] = useState('transactions');
   const [isExporting, setIsExporting] = useState(false);
-  const [dateRange, setDateRange] = useState({ startDate: "", endDate: "" });
-  const [statusFilter, setStatusFilter] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
-  const [supplierFilter, setSupplierFilter] = useState("");
-  const [transactionTypeFilter, setTransactionTypeFilter] = useState("");
-  const [employeeFilter, setEmployeeFilter] = useState("");
+  const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
+  const [statusFilter, setStatusFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState('');
+  const [employeeFilter, setEmployeeFilter] = useState('');
 
-  const { categories, suppliers, employees, isLoading: loadingRefData } = useReferenceData();
+  const { categories, suppliers, employees, isLoading } = useReferenceData();
   const { toast } = useSweetAlert();
-  const isMountedRef = useRef(true);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => { isMountedRef.current = false; };
-  }, []);
 
   const currentReport = REPORT_TYPES.find(r => r.id === selectedReport) || REPORT_TYPES[0];
 
-  const categoryOptions = useOptions(categories, "All Categories");
-  const supplierOptions = useOptions(suppliers, "All Suppliers");
-  const employeeOptions = useOptions(
-    employees.map(e => ({ value: e.value, label: e.label })),
-    "All Employees"
-  );
+  const categoryOptions = useOptions(categories, 'All Categories');
+  const supplierOptions = useOptions(suppliers, 'All Suppliers');
+  const employeeOptions = useOptions(employees, 'All Employees');
 
   const buildParams = useCallback(() => {
     const params = {};
@@ -89,30 +82,41 @@ const ReportsMenu = () => {
     let result = { success: false };
     try {
       switch (selectedReport) {
-        case "transactions": result = await reportsData.exportTransaction(params); break;
-        case "inventory": result = await reportsData.exportInventory(params); break;
-        case "employee": result = await reportsData.exportEmployee(params); break;
-        case "maintenance": result = await reportsData.exportMaintenance(params); break;
-        case "financial": result = await reportsData.exportFinancial(params); break;
-        default: break;
+        case 'transactions':
+          result = await reportsData.exportTransaction(params);
+          break;
+        case 'inventory':
+          result = await reportsData.exportInventory(params);
+          break;
+        case 'employee':
+          result = await reportsData.exportEmployee(params);
+          break;
+        case 'maintenance':
+          result = await reportsData.exportMaintenance(params);
+          break;
+        case 'financial':
+          result = await reportsData.exportFinancial(params);
+          break;
+        default:
+          break;
       }
-    } catch (error) {
-      toast.error("Failed to generate report. Please try again.");
+    } catch {
+      toast.error('Failed to generate report');
     }
     setIsExporting(false);
-    if (!result.success) toast.error("Failed to generate report. Please try again.");
+    if (!result.success) toast.error('Failed to generate report. Please try again.');
   };
 
   const resetFilters = () => {
-    setDateRange({ startDate: "", endDate: "" });
-    setStatusFilter("");
-    setCategoryFilter("");
-    setSupplierFilter("");
-    setTransactionTypeFilter("");
-    setEmployeeFilter("");
+    setDateRange({ startDate: '', endDate: '' });
+    setStatusFilter('');
+    setCategoryFilter('');
+    setSupplierFilter('');
+    setTransactionTypeFilter('');
+    setEmployeeFilter('');
   };
 
-  if (loadingRefData) {
+  if (isLoading) {
     return (
       <div className="reports-menu">
         <div className="page-header"><h1 className="page-title">Reports & Analytics</h1></div>
@@ -129,7 +133,11 @@ const ReportsMenu = () => {
           <Card title="Select Report Type">
             <div className="reports-menu__report-types">
               {REPORT_TYPES.map(report => (
-                <button key={report.id} className={`reports-menu__report-card ${selectedReport === report.id ? "reports-menu__report-card--active" : ""}`} onClick={() => setSelectedReport(report.id)}>
+                <button
+                  key={report.id}
+                  className={`reports-menu__report-card ${selectedReport === report.id ? 'reports-menu__report-card--active' : ''}`}
+                  onClick={() => setSelectedReport(report.id)}
+                >
                   <div className="reports-menu__report-icon">{report.icon}</div>
                   <div className="reports-menu__report-info">
                     <h3 className="reports-menu__report-label">{report.label}</h3>

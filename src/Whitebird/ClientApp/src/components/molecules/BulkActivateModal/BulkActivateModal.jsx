@@ -1,3 +1,4 @@
+// src/components/molecules/BulkActivateModal/BulkActivateModal.jsx
 import React, { useState } from "react";
 import { FiCheckSquare, FiAlertTriangle } from "react-icons/fi";
 import { Box, Typography, Chip } from "@mui/material";
@@ -17,6 +18,15 @@ const BulkActivateModal = ({
   const [isActivating, setIsActivating] = useState(false);
   const [activate, setActivate] = useState(true);
 
+  // Determine if we're activating or deactivating based on title
+  React.useEffect(() => {
+    if (title.toLowerCase().includes('deactivate')) {
+      setActivate(false);
+    } else {
+      setActivate(true);
+    }
+  }, [title]);
+
   const handleConfirm = async () => {
     if (selectedIds.length === 0) return;
     setIsActivating(true);
@@ -24,6 +34,15 @@ const BulkActivateModal = ({
     setIsActivating(false);
     onClose();
   };
+
+  // If no items selected, close modal
+  React.useEffect(() => {
+    if (isOpen && selectedIds.length === 0) {
+      onClose();
+    }
+  }, [isOpen, selectedIds, onClose]);
+
+  const actionText = activate ? 'Activate' : 'Deactivate';
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="md">
@@ -33,7 +52,7 @@ const BulkActivateModal = ({
         </div>
 
         <Typography variant="h6" className="bulk-activate-modal__title">
-          {activate ? "Activate" : "Deactivate"} {selectedIds.length} {itemName}?
+          {actionText} {selectedIds.length} {itemName}?
         </Typography>
 
         <Typography variant="body2" className="bulk-activate-modal__description">
@@ -75,7 +94,7 @@ const BulkActivateModal = ({
             onClick={handleConfirm}
             loading={isActivating}
           >
-            {activate ? "Yes, Activate" : "Yes, Deactivate"}
+            {actionText}
           </Button>
         </div>
       </div>

@@ -1,4 +1,5 @@
-import React, { useState, useCallback, createContext, useContext } from 'react';
+// src/components/molecules/ConfirmDialog/ConfirmDialog.jsx
+import React, { useCallback, createContext, useContext } from 'react';
 import { alertUtils, toastr } from '../../../lib/sweetAlert';
 
 // ============================================================
@@ -9,7 +10,6 @@ const ConfirmContext = createContext(null);
 export const useConfirm = () => {
   const context = useContext(ConfirmContext);
   if (!context) {
-    // Fallback: return function that uses SweetAlert2 directly
     return {
       show: (options) => alertUtils.confirm(options),
     };
@@ -32,7 +32,7 @@ export const ConfirmDialogProvider = ({ children }) => {
 };
 
 // ============================================================
-// STATIC API (Backward compatible)
+// STATIC API - FIXED: Gunakan toastr langsung
 // ============================================================
 class ConfirmDialog {
   static show(options = {}) {
@@ -55,11 +55,20 @@ class ConfirmDialog {
   static showError = (title, text) =>
     alertUtils.error(title, text);
 
+  // FIX: Gunakan toastr langsung dari sweetAlert
   static toast = {
-    success: (msg) => toastr.success(msg),
-    error: (msg) => toastr.error(msg),
-    info: (msg) => toastr.info(msg),
-    warn: (msg) => toastr.warning(msg),
+    success: (msg) => {
+      if (msg) toastr.success(msg);
+    },
+    error: (msg) => {
+      if (msg) toastr.error(msg);
+    },
+    info: (msg) => {
+      if (msg) toastr.info(msg);
+    },
+    warning: (msg) => {
+      if (msg) toastr.warning(msg);
+    },
   };
 
   static close = () => {};

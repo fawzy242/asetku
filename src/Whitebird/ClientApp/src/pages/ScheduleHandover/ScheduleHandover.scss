@@ -1,0 +1,8 @@
+// src/pages/ScheduleHandover/ScheduleHandover.scss
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+@use '../../styles/shared';
+
+.schedule-handover {
+    color: var(--text-primary);
+}

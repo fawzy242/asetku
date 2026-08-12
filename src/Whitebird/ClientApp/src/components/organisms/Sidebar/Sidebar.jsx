@@ -1,8 +1,10 @@
+// src/components/organisms/Sidebar/Sidebar.jsx
 import React, { useState, useEffect } from 'react';
-import { 
-  FiHome, FiBox, FiRefreshCw, FiUsers, FiFolder, FiBarChart2, 
-  FiChevronDown, FiChevronLeft, FiGrid, FiTruck, FiMapPin, 
-  FiMenu, FiCrosshair, FiUserCheck, FiDatabase, FiBriefcase 
+import {
+  FiHome, FiBox, FiRefreshCw, FiUsers, FiFolder, FiBarChart2,
+  FiChevronDown, FiChevronLeft, FiGrid, FiTruck, FiMapPin,
+  FiMenu, FiCrosshair, FiUserCheck, FiBriefcase, FiDatabase,
+  FiCalendar, FiArrowRight, FiArrowLeft, FiTool
 } from 'react-icons/fi';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.scss';
@@ -14,19 +16,38 @@ const menuItems = [
   { id: 'tracking', label: 'Asset Tracking', icon: FiCrosshair, path: '/tracking' },
   { id: 'employees', label: 'Employees', icon: FiUsers, path: '/employees' },
   { id: 'employee-summary', label: 'Employee Summary', icon: FiUserCheck, path: '/employee-summary' },
-  { 
-    id: 'master-data', 
-    label: 'Master Data', 
-    icon: FiFolder, 
-    path: null, 
+
+  // ============================================================
+  // MASTER DATA — TETAP ADA (tidak dihapus)
+  // ============================================================
+  {
+    id: 'master-data',
+    label: 'Master Data',
+    icon: FiFolder,
+    path: null,
     children: [
       { id: 'categories', label: 'Categories', icon: FiGrid, path: '/categories' },
       { id: 'suppliers', label: 'Suppliers', icon: FiTruck, path: '/suppliers' },
       { id: 'departments', label: 'Departments', icon: FiBriefcase, path: '/departments' },
       { id: 'offices', label: 'Offices', icon: FiMapPin, path: '/offices' },
-      { id: 'master-data-view', label: 'Master Data', icon: FiDatabase, path: '/master-data' },
     ]
   },
+
+  // ============================================================
+  // SCHEDULE — MENU BARU (3 child)
+  // ============================================================
+  {
+    id: 'schedule',
+    label: 'Schedule',
+    icon: FiCalendar,
+    path: null,
+    children: [
+      { id: 'schedule-handover', label: 'Handover', icon: FiArrowRight, path: '/schedule-handover' },
+      { id: 'schedule-return', label: 'Return', icon: FiArrowLeft, path: '/schedule-return' },
+      { id: 'schedule-maintenance', label: 'Maintenance', icon: FiTool, path: '/schedule-maintenance' },
+    ]
+  },
+
   { id: 'reports', label: 'Reports', icon: FiBarChart2, path: '/reports' },
 ];
 
@@ -59,10 +80,10 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
     });
   }, [activePath]);
 
-  const toggleExpand = (id) => setExpandedItems(prev => { 
-    const next = new Set(prev); 
-    next.has(id) ? next.delete(id) : next.add(id); 
-    return next; 
+  const toggleExpand = (id) => setExpandedItems(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
   });
 
   const handleToggle = () => {

@@ -1,0 +1,8 @@
+// src/pages/ScheduleReturn/ScheduleReturn.scss
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+@use '../../styles/shared';
+
+.schedule-return {
+    color: var(--text-primary);
+}

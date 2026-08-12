@@ -1,17 +1,19 @@
+// src/components/molecules/PostMaintenanceModalContent/PostMaintenanceModalContent.jsx
 import React from 'react';
 import { Box } from '@mui/material';
 import DatePickerInput from '../../atoms/Input/DatePickerInput';
 import Select from '../../atoms/Select/Select';
 import Input from '../../atoms/Input/Input';
+import NumberInput from '../../atoms/Input/NumberInput';
 import Button from '../../atoms/Button/Button';
 import './PostMaintenanceModalContent.scss';
 
 /**
  * Centralized Post Maintenance Modal Content component
- * 
+ *
  * @param {Object} props
  * @param {Object} props.transaction - Selected transaction
- * @param {Object} props.postData - Post maintenance form data
+ * @param {Object} props.postData - Post maintenance form data (completionDate, condition, notes, maintenanceCost)
  * @param {Function} props.onPostDataChange - Post data change handler
  * @param {Function} props.onSubmit - Submit handler
  * @param {Function} props.onCancel - Cancel handler
@@ -44,22 +46,31 @@ const PostMaintenanceModalContent = ({
           Type: {transaction?.transactionTypeName} | Maintenance Transaction
         </p>
       </Box>
-      
+
       <DatePickerInput
         label="Completion Date"
         value={postData.completionDate}
         onChange={(e) => handleChange('completionDate')(e.target.value)}
         required
       />
-      
+
       <Select
-        label="Condition After"
-        value={postData.conditionAfter}
-        onChange={(e) => handleChange('conditionAfter')(e.target.value)}
+        label="Condition" // FIX: Backend hanya punya "condition"
+        value={postData.condition}
+        onChange={(e) => handleChange('condition')(e.target.value)}
         options={conditionOptions}
         required
       />
-      
+
+      <NumberInput
+        label="Maintenance Cost"
+        value={postData.maintenanceCost}
+        onChange={(e) => handleChange('maintenanceCost')(e.target.value)}
+        prefix="Rp "
+        thousandSeparator
+        decimalScale={0}
+      />
+
       <Input
         label="Notes"
         value={postData.notes || ''}
@@ -67,7 +78,7 @@ const PostMaintenanceModalContent = ({
         multiline
         rows={2}
       />
-      
+
       <Box className="post-maintenance-modal-content__actions" sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
         <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
           Cancel

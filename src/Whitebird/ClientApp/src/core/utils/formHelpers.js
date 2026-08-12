@@ -1,13 +1,7 @@
-/**
- * Centralized form data transformation utilities
- * Untuk menghilangkan duplikasi transformFormData di berbagai pages
- */
+// src/core/utils/formHelpers.js
 
 /**
  * Clean nullable string fields (convert empty string to null)
- * @param {Object} data - Form data object
- * @param {string[]} fields - Array of field names to clean
- * @returns {Object} Cleaned data
  */
 export const cleanNullableStrings = (data, fields = []) => {
   const result = { ...data };
@@ -18,40 +12,27 @@ export const cleanNullableStrings = (data, fields = []) => {
   });
   return result;
 };
+
 /**
- * Clean nullable ID fields (convert empty string to null, parse string to int)
- * @param {Object} data - Form data object
- * @param {string[]} fields - Array of field names to clean
- * @returns {Object} Cleaned data
+ * Clean ID fields (convert to number or null)
  */
 export const cleanIdFields = (data, fields = []) => {
   const result = { ...data };
   fields.forEach(field => {
-    // Jika value adalah string kosong, undefined, atau null -> set ke null
     if (result[field] === '' || result[field] === undefined || result[field] === null) {
       result[field] = null;
-    } 
-    // Jika value adalah string angka -> parse ke integer
-    else if (typeof result[field] === 'string') {
+    } else if (typeof result[field] === 'string') {
       const parsed = parseInt(result[field], 10);
       result[field] = isNaN(parsed) ? null : parsed;
-    }
-    // Jika value sudah number, biarkan
-    else if (typeof result[field] === 'number') {
-      // sudah benar
-    }
-    // Selain itu (boolean, object, dll) -> null
-    else {
+    } else if (typeof result[field] !== 'number') {
       result[field] = null;
     }
   });
   return result;
 };
+
 /**
- * Clean nullable number fields (convert empty string to null, parse string to float)
- * @param {Object} data - Form data object
- * @param {string[]} fields - Array of field names to clean
- * @returns {Object} Cleaned data
+ * Clean number fields (convert to number or null)
  */
 export const cleanNumberFields = (data, fields = []) => {
   const result = { ...data };
@@ -67,10 +48,7 @@ export const cleanNumberFields = (data, fields = []) => {
 };
 
 /**
- * Clean nullable date fields (convert empty string to null)
- * @param {Object} data - Form data object
- * @param {string[]} fields - Array of field names to clean
- * @returns {Object} Cleaned data
+ * Clean date fields (convert empty string to null)
  */
 export const cleanDateFields = (data, fields = []) => {
   const result = { ...data };
@@ -82,51 +60,24 @@ export const cleanDateFields = (data, fields = []) => {
   return result;
 };
 
-/**
- * Clean boolean field (convert string 'true'/'false' to boolean)
- * @param {Object} data - Form data object
- * @param {string} field - Field name
- * @returns {Object} Cleaned data
- */
-export const cleanBooleanField = (data, field) => {
-  const result = { ...data };
-  if (result[field] === 'true' || result[field] === true) {
-    result[field] = true;
-  } else if (result[field] === 'false' || result[field] === false) {
-    result[field] = false;
-  } else {
-    result[field] = null;
-  }
-  return result;
-};
-
-/**
- * Comprehensive form cleaner for Assets
- * @param {Object} data - Asset form data
- * @returns {Object} Cleaned asset data
- */
+// ============================================================
+// ASSET
+// ============================================================
 export const cleanAssetFormData = (data) => {
   let result = cleanNullableStrings(data, [
     'brand', 'model', 'serialNumber', 'imei', 'macAddress',
     'hostname', 'ipAddress', 'invoiceNumber', 'notes'
   ]);
-  
-  result = cleanIdFields(result, [
-    'categoryId', 'supplierId', 'officeId', 'warrantyPeriod', 
-    'usefulLife', 'assetCondition', 'assetConditionPurchase'
-  ]);
-  
-  result = cleanNumberFields(result, ['purchasePrice', 'residualValue']);
-  result = cleanBooleanField(result, 'operasionalOffice');
-  
+  result = cleanIdFields(result, ['categoryId', 'supplierId', 'warrantyPeriod']);
+  result = cleanNumberFields(result, ['purchasePrice']);
+  // REMOVED: warrantyExpiryDate (response-only, not for create/update)
+  // REMOVED: operasionalOffice, officeId, residualValue, usefulLife, assetCondition
   return result;
 };
 
-/**
- * Comprehensive form cleaner for Employees
- * @param {Object} data - Employee form data
- * @returns {Object} Cleaned employee data
- */
+// ============================================================
+// EMPLOYEE
+// ============================================================
 export const cleanEmployeeFormData = (data) => {
   let result = cleanNullableStrings(data, ['address', 'phoneNumber', 'email']);
   result = cleanIdFields(result, ['departmentId', 'position', 'employmentStatus', 'officeId']);
@@ -134,80 +85,99 @@ export const cleanEmployeeFormData = (data) => {
   return result;
 };
 
-/**
- * Comprehensive form cleaner for Transactions
- * @param {Object} data - Transaction form data
- * @returns {Object} Cleaned transaction data
- */
+// ============================================================
+// TRANSACTION
+// ============================================================
 export const cleanTransactionFormData = (data) => {
-  let result = cleanNullableStrings(data, ['expectedReturnDate', 'notes', 'conditionBefore', 'maintenanceType']);
-  result = cleanIdFields(result, ['fromEmployeeId', 'toEmployeeId', 'toLocationId', 'fromAssetTransactionId']);
+  let result = cleanNullableStrings(data, ['expectedLoanReturnDate', 'notes']);
+  result = cleanIdFields(result, ['employeeId', 'officeId', 'fromAssetTransactionId']);
   result = cleanNumberFields(result, ['maintenanceCost']);
-  
+
   // Ensure assetId is number
   if (result.assetId === '' || result.assetId === null || result.assetId === undefined) {
     result.assetId = 0;
   } else if (typeof result.assetId === 'string') {
     result.assetId = parseInt(result.assetId, 10);
   }
-  
-  // Set default transaction date
-  if (!result.transactionDate) {
+
+  // Convert transactionDate to ISO string
+  if (result.transactionDate) {
+    if (typeof result.transactionDate === 'string' && result.transactionDate.length === 10) {
+      result.transactionDate = `${result.transactionDate}T00:00:00`;
+    }
+  } else {
     result.transactionDate = new Date().toISOString();
   }
-  
+
   return result;
 };
 
-/**
- * Comprehensive form cleaner for Offices
- * @param {Object} data - Office form data
- * @returns {Object} Cleaned office data
- */
+// ============================================================
+// TRANSACTION RETURN (Shortcut)
+// ============================================================
+export const cleanReturnFormData = (data) => {
+  let result = cleanNullableStrings(data, ['notes']);
+  // BACKEND: condition (not conditionAfter)
+  result = cleanIdFields(result, ['condition']);
+  return result;
+};
+
+// ============================================================
+// POST MAINTENANCE (Shortcut)
+// ============================================================
+export const cleanPostMaintenanceFormData = (data) => {
+  let result = cleanNullableStrings(data, ['notes']);
+  // BACKEND: condition (not conditionAfter)
+  result = cleanIdFields(result, ['condition']);
+  result = cleanNumberFields(result, ['maintenanceCost']);
+  return result;
+};
+
+// ============================================================
+// OFFICE
+// ============================================================
 export const cleanOfficeFormData = (data) => {
   let result = cleanNullableStrings(data, ['officeCode', 'city', 'address', 'phone']);
   result = cleanIdFields(result, ['officeType', 'parentOfficeId']);
   return result;
 };
 
-/**
- * Comprehensive form cleaner for Departments
- * @param {Object} data - Department form data
- * @returns {Object} Cleaned department data
- */
+// ============================================================
+// DEPARTMENT
+// ============================================================
 export const cleanDepartmentFormData = (data) => {
   return cleanNullableStrings(data, ['departmentCode', 'description']);
 };
 
-/**
- * Comprehensive form cleaner for Categories
- * @param {Object} data - Category form data
- * @returns {Object} Cleaned category data
- */
+// ============================================================
+// CATEGORY
+// ============================================================
 export const cleanCategoryFormData = (data) => {
   let result = cleanNullableStrings(data, ['categoryCode', 'description']);
   result = cleanIdFields(result, ['parentCategoryId']);
   return result;
 };
 
-/**
- * Comprehensive form cleaner for Suppliers
- * @param {Object} data - Supplier form data
- * @returns {Object} Cleaned supplier data
- */
+// ============================================================
+// SUPPLIER
+// ============================================================
 export const cleanSupplierFormData = (data) => {
   return cleanNullableStrings(data, ['contactPerson', 'phoneNumber', 'email', 'address']);
 };
 
+// ============================================================
+// EXPORT ALL
+// ============================================================
 export default {
   cleanNullableStrings,
   cleanIdFields,
   cleanNumberFields,
   cleanDateFields,
-  cleanBooleanField,
   cleanAssetFormData,
   cleanEmployeeFormData,
   cleanTransactionFormData,
+  cleanReturnFormData,
+  cleanPostMaintenanceFormData,
   cleanOfficeFormData,
   cleanDepartmentFormData,
   cleanCategoryFormData,

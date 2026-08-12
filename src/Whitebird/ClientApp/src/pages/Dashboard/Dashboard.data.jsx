@@ -1,42 +1,53 @@
-import DashboardApi from './Dashboard.api';
+// src/pages/Dashboard/Dashboard.data.js
+import apiClient from '../../core/api/apiClient';
 import BaseData from '../../core/services/BaseData';
 
 class DashboardData extends BaseData {
   constructor() {
-    super(DashboardApi);
+    super(apiClient.dashboard);
+    this.setEntityName('dashboard');
   }
 
   async fetchDashboardData() {
     try {
       const currentYear = new Date().getFullYear();
-      
-      // Gunakan Promise.all dengan error handling per request
+
       const results = await Promise.allSettled([
         this.api.getStats(),
         this.api.getMonthlyStats(currentYear),
         this.api.getCategoryBreakdown(),
         this.api.getRecentTransactions(10),
         this.api.getExpiredWarranty(),
-        this.api.getUpcomingMaintenance(),
-        this.api.getPendingApprovals(),
+        this.api.getScheduleStats(),
       ]);
-      
-      // Extract data dari results
-      const extractData = (result, defaultValue = []) => {
+
+      // Helper to extract data from ApiResponse
+      const extractData = (result, fallback = {}) => {
         if (result.status === 'fulfilled' && result.value?.data) {
-          return result.value.data;
+          const data = result.value.data;
+          // If data is ApiResponse with isSuccess
+          if (data.isSuccess !== undefined) {
+            return data.isSuccess ? (data.data || fallback) : fallback;
+          }
+          // If data is already the response
+          return data || fallback;
         }
-        return defaultValue;
+        return fallback;
       };
-      
+
+      // Helper to extract array data
+      const extractArray = (result, fallback = []) => {
+        const data = extractData(result, fallback);
+        return Array.isArray(data) ? data : fallback;
+      };
+
       const stats = extractData(results[0], {});
-      const monthlyStats = extractData(results[1], []);
-      const categoryBreakdown = extractData(results[2], []);
-      const recentTransactions = extractData(results[3], []);
-      const expiredWarranty = extractData(results[4], []);
-      const upcomingMaintenance = extractData(results[5], []);
-      const pendingApprovals = extractData(results[6], []);
-      
+      const monthlyStats = extractArray(results[1], []);
+      const categoryBreakdown = extractArray(results[2], []);
+      const recentTransactions = extractArray(results[3], []);
+      const expiredWarranty = extractArray(results[4], []);
+      const scheduleStats = extractData(results[5], {});
+
       return {
         success: true,
         data: {
@@ -45,24 +56,21 @@ class DashboardData extends BaseData {
           categoryBreakdown,
           recentTransactions,
           expiredWarranty,
-          upcomingMaintenance,
-          pendingApprovals,
-        }
+          scheduleStats,
+        },
       };
     } catch (error) {
-      console.error('Dashboard data fetch error:', error);
-      return { 
-        success: false, 
-        error: 'Failed to load dashboard data',
+      console.error('Dashboard fetch error:', error);
+      return {
+        success: false,
         data: {
           stats: {},
           monthlyStats: [],
           categoryBreakdown: [],
           recentTransactions: [],
           expiredWarranty: [],
-          upcomingMaintenance: [],
-          pendingApprovals: [],
-        }
+          scheduleStats: {},
+        },
       };
     }
   }

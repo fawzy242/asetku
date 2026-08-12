@@ -1,8 +1,9 @@
+// src/lib/sweetAlert.js
 import Swal from 'sweetalert2';
 import toast from 'react-hot-toast';
 import 'sweetalert2/dist/sweetalert2.min.css';
 
-// SweetAlert2 default configuration with full theming
+// SweetAlert2 default configuration
 export const swal = Swal.mixin({
   customClass: {
     confirmButton: 'swal-confirm-btn',
@@ -17,15 +18,15 @@ export const swal = Swal.mixin({
   },
   buttonsStyling: false,
   reverseButtons: true,
-  // Blur effect sama seperti Modal component
   backdrop: `rgba(0, 0, 0, 0.6)`,
   allowOutsideClick: false,
   allowEscapeKey: true,
 });
 
-// Toast configuration (non-blocking notifications)
+// Toast configuration - FIX: Pastikan ini berfungsi
 export const toastr = {
   success: (message, options = {}) => {
+    if (!message) return;
     toast.success(message, {
       position: 'bottom-right',
       duration: 3000,
@@ -33,6 +34,7 @@ export const toastr = {
     });
   },
   error: (message, options = {}) => {
+    if (!message) return;
     toast.error(message, {
       position: 'bottom-right',
       duration: 4000,
@@ -40,6 +42,7 @@ export const toastr = {
     });
   },
   info: (message, options = {}) => {
+    if (!message) return;
     toast(message, {
       icon: 'ℹ️',
       position: 'bottom-right',
@@ -48,6 +51,7 @@ export const toastr = {
     });
   },
   warning: (message, options = {}) => {
+    if (!message) return;
     toast(message, {
       icon: '⚠️',
       position: 'bottom-right',
@@ -57,7 +61,7 @@ export const toastr = {
   },
 };
 
-// Alert utilities (blocking modals)
+// Alert utilities
 export const alertUtils = {
   confirm: async (options) => {
     const result = await swal.fire({

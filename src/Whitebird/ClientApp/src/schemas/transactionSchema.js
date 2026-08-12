@@ -1,4 +1,6 @@
+// src/core/schemas/transactionSchema.js
 import { z } from 'zod';
+import { TRANSACTION_TYPES } from '../constants/transactionTypes';
 
 const stringField = (max = 500, required = false) => {
   let schema = z.string().max(max, `Maximum ${max} characters`);
@@ -25,79 +27,72 @@ const datetimeField = (required = true) => {
 };
 
 export const transactionSchema = z.object({
-  // Required fields
+  // Required
   assetId: numberField(true),
   transactionType: numberField(true),
-  transactionDate: datetimeField(true),
-  
-  // Optional fields
-  fromEmployeeId: numberField(),
-  toEmployeeId: numberField(),
-  toLocationId: numberField(),
-  expectedReturnDate: dateField(),
-  actualReturnDate: dateField(),
+  transactionDate: datetimeField(true), // DATETIME
+
+  // Single employee & office
+  employeeId: numberField(),
+  officeId: numberField(),
+
+  // Renamed from expectedReturnDate
+  expectedLoanReturnDate: dateField(),
+
+  // Single condition (replaces conditionBefore / conditionAfter)
+  condition: numberField(),
+
   notes: stringField(),
-  conditionBefore: numberField(),
-  conditionAfter: numberField(),
   maintenanceType: numberField(),
   maintenanceCost: numberField(),
   fromAssetTransactionId: numberField(),
-  
-  // Conditional validation
 }).superRefine((data, ctx) => {
-  // LOAN requires expectedReturnDate
-  if (data.transactionType === 3 && !data.expectedReturnDate) {
+  const type = data.transactionType;
+
+  // LOAN requires expectedLoanReturnDate
+  if (type === TRANSACTION_TYPES.LOAN && !data.expectedLoanReturnDate) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ['expectedReturnDate'],
+      path: ['expectedLoanReturnDate'],
       message: 'Expected return date is required for LOAN',
     });
   }
-  
-  // LOAN_RETURN requires fromAssetTransactionId
-  if (data.transactionType === 5 && !data.fromAssetTransactionId) {
+
+  // HANDOVER / TRANSFER / LOAN require employeeId
+  if ([TRANSACTION_TYPES.HANDOVER, TRANSACTION_TYPES.TRANSFER, TRANSACTION_TYPES.LOAN].includes(type) && !data.employeeId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['employeeId'],
+      message: 'Employee is required for this transaction type',
+    });
+  }
+
+  // OPERATIONAL_OFFICE requires officeId
+  if (type === TRANSACTION_TYPES.OPERATIONAL_OFFICE && !data.officeId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['officeId'],
+      message: 'Office is required for OPERATIONAL OFFICE',
+    });
+  }
+
+  // LOAN_RETURN / POST_MAINTENANCE require fromAssetTransactionId
+  if ([TRANSACTION_TYPES.LOAN_RETURN, TRANSACTION_TYPES.POST_MAINTENANCE].includes(type) && !data.fromAssetTransactionId) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['fromAssetTransactionId'],
-      message: 'Paired transaction is required for LOAN_RETURN',
+      message: 'Paired transaction is required',
     });
   }
-  
-  // POST_MAINTENANCE requires fromAssetTransactionId
-  if (data.transactionType === 7 && !data.fromAssetTransactionId) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['fromAssetTransactionId'],
-      message: 'Paired transaction is required for POST_MAINTENANCE',
-    });
-  }
-  
-  // TRANSFER requires both from and to employee
-  if (data.transactionType === 2) {
-    if (!data.fromEmployeeId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['fromEmployeeId'],
-        message: 'From employee is required for TRANSFER',
-      });
-    }
-    if (!data.toEmployeeId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['toEmployeeId'],
-        message: 'To employee is required for TRANSFER',
-      });
-    }
-  }
-  
+
   // Expected return date must be after transaction date
-  if (data.expectedReturnDate && data.transactionDate) {
-    const expectedDate = new Date(data.expectedReturnDate);
-    const transDate = new Date(data.transactionDate);
-    if (expectedDate <= transDate) {
+  if (data.expectedLoanReturnDate && data.transactionDate) {
+    const expected = new Date(data.expectedLoanReturnDate);
+    const trans = new Date(data.transactionDate);
+    if (expected <= trans) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['expectedReturnDate'],
+        path: ['expectedLoanReturnDate'],
         message: 'Expected return date must be after transaction date',
       });
     }
@@ -105,5 +100,4 @@ export const transactionSchema = z.object({
 });
 
 export type TransactionFormData = z.infer<typeof transactionSchema>;
-
 export default transactionSchema;

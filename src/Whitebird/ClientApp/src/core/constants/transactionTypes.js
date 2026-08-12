@@ -1,12 +1,4 @@
-/**
- * CENTRALIZED TRANSACTION TYPE CONSTANTS
- * Single source of truth untuk semua transaction type options.
- * 
- * NOTE: Values are integers (FK to MasterData table in backend)
- * 
- * Usage:
- *   import { TRANSACTION_TYPE_OPTIONS, TRANSACTION_TYPES } from '../../core/constants/transactionTypes';
- */
+// src/core/constants/transactionTypes.js
 
 export const TRANSACTION_TYPES = {
   HANDOVER: 1,
@@ -17,126 +9,87 @@ export const TRANSACTION_TYPES = {
   MAINTENANCE: 6,
   POST_MAINTENANCE: 7,
   DISPOSAL: 8,
+  OPERATIONAL_OFFICE: 9,
 };
 
-/**
- * UPDATED: Transaction type options untuk dropdown/select.
- * REMOVED: RETURN, LOAN_RETURN, and POST_MAINTENANCE (only via shortcuts)
- */
-export const TRANSACTION_TYPE_OPTIONS = [
-  { value: "", label: "Select Type" },
-  { value: TRANSACTION_TYPES.HANDOVER, label: "HANDOVER (Company → Employee)" },
-  { value: TRANSACTION_TYPES.TRANSFER, label: "TRANSFER (Employee → Employee)" },
-  { value: TRANSACTION_TYPES.LOAN, label: "LOAN (Company → Employee)" },
-  { value: TRANSACTION_TYPES.MAINTENANCE, label: "MAINTENANCE" },
-  { value: TRANSACTION_TYPES.DISPOSAL, label: "DISPOSAL" },
-];
-
-/**
- * Transaction type options untuk filter dropdown (include all for filtering)
- */
-export const TRANSACTION_TYPE_FILTER_OPTIONS = [
-  { value: "", label: "All Types" },
-  { value: TRANSACTION_TYPES.HANDOVER, label: "Handover" },
-  { value: TRANSACTION_TYPES.TRANSFER, label: "Transfer" },
-  { value: TRANSACTION_TYPES.LOAN, label: "Loan" },
-  { value: TRANSACTION_TYPES.RETURN, label: "Return" },
-  { value: TRANSACTION_TYPES.LOAN_RETURN, label: "Loan Return" },
-  { value: TRANSACTION_TYPES.MAINTENANCE, label: "Maintenance" },
-  { value: TRANSACTION_TYPES.POST_MAINTENANCE, label: "Post-Maintenance" },
-  { value: TRANSACTION_TYPES.DISPOSAL, label: "Disposal" },
-];
-
-/**
- * Transaction types yang memerlukan PairedTransactionId (fromAssetTransactionId).
- */
-export const TRANSACTION_TYPES_REQUIRING_PAIR = [
-  TRANSACTION_TYPES.LOAN_RETURN,
-  TRANSACTION_TYPES.POST_MAINTENANCE,
-];
-
-/**
- * Transaction types yang membuat pairing (bisa dipilih sebagai pair source).
- */
-export const TRANSACTION_TYPES_CREATING_PAIR = [
-  TRANSACTION_TYPES.LOAN,
-  TRANSACTION_TYPES.MAINTENANCE,
-];
-
-/**
- * Transaction types yang memerlukan ToEmployeeId (penerima).
- */
-export const TRANSACTION_TYPES_REQUIRING_TO_EMPLOYEE = [
-  TRANSACTION_TYPES.HANDOVER,
-  TRANSACTION_TYPES.TRANSFER,
-  TRANSACTION_TYPES.LOAN,
-];
-
-/**
- * Transaction types yang memerlukan FromEmployeeId (pemberi).
- */
-export const TRANSACTION_TYPES_REQUIRING_FROM_EMPLOYEE = [
-  TRANSACTION_TYPES.TRANSFER,
-  TRANSACTION_TYPES.RETURN,
-  TRANSACTION_TYPES.LOAN_RETURN,
-];
-
-/**
- * Transaction types that can be returned via shortcut
- */
-export const TRANSACTION_TYPES_RETURNABLE = [
-  TRANSACTION_TYPES.HANDOVER,
-  TRANSACTION_TYPES.LOAN,
-  TRANSACTION_TYPES.MAINTENANCE,
-];
-
-/**
- * Transaction types that are primary (Grid 1)
- */
-export const TRANSACTION_TYPES_PRIMARY = [
+// ADD types (bisa dibuat manual via form)
+export const TRANSACTION_TYPE_ADD = [
   TRANSACTION_TYPES.HANDOVER,
   TRANSACTION_TYPES.TRANSFER,
   TRANSACTION_TYPES.LOAN,
   TRANSACTION_TYPES.MAINTENANCE,
   TRANSACTION_TYPES.DISPOSAL,
+  TRANSACTION_TYPES.OPERATIONAL_OFFICE,
 ];
 
-/**
- * Transaction types that are secondary (Grid 2 - from shortcuts)
- */
-export const TRANSACTION_TYPES_SECONDARY = [
+// RETURN types (hanya via shortcut)
+export const TRANSACTION_TYPE_RETURN = [
   TRANSACTION_TYPES.RETURN,
   TRANSACTION_TYPES.LOAN_RETURN,
   TRANSACTION_TYPES.POST_MAINTENANCE,
 ];
 
-/**
- * Helper: Get transaction type name from code
- */
+export const TRANSACTION_TYPE_OPTIONS = [
+  { value: '', label: 'Select Type' },
+  { value: TRANSACTION_TYPES.HANDOVER, label: 'HANDOVER' },
+  { value: TRANSACTION_TYPES.TRANSFER, label: 'TRANSFER' },
+  { value: TRANSACTION_TYPES.LOAN, label: 'LOAN' },
+  { value: TRANSACTION_TYPES.MAINTENANCE, label: 'MAINTENANCE' },
+  { value: TRANSACTION_TYPES.DISPOSAL, label: 'DISPOSAL' },
+  { value: TRANSACTION_TYPES.OPERATIONAL_OFFICE, label: 'OPERATIONAL OFFICE' },
+];
+
+export const TRANSACTION_TYPE_FILTER_OPTIONS = [
+  { value: '', label: 'All Types' },
+  ...TRANSACTION_TYPE_OPTIONS.filter(o => o.value !== ''),
+];
+
+export const TRANSACTION_TYPES_REQUIRING_EMPLOYEE = [
+  TRANSACTION_TYPES.HANDOVER,
+  TRANSACTION_TYPES.TRANSFER,
+  TRANSACTION_TYPES.LOAN,
+];
+
+export const TRANSACTION_TYPES_REQUIRING_OFFICE = [
+  TRANSACTION_TYPES.OPERATIONAL_OFFICE,
+];
+
+export const TRANSACTION_TYPES_REQUIRING_PAIR = [
+  TRANSACTION_TYPES.LOAN_RETURN,
+  TRANSACTION_TYPES.POST_MAINTENANCE,
+];
+
+export const TRANSACTION_TYPES_RETURNABLE = [
+  TRANSACTION_TYPES.HANDOVER,
+  TRANSACTION_TYPES.LOAN,
+];
+
 export const getTransactionTypeName = (code) => {
   const entry = Object.entries(TRANSACTION_TYPES).find(([_, value]) => value === code);
   return entry ? entry[0] : 'UNKNOWN';
 };
 
-/**
- * Helper: Get transaction type code from name
- */
-export const getTransactionTypeCode = (name) => {
-  return TRANSACTION_TYPES[name] || null;
+export const isPrimaryTransactionType = (code) => TRANSACTION_TYPE_ADD.includes(code);
+export const isSecondaryTransactionType = (code) => TRANSACTION_TYPE_RETURN.includes(code);
+
+// ============================================================
+// TRANSACTION TYPE COLORS (untuk Chip di grid)
+// ============================================================
+export const TRANSACTION_TYPE_COLORS = {
+  HANDOVER: { bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', label: 'Handover' },
+  TRANSFER: { bg: 'rgba(139, 92, 246, 0.15)', color: '#8b5cf6', label: 'Transfer' },
+  LOAN: { bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', label: 'Loan' },
+  RETURN: { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', label: 'Return' },
+  LOAN_RETURN: { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', label: 'Loan Return' },
+  MAINTENANCE: { bg: 'rgba(245, 158, 11, 0.15)', color: '#d97706', label: 'Maintenance' },
+  POST_MAINTENANCE: { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', label: 'Post Maintenance' },
+  DISPOSAL: { bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', label: 'Disposal' },
+  OPERATIONAL_OFFICE: { bg: 'rgba(139, 92, 246, 0.15)', color: '#8b5cf6', label: 'Operational Office' },
 };
 
-/**
- * Helper: Check if transaction type is primary
- */
-export const isPrimaryTransactionType = (code) => {
-  return TRANSACTION_TYPES_PRIMARY.includes(code);
-};
-
-/**
- * Helper: Check if transaction type is secondary
- */
-export const isSecondaryTransactionType = (code) => {
-  return TRANSACTION_TYPES_SECONDARY.includes(code);
+export const getTransactionTypeColor = (typeName) => {
+  if (!typeName) return { bg: 'rgba(107,114,128,0.1)', color: '#6b7280', label: 'Unknown' };
+  return TRANSACTION_TYPE_COLORS[typeName] || { bg: 'rgba(107,114,128,0.1)', color: '#6b7280', label: typeName };
 };
 
 export default TRANSACTION_TYPES;

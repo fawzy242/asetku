@@ -1,5 +1,7 @@
+// src/context/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
-import apiService from "../core/services/api.service";
+import apiService from "../core/services/api.service"; // FIX: Path yang benar
+import apiClient from "../core/api/apiClient"; // FIX: Path yang benar
 import utilsHelper from "../core/utils/utils.helper";
 import ConfirmDialog from "../components/molecules/ConfirmDialog/ConfirmDialog";
 
@@ -31,20 +33,18 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // NEW: Refresh user data from API
   const refreshUser = useCallback(async () => {
     const token = localStorage.getItem("whitebird_session_token");
     if (!token) return false;
     
     try {
-      const response = await apiService.get("/Auth/me");
+      const response = await apiClient.user.getMe();
       if (response.data?.isSuccess && response.data?.data) {
         const userData = response.data.data;
         
-        // Build profile photo URL
         const request = { scheme: window.location.protocol.replace(':', ''), host: window.location.host };
         const profilePhotoUrl = userData.userId 
-          ? `${request.scheme}://${request.host}/api/Auth/profile-photo/${userData.userId}`
+          ? `${request.scheme}://${request.host}/api/User/profile-photo`
           : null;
         
         const updatedUser = { ...userData, profilePhotoUrl };
@@ -107,10 +107,9 @@ export const AuthProvider = ({ children }) => {
       if (response.data?.isSuccess) {
         const { sessionToken, user: userData } = response.data.data;
         
-        // Build profile photo URL
         const request = { scheme: window.location.protocol.replace(':', ''), host: window.location.host };
         const profilePhotoUrl = userData.userId 
-          ? `${request.scheme}://${request.host}/api/Auth/profile-photo/${userData.userId}`
+          ? `${request.scheme}://${request.host}/api/User/profile-photo`
           : null;
         
         const userWithPhoto = { ...userData, profilePhotoUrl };
@@ -144,7 +143,7 @@ export const AuthProvider = ({ children }) => {
     login, 
     logout, 
     checkAuth,
-    refreshUser  // EXPORT refreshUser function
+    refreshUser
   };
   
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

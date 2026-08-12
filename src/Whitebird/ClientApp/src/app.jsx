@@ -1,3 +1,4 @@
+// app.jsx
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -25,10 +26,14 @@ const Categories = lazy(() => import('./pages/Categories/Categories'));
 const Suppliers = lazy(() => import('./pages/Suppliers/Suppliers'));
 const Departments = lazy(() => import('./pages/Departments/Departments'));
 const Offices = lazy(() => import('./pages/Offices/Offices'));
-const MasterData = lazy(() => import('./pages/MasterData/MasterData'));
 const Reports = lazy(() => import('./pages/Reports/Reports'));
 const Profile = lazy(() => import('./pages/Profile/Profile'));
 const NotFound = lazy(() => import('./pages/NotFound/NotFound'));
+
+// Schedule menus
+const ScheduleHandover = lazy(() => import('./pages/ScheduleHandover/ScheduleHandover'));
+const ScheduleReturn = lazy(() => import('./pages/ScheduleReturn/ScheduleReturn'));
+const ScheduleMaintenance = lazy(() => import('./pages/ScheduleMaintenance/ScheduleMaintenance'));
 
 const PageLoader = () => (
   <div className="app__loading" role="status" aria-label="Loading page">
@@ -84,9 +89,11 @@ const AppRoutes = () => (
       <Route path="suppliers" element={<LazyPage><Suppliers /></LazyPage>} />
       <Route path="departments" element={<LazyPage><Departments /></LazyPage>} />
       <Route path="offices" element={<LazyPage><Offices /></LazyPage>} />
-      <Route path="master-data" element={<LazyPage><MasterData /></LazyPage>} />
       <Route path="reports" element={<LazyPage><Reports /></LazyPage>} />
       <Route path="profile" element={<LazyPage><Profile /></LazyPage>} />
+      <Route path="schedule-handover" element={<LazyPage><ScheduleHandover /></LazyPage>} />
+      <Route path="schedule-return" element={<LazyPage><ScheduleReturn /></LazyPage>} />
+      <Route path="schedule-maintenance" element={<LazyPage><ScheduleMaintenance /></LazyPage>} />
     </Route>
     <Route path="/404" element={<LazyPage><NotFound /></LazyPage>} />
     <Route path="*" element={<Navigate to="/404" replace />} />

@@ -1,58 +1,102 @@
-import AssetsApi from './Assets.api';
+// src/pages/Assets/Assets.data.js
+import apiClient from '../../core/api/apiClient';
 import BaseData from '../../core/services/BaseData';
 import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
+import { handleSuccess, handleApiError } from '../../core/services';
 
 class AssetsData extends BaseData {
   constructor() {
-    super(AssetsApi);
+    super(apiClient.asset);
+    this.setEntityName('asset');
   }
 
+  /**
+   * Bulk activate or deactivate assets
+   */
   async bulkActivate(ids, activate) {
-    const confirmed = await ConfirmDialog.show({
-      title: activate ? 'Activate Assets' : 'Deactivate Assets',
-      text: `Are you sure you want to ${activate ? 'activate' : 'deactivate'} ${ids.length} asset(s)?`,
-      icon: 'warning',
-      confirmButtonText: activate ? 'Yes, Activate' : 'Yes, Deactivate',
-    });
-    if (!confirmed) return { success: false, cancelled: true };
-
+    const actionText = activate ? 'activate' : 'deactivate';
+    
     try {
-      const result = await this.api.bulkActivate(ids, activate);
-      if (result.isSuccess) {
-        ConfirmDialog.toast.success(`${result.data} asset(s) ${activate ? 'activated' : 'deactivated'} successfully`);
-        return { success: true };
+      const endpoint = activate ? this.api.activate : this.api.deactivate;
+      const result = await endpoint({ ids });
+      
+      if (result.data?.isSuccess !== undefined) {
+        if (!result.data.isSuccess) {
+          const errorMsg = result.data.errors?.join('\n') || result.data.message || `Failed to ${actionText}`;
+          ConfirmDialog.toast.error(errorMsg);
+          return { success: false };
+        }
+        
+        const count = result.data.data || ids.length;
+        handleSuccess({
+          operation: activate ? 'activate' : 'deactivate',
+          entityName: 'asset',
+          message: `${count} asset(s) ${actionText}d successfully`,
+          result: result.data,
+        });
+        
+        return { success: true, data: count };
       }
-      ConfirmDialog.toast.error(result.message || 'Failed');
-      return { success: false };
-    } catch {
-      ConfirmDialog.toast.error('Failed to process');
-      return { success: false };
+      
+      ConfirmDialog.toast.success(`${ids.length} asset(s) ${actionText}d successfully`);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.userMessage || error.message || `Failed to ${actionText}`,
+      };
     }
   }
 
+  /**
+   * Import assets from Excel file
+   */
   async importAssets(file) {
     try {
       const result = await this.api.import(file);
-      if (result.isSuccess && result.data) {
-        const importResult = result.data;
-        if (importResult.errorCount > 0) {
-          ConfirmDialog.toast.warning(`Import completed: ${importResult.successCount} success, ${importResult.errorCount} errors`);
+      
+      if (result.data?.isSuccess !== undefined) {
+        if (!result.data.isSuccess) {
+          const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Import failed';
+          ConfirmDialog.toast.error(errorMsg);
+          return { success: false };
+        }
+        
+        const importResult = result.data.data;
+        if (importResult?.errorCount > 0) {
+          ConfirmDialog.toast.warning(
+            `Import completed: ${importResult.successCount} success, ${importResult.errorCount} errors`
+          );
         } else {
-          ConfirmDialog.toast.success(`Import completed: ${importResult.successCount} assets imported successfully`);
+          handleSuccess({
+            operation: 'import',
+            entityName: 'asset',
+            message: `Import completed: ${importResult?.successCount || 0} assets imported successfully`,
+            result: result.data,
+          });
         }
         return { success: true, data: importResult };
       }
-      ConfirmDialog.toast.error(result.message || 'Import failed');
-      return { success: false };
-    } catch {
-      ConfirmDialog.toast.error('Failed to import');
-      return { success: false };
+      
+      ConfirmDialog.toast.success('Assets imported successfully');
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.userMessage || error.message || 'Failed to import',
+      };
     }
   }
 
+  /**
+   * Download import template
+   */
   async downloadTemplate() {
     try {
-      const blob = await this.api.downloadImportTemplate();
+      const blob = await this.api.getImportTemplate();
+      if (!(blob instanceof Blob) || blob.size === 0) {
+        throw new Error('Empty template');
+      }
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -63,12 +107,13 @@ class AssetsData extends BaseData {
       window.URL.revokeObjectURL(url);
       ConfirmDialog.toast.success('Template downloaded');
       return { success: true };
-    } catch {
-      ConfirmDialog.toast.error('Failed to download template');
+    } catch (error) {
+      ConfirmDialog.toast.error(error.message || 'Failed to download template');
       return { success: false };
     }
   }
 
+  // Override default messages
   getCreateMessage() { return 'Asset created successfully'; }
   getUpdateMessage() { return 'Asset updated successfully'; }
   getDeleteMessage() { return 'Asset deleted successfully'; }

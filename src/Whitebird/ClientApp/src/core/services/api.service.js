@@ -1,6 +1,7 @@
+// src/core/api/api.service.js
 import axios from 'axios';
-import toast from 'react-hot-toast';
 import { API_CONFIG } from '../constants/appConstants';
+import { handleApiError, shouldIgnoreError } from '../services/apiErrorHandler';
 
 class ApiService {
   constructor() {
@@ -8,7 +9,10 @@ class ApiService {
     this.instance = axios.create({
       baseURL: API_CONFIG.BASE_URL,
       timeout: API_CONFIG.TIMEOUT,
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json', 
+        'Accept': 'application/json' 
+      }
     });
     this.setupInterceptors();
   }
@@ -30,44 +34,35 @@ class ApiService {
     this.instance.interceptors.response.use(
       (response) => response,
       (error) => {
-        if (axios.isCancel(error)) {
-          // Request was cancelled, silently ignore
+        // Skip cancellation errors
+        if (axios.isCancel(error) || shouldIgnoreError(error)) {
           return Promise.reject(error);
         }
-        this.handleError(error);
-        return Promise.reject(error);
+
+        // Handle API error centrally
+        const handledError = handleApiError(error, {
+          showToast: true,
+        });
+
+        // Reject with enriched error
+        return Promise.reject({
+          ...error,
+          handled: handledError.handled,
+          userMessage: handledError.message,
+          status: handledError.status,
+          apiData: handledError.data,
+        });
       }
     );
   }
 
   handleError(error) {
-    if (error.response) {
-      const { status, data } = error.response;
-      switch (status) {
-        case 401:
-          localStorage.removeItem(API_CONFIG.SESSION_TOKEN_KEY);
-          localStorage.removeItem('user');
-          if (window.location.pathname !== '/login') {
-            window.location.href = '/login';
-          }
-          toast.error('Session expired. Please login again.');
-          break;
-        case 403:
-          toast.error('Access denied.');
-          break;
-        case 500:
-          toast.error('Server error. Please try again later.');
-          break;
-        default:
-          if (data?.errors?.length > 0) {
-            toast.error(data.errors.join('\n'));
-          } else if (data?.message) {
-            toast.error(data.message);
-          }
-      }
-    } else if (error.request) {
-      toast.error('Network error. Please check your connection.');
+    // This method is kept for backward compatibility
+    // but actual handling is done in interceptors
+    if (error.handled) {
+      return error.userMessage;
     }
+    return error.response?.data?.message || error.message || 'An unexpected error occurred';
   }
 
   cancelPendingRequest(key) {
@@ -88,7 +83,6 @@ class ApiService {
     const controller = new AbortController();
     const requestKey = `GET:${url}:${JSON.stringify(config.params || {})}`;
     
-    // Cancel previous request with same key
     this.cancelPendingRequest(requestKey);
     this.pendingRequests.set(requestKey, controller);
 

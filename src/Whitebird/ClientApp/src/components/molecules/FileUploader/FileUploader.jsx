@@ -1,47 +1,70 @@
+// src/components/molecules/FileUploader/FileUploader.jsx
 import React, { useState, useCallback } from 'react';
 import { FiUpload, FiX, FiImage, FiFile, FiTrash2, FiStar, FiEye } from 'react-icons/fi';
 import { Box, Chip, LinearProgress, IconButton, Typography, Dialog, DialogContent, IconButton as MuiIconButton } from '@mui/material';
 import apiService from '../../../core/services/api.service';
 import ConfirmDialog from '../ConfirmDialog/ConfirmDialog';
+import { handleSuccess } from '../../../core/services/successHandler';
 import './FileUploader.scss';
 
+/**
+ * Generic File Uploader Component
+ * 
+ * @param {Object} props
+ * @param {string} props.uploadEndpoint - API endpoint for upload (e.g., "/Asset/1/photo")
+ * @param {number} props.referenceId - Reference ID for the entity (optional, for delete)
+ * @param {Function} props.onUploadComplete - Callback after upload
+ * @param {Function} props.onFileDeleted - Callback after file deleted
+ * @param {number} props.maxFiles - Maximum number of files
+ * @param {Array} props.allowedTypes - Allowed MIME types
+ * @param {number} props.maxSizeMB - Maximum file size in MB
+ * @param {string} props.entityType - Entity type for messages (e.g., "asset", "employee")
+ * @param {boolean} props.disableDelete - Disable delete functionality
+ */
 const FileUploader = ({ 
-  referenceTable, 
+  uploadEndpoint,
   referenceId, 
   onUploadComplete, 
   onFileDeleted,
   maxFiles = 10,
-  allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/plain'],
-  maxSizeMB = 10
+  allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'],
+  maxSizeMB = 10,
+  entityType = 'record',
+  disableDelete = false
 }) => {
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
 
   const fetchFiles = useCallback(async () => {
-    if (!referenceId) return;
+    if (!referenceId || !uploadEndpoint) {
+      setFiles([]);
+      return;
+    }
     setLoading(true);
     try {
-      const response = await apiService.get(`/FileAttachment/reference/${referenceTable}/${referenceId}`);
+      const basePath = uploadEndpoint.split('/').slice(0, -1).join('/');
+      const response = await apiService.get(`${basePath}/attachments`);
       if (response.data?.isSuccess) {
         setFiles(response.data.data || []);
       }
     } catch (error) {
-      console.error('Failed to fetch files:', error);
+      console.warn('Failed to fetch files:', error);
+      setFiles([]);
     } finally {
       setLoading(false);
     }
-  }, [referenceTable, referenceId]);
+  }, [referenceId, uploadEndpoint]);
 
   React.useEffect(() => {
-    if (referenceId) {
+    if (referenceId && uploadEndpoint) {
       fetchFiles();
     }
-  }, [referenceId, fetchFiles]);
+  }, [referenceId, uploadEndpoint, fetchFiles]);
 
   const handleFileSelect = useCallback(async (event) => {
     const selectedFiles = Array.from(event.target.files);
@@ -61,6 +84,11 @@ const FileUploader = ({
       }
     }
 
+    if (!uploadEndpoint) {
+      ConfirmDialog.toast.error('Upload endpoint not available. Please save the record first.');
+      return;
+    }
+
     setUploading(true);
     setUploadProgress(0);
 
@@ -68,11 +96,9 @@ const FileUploader = ({
       const file = selectedFiles[i];
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('fileCategory', 'Document');
-      formData.append('isPrimary', files.length === 0 && i === 0 ? 'true' : 'false');
 
       try {
-        const response = await apiService.post(`/FileAttachment/upload/${referenceTable}/${referenceId}`, formData, {
+        const response = await apiService.post(uploadEndpoint, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
           onUploadProgress: (progressEvent) => {
             const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -80,7 +106,11 @@ const FileUploader = ({
           },
         });
         if (response.data?.isSuccess) {
-          ConfirmDialog.toast.success(`Uploaded: ${file.name}`);
+          handleSuccess({
+            operation: 'upload',
+            entityName: 'file',
+            message: `Uploaded: ${file.name}`,
+          });
         }
       } catch (error) {
         ConfirmDialog.toast.error(`Failed to upload: ${file.name}`);
@@ -92,9 +122,14 @@ const FileUploader = ({
     setUploadProgress(0);
     fetchFiles();
     if (onUploadComplete) onUploadComplete();
-  }, [files.length, maxFiles, allowedTypes, maxSizeMB, referenceTable, referenceId, fetchFiles, onUploadComplete]);
+  }, [files.length, maxFiles, allowedTypes, maxSizeMB, uploadEndpoint, fetchFiles, onUploadComplete]);
 
   const handleDelete = useCallback(async (fileId, fileName) => {
+    if (disableDelete) {
+      ConfirmDialog.toast.warning('Delete is not available for this entity');
+      return;
+    }
+
     const confirmed = await ConfirmDialog.show({
       title: 'Delete File',
       text: `Are you sure you want to delete "${fileName}"?`,
@@ -115,7 +150,7 @@ const FileUploader = ({
     } catch {
       ConfirmDialog.toast.error('Failed to delete');
     }
-  }, [fetchFiles, onFileDeleted]);
+  }, [fetchFiles, onFileDeleted, disableDelete]);
 
   const handleSetPrimary = useCallback(async (fileId) => {
     try {
@@ -129,7 +164,6 @@ const FileUploader = ({
     }
   }, [fetchFiles]);
 
-  // NEW: Handle preview
   const handlePreview = useCallback(async (file) => {
     setPreviewFile(file);
     setPreviewOpen(true);
@@ -162,42 +196,20 @@ const FileUploader = ({
   const getFileIcon = (mimeType, fileName) => {
     if (isImage(mimeType)) return <FiImage size={24} />;
     if (isPdf(mimeType)) return <FiFile size={24} />;
-    const extension = fileName?.split('.').pop()?.toLowerCase();
-    switch (extension) {
-      case 'doc':
-      case 'docx':
-        return <FiFile size={24} />;
-      case 'xls':
-      case 'xlsx':
-        return <FiFile size={24} />;
-      default:
-        return <FiFile size={24} />;
-    }
+    return <FiFile size={24} />;
   };
 
   const getFileTypeLabel = (mimeType, fileName) => {
     if (isImage(mimeType)) return 'Image';
     if (isPdf(mimeType)) return 'PDF';
-    const extension = fileName?.split('.').pop()?.toLowerCase();
-    switch (extension) {
-      case 'doc':
-      case 'docx':
-        return 'Word Document';
-      case 'xls':
-      case 'xlsx':
-        return 'Excel Spreadsheet';
-      case 'txt':
-        return 'Text File';
-      default:
-        return 'Document';
-    }
+    return 'Document';
   };
 
   if (!referenceId) {
     return (
       <Box className="file-uploader-placeholder">
         <Typography variant="body2" color="text.secondary">
-          Save the record first to enable file attachments
+          Save the {entityType} first to enable file attachments
         </Typography>
       </Box>
     );
@@ -214,7 +226,7 @@ const FileUploader = ({
             type="file"
             multiple
             onChange={handleFileSelect}
-            disabled={uploading}
+            disabled={uploading || !uploadEndpoint}
             accept={allowedTypes.join(',')}
             style={{ display: 'none' }}
           />
@@ -258,16 +270,17 @@ const FileUploader = ({
                     <FiStar size={16} />
                   </IconButton>
                 )}
-                <IconButton size="small" onClick={() => handleDelete(file.fileAttachmentId, file.originalFileName)} title="Delete">
-                  <FiTrash2 size={16} />
-                </IconButton>
+                {!disableDelete && (
+                  <IconButton size="small" onClick={() => handleDelete(file.fileAttachmentId, file.originalFileName)} title="Delete">
+                    <FiTrash2 size={16} />
+                  </IconButton>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Preview Modal */}
       <Dialog
         open={previewOpen}
         onClose={handleClosePreview}
@@ -317,18 +330,6 @@ const FileUploader = ({
                   <Typography variant="body2" color="text.secondary">
                     Preview not available for this file type
                   </Typography>
-                  <Button
-                    variant="primary"
-                    onClick={() => {
-                      const link = document.createElement('a');
-                      link.href = previewUrl;
-                      link.download = previewFile.originalFileName;
-                      link.click();
-                    }}
-                    sx={{ mt: 2 }}
-                  >
-                    Download File
-                  </Button>
                 </Box>
               )}
             </Box>

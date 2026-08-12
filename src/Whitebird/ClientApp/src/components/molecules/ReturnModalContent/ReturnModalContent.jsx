@@ -1,3 +1,4 @@
+// src/components/molecules/ReturnModalContent/ReturnModalContent.jsx
 import React from 'react';
 import { Box } from '@mui/material';
 import DatePickerInput from '../../atoms/Input/DatePickerInput';
@@ -8,10 +9,10 @@ import './ReturnModalContent.scss';
 
 /**
  * Centralized Return Modal Content component
- * 
+ *
  * @param {Object} props
  * @param {Object} props.transaction - Selected transaction
- * @param {Object} props.returnData - Return form data
+ * @param {Object} props.returnData - Return form data (actualReturnDate, condition, notes)
  * @param {Function} props.onReturnDataChange - Return data change handler
  * @param {Function} props.onSubmit - Submit handler
  * @param {Function} props.onCancel - Cancel handler
@@ -41,25 +42,25 @@ const ReturnModalContent = ({
           Transaction ID: {transaction?.assetTransactionId}
         </p>
         <p className="return-modal-content__info-detail">
-          Type: {transaction?.transactionTypeName} | Holder: {transaction?.toEmployeeName || 'None'}
+          Type: {transaction?.transactionTypeName} | Holder: {transaction?.employeeName || 'None'}
         </p>
       </Box>
-      
+
       <DatePickerInput
         label="Actual Return Date"
         value={returnData.actualReturnDate}
         onChange={(e) => handleChange('actualReturnDate')(e.target.value)}
         required
       />
-      
+
       <Select
-        label="Condition After"
-        value={returnData.conditionAfter}
-        onChange={(e) => handleChange('conditionAfter')(e.target.value)}
+        label="Condition" // FIX: Backend hanya punya "condition"
+        value={returnData.condition}
+        onChange={(e) => handleChange('condition')(e.target.value)}
         options={conditionOptions}
         required
       />
-      
+
       <Input
         label="Notes"
         value={returnData.notes || ''}
@@ -67,7 +68,7 @@ const ReturnModalContent = ({
         multiline
         rows={2}
       />
-      
+
       <Box className="return-modal-content__actions" sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
         <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
           Cancel

@@ -1,3 +1,4 @@
+// src/components/molecules/DataTable/DataTable.jsx
 import React, { memo, useMemo, useState, useCallback, useEffect } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 import "./DataTable.scss";
@@ -50,11 +51,15 @@ const DataTable = memo(({
     }
     if (row?.id != null) return row.id;
     if (row?.assetId != null) return row.assetId;
+    if (row?.assetTransactionId != null) return row.assetTransactionId;
     if (row?.categoryId != null) return row.categoryId;
     if (row?.supplierId != null) return row.supplierId;
     if (row?.officeId != null) return row.officeId;
     if (row?.employeeId != null) return row.employeeId;
-    if (row?.assetTransactionId != null) return row.assetTransactionId;
+    if (row?.departmentId != null) return row.departmentId;
+    if (row?.scheduleHandoverId != null) return row.scheduleHandoverId;
+    if (row?.scheduleReturnId != null) return row.scheduleReturnId;
+    if (row?.scheduleMaintenanceId != null) return row.scheduleMaintenanceId;
     return `row-${Math.random().toString(36).substr(2, 9)}`;
   }, [getRowId]);
 
@@ -118,6 +123,7 @@ const DataTable = memo(({
       borderBottom: "1px solid var(--border)",
       color: "var(--text-primary)",
       fontSize: "0.875rem",
+      "&:focus, &:focus-within": { outline: "none" },
     },
     "& .MuiDataGrid-row:hover": {
       backgroundColor: "var(--table-row-hover)",
