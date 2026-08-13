@@ -193,12 +193,11 @@ public class ReportsReps : IReportsReps
             END as CurrentStatus,
             mdCondition.MasterDataName as AssetConditionName,
             mdPurchase.MasterDataName as AssetConditionPurchaseName,
-            o.OfficeName, c.CategoryName, s.SupplierName,
+            c.CategoryName, s.SupplierName,
             e.FullName as CurrentHolderName
         FROM Asset a
         LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
         LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
-        LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
         LEFT JOIN MasterData mdPurchase ON a.AssetConditionPurchase = mdPurchase.ReferenceCode AND mdPurchase.ReferenceName = 'AssetConditionPurchase' AND mdPurchase.IsActive = 1
         LEFT JOIN MasterData mdCondition ON at2.Condition = mdCondition.ReferenceCode AND mdCondition.ReferenceName = 'AssetCondition' AND mdCondition.IsActive = 1
         LEFT JOIN Employee e ON at2.EmployeeId = e.EmployeeId AND e.IsActive = 1
@@ -375,7 +374,7 @@ public class ReportsReps : IReportsReps
             SELECT 
                 a.AssetId, a.AssetCode, a.AssetName, a.PurchaseDate, a.PurchasePrice, a.InvoiceNumber,
                 a.WarrantyPeriod, a.WarrantyExpiryDate,
-                c.CategoryName, s.SupplierName, o.OfficeName,
+                c.CategoryName, s.SupplierName,
                 md.MasterDataName as AssetConditionPurchaseName,
                 CASE WHEN a.WarrantyExpiryDate < GETDATE() THEN 'Yes' ELSE 'No' END as IsWarrantyExpired,
                 (SELECT COUNT(*) FROM AssetTransaction WHERE AssetId = a.AssetId AND MaintenanceCost IS NOT NULL AND IsActive = 1) as MaintenanceCount,
@@ -384,7 +383,6 @@ public class ReportsReps : IReportsReps
             FROM Asset a
             LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
             LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
-            LEFT JOIN Office o ON a.OfficeId = o.OfficeId AND o.IsActive = 1
             LEFT JOIN MasterData md ON a.AssetConditionPurchase = md.ReferenceCode AND md.ReferenceName = 'AssetConditionPurchase' AND md.IsActive = 1
             {whereClause}
             ORDER BY a.PurchaseDate DESC, a.AssetCode";

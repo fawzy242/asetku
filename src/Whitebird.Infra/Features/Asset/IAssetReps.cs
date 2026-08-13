@@ -11,25 +11,25 @@ public interface IAssetReps
     // ============================================================
     // RAW ENTITY METHODS
     // ============================================================
-    
+
     Task<AssetEntity?> GetByIdRawAsync(int assetId);
     Task<bool> IsAssetCodeExistsAsync(string assetCode, int? excludeAssetId = null);
-    
+
     // ============================================================
     // DETAIL VIEW METHODS
     // ============================================================
-    
+
     Task<AssetDetailView?> GetDetailByIdAsync(int assetId);
     Task<IEnumerable<AssetListView>> GetAllListViewAsync();
     Task<IEnumerable<AssetListView>> GetByCategoryListViewAsync(int categoryId);
     Task<IEnumerable<AssetListView>> GetByHolderListViewAsync(int employeeId);
     Task<IEnumerable<AssetListView>> GetExpiredWarrantyListViewAsync();
     Task<IEnumerable<AssetListView>> GetByStatusListViewAsync(string status);
-    
+
     // ============================================================
     // COUNT METHODS
     // ============================================================
-    
+
     Task<int> GetTotalAssetsCountAsync();
     Task<int> GetAvailableAssetsCountAsync();
     Task<int> GetAssignedAssetsCountAsync();
@@ -42,23 +42,33 @@ public interface IAssetReps
     // ============================================================
     // PAGINATION
     // ============================================================
-    
+
     Task<PaginatedResult<AssetListView>> GetPagedListAsync(
         int page, int pageSize, string? search = null, string? sortBy = null,
         bool sortDescending = false, Dictionary<string, object>? filters = null);
-    
+
     // ============================================================
     // DROPDOWN
     // ============================================================
-    
+
     Task<IEnumerable<AssetDropdownView>> GetDropdownListByTransactionTypeAsync(int transactionType);
 
     // ============================================================
     // SOFTWARE INSTALLATION
     // ============================================================
-    
+
     Task<SoftwareInstallationEntity?> GetSoftwareInstallationByAssetIdAsync(int assetId);
     Task<int> InsertSoftwareInstallationAsync(SoftwareInstallationEntity entity);
     Task<int> UpdateSoftwareInstallationAsync(SoftwareInstallationEntity entity);
     Task<int> DeleteSoftwareInstallationByAssetIdAsync(int assetId);
+
+    // ============================================================
+    // ASSET ATTACHMENT (NEW)
+    // ============================================================
+
+    Task<int> InsertAttachmentAsync(AssetAttachmentEntity entity);
+    Task<IEnumerable<AssetAttachmentEntity>> GetAttachmentsByAssetIdAsync(int assetId);
+    Task<AssetAttachmentEntity?> GetAttachmentByIdAsync(int attachmentId);
+    Task<int> DeleteAttachmentAsync(int attachmentId);
+    Task<int> DeleteAttachmentsByAssetIdAsync(int assetId);
 }

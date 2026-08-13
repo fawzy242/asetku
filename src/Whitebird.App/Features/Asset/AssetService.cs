@@ -76,7 +76,7 @@ public class AssetService : BaseService, IAssetService
             if (software != null)
             {
                 asset.SoftwareInstallation = software.Adapt<SoftwareInstallationView>();
-                
+
                 if (software.OperatingSystem.HasValue)
                 {
                     var os = await _masterDataLookupService.GetPositionNameAsync(software.OperatingSystem.Value);
@@ -185,6 +185,8 @@ public class AssetService : BaseService, IAssetService
                 await _assetReps.InsertSoftwareInstallationAsync(softwareEntity);
             }
 
+            // CREATE MODE: NO FILE UPLOAD
+
             var created = await _assetReps.GetDetailByIdAsync(assetId);
 
             if (created != null)
@@ -202,7 +204,11 @@ public class AssetService : BaseService, IAssetService
         }, "create asset");
     }
 
-    public async Task<ServiceResult<AssetDetailView>> UpdateAsync(int id, AssetUpdateViewModel model)
+    // ============================================================
+    // UPDATE — Handle base64 file upload
+    // ============================================================
+
+    public async Task<ServiceResult<AssetDetailView>> UpdateAsync(int id, AssetUpdateFormDto model)
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
@@ -221,7 +227,25 @@ public class AssetService : BaseService, IAssetService
             var oldCode = existing.AssetCode;
             var oldName = existing.AssetName;
 
-            model.Adapt(existing);
+            // Map manual
+            existing.AssetCode = model.AssetCode;
+            existing.AssetName = model.AssetName;
+            existing.CategoryId = model.CategoryId;
+            existing.Brand = model.Brand;
+            existing.Model = model.Model;
+            existing.SerialNumber = model.SerialNumber;
+            existing.Imei = model.Imei;
+            existing.MacAddress = model.MacAddress;
+            existing.Hostname = model.Hostname;
+            existing.IpAddress = model.IpAddress;
+            existing.PurchaseDate = model.PurchaseDate;
+            existing.PurchasePrice = model.PurchasePrice;
+            existing.InvoiceNumber = model.InvoiceNumber;
+            existing.SupplierId = model.SupplierId;
+            existing.WarrantyPeriod = model.WarrantyPeriod;
+            existing.AssetConditionPurchase = model.AssetConditionPurchase;
+            existing.Notes = model.Notes;
+            existing.IsActive = model.IsActive;
             existing.ModifiedDate = DateTime.Now;
             existing.ModifiedBy = _currentUserService.GetDisplayName();
 
@@ -234,7 +258,7 @@ public class AssetService : BaseService, IAssetService
             if (model.SoftwareInstallation != null)
             {
                 var existingSoftware = await _assetReps.GetSoftwareInstallationByAssetIdAsync(id);
-                
+
                 if (existingSoftware != null)
                 {
                     model.SoftwareInstallation.Adapt(existingSoftware);
@@ -253,6 +277,58 @@ public class AssetService : BaseService, IAssetService
                 }
             }
 
+            // ============================================================
+            // HANDLE PHOTO PROFILE (base64)
+            // ============================================================
+            if (!string.IsNullOrEmpty(model.PhotoFileBase64))
+            {
+                // Delete existing photo
+                var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("AssetPhotoProfile", id);
+                if (existingPhotos.IsSuccess && existingPhotos.Data != null && existingPhotos.Data.Any())
+                {
+                    foreach (var photo in existingPhotos.Data)
+                    {
+                        await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
+                    }
+                }
+
+                // Convert base64 to file and upload
+                await AddPhotoProfileFromBase64Async(id, model.PhotoFileBase64, model.PhotoFileName ?? "photo.jpg");
+            }
+
+            // ============================================================
+            // HANDLE ATTACHMENTS (base64)
+            // ============================================================
+            if (model.ReplaceAttachments || (model.AttachmentFilesBase64 != null && model.AttachmentFilesBase64.Any()))
+            {
+                var existingAttachments = await _assetReps.GetAttachmentsByAssetIdAsync(id);
+                var keepIds = model.AttachmentIdsToKeep ?? new List<int>();
+
+                foreach (var att in existingAttachments)
+                {
+                    if (!keepIds.Contains(att.FileAttachmentId))
+                    {
+                        await _fileAttachmentService.DeleteAsync(att.FileAttachmentId);
+                        await _assetReps.DeleteAttachmentAsync(att.AssetAttachmentId);
+                    }
+                }
+
+                if (model.AttachmentFilesBase64 != null && model.AttachmentFilesBase64.Any())
+                {
+                    int order = existingAttachments.Count(a => keepIds.Contains(a.FileAttachmentId));
+                    for (int i = 0; i < model.AttachmentFilesBase64.Count; i++)
+                    {
+                        var base64 = model.AttachmentFilesBase64[i];
+                        var fileName = model.AttachmentFileNames?[i] ?? $"attachment_{i}.pdf";
+                        if (!string.IsNullOrEmpty(base64))
+                        {
+                            await AddAttachmentFromBase64Async(id, base64, fileName, order);
+                            order++;
+                        }
+                    }
+                }
+            }
+
             var updated = await _assetReps.GetDetailByIdAsync(id);
 
             await _activityLogService.LogUpdateAsync(
@@ -264,6 +340,10 @@ public class AssetService : BaseService, IAssetService
             return ServiceResult<AssetDetailView>.Success(updated!, "Asset updated successfully");
         }, "update asset");
     }
+
+    // ============================================================
+    // DELETE & SOFT DELETE
+    // ============================================================
 
     public async Task<ServiceResult> DeleteAsync(int id)
     {
@@ -338,7 +418,6 @@ public class AssetService : BaseService, IAssetService
 
             if (!string.IsNullOrEmpty(request.Status)) filters["status"] = request.Status;
             if (request.CategoryId.HasValue) filters["categoryId"] = request.CategoryId.Value;
-            if (request.OfficeId.HasValue) filters["officeId"] = request.OfficeId.Value;
             if (request.SupplierId.HasValue) filters["supplierId"] = request.SupplierId.Value;
             if (request.IsActive.HasValue) filters["isActive"] = request.IsActive.Value;
 
@@ -471,15 +550,6 @@ public class AssetService : BaseService, IAssetService
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("AssetPhotoProfile", assetId);
-            if (existingPhotos.IsSuccess && existingPhotos.Data != null && existingPhotos.Data.Any())
-            {
-                foreach (var photo in existingPhotos.Data)
-                {
-                    await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
-                }
-            }
-
             var subDirectory = Path.Combine("Asset", assetId.ToString(), "Profile");
             var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
             var fileHash = _storageService.ComputeFileHash(file);
@@ -506,6 +576,48 @@ public class AssetService : BaseService, IAssetService
 
             return ServiceResult.Success("Profile photo uploaded successfully");
         }, "add asset photo profile");
+    }
+
+    private async Task AddPhotoProfileFromBase64Async(int assetId, string base64String, string fileName)
+    {
+        var bytes = Convert.FromBase64String(base64String);
+        using var stream = new MemoryStream(bytes);
+        var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = GetContentType(fileName)
+        };
+        await AddPhotoProfileAsync(assetId, file);
+    }
+
+    private async Task AddAttachmentFromBase64Async(int assetId, string base64String, string fileName, int order)
+    {
+        var bytes = Convert.FromBase64String(base64String);
+        using var stream = new MemoryStream(bytes);
+        var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = GetContentType(fileName)
+        };
+        await AddAttachmentAsync(assetId, file, $"Attachment: {fileName}", order);
+    }
+
+    private string GetContentType(string fileName)
+    {
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        return ext switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".gif" => "image/gif",
+            ".pdf" => "application/pdf",
+            ".doc" => "application/msword",
+            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".xls" => "application/vnd.ms-excel",
+            ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".txt" => "text/plain",
+            _ => "application/octet-stream"
+        };
     }
 
     public async Task<ServiceResult> DeletePhotoProfileAsync(int assetId)
@@ -556,14 +668,135 @@ public class AssetService : BaseService, IAssetService
             }
 
             var primaryPhoto = existingPhotos.Data.FirstOrDefault(p => p.IsPrimary) ?? existingPhotos.Data.First();
-            var fileEntity = await _fileAttachmentService.GetByIdAsync(primaryPhoto.FileAttachmentId);
-            if (!fileEntity.IsSuccess || fileEntity.Data == null)
+
+            var fileResult = await _fileAttachmentService.GetByIdAsync(primaryPhoto.FileAttachmentId);
+            if (!fileResult.IsSuccess || fileResult.Data == null)
             {
-                return ServiceResult<byte[]>.NotFound("Profile photo not found");
+                return ServiceResult<byte[]>.NotFound("Profile photo file not found");
             }
 
-            var fileBytes = await _storageService.ReadFileAsync(fileEntity.Data.FilePath);
+            var fileBytes = await _storageService.ReadFileAsync(fileResult.Data.FilePath);
             return ServiceResult<byte[]>.Success(fileBytes);
         }, "get asset photo profile");
+    }
+
+    // ============================================================
+    // ASSET ATTACHMENT
+    // ============================================================
+
+    public async Task<ServiceResult<AssetAttachmentEntity>> AddAttachmentAsync(int assetId, IFormFile file, string? description = null, int order = 0)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return ServiceResult<AssetAttachmentEntity>.BadRequest("No file provided");
+        }
+
+        var asset = await _assetReps.GetByIdRawAsync(assetId);
+        if (asset == null)
+        {
+            return ServiceResult<AssetAttachmentEntity>.NotFound($"Asset with id {assetId} not found");
+        }
+
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!FileSizeConstants.IsAllowedAssetExtension(extension))
+        {
+            return ServiceResult<AssetAttachmentEntity>.BadRequest($"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedAssetExtensions)}");
+        }
+
+        if (file.Length > FileSizeConstants.MaxAssetAttachmentBytes)
+        {
+            return ServiceResult<AssetAttachmentEntity>.BadRequest($"File size exceeds {FileSizeConstants.MaxAssetAttachmentMB}MB limit");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var subDirectory = Path.Combine("Asset", assetId.ToString(), "Attachments");
+            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
+            var fileHash = _storageService.ComputeFileHash(file);
+
+            var uploadModel = new FileAttachmentUploadDto
+            {
+                File = file,
+                FileCategory = "AssetAttachment",
+                Description = description ?? $"Attachment for Asset {asset.AssetCode}",
+                IsPrimary = false
+            };
+
+            var fileResult = await _fileAttachmentService.UploadAsync("Asset", assetId, uploadModel);
+            if (!fileResult.IsSuccess || fileResult.Data == null)
+            {
+                return ServiceResult<AssetAttachmentEntity>.Failure("Failed to upload file");
+            }
+
+            var attachmentEntity = new AssetAttachmentEntity
+            {
+                AssetId = assetId,
+                FileAttachmentId = fileResult.Data.FileAttachmentId,
+                Order = order,
+                IsActive = true,
+                CreatedDate = DateTime.Now,
+                CreatedBy = _currentUserService.GetDisplayName()
+            };
+
+            var attachmentId = await _assetReps.InsertAttachmentAsync(attachmentEntity);
+            var created = await _assetReps.GetAttachmentByIdAsync(attachmentId);
+
+            await _activityLogService.LogCreateAsync(
+                TableNames.Asset,
+                assetId,
+                $"Attachment added for Asset '{asset.AssetCode}': {file.FileName}",
+                _currentUserService.GetDisplayName());
+
+            return ServiceResult<AssetAttachmentEntity>.Success(created!, "Attachment added successfully");
+        }, "add asset attachment");
+    }
+
+    public async Task<ServiceResult<IEnumerable<AssetAttachmentEntity>>> GetAttachmentsAsync(int assetId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var asset = await _assetReps.GetByIdRawAsync(assetId);
+            if (asset == null)
+            {
+                return ServiceResult<IEnumerable<AssetAttachmentEntity>>.NotFound($"Asset with id {assetId} not found");
+            }
+
+            var attachments = await _assetReps.GetAttachmentsByAssetIdAsync(assetId);
+            return ServiceResult<IEnumerable<AssetAttachmentEntity>>.Success(attachments);
+        }, "get asset attachments");
+    }
+
+    public async Task<ServiceResult> DeleteAttachmentAsync(int assetId, int attachmentId)
+    {
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var asset = await _assetReps.GetByIdRawAsync(assetId);
+            if (asset == null)
+            {
+                return ServiceResult.NotFound($"Asset with id {assetId} not found");
+            }
+
+            var attachment = await _assetReps.GetAttachmentByIdAsync(attachmentId);
+            if (attachment == null || attachment.AssetId != assetId)
+            {
+                return ServiceResult.NotFound($"Attachment with id {attachmentId} not found for asset {assetId}");
+            }
+
+            var fileResult = await _fileAttachmentService.DeleteAsync(attachment.FileAttachmentId);
+            if (!fileResult.IsSuccess)
+            {
+                return ServiceResult.Failure("Failed to delete file attachment");
+            }
+
+            await _assetReps.DeleteAttachmentAsync(attachmentId);
+
+            await _activityLogService.LogDeleteAsync(
+                TableNames.Asset,
+                assetId,
+                $"Attachment {attachmentId} deleted for Asset '{asset.AssetCode}'",
+                _currentUserService.GetDisplayName());
+
+            return ServiceResult.Success("Attachment deleted successfully");
+        }, "delete asset attachment");
     }
 }

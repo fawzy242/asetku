@@ -82,14 +82,6 @@ public class AssetImportService : ImportService<AssetImportDto, AssetEntity>
         }
         cache["Suppliers"] = supplierDict;
 
-        var officeDict = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var allOffices = await _officeReps.GetAllListViewAsync();
-        foreach (var o in allOffices)
-        {
-            officeDict[o.OfficeName] = o.OfficeId;
-        }
-        cache["Offices"] = officeDict;
-
         var conditionPurchaseCache = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var conditionPurchases = await _masterDataService.GetAssetConditionPurchasesAsync();
         if (conditionPurchases.IsSuccess && conditionPurchases.Data != null)

@@ -47,11 +47,11 @@ public class FileAttachmentReps : IFileAttachmentReps
     {
         const string sql = @"
             INSERT INTO FileAttachment (
-                ReferenceTable, ReferenceId, FileCategory, FileName, OriginalFileName, 
+                FileCategory, FileName, OriginalFileName, 
                 FileExtension, FileMimeType, FilePath, FileSize, FileHash, Description, 
                 VersionNumber, IsPrimary, IsActive, CreatedDate, CreatedBy
             ) VALUES (
-                @ReferenceTable, @ReferenceId, @FileCategory, @FileName, @OriginalFileName,
+                @FileCategory, @FileName, @OriginalFileName,
                 @FileExtension, @FileMimeType, @FilePath, @FileSize, @FileHash, @Description,
                 @VersionNumber, @IsPrimary, 1, GETDATE(), @CreatedBy
             );

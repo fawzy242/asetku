@@ -371,7 +371,7 @@ public class AssetReps : IAssetReps
     }
 
     // ============================================================
-    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
+    // PAGINATION
     // ============================================================
 
     public async Task<PaginatedResult<AssetListView>> GetPagedListAsync(
@@ -600,6 +600,51 @@ public class AssetReps : IAssetReps
             SET IsActive = 0, ModifiedDate = GETDATE() 
             WHERE AssetId = @AssetId";
 
+        return await _context.ExecuteAsync(sql, new { AssetId = assetId });
+    }
+
+    // ============================================================
+    // ASSET ATTACHMENT
+    // ============================================================
+
+    public async Task<int> InsertAttachmentAsync(AssetAttachmentEntity entity)
+    {
+        const string sql = @"
+            INSERT INTO AssetAttachment (
+                AssetId, FileAttachmentId, [Order], IsActive, CreatedDate, CreatedBy
+            ) VALUES (
+                @AssetId, @FileAttachmentId, @Order, 1, GETDATE(), @CreatedBy
+            );
+            SELECT CAST(SCOPE_IDENTITY() AS INT);";
+
+        return await _context.ExecuteScalarAsync<int>(sql, entity);
+    }
+
+    public async Task<IEnumerable<AssetAttachmentEntity>> GetAttachmentsByAssetIdAsync(int assetId)
+    {
+        const string sql = @"
+            SELECT * FROM AssetAttachment 
+            WHERE AssetId = @AssetId AND IsActive = 1
+            ORDER BY [Order] ASC, CreatedDate DESC";
+
+        return await _context.QueryAsync<AssetAttachmentEntity>(sql, new { AssetId = assetId });
+    }
+
+    public async Task<AssetAttachmentEntity?> GetAttachmentByIdAsync(int attachmentId)
+    {
+        const string sql = "SELECT * FROM AssetAttachment WHERE AssetAttachmentId = @AttachmentId AND IsActive = 1";
+        return await _context.QueryFirstOrDefaultAsync<AssetAttachmentEntity>(sql, new { AttachmentId = attachmentId });
+    }
+
+    public async Task<int> DeleteAttachmentAsync(int attachmentId)
+    {
+        const string sql = "UPDATE AssetAttachment SET IsActive = 0, ModifiedDate = GETDATE() WHERE AssetAttachmentId = @AttachmentId";
+        return await _context.ExecuteAsync(sql, new { AttachmentId = attachmentId });
+    }
+
+    public async Task<int> DeleteAttachmentsByAssetIdAsync(int assetId)
+    {
+        const string sql = "UPDATE AssetAttachment SET IsActive = 0, ModifiedDate = GETDATE() WHERE AssetId = @AssetId";
         return await _context.ExecuteAsync(sql, new { AssetId = assetId });
     }
 }

@@ -1,6 +1,6 @@
 // src/pages/AssetTransactions/AssetTransactions.menu.jsx
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Grid, Chip, Box } from '@mui/material';
+import { Grid, Chip, Box, Typography } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import AssetTransactionsData from './AssetTransactions.data';
 import DataTable from '../../components/molecules/DataTable/DataTable';
@@ -22,7 +22,7 @@ import StatusChip from '../../components/atoms/StatusChip/StatusChip';
 import TransactionFilter from '../../components/molecules/TransactionFilter/TransactionFilter';
 import ReturnModalContent from '../../components/molecules/ReturnModalContent/ReturnModalContent';
 import PostMaintenanceModalContent from '../../components/molecules/PostMaintenanceModalContent/PostMaintenanceModalContent';
-import { FiUpload, FiCheckSquare, FiPlus } from 'react-icons/fi';
+import { FiUpload, FiCheckSquare, FiPlus, FiCheck, FiX, FiRotateCcw } from 'react-icons/fi';
 import {
   TRANSACTION_TYPE_OPTIONS,
   TRANSACTION_TYPES,
@@ -49,12 +49,25 @@ import './AssetTransactions.scss';
 const transactionsData = new AssetTransactionsData();
 transactionsData.transformFormData = cleanTransactionFormData;
 
-const TRANSACTION_TABS = [
+// ============================================================
+// TAB DEFINITIONS
+// ============================================================
+const MAIN_TABS = [
+  { id: 'monitoring', label: '📊 Monitoring' },
+  { id: 'management', label: '⚙️ Management' },
+];
+
+const MONITORING_SUB_TABS = [
+  { id: 'pending-approval', label: 'Pending Approval' },
+  { id: 'active-loans', label: 'Active Loans' },
+  { id: 'overdue-loans', label: 'Overdue Loans' },
+  { id: 'under-maintenance', label: 'Under Maintenance' },
+];
+
+const MANAGEMENT_SUB_TABS = [
   { id: 'approved', label: 'Approved' },
   { id: 'pending', label: 'Pending' },
   { id: 'rejected', label: 'Rejected' },
-  { id: 'active-loans', label: 'Active Loans' },
-  { id: 'overdue-loans', label: 'Overdue Loans' },
 ];
 
 const INITIAL_FORM_DATA = {
@@ -71,23 +84,27 @@ const INITIAL_FORM_DATA = {
   transactionDate: new Date().toISOString(),
 };
 
-const TABS_WITH_CHECKBOX = ['pending', 'approved'];
-
 const AssetTransactionsMenu = () => {
-  const [activeTab, setActiveTab] = useState('approved');
+  // ============================================================
+  // TAB STATE
+  // ============================================================
+  const [activeMainTab, setActiveMainTab] = useState('monitoring');
+  const [activeSubTab, setActiveSubTab] = useState('pending-approval');
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilterStart, setDateFilterStart] = useState('');
   const [dateFilterEnd, setDateFilterEnd] = useState('');
+
+  // ============================================================
+  // MODAL STATE
+  // ============================================================
   const [showImportModal, setShowImportModal] = useState(false);
-  const [showBulkActivateModalPrimary, setShowBulkActivateModalPrimary] = useState(false);
-  const [showBulkActivateModalSecondary, setShowBulkActivateModalSecondary] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showPostMaintenanceModal, setShowPostMaintenanceModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [isReturnSubmitting, setIsReturnSubmitting] = useState(false);
   const [isPostMaintenanceSubmitting, setIsPostMaintenanceSubmitting] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [importResult, setImportResult] = useState(null);
   const [returnData, setReturnData] = useState({
     actualReturnDate: new Date().toISOString().split('T')[0],
     condition: '',
@@ -108,6 +125,9 @@ const AssetTransactionsMenu = () => {
 
   const { employees, offices, assets: refAssets, conditions, maintenanceTypes } = useReferenceData();
 
+  // ============================================================
+  // CRUD FORM
+  // ============================================================
   const {
     showModal,
     editingRecord: editingTransaction,
@@ -122,9 +142,13 @@ const AssetTransactionsMenu = () => {
     idField: 'assetTransactionId',
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['monitoring'] });
     },
   });
 
+  // ============================================================
+  // BULK SELECTION — MANAGEMENT TAB
+  // ============================================================
   const {
     selectedRowIds: selectedPrimaryIds,
     selectionCount: primarySelectionCount,
@@ -143,69 +167,163 @@ const AssetTransactionsMenu = () => {
     getSelectedIds: getSecondarySelectedIds,
   } = useBulkSelection({ idField: 'assetTransactionId' });
 
-  const showCheckbox = TABS_WITH_CHECKBOX.includes(activeTab);
-
-  const buildFilters = useCallback(() => {
+  // ============================================================
+  // MONITORING TAB — GRID DATA
+  // ============================================================
+  const fetchMonitoringData = useCallback(async (params) => {
     const filters = {};
-    if (activeTab === 'active-loans' || activeTab === 'overdue-loans') return filters;
-    if (activeTab === 'pending') filters.approved = null;
-    else if (activeTab === 'approved') filters.approved = true;
-    else if (activeTab === 'rejected') filters.approved = false;
+    if (searchTerm) filters.search = searchTerm;
+    if (dateFilterStart) filters.startDate = dateFilterStart;
+    if (dateFilterEnd) filters.endDate = dateFilterEnd;
+
+    const requestParams = {
+      page: params.page || 1,
+      pageSize: params.pageSize || 10,
+      ...filters,
+      ...params,
+    };
+
+    let result;
+    switch (activeSubTab) {
+      case 'pending-approval':
+        result = await transactionsData.api.getGridPendingApproval(requestParams);
+        break;
+      case 'active-loans':
+        result = await transactionsData.api.getActiveLoans(requestParams);
+        break;
+      case 'overdue-loans':
+        result = await transactionsData.api.getOverdueLoans(requestParams);
+        break;
+      case 'under-maintenance':
+        result = await transactionsData.api.getUnderMaintenance(requestParams);
+        break;
+      default:
+        result = await transactionsData.api.getGridPendingApproval(requestParams);
+    }
+
+    return {
+      success: true,
+      data: {
+        data: result.data?.data || [],
+        totalCount: result.data?.totalCount || 0,
+      },
+    };
+  }, [activeSubTab, searchTerm, dateFilterStart, dateFilterEnd]);
+
+  const {
+    data: monitoringData,
+    totalCount: monitoringTotal,
+    loading: monitoringLoading,
+    page: monitoringPage,
+    setPage: setMonitoringPage,
+    pageSize: monitoringPageSize,
+    setPageSize: setMonitoringPageSize,
+    reload: reloadMonitoring,
+  } = useGridData(['monitoring', activeSubTab, searchTerm, dateFilterStart, dateFilterEnd], fetchMonitoringData);
+
+  // ============================================================
+  // MANAGEMENT TAB — GRID DATA
+  // ============================================================
+  const buildManagementFilters = useCallback(() => {
+    const filters = {};
+    if (activeSubTab === 'pending') filters.approved = null;
+    else if (activeSubTab === 'approved') filters.approved = true;
+    else if (activeSubTab === 'rejected') filters.approved = false;
 
     if (searchTerm) filters.search = searchTerm;
     if (dateFilterStart) filters.startDate = dateFilterStart;
     if (dateFilterEnd) filters.endDate = dateFilterEnd;
     return filters;
-  }, [activeTab, searchTerm, dateFilterStart, dateFilterEnd]);
+  }, [activeSubTab, searchTerm, dateFilterStart, dateFilterEnd]);
 
-  const fetchGridData = useCallback(
+  const fetchManagementData = useCallback(
     async (params) => {
-      const filters = buildFilters();
+      const filters = buildManagementFilters();
+      const requestParams = {
+        page: params.page || 1,
+        pageSize: params.pageSize || 10,
+        ...filters,
+        ...params,
+      };
 
-      if (activeTab === 'active-loans') {
-        const result = await transactionsData.api.getActiveLoans({ ...params, ...filters });
-        return { success: true, data: { data: result.data?.data || [], totalCount: result.data?.totalCount || 0 } };
-      }
-      if (activeTab === 'overdue-loans') {
-        const result = await transactionsData.api.getOverdueLoans({ ...params, ...filters });
-        return { success: true, data: { data: result.data?.data || [], totalCount: result.data?.totalCount || 0 } };
-      }
-      if (activeTab === 'rejected') {
-        const result = await transactionsData.api.getGridPendingApproval({ ...params, ...filters, approved: false });
-        return { success: true, data: { data: result.data?.data || [], totalCount: result.data?.totalCount || 0 } };
-      }
-      if (activeTab === 'pending') {
-        const result = await transactionsData.api.getGridPendingApproval({ ...params, ...filters });
-        return { success: true, data: { data: result.data?.data || [], totalCount: result.data?.totalCount || 0 } };
-      }
-
-      const result = await transactionsData.api.getGridAdd({ ...params, ...filters });
-      return { success: true, data: { data: result.data?.data || [], totalCount: result.data?.totalCount || 0 } };
+      const result = await transactionsData.api.getGridAdd(requestParams);
+      return {
+        success: true,
+        data: {
+          data: result.data?.data || [],
+          totalCount: result.data?.totalCount || 0,
+        },
+      };
     },
-    [activeTab, buildFilters]
+    [buildManagementFilters]
   );
 
   const {
-    data: transactions,
-    totalCount,
-    loading,
-    page,
-    setPage,
-    pageSize,
-    setPageSize,
-    reload,
-  } = useGridData(['transactions', activeTab, searchTerm, dateFilterStart, dateFilterEnd], fetchGridData);
+    data: managementData,
+    totalCount: managementTotal,
+    loading: managementLoading,
+    page: managementPage,
+    setPage: setManagementPage,
+    pageSize: managementPageSize,
+    setPageSize: setManagementPageSize,
+    reload: reloadManagement,
+  } = useGridData(['management', activeSubTab, searchTerm, dateFilterStart, dateFilterEnd], fetchManagementData);
 
+  // ============================================================
+  // MANAGEMENT — SECONDARY GRID (RETURN types)
+  // ============================================================
+  const fetchManagementReturnData = useCallback(
+    async (params) => {
+      const filters = buildManagementFilters();
+      const requestParams = {
+        page: params.page || 1,
+        pageSize: params.pageSize || 10,
+        ...filters,
+        ...params,
+      };
+
+      const result = await transactionsData.api.getGridReturn(requestParams);
+      return {
+        success: true,
+        data: {
+          data: result.data?.data || [],
+          totalCount: result.data?.totalCount || 0,
+        },
+      };
+    },
+    [buildManagementFilters]
+  );
+
+  const {
+    data: managementReturnData,
+    totalCount: managementReturnTotal,
+    loading: managementReturnLoading,
+    page: managementReturnPage,
+    setPage: setManagementReturnPage,
+    pageSize: managementReturnPageSize,
+    setPageSize: setManagementReturnPageSize,
+    reload: reloadManagementReturn,
+  } = useGridData(['management-return', activeSubTab, searchTerm, dateFilterStart, dateFilterEnd], fetchManagementReturnData);
+
+  // ============================================================
+  // EFFECTS — RELOAD ON TAB CHANGE
+  // ============================================================
   useEffect(() => {
     isMountedRef.current = true;
-    setPage(1);
     clearPrimarySelection();
     clearSecondarySelection();
-    reload();
+    if (activeMainTab === 'monitoring') {
+      reloadMonitoring();
+    } else {
+      reloadManagement();
+      reloadManagementReturn();
+    }
     return () => { isMountedRef.current = false; };
-  }, [activeTab, reload, setPage, clearPrimarySelection, clearSecondarySelection]);
+  }, [activeMainTab, activeSubTab, reloadMonitoring, reloadManagement, reloadManagementReturn]);
 
-  // Fetch paired transaction options
+  // ============================================================
+  // FETCH PAIRED TRANSACTION OPTIONS
+  // ============================================================
   useEffect(() => {
     const type = parseInt(formData.transactionType);
     if (formData.assetId && TRANSACTION_TYPES_REQUIRING_PAIR.includes(type)) {
@@ -239,88 +357,129 @@ const AssetTransactionsMenu = () => {
     }
   }, [formData.transactionType, formData.assetId, setFormField]);
 
-  const handleSearch = useCallback(
-    (search) => {
-      setSearchTerm(search);
-      setPage(1);
-      clearPrimarySelection();
-      clearSecondarySelection();
-    },
-    [setPage, clearPrimarySelection, clearSecondarySelection]
-  );
+  // ============================================================
+  // HANDLERS — SEARCH & FILTER
+  // ============================================================
+  const handleSearch = useCallback((search) => {
+    setSearchTerm(search);
+    setMonitoringPage(1);
+    setManagementPage(1);
+    setManagementReturnPage(1);
+    clearPrimarySelection();
+    clearSecondarySelection();
+  }, [setMonitoringPage, setManagementPage, setManagementReturnPage, clearPrimarySelection, clearSecondarySelection]);
 
-  const handleDateFilterChange = useCallback(
-    (start, end) => {
-      setDateFilterStart(start);
-      setDateFilterEnd(end);
-      setPage(1);
-      clearPrimarySelection();
-      clearSecondarySelection();
-    },
-    [setPage, clearPrimarySelection, clearSecondarySelection]
-  );
+  const handleDateFilterChange = useCallback((start, end) => {
+    setDateFilterStart(start);
+    setDateFilterEnd(end);
+    setMonitoringPage(1);
+    setManagementPage(1);
+    setManagementReturnPage(1);
+    clearPrimarySelection();
+    clearSecondarySelection();
+  }, [setMonitoringPage, setManagementPage, setManagementReturnPage, clearPrimarySelection, clearSecondarySelection]);
 
-  // Bulk actions
-  const handleBulkApprove = useCallback(
-    async (ids, gridType = 'primary') => {
-      const confirmed = await confirm({
-        title: 'Approve Transactions',
-        text: `Are you sure you want to approve ${ids.length} transaction(s)?`,
-        confirmButtonText: 'Yes, Approve',
-      });
-      if (!confirmed) return;
-      const r = await transactionsData.bulkApprove(ids);
-      if (r.success && isMountedRef.current) {
-        toast.success(`${ids.length} transaction(s) approved`);
-        if (gridType === 'primary') clearPrimarySelection();
-        else clearSecondarySelection();
-        reload();
-      }
-    },
-    [reload, toast, confirm, clearPrimarySelection, clearSecondarySelection]
-  );
+  // ============================================================
+  // HANDLERS — COMPLETE / UNCOMPLETE
+  // ============================================================
+  const handleComplete = useCallback(async (id) => {
+    const confirmed = await confirm({
+      title: 'Complete Transaction',
+      text: 'Are you sure you want to complete this transaction? All required documents must be uploaded and approved.',
+      confirmButtonText: 'Yes, Complete',
+    });
+    if (!confirmed) return;
 
-  const handleBulkReject = useCallback(
-    async (ids, gridType = 'primary') => {
-      const confirmed = await confirm({
-        title: 'Reject Transactions',
-        text: `Are you sure you want to reject ${ids.length} transaction(s)?`,
-        icon: 'warning',
-        confirmButtonText: 'Yes, Reject',
-        confirmButtonColor: '#ef4444',
-      });
-      if (!confirmed) return;
-      const r = await transactionsData.bulkReject(ids);
-      if (r.success && isMountedRef.current) {
-        toast.success(`${ids.length} transaction(s) rejected`);
-        if (gridType === 'primary') clearPrimarySelection();
-        else clearSecondarySelection();
-        reload();
-      }
-    },
-    [reload, toast, confirm, clearPrimarySelection, clearSecondarySelection]
-  );
+    const r = await transactionsData.complete(id);
+    if (r.success && isMountedRef.current) {
+      toast.success('Transaction completed successfully');
+      reloadMonitoring();
+      reloadManagement();
+      reloadManagementReturn();
+    }
+  }, [reloadMonitoring, reloadManagement, reloadManagementReturn, toast, confirm]);
 
-  const handleBulkPending = useCallback(
-    async (ids, gridType = 'primary') => {
-      const confirmed = await confirm({
-        title: 'Move to Pending',
-        text: `Are you sure you want to move ${ids.length} transaction(s) back to pending?`,
-        confirmButtonText: 'Yes, Revert',
-      });
-      if (!confirmed) return;
-      const r = await transactionsData.bulkPending(ids);
-      if (r.success && isMountedRef.current) {
-        toast.success(`${ids.length} transaction(s) moved to pending`);
-        if (gridType === 'primary') clearPrimarySelection();
-        else clearSecondarySelection();
-        reload();
-      }
-    },
-    [reload, toast, confirm, clearPrimarySelection, clearSecondarySelection]
-  );
+  const handleUncomplete = useCallback(async (id) => {
+    const confirmed = await confirm({
+      title: 'Uncomplete Transaction',
+      text: 'Are you sure you want to uncomplete this transaction? This will revert it back to approved status.',
+      icon: 'warning',
+      confirmButtonText: 'Yes, Uncomplete',
+      confirmButtonColor: '#f59e0b',
+    });
+    if (!confirmed) return;
 
-  // Shortcuts
+    const r = await transactionsData.uncomplete(id);
+    if (r.success && isMountedRef.current) {
+      toast.success('Transaction uncompleted successfully');
+      reloadMonitoring();
+      reloadManagement();
+      reloadManagementReturn();
+    }
+  }, [reloadMonitoring, reloadManagement, reloadManagementReturn, toast, confirm]);
+
+  // ============================================================
+  // HANDLERS — BULK APPROVAL
+  // ============================================================
+  const handleBulkApprove = useCallback(async (ids, gridType = 'primary') => {
+    const confirmed = await confirm({
+      title: 'Approve Transactions',
+      text: `Are you sure you want to approve ${ids.length} transaction(s)?`,
+      confirmButtonText: 'Yes, Approve',
+    });
+    if (!confirmed) return;
+    const r = await transactionsData.bulkApprove(ids);
+    if (r.success && isMountedRef.current) {
+      toast.success(`${ids.length} transaction(s) approved`);
+      if (gridType === 'primary') clearPrimarySelection();
+      else clearSecondarySelection();
+      reloadManagement();
+      reloadManagementReturn();
+      reloadMonitoring();
+    }
+  }, [reloadManagement, reloadManagementReturn, reloadMonitoring, toast, confirm, clearPrimarySelection, clearSecondarySelection]);
+
+  const handleBulkReject = useCallback(async (ids, gridType = 'primary') => {
+    const confirmed = await confirm({
+      title: 'Reject Transactions',
+      text: `Are you sure you want to reject ${ids.length} transaction(s)?`,
+      icon: 'warning',
+      confirmButtonText: 'Yes, Reject',
+      confirmButtonColor: '#ef4444',
+    });
+    if (!confirmed) return;
+    const r = await transactionsData.bulkReject(ids);
+    if (r.success && isMountedRef.current) {
+      toast.success(`${ids.length} transaction(s) rejected`);
+      if (gridType === 'primary') clearPrimarySelection();
+      else clearSecondarySelection();
+      reloadManagement();
+      reloadManagementReturn();
+      reloadMonitoring();
+    }
+  }, [reloadManagement, reloadManagementReturn, reloadMonitoring, toast, confirm, clearPrimarySelection, clearSecondarySelection]);
+
+  const handleBulkPending = useCallback(async (ids, gridType = 'primary') => {
+    const confirmed = await confirm({
+      title: 'Move to Pending',
+      text: `Are you sure you want to move ${ids.length} transaction(s) back to pending?`,
+      confirmButtonText: 'Yes, Revert',
+    });
+    if (!confirmed) return;
+    const r = await transactionsData.bulkPending(ids);
+    if (r.success && isMountedRef.current) {
+      toast.success(`${ids.length} transaction(s) moved to pending`);
+      if (gridType === 'primary') clearPrimarySelection();
+      else clearSecondarySelection();
+      reloadManagement();
+      reloadManagementReturn();
+      reloadMonitoring();
+    }
+  }, [reloadManagement, reloadManagementReturn, reloadMonitoring, toast, confirm, clearPrimarySelection, clearSecondarySelection]);
+
+  // ============================================================
+  // HANDLERS — SHORTCUTS
+  // ============================================================
   const handleReturnShortcut = useCallback((tx) => {
     setSelectedTransaction(tx);
     setReturnData({
@@ -353,11 +512,13 @@ const AssetTransactionsMenu = () => {
     setIsReturnSubmitting(false);
     if (r.success && isMountedRef.current) {
       setShowReturnModal(false);
-      reload();
+      reloadMonitoring();
+      reloadManagement();
+      reloadManagementReturn();
       clearPrimarySelection();
       clearSecondarySelection();
     }
-  }, [selectedTransaction, isReturnSubmitting, returnData, reload, clearPrimarySelection, clearSecondarySelection]);
+  }, [selectedTransaction, isReturnSubmitting, returnData, reloadMonitoring, reloadManagement, reloadManagementReturn, clearPrimarySelection, clearSecondarySelection]);
 
   const handlePostMaintenanceSubmit = useCallback(async () => {
     if (!selectedTransaction || isPostMaintenanceSubmitting) return;
@@ -371,165 +532,343 @@ const AssetTransactionsMenu = () => {
     setIsPostMaintenanceSubmitting(false);
     if (r.success && isMountedRef.current) {
       setShowPostMaintenanceModal(false);
-      reload();
+      reloadMonitoring();
+      reloadManagement();
+      reloadManagementReturn();
       clearPrimarySelection();
       clearSecondarySelection();
     }
-  }, [selectedTransaction, isPostMaintenanceSubmitting, postMaintenanceData, reload, clearPrimarySelection, clearSecondarySelection]);
+  }, [selectedTransaction, isPostMaintenanceSubmitting, postMaintenanceData, reloadMonitoring, reloadManagement, reloadManagementReturn, clearPrimarySelection, clearSecondarySelection]);
 
+  // ============================================================
+  // HANDLERS — CRUD SUBMIT
+  // ============================================================
   const onSubmit = useCallback(async () => {
     const success = await crudHandleSubmit();
     if (success && isMountedRef.current) {
       toast.success(editingTransaction ? 'Transaction updated' : 'Transaction created (Pending approval)');
-      reload();
+      reloadManagement();
+      reloadManagementReturn();
+      reloadMonitoring();
       clearPrimarySelection();
       clearSecondarySelection();
     }
     return success;
-  }, [crudHandleSubmit, reload, toast, editingTransaction, clearPrimarySelection, clearSecondarySelection]);
+  }, [crudHandleSubmit, reloadManagement, reloadManagementReturn, reloadMonitoring, toast, editingTransaction, clearPrimarySelection, clearSecondarySelection]);
 
-  const handleTabChange = useCallback(
-    (tab) => {
-      setActiveTab(tab);
-      setPage(1);
-      setSearchTerm('');
-      setDateFilterStart('');
-      setDateFilterEnd('');
+  // ============================================================
+  // HANDLERS — TAB CHANGE
+  // ============================================================
+  const handleMainTabChange = useCallback((tab) => {
+    setActiveMainTab(tab);
+    setActiveSubTab(tab === 'monitoring' ? 'pending-approval' : 'approved');
+    setSearchTerm('');
+    setDateFilterStart('');
+    setDateFilterEnd('');
+    clearPrimarySelection();
+    clearSecondarySelection();
+    setMonitoringPage(1);
+    setManagementPage(1);
+    setManagementReturnPage(1);
+  }, [clearPrimarySelection, clearSecondarySelection, setMonitoringPage, setManagementPage, setManagementReturnPage]);
+
+  const handleSubTabChange = useCallback((tab) => {
+    setActiveSubTab(tab);
+    setSearchTerm('');
+    setDateFilterStart('');
+    setDateFilterEnd('');
+    clearPrimarySelection();
+    clearSecondarySelection();
+    setMonitoringPage(1);
+    setManagementPage(1);
+    setManagementReturnPage(1);
+  }, [clearPrimarySelection, clearSecondarySelection, setMonitoringPage, setManagementPage, setManagementReturnPage]);
+
+  // ============================================================
+  // HANDLERS — IMPORT
+  // ============================================================
+  const handleImport = useCallback(async (file) => {
+    setIsImporting(true);
+    const r = await transactionsData.importTransactions(file);
+    setIsImporting(false);
+    if (r.success && isMountedRef.current) {
+      setImportResult(r.data);
+      if (r.data.errorCount === 0) toast.success(`Import completed: ${r.data.successCount} transactions`);
+      else toast.warning(`Import completed: ${r.data.successCount} success, ${r.data.errorCount} errors`);
+      reloadManagement();
+      reloadManagementReturn();
+      reloadMonitoring();
       clearPrimarySelection();
       clearSecondarySelection();
-    },
-    [setPage, clearPrimarySelection, clearSecondarySelection]
-  );
-
-  const handleImport = useCallback(
-    async (file) => {
-      setIsImporting(true);
-      const r = await transactionsData.importTransactions(file);
-      setIsImporting(false);
-      if (r.success && isMountedRef.current) {
-        setImportResult(r.data);
-        if (r.data.errorCount === 0) toast.success(`Import completed: ${r.data.successCount} transactions`);
-        else toast.warning(`Import completed: ${r.data.successCount} success, ${r.data.errorCount} errors`);
-        reload();
-        clearPrimarySelection();
-        clearSecondarySelection();
-      }
-    },
-    [reload, toast, clearPrimarySelection, clearSecondarySelection]
-  );
+    }
+  }, [reloadManagement, reloadManagementReturn, reloadMonitoring, toast, clearPrimarySelection, clearSecondarySelection]);
 
   const handleDownloadTemplate = useCallback(async () => {
     await transactionsData.downloadTemplate();
   }, []);
 
-  // Grid actions
-  const getConditionalActions = useCallback(
-    (row) => {
-      const isPending = row.approved === null;
-      const isApproved = row.approved === true;
-      const isPrimary = isPrimaryTransactionType(row.transactionType);
-      const hasPair = row.fromAssetTransactionId !== null && row.fromAssetTransactionId !== undefined;
+  // ============================================================
+  // GRID ACTIONS — MONITORING
+  // ============================================================
+  const getMonitoringActions = useCallback((row) => {
+    const actions = [];
+    const isPending = row.approved === null;
+    const isApproved = row.approved === true;
+    const isCompleted = row.completed === true;
 
-      const actions = [];
-      if (isPending) {
-        actions.push(ACTION_TYPES.EDIT);
-        actions.push(ACTION_TYPES.DELETE);
-      }
-      if (isApproved) {
-        actions.push(ACTION_TYPES.EDIT);
-        actions.push(ACTION_TYPES.DELETE);
-        if (isPrimary && TRANSACTION_TYPES_RETURNABLE.includes(row.transactionType) && !hasPair) {
-          actions.push(ACTION_TYPES.RETURN);
-        }
-        if (isPrimary && row.transactionType === TRANSACTION_TYPES.MAINTENANCE && !hasPair) {
-          actions.push(ACTION_TYPES.POST_MAINTENANCE);
-        }
-      }
-      return actions;
-    },
-    []
-  );
+    // Jika pending, bisa edit dan delete
+    if (isPending && activeSubTab === 'pending-approval') {
+      actions.push(ACTION_TYPES.EDIT);
+      actions.push(ACTION_TYPES.DELETE);
+    }
 
-  const handleActionClick = useCallback(
-    (actionType, row) => {
-      if (actionType === ACTION_TYPES.EDIT) handleEdit(row);
-      else if (actionType === ACTION_TYPES.DELETE) {
-        confirmDelete('Cancel Transaction', `Cancel transaction for ${row.assetCode}?`).then(confirmed => {
-          if (confirmed) transactionsData.delete(row.assetTransactionId).then(() => {
-            toast.success('Transaction cancelled');
-            reload();
-            clearPrimarySelection();
-            clearSecondarySelection();
-          });
+    // Jika approved dan belum completed, bisa complete
+    if (isApproved && !isCompleted && activeSubTab === 'pending-approval') {
+      actions.push('complete');
+    }
+
+    // Jika sudah completed, bisa uncomplete
+    if (isCompleted && activeSubTab === 'pending-approval') {
+      actions.push('uncomplete');
+    }
+
+    return actions;
+  }, [activeSubTab]);
+
+  const handleMonitoringAction = useCallback((actionType, row) => {
+    if (actionType === ACTION_TYPES.EDIT) {
+      handleEdit(row);
+    } else if (actionType === ACTION_TYPES.DELETE) {
+      confirmDelete('Cancel Transaction', `Cancel transaction for ${row.assetCode}?`).then(confirmed => {
+        if (confirmed) transactionsData.delete(row.assetTransactionId).then(() => {
+          toast.success('Transaction cancelled');
+          reloadMonitoring();
+          reloadManagement();
+          reloadManagementReturn();
+          clearPrimarySelection();
+          clearSecondarySelection();
         });
-      } else if (actionType === ACTION_TYPES.RETURN) handleReturnShortcut(row);
-      else if (actionType === ACTION_TYPES.POST_MAINTENANCE) handlePostMaintenanceShortcut(row);
-    },
-    [handleEdit, confirmDelete, toast, reload, clearPrimarySelection, clearSecondarySelection, handleReturnShortcut, handlePostMaintenanceShortcut]
-  );
+      });
+    } else if (actionType === 'complete') {
+      handleComplete(row.assetTransactionId);
+    } else if (actionType === 'uncomplete') {
+      handleUncomplete(row.assetTransactionId);
+    }
+  }, [handleEdit, handleComplete, handleUncomplete, toast, reloadMonitoring, reloadManagement, reloadManagementReturn, clearPrimarySelection, clearSecondarySelection, confirmDelete]);
 
-  const { actionColumn } = useGridActions({
+  const { actionColumn: monitoringActionColumn } = useGridActions({
     actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
-    onAction: handleActionClick,
-    getConditionalActions,
+    onAction: handleMonitoringAction,
+    getConditionalActions: getMonitoringActions,
     rowIdField: 'assetTransactionId',
   });
 
-  const showEmployee = TRANSACTION_TYPES_REQUIRING_EMPLOYEE.includes(parseInt(formData.transactionType));
-  const showOffice = TRANSACTION_TYPES_REQUIRING_OFFICE.includes(parseInt(formData.transactionType));
-  const showPaired = TRANSACTION_TYPES_REQUIRING_PAIR.includes(parseInt(formData.transactionType));
-  const showMaintenance = parseInt(formData.transactionType) === TRANSACTION_TYPES.MAINTENANCE;
-  const showExpectedReturn = parseInt(formData.transactionType) === TRANSACTION_TYPES.LOAN;
+  // ============================================================
+  // GRID ACTIONS — MANAGEMENT
+  // ============================================================
+  const getManagementActions = useCallback((row) => {
+    const isPending = row.approved === null;
+    const isApproved = row.approved === true;
+    const isPrimary = isPrimaryTransactionType(row.transactionType);
+    const hasPair = row.fromAssetTransactionId !== null && row.fromAssetTransactionId !== undefined;
 
-  const employeeOptions = useOptions(employees, 'Select Employee');
-  const officeOptions = useOptions(offices, 'Select Office');
-  const conditionOptions = useOptions(conditions, 'Select Condition');
-  const maintenanceTypeOptions = useOptions(maintenanceTypes, 'Select Maintenance Type');
+    const actions = [];
+    if (isPending) {
+      actions.push(ACTION_TYPES.EDIT);
+      actions.push(ACTION_TYPES.DELETE);
+    }
+    if (isApproved) {
+      actions.push(ACTION_TYPES.EDIT);
+      actions.push(ACTION_TYPES.DELETE);
+      if (isPrimary && TRANSACTION_TYPES_RETURNABLE.includes(row.transactionType) && !hasPair && row.completed === true) {
+        actions.push(ACTION_TYPES.RETURN);
+      }
+      if (isPrimary && row.transactionType === TRANSACTION_TYPES.MAINTENANCE && !hasPair && row.completed === true) {
+        actions.push(ACTION_TYPES.POST_MAINTENANCE);
+      }
+    }
+    return actions;
+  }, []);
 
-  const filteredAssetOptions = useMemo(() => {
-    return [{ value: '', label: 'Select Asset' }, ...refAssets.map(a => ({ value: a.value, label: a.label }))];
-  }, [refAssets]);
+  const handleManagementAction = useCallback((actionType, row) => {
+    if (actionType === ACTION_TYPES.EDIT) handleEdit(row);
+    else if (actionType === ACTION_TYPES.DELETE) {
+      confirmDelete('Cancel Transaction', `Cancel transaction for ${row.assetCode}?`).then(confirmed => {
+        if (confirmed) transactionsData.delete(row.assetTransactionId).then(() => {
+          toast.success('Transaction cancelled');
+          reloadManagement();
+          reloadManagementReturn();
+          reloadMonitoring();
+          clearPrimarySelection();
+          clearSecondarySelection();
+        });
+      });
+    } else if (actionType === ACTION_TYPES.RETURN) handleReturnShortcut(row);
+    else if (actionType === ACTION_TYPES.POST_MAINTENANCE) handlePostMaintenanceShortcut(row);
+  }, [handleEdit, confirmDelete, toast, reloadManagement, reloadManagementReturn, reloadMonitoring, clearPrimarySelection, clearSecondarySelection, handleReturnShortcut, handlePostMaintenanceShortcut]);
 
-  const columns = useMemo(
-    () => [
-      {
-        field: 'transactionDate',
-        headerName: 'Date',
-        width: 180,
-        renderCell: (p) => {
-          const val = p?.row?.transactionDate ?? p?.value;
-          return val ? <span>{utilsHelper.formatDateTime(val)}</span> : <span className="u-text-muted">-</span>;
-        },
+  const { actionColumn: managementActionColumn } = useGridActions({
+    actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
+    onAction: handleManagementAction,
+    getConditionalActions: getManagementActions,
+    rowIdField: 'assetTransactionId',
+  });
+
+  // ============================================================
+  // GRID ACTIONS — MANAGEMENT RETURN
+  // ============================================================
+  const getManagementReturnActions = useCallback((row) => {
+    const isPending = row.approved === null;
+    const actions = [];
+    if (isPending) {
+      actions.push(ACTION_TYPES.EDIT);
+      actions.push(ACTION_TYPES.DELETE);
+    }
+    return actions;
+  }, []);
+
+  const handleManagementReturnAction = useCallback((actionType, row) => {
+    if (actionType === ACTION_TYPES.EDIT) handleEdit(row);
+    else if (actionType === ACTION_TYPES.DELETE) {
+      confirmDelete('Cancel Transaction', `Cancel transaction for ${row.assetCode}?`).then(confirmed => {
+        if (confirmed) transactionsData.delete(row.assetTransactionId).then(() => {
+          toast.success('Transaction cancelled');
+          reloadManagement();
+          reloadManagementReturn();
+          reloadMonitoring();
+          clearPrimarySelection();
+          clearSecondarySelection();
+        });
+      });
+    }
+  }, [handleEdit, confirmDelete, toast, reloadManagement, reloadManagementReturn, reloadMonitoring, clearPrimarySelection, clearSecondarySelection]);
+
+  const { actionColumn: managementReturnActionColumn } = useGridActions({
+    actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
+    onAction: handleManagementReturnAction,
+    getConditionalActions: getManagementReturnActions,
+    rowIdField: 'assetTransactionId',
+  });
+
+  // ============================================================
+  // COLUMN DEFINITIONS
+  // ============================================================
+  const baseColumns = [
+    {
+      field: 'transactionDate',
+      headerName: 'Date',
+      width: 180,
+      renderCell: (p) => {
+        const val = p?.row?.transactionDate ?? p?.value;
+        return val ? <span>{utilsHelper.formatDateTime(val)}</span> : <span className="u-text-muted">-</span>;
       },
+    },
+    {
+      field: 'assetCode',
+      headerName: 'Asset Code',
+      width: 120,
+      renderCell: (p) => <span>{p?.row?.assetCode ?? p?.value ?? '-'}</span>,
+    },
+    {
+      field: 'assetName',
+      headerName: 'Asset Name',
+      flex: 1,
+      minWidth: 160,
+      renderCell: (p) => <span>{p?.row?.assetName ?? p?.value ?? '-'}</span>,
+    },
+    {
+      field: 'transactionTypeName',
+      headerName: 'Type',
+      width: 150,
+      renderCell: (p) => {
+        const name = p?.row?.transactionTypeName ?? p?.value ?? '';
+        const colors = getTransactionTypeColor(name);
+        return <Chip label={colors.label} size="small" sx={{ bgcolor: colors.bg, color: colors.color, fontWeight: 500 }} />;
+      },
+    },
+    {
+      field: 'employeeName',
+      headerName: 'Employee',
+      width: 150,
+      renderCell: (p) => <span>{p?.row?.employeeName ?? p?.value ?? '-'}</span>,
+    },
+  ];
+
+  const monitoringColumns = useMemo(() => {
+    const statusColumns = [
       {
-        field: 'assetCode',
-        headerName: 'Asset Code',
+        field: 'approved',
+        headerName: 'Status',
         width: 120,
-        renderCell: (p) => <span>{p?.row?.assetCode ?? p?.value ?? '-'}</span>,
-      },
-      {
-        field: 'assetName',
-        headerName: 'Asset Name',
-        flex: 1,
-        minWidth: 160,
-        renderCell: (p) => <span>{p?.row?.assetName ?? p?.value ?? '-'}</span>,
-      },
-      {
-        field: 'transactionTypeName',
-        headerName: 'Type',
-        width: 150,
         renderCell: (p) => {
-          const name = p?.row?.transactionTypeName ?? p?.value ?? '';
-          const colors = getTransactionTypeColor(name);
-          return <Chip label={colors.label} size="small" sx={{ bgcolor: colors.bg, color: colors.color, fontWeight: 500 }} />;
+          const row = p?.row || {};
+          let status = 'Pending';
+          if (row.approved === true) status = 'Approved';
+          if (row.approved === false) status = 'Rejected';
+          if (row.completed === true) status = 'Completed';
+          return <StatusChip status={status} />;
         },
       },
+    ];
+
+    // Tambahkan kolom khusus untuk pending-approval
+    if (activeSubTab === 'pending-approval') {
+      return [
+        ...baseColumns,
+        {
+          field: 'conditionName',
+          headerName: 'Condition',
+          width: 120,
+          renderCell: (p) => <span>{p?.row?.conditionName ?? p?.value ?? '-'}</span>,
+        },
+        ...statusColumns,
+        {
+          field: 'hasNeedToChange',
+          headerName: 'Need Revision',
+          width: 130,
+          renderCell: (p) => {
+            const hasNeedToChange = p?.row?.hasNeedToChange || false;
+            return hasNeedToChange ? <Chip label="⚠️ Need Revision" size="small" color="warning" /> : <Chip label="✓ OK" size="small" color="success" />;
+          },
+        },
+        {
+          field: 'allAttachmentsApproved',
+          headerName: 'Docs Approved',
+          width: 130,
+          renderCell: (p) => {
+            const allApproved = p?.row?.allAttachmentsApproved || false;
+            return allApproved ? <Chip label="✓ All Approved" size="small" color="success" /> : <Chip label="⏳ Pending" size="small" color="warning" />;
+          },
+        },
+        monitoringActionColumn,
+      ];
+    }
+
+    // Untuk active-loans, overdue-loans, under-maintenance
+    return [
+      ...baseColumns,
       {
-        field: 'employeeName',
-        headerName: 'Employee',
-        width: 150,
-        renderCell: (p) => <span>{p?.row?.employeeName ?? p?.value ?? '-'}</span>,
+        field: 'conditionName',
+        headerName: 'Condition',
+        width: 120,
+        renderCell: (p) => <span>{p?.row?.conditionName ?? p?.value ?? '-'}</span>,
       },
+      ...statusColumns,
+      {
+        field: 'expectedLoanReturnDate',
+        headerName: 'Exp. Return',
+        width: 130,
+        renderCell: (p) => {
+          const val = p?.row?.expectedLoanReturnDate ?? p?.value;
+          return val ? <span>{utilsHelper.formatDate(val)}</span> : <span className="u-text-muted">-</span>;
+        },
+      },
+    ];
+  }, [activeSubTab, baseColumns, monitoringActionColumn]);
+
+  const managementColumns = useMemo(() => {
+    return [
+      ...baseColumns,
       {
         field: 'officeName',
         headerName: 'Office',
@@ -557,16 +896,43 @@ const AssetTransactionsMenu = () => {
           return val ? <span>{utilsHelper.formatDate(val)}</span> : <span className="u-text-muted">-</span>;
         },
       },
-      actionColumn,
-    ],
-    [actionColumn]
-  );
+      managementActionColumn,
+    ];
+  }, [baseColumns, managementActionColumn]);
 
-  const bulkAction = activeTab === 'pending' ? 'approve' : activeTab === 'approved' ? 'reject' : '';
+  const managementReturnColumns = useMemo(() => {
+    return [
+      ...baseColumns,
+      {
+        field: 'officeName',
+        headerName: 'Office',
+        width: 150,
+        renderCell: (p) => <span>{p?.row?.officeName ?? p?.value ?? '-'}</span>,
+      },
+      {
+        field: 'approved',
+        headerName: 'Status',
+        width: 120,
+        renderCell: (p) => {
+          const row = p?.row || {};
+          let status = 'Pending';
+          if (row.approved === true) status = 'Approved';
+          if (row.approved === false) status = 'Rejected';
+          return <StatusChip status={status} />;
+        },
+      },
+      managementReturnActionColumn,
+    ];
+  }, [baseColumns, managementReturnActionColumn]);
+
+  // ============================================================
+  // BULK ACTIONS (Management Tab)
+  // ============================================================
+  const bulkAction = activeSubTab === 'pending' ? 'approve' : activeSubTab === 'approved' ? 'reject' : '';
   const bulkActionLabel = bulkAction === 'approve' ? 'Approve' : bulkAction === 'reject' ? 'Reject' : '';
 
   const renderBulkButton = (ids, gridType) => {
-    if (!ids.length || !showCheckbox || !bulkAction) return null;
+    if (!ids.length || !bulkAction) return null;
     const onClick = bulkAction === 'approve'
       ? () => handleBulkApprove(ids, gridType)
       : () => handleBulkReject(ids, gridType);
@@ -577,6 +943,9 @@ const AssetTransactionsMenu = () => {
     );
   };
 
+  // ============================================================
+  // HEADER ACTIONS
+  // ============================================================
   const headerActions = (
     <>
       <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)} className="u-inline-flex u-btn-gap">
@@ -588,10 +957,35 @@ const AssetTransactionsMenu = () => {
     </>
   );
 
-  if (loading && !transactions.length) return <div className="page-loading"><Spinner size="lg" /></div>;
+  // ============================================================
+  // FORM HELPERS
+  // ============================================================
+  const showEmployee = TRANSACTION_TYPES_REQUIRING_EMPLOYEE.includes(parseInt(formData.transactionType));
+  const showOffice = TRANSACTION_TYPES_REQUIRING_OFFICE.includes(parseInt(formData.transactionType));
+  const showPaired = TRANSACTION_TYPES_REQUIRING_PAIR.includes(parseInt(formData.transactionType));
+  const showMaintenance = parseInt(formData.transactionType) === TRANSACTION_TYPES.MAINTENANCE;
+  const showExpectedReturn = parseInt(formData.transactionType) === TRANSACTION_TYPES.LOAN;
 
-  const primaryData = transactions.filter(t => isPrimaryTransactionType(t.transactionType));
-  const secondaryData = transactions.filter(t => isSecondaryTransactionType(t.transactionType));
+  const employeeOptions = useOptions(employees, 'Select Employee');
+  const officeOptions = useOptions(offices, 'Select Office');
+  const conditionOptions = useOptions(conditions, 'Select Condition');
+  const maintenanceTypeOptions = useOptions(maintenanceTypes, 'Select Maintenance Type');
+
+  const filteredAssetOptions = useMemo(() => {
+    return [{ value: '', label: 'Select Asset' }, ...refAssets.map(a => ({ value: a.value, label: a.label }))];
+  }, [refAssets]);
+
+  // ============================================================
+  // RENDER
+  // ============================================================
+  const isMonitoring = activeMainTab === 'monitoring';
+
+  if (managementLoading && !managementData.length) return <div className="page-loading"><Spinner size="lg" /></div>;
+
+  const primaryData = managementData;
+  const secondaryData = managementReturnData;
+
+  const showCheckbox = activeSubTab === 'pending' || activeSubTab === 'approved';
 
   return (
     <div className="transactions-menu">
@@ -603,9 +997,24 @@ const AssetTransactionsMenu = () => {
         <div className="transactions-menu__header-actions">{headerActions}</div>
       </div>
 
-      <Tabs tabs={TRANSACTION_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+      {/* ============================================================ */}
+      {/* MAIN TABS — Monitoring | Management */}
+      {/* ============================================================ */}
+      <Tabs tabs={MAIN_TABS} activeTab={activeMainTab} onTabChange={handleMainTabChange} />
 
-      <div className="transactions-menu__date-filter-container">
+      {/* ============================================================ */}
+      {/* SUB TABS */}
+      {/* ============================================================ */}
+      {isMonitoring ? (
+        <Tabs tabs={MONITORING_SUB_TABS} activeTab={activeSubTab} onTabChange={handleSubTabChange} />
+      ) : (
+        <Tabs tabs={MANAGEMENT_SUB_TABS} activeTab={activeSubTab} onTabChange={handleSubTabChange} />
+      )}
+
+      {/* ============================================================ */}
+      {/* FILTERS */}
+      {/* ============================================================ */}
+      <div className="transactions-menu__filter-container">
         <TransactionFilter
           startDate={dateFilterStart}
           endDate={dateFilterEnd}
@@ -614,58 +1023,105 @@ const AssetTransactionsMenu = () => {
           onClear={() => handleDateFilterChange('', '')}
           hasFilter={!!(dateFilterStart || dateFilterEnd)}
         />
+        <SearchToolbar onSearch={handleSearch} placeholder="Search transactions..." />
       </div>
 
-      <SearchToolbar onSearch={handleSearch} placeholder="Search transactions..." />
+      {/* ============================================================ */}
+      {/* MONITORING TAB — 1 GRID */}
+      {/* ============================================================ */}
+      {isMonitoring && (
+        <Card
+          className="transactions-menu__grid-card"
+          title={
+            activeSubTab === 'pending-approval' ? '📋 Pending Approval' :
+            activeSubTab === 'active-loans' ? '📌 Active Loans' :
+            activeSubTab === 'overdue-loans' ? '⚠️ Overdue Loans' :
+            '🔧 Under Maintenance'
+          }
+          subtitle={
+            activeSubTab === 'pending-approval' ? 'Transactions awaiting document approval and completion' :
+            activeSubTab === 'active-loans' ? 'Currently active loan transactions' :
+            activeSubTab === 'overdue-loans' ? 'Loan transactions past expected return date' :
+            'Assets currently under maintenance'
+          }
+        >
+          <DataTable
+            rows={monitoringData}
+            columns={monitoringColumns}
+            loading={monitoringLoading}
+            pageSize={monitoringPageSize}
+            page={monitoringPage}
+            totalRowCount={monitoringTotal}
+            onPageChange={setMonitoringPage}
+            onPageSizeChange={setMonitoringPageSize}
+            getRowId={(row) => row?.assetTransactionId || `mon-${Math.random()}`}
+            checkboxSelection={false}
+            ariaLabel="Monitoring transactions"
+            paginationMode="server"
+          />
+        </Card>
+      )}
 
-      {/* Grid Primary (ADD types) */}
-      <Card
-        className="transactions-menu__grid-card"
-        title="Primary Transactions"
-        subtitle="Handover, Transfer, Loan, Maintenance, Disposal, Operational Office"
-        actions={renderBulkButton(getPrimarySelectedIds(primaryData), 'primary')}
-      >
-        <DataTable
-          rows={primaryData}
-          columns={columns}
-          loading={loading}
-          pageSize={pageSize}
-          page={page}
-          totalRowCount={totalCount}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-          getRowId={(row) => row?.assetTransactionId || `primary-${Math.random()}`}
-          checkboxSelection={showCheckbox}
-          onRowSelectionModelChange={handlePrimarySelectionChange}
-          ariaLabel="Primary transactions"
-          paginationMode="server"
-        />
-      </Card>
+      {/* ============================================================ */}
+      {/* MANAGEMENT TAB — 2 GRIDS */}
+      {/* ============================================================ */}
+      {!isMonitoring && (
+        <>
+          {/* Grid Primary (ADD types) */}
+          <Card
+            className="transactions-menu__grid-card"
+            title="Primary Transactions"
+            subtitle="Handover, Transfer, Loan, Maintenance, Disposal, Operational Office"
+            actions={renderBulkButton(getPrimarySelectedIds(primaryData), 'primary')}
+          >
+            <DataTable
+              rows={primaryData}
+              columns={managementColumns}
+              loading={managementLoading}
+              pageSize={managementPageSize}
+              page={managementPage}
+              totalRowCount={managementTotal}
+              onPageChange={setManagementPage}
+              onPageSizeChange={setManagementPageSize}
+              getRowId={(row) => row?.assetTransactionId || `primary-${Math.random()}`}
+              checkboxSelection={showCheckbox}
+              onRowSelectionModelChange={handlePrimarySelectionChange}
+              ariaLabel="Primary transactions"
+              paginationMode="server"
+            />
+          </Card>
 
-      {/* Grid Secondary (RETURN types) */}
-      <Card
-        className="transactions-menu__grid-card"
-        title="Secondary Transactions"
-        subtitle="Return, Loan Return, Post Maintenance"
-        actions={renderBulkButton(getSecondarySelectedIds(secondaryData), 'secondary')}
-      >
-        <DataTable
-          rows={secondaryData}
-          columns={columns}
-          loading={loading}
-          pageSize={pageSize}
-          page={1}
-          onPageChange={() => {}}
-          onPageSizeChange={() => {}}
-          getRowId={(row) => row?.assetTransactionId || `secondary-${Math.random()}`}
-          checkboxSelection={showCheckbox}
-          onRowSelectionModelChange={handleSecondarySelectionChange}
-          ariaLabel="Secondary transactions"
-          paginationMode="client"
-        />
-      </Card>
+          {/* Grid Secondary (RETURN types) */}
+          <Card
+            className="transactions-menu__grid-card"
+            title="Secondary Transactions"
+            subtitle="Return, Loan Return, Post Maintenance"
+            actions={renderBulkButton(getSecondarySelectedIds(secondaryData), 'secondary')}
+          >
+            <DataTable
+              rows={secondaryData}
+              columns={managementReturnColumns}
+              loading={managementReturnLoading}
+              pageSize={managementReturnPageSize}
+              page={managementReturnPage}
+              totalRowCount={managementReturnTotal}
+              onPageChange={setManagementReturnPage}
+              onPageSizeChange={setManagementReturnPageSize}
+              getRowId={(row) => row?.assetTransactionId || `secondary-${Math.random()}`}
+              checkboxSelection={showCheckbox}
+              onRowSelectionModelChange={handleSecondarySelectionChange}
+              ariaLabel="Secondary transactions"
+              paginationMode="server"
+            />
+          </Card>
+        </>
+      )}
 
-      {/* MODAL FORM */}
+      {/* ============================================================ */}
+      {/* MODALS */}
+      {/* ============================================================ */}
+
+      {/* CRUD Modal */}
       <CrudModal
         isOpen={showModal}
         onClose={handleClose}
@@ -791,7 +1247,11 @@ const AssetTransactionsMenu = () => {
               <FileUploader
                 referenceTable="AssetTransaction"
                 referenceId={editingTransaction?.assetTransactionId}
-                onUploadComplete={reload}
+                onUploadComplete={() => {
+                  reloadMonitoring();
+                  reloadManagement();
+                  reloadManagementReturn();
+                }}
               />
             </Grid>
           </Grid>

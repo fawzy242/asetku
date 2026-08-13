@@ -379,16 +379,14 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
                 a.AssetName,
                 mdType.MasterDataName AS TransactionTypeName,
                 at.TransactionDate,
-                fe.FullName AS FromEmployeeName,
-                te.FullName AS ToEmployeeName,
+                e.FullName AS EmployeeName,
                 mdCondition.MasterDataName AS ConditionAfterName,
                 at.Notes";
 
         var fromClause = @"
             FROM AssetTransaction at
             LEFT JOIN Asset a ON at.AssetId = a.AssetId
-            LEFT JOIN Employee fe ON at.FromEmployeeId = fe.EmployeeId
-            LEFT JOIN Employee te ON at.ToEmployeeId = te.EmployeeId
+            LEFT JOIN Employee e ON at.EmployeeId = e.EmployeeId
             LEFT JOIN MasterData mdType ON at.TransactionType = mdType.ReferenceCode AND mdType.ReferenceName = 'TransactionType' AND mdType.IsActive = 1
             LEFT JOIN MasterData mdCondition ON at.Condition = mdCondition.ReferenceCode AND mdCondition.ReferenceName = 'AssetCondition' AND mdCondition.IsActive = 1";
 

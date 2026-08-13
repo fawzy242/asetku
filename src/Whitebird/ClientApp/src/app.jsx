@@ -1,6 +1,7 @@
-// app.jsx
+// src/app.jsx
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast'; // TAMBAHKAN IMPORT INI
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -109,6 +110,34 @@ const App = () => (
             <BrowserRouter>
               <div className="app">
                 <AppRoutes />
+                {/* TAMBAHKAN Toaster DI SINI */}
+                <Toaster
+                  position="bottom-right"
+                  toastOptions={{
+                    duration: 3000,
+                    style: {
+                      background: 'var(--card-bg)',
+                      color: 'var(--text-primary)',
+                      borderRadius: '12px',
+                      border: '1px solid var(--border)',
+                      padding: '12px 20px',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                    },
+                    success: {
+                      style: {
+                        background: 'var(--success)',
+                        color: '#ffffff',
+                      },
+                    },
+                    error: {
+                      style: {
+                        background: 'var(--error)',
+                        color: '#ffffff',
+                      },
+                    },
+                  }}
+                />
               </div>
             </BrowserRouter>
           </ConfirmDialogProvider>

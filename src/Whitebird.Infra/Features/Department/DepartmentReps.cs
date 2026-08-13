@@ -24,7 +24,7 @@ public class DepartmentReps : IDepartmentReps
 
     public async Task<DepartmentEntity?> GetByIdRawAsync(int departmentId)
     {
-        const string sql = "SELECT * FROM Department WHERE DepartmentId = @DepartmentId AND IsActive = 1";
+        const string sql = "SELECT * FROM Department WHERE DepartmentId = @DepartmentId";
         return await _context.QueryFirstOrDefaultAsync<DepartmentEntity>(sql, new { DepartmentId = departmentId });
     }
 

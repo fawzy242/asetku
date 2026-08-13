@@ -24,7 +24,7 @@ public class OfficeReps : IOfficeReps
 
     public async Task<OfficeEntity?> GetByIdRawAsync(int officeId)
     {
-        const string sql = "SELECT * FROM Office WHERE OfficeId = @OfficeId AND IsActive = 1";
+        const string sql = "SELECT * FROM Office WHERE OfficeId = @OfficeId";
         return await _context.QueryFirstOrDefaultAsync<OfficeEntity>(sql, new { OfficeId = officeId });
     }
 

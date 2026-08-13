@@ -11,7 +11,6 @@ import apiClient from "../../../core/api/apiClient";
 import { useDebounce } from "../../../hooks/useDebounce";
 import "./Topbar.scss";
 
-// FIX: Gunakan endpoint /Home/search (bukan /Asset/search)
 const fetchSearchResults = async (keyword) => {
   if (!keyword || keyword.trim().length < 2) return [];
   
@@ -37,6 +36,8 @@ const Topbar = ({ user = null }) => {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [profilePhotoUrl, setProfilePhotoUrl] = useState(null);
+  const loadingRef = useRef(false);
+  const mountedRef = useRef(true);
   const searchRef = useRef(null);
   const userMenuRef = useRef(null);
   const navigate = useNavigate();
@@ -44,21 +45,76 @@ const Topbar = ({ user = null }) => {
   const { logout, refreshUser } = useAuth();
   const { theme, toggleTheme } = useUIStore();
 
-  // Load profile photo
-  const loadProfilePhoto = useCallback(async () => {
-    try {
-      const response = await apiClient.user.getPhoto();
-      if (response.data && response.data.size > 0) {
-        const url = URL.createObjectURL(response.data);
-        setProfilePhotoUrl(url);
-      } else {
-        setProfilePhotoUrl(null);
-      }
-    } catch (error) {
+const loadProfilePhoto = useCallback(async () => {
+  // Cegah multiple request bersamaan
+  if (loadingRef.current) return;
+  loadingRef.current = true;
+
+  try {
+    const response = await apiClient.user.getPhoto();
+    if (!mountedRef.current) return;
+    
+    // FIX: Cek apakah response adalah canceled (dari api.service)
+    if (response?.isCanceled) {
+      return;
+    }
+    
+    if (response.data && response.data.size > 0) {
+      const url = URL.createObjectURL(response.data);
+      setProfilePhotoUrl(url);
+    } else {
       setProfilePhotoUrl(null);
     }
-  }, []);
+  } catch (error) {
+    if (!mountedRef.current) return;
+    
+    // FIX: Abaikan semua error yang berhubungan dengan cancel
+    if (error?.name === 'CanceledError' || 
+        error?.message === 'canceled' || 
+        error?.isCanceled === true ||
+        error?.code === 'ERR_CANCELED') {
+      return;
+    }
+    // 404 berarti tidak ada photo - ini normal, bukan error
+    if (error.response?.status === 404) {
+      setProfilePhotoUrl(null);
+      return;
+    }
+    // Hanya log error yang tidak diketahui
+    console.warn('Failed to load profile photo:', error);
+    setProfilePhotoUrl(null);
+  } finally {
+    loadingRef.current = false;
+  }
+}, []);
 
+  // FIX: Event listener dengan debounce untuk mencegah multiple trigger
+  useEffect(() => {
+    mountedRef.current = true;
+    let timeoutId = null;
+
+    const handlePhotoUpdated = () => {
+      // Debounce: tunggu 300ms sebelum reload
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      timeoutId = setTimeout(() => {
+        loadProfilePhoto();
+      }, 300);
+    };
+    
+    window.addEventListener('profile-photo-updated', handlePhotoUpdated);
+    
+    return () => {
+      mountedRef.current = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      window.removeEventListener('profile-photo-updated', handlePhotoUpdated);
+    };
+  }, [loadProfilePhoto]);
+
+  // Load photo saat user berubah
   useEffect(() => {
     if (user?.userId) {
       loadProfilePhoto();
@@ -195,6 +251,7 @@ const Topbar = ({ user = null }) => {
               <Avatar 
                 src={profilePhotoUrl} 
                 sx={{ width: 36, height: 36 }}
+                onError={() => setProfilePhotoUrl(null)}
               />
             ) : (
               <span className="topbar__user-avatar">{userInitial}</span>
@@ -209,6 +266,7 @@ const Topbar = ({ user = null }) => {
                   <Avatar 
                     src={profilePhotoUrl} 
                     sx={{ width: 48, height: 48 }}
+                    onError={() => setProfilePhotoUrl(null)}
                   />
                 ) : (
                   <span className="topbar__user-avatar--large">{userInitial}</span>

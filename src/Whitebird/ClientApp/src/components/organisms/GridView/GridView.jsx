@@ -1,3 +1,4 @@
+// src/components/organisms/GridView/GridView.jsx
 import React, { useState, useCallback, useEffect } from 'react';
 import { Box } from '@mui/material';
 import DataTable from '../../molecules/DataTable/DataTable';
@@ -29,6 +30,7 @@ const GridView = ({
   ariaLabel = 'Data table',
   extraActions = null,
   className = '',
+  filterComponent = null,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -92,6 +94,9 @@ const GridView = ({
           )}
         </Box>
       </Box>
+
+      {/* Filter Component - Di sini (sebelum tabs) */}
+      {filterComponent}
 
       {tabs && tabs.length > 0 && (
         <Tabs tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />

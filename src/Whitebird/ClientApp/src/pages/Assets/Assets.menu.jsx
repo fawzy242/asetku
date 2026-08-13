@@ -1,7 +1,8 @@
 // src/pages/Assets/Assets.menu.jsx
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Grid, Chip } from '@mui/material';
+import { Grid, Box, Avatar, Typography, IconButton } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
+import { FiCamera, FiX, FiPaperclip, FiFile, FiUpload } from 'react-icons/fi';
 import AssetsData from './Assets.data';
 import GridView from '../../components/organisms/GridView/GridView';
 import CrudModal from '../../components/molecules/CrudModal/CrudModal';
@@ -11,13 +12,12 @@ import Select from '../../components/atoms/Select/Select';
 import DatePickerInput from '../../components/atoms/Input/DatePickerInput';
 import NumberInput from '../../components/atoms/Input/NumberInput';
 import Spinner from '../../components/atoms/Spinner/Spinner';
-import FileUploader from '../../components/molecules/FileUploader/FileUploader';
 import ImportModal from '../../components/molecules/ImportModal/ImportModal';
 import BulkActivateModal from '../../components/molecules/BulkActivateModal/BulkActivateModal';
 import Button from '../../components/atoms/Button/Button';
 import StatusChip from '../../components/atoms/StatusChip/StatusChip';
-import { FiUpload, FiCheckSquare } from 'react-icons/fi';
-import { ASSET_GRID_TABS } from '../../core/constants/assetStatuses';
+import { FiCheckSquare } from 'react-icons/fi';
+import { ASSET_TABS } from '../../core/constants/assetStatuses';
 import { ACTION_TYPES, useGridActions } from '../../hooks/useGridActions';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
@@ -26,11 +26,11 @@ import { useReferenceData } from '../../hooks/useReferenceData';
 import { useCrudFormBase } from '../../hooks/useCrudFormBase';
 import { useOptions } from '../../hooks/useOptions';
 import { cleanAssetFormData } from '../../core/utils/formHelpers';
+import { alertUtils } from '../../lib/sweetAlert';
 import utilsHelper from '../../core/utils/utils.helper';
 import './Assets.scss';
 
 const assetsData = new AssetsData();
-assetsData.transformFormData = cleanAssetFormData;
 
 const INITIAL_FORM_DATA = {
   assetCode: '',
@@ -59,9 +59,20 @@ const AssetsMenu = () => {
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  
+  const [filterCategoryId, setFilterCategoryId] = useState('');
+  const [filterSupplierId, setFilterSupplierId] = useState('');
+  
   const isMountedRef = useRef(true);
   const queryClient = useQueryClient();
-  const { toast, confirmDelete, confirm } = useSweetAlert();
+  const { toast, confirm } = useSweetAlert();
+  
+  // File state - ONLY for EDIT mode
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [attachmentFiles, setAttachmentFiles] = useState([]);
+  const [existingAttachments, setExistingAttachments] = useState([]);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const { categories, suppliers, assetConditionPurchases } = useReferenceData();
 
@@ -74,12 +85,17 @@ const AssetsMenu = () => {
     handleCreate,
     handleEdit,
     handleClose,
-    handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, assetsData, {
     idField: 'assetId',
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assets'] });
       queryClient.invalidateQueries({ queryKey: ['reference', 'assets'] });
+      // Reset file state
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      setAttachmentFiles([]);
+      setExistingAttachments([]);
+      setIsEditMode(false);
     },
   });
 
@@ -87,19 +103,84 @@ const AssetsMenu = () => {
     useBulkSelection({ idField: 'assetId' });
 
   const showCheckbox = useMemo(() => {
-    return activeTab === 'Active' || activeTab === 'Inactive';
+    return activeTab === 'active' || activeTab === 'inactive';
   }, [activeTab]);
+
+  const categoryFilterOptions = useOptions(categories, 'All Categories');
+  const supplierFilterOptions = useOptions(suppliers, 'All Suppliers');
+  const categoryFormOptions = useOptions(categories, 'Select Category');
+  const supplierFormOptions = useOptions(suppliers, 'Select Supplier');
+  const conditionPurchaseOptions = useOptions(assetConditionPurchases, 'Select Purchase Condition');
+
+  // Load existing attachments when editing
+  useEffect(() => {
+    if (editingAsset?.assetId) {
+      setIsEditMode(true);
+      // Fetch existing attachments
+      const fetchAttachments = async () => {
+        try {
+          const response = await apiClient.asset.getAttachments(editingAsset.assetId);
+          const files = response.data?.data || response.data || [];
+          if (Array.isArray(files)) {
+            setExistingAttachments(files);
+          }
+        } catch (error) {
+          console.warn('Failed to fetch attachments:', error);
+        }
+      };
+      fetchAttachments();
+    } else {
+      setIsEditMode(false);
+      setExistingAttachments([]);
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      setAttachmentFiles([]);
+    }
+  }, [editingAsset]);
 
   const buildFilters = useCallback(() => {
     const filters = {};
-    if (activeTab !== 'all') {
-      filters.status = activeTab;
+    
+    switch (activeTab) {
+      case 'all':
+        break;
+      case 'active':
+        filters.isActive = true;
+        break;
+      case 'inactive':
+        filters.isActive = false;
+        break;
+      case 'available':
+        filters.status = 'Available';
+        break;
+      case 'assigned':
+        filters.status = 'Assigned';
+        break;
+      case 'onloan':
+        filters.status = 'On Loan';
+        break;
+      case 'inmaintenance':
+        filters.status = 'In Maintenance';
+        break;
+      case 'damaged':
+        filters.status = 'Damaged';
+        break;
+      default:
+        break;
     }
+    
     if (searchTerm) {
       filters.search = searchTerm;
     }
+    if (filterCategoryId) {
+      filters.categoryId = parseInt(filterCategoryId, 10);
+    }
+    if (filterSupplierId) {
+      filters.supplierId = parseInt(filterSupplierId, 10);
+    }
+    
     return filters;
-  }, [activeTab, searchTerm]);
+  }, [activeTab, searchTerm, filterCategoryId, filterSupplierId]);
 
   const fetchGridData = useCallback(
     async (params) => {
@@ -125,7 +206,7 @@ const AssetsMenu = () => {
     pageSize,
     setPageSize,
     reload,
-  } = useGridData(['assets', activeTab, searchTerm], fetchGridData);
+  } = useGridData(['assets', activeTab, searchTerm, filterCategoryId, filterSupplierId], fetchGridData);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -135,7 +216,7 @@ const AssetsMenu = () => {
     return () => {
       isMountedRef.current = false;
     };
-  }, [activeTab, reload, setPage, clearSelection]);
+  }, [activeTab, reload, setPage, clearSelection, filterCategoryId, filterSupplierId]);
 
   const assets = useMemo(() => {
     return (rawAssets || []).map(asset => ({
@@ -156,29 +237,167 @@ const AssetsMenu = () => {
 
   const handleDelete = useCallback(
     async (asset) => {
-      const confirmed = await confirmDelete('Delete Asset', `Are you sure you want to delete "${asset.assetName}"?`);
+      const confirmed = await confirm({
+        title: 'Delete Asset',
+        text: `Are you sure you want to delete "${asset.assetName}"?`,
+        icon: 'warning',
+        confirmButtonText: 'Yes, Delete',
+        confirmButtonColor: '#ef4444',
+      });
       if (!confirmed) return;
       const r = await assetsData.delete(asset.assetId);
       if (r.success && isMountedRef.current) {
-        toast.success('Asset deleted successfully');
+        await alertUtils.success('Success!', 'Asset deleted successfully');
         queryClient.invalidateQueries({ queryKey: ['assets'] });
         reload();
         clearSelection();
       }
     },
-    [reload, queryClient, toast, confirmDelete, clearSelection]
+    [reload, queryClient, confirm, clearSelection]
   );
 
-  const onSubmit = useCallback(async () => {
-    const success = await crudHandleSubmit();
-    if (success && isMountedRef.current) {
-      toast.success(editingAsset ? 'Asset updated successfully' : 'Asset created successfully');
-      queryClient.invalidateQueries({ queryKey: ['assets'] });
-      reload();
-      clearSelection();
+  // Photo handlers - EDIT mode only
+  const handlePhotoChange = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      console.warn('No file selected');
+      return;
     }
-    return success;
-  }, [crudHandleSubmit, reload, queryClient, toast, editingAsset, clearSelection]);
+    
+    console.log('📸 File selected:', file.name, file.size, file.type);
+    
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+    
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setPhotoPreview(event.target.result);
+    };
+    reader.readAsDataURL(file);
+    
+    // Reset input agar bisa upload file yang sama lagi
+    e.target.value = '';
+  }, [toast]);
+
+  const handleRemovePhoto = useCallback(() => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+  }, []);
+
+  // Attachment handlers - EDIT mode only
+  const handleAttachmentChange = useCallback((e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    const newFiles = [];
+    for (const file of files) {
+      const ext = `.${file.name.split('.').pop()?.toLowerCase()}`;
+      const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt'];
+      if (!allowedExtensions.includes(ext)) {
+        toast.error(`File type not allowed: ${file.name}`);
+        continue;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`File too large: ${file.name} (max 10MB)`);
+        continue;
+      }
+      newFiles.push(file);
+    }
+    
+    if (newFiles.length > 0) {
+      setAttachmentFiles(prev => [...prev, ...newFiles]);
+    }
+    
+    // Reset input
+    e.target.value = '';
+  }, [toast]);
+
+  const handleRemoveAttachment = useCallback((index) => {
+    setAttachmentFiles(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleRemoveExistingAttachment = useCallback((attachmentId) => {
+    setExistingAttachments(prev => prev.filter(a => a.fileAttachmentId !== attachmentId));
+  }, []);
+
+  // ============================================================
+  // HANDLE SUBMIT — Kirim data + file (base64)
+  // ============================================================
+  const handleFormSubmit = useCallback(async (event) => {
+    if (event && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
+    
+    if (isSubmitting) return;
+
+    // Build submit data
+    const submitData = {
+      ...formData,
+      // Kirim file state apa adanya, nanti di convert ke base64 di data layer
+      photoFile: photoFile,
+      attachmentFiles: attachmentFiles,
+      attachmentIdsToKeep: isEditMode ? existingAttachments.map(a => a.fileAttachmentId) : [],
+      replaceAttachments: isEditMode ? true : false,
+    };
+
+    // Log untuk debug
+    console.log('📤 Submitting asset with files:', {
+      hasPhoto: photoFile instanceof File,
+      photoSize: photoFile instanceof File ? photoFile.size : 0,
+      attachmentsCount: attachmentFiles.length,
+    });
+
+    try {
+      const result = isEditMode && editingAsset
+        ? await assetsData.update(editingAsset.assetId, submitData)
+        : await assetsData.create(submitData);
+      
+      if (result.success) {
+        // Reset file state
+        setPhotoFile(null);
+        setPhotoPreview(null);
+        setAttachmentFiles([]);
+        setExistingAttachments([]);
+        setIsEditMode(false);
+        
+        handleClose();
+        queryClient.invalidateQueries({ queryKey: ['assets'] });
+        queryClient.invalidateQueries({ queryKey: ['reference', 'assets'] });
+        reload();
+        clearSelection();
+        
+        const message = isEditMode && editingAsset 
+          ? 'Asset updated successfully' 
+          : 'Asset created successfully';
+        await alertUtils.success('Success!', message);
+      } else {
+        const errorMsg = result.error || result.errors?.join('\n') || 'Failed to save asset';
+        await alertUtils.error('Error', errorMsg);
+      }
+    } catch (error) {
+      const errorMsg = error.userMessage || error.message || 'Failed to save asset';
+      await alertUtils.error('Error', errorMsg);
+    }
+  }, [
+    formData, 
+    isEditMode, 
+    editingAsset, 
+    photoFile, 
+    attachmentFiles, 
+    existingAttachments,
+    isSubmitting,
+    handleClose,
+    reload,
+    clearSelection,
+    queryClient
+  ]);
 
   const handleTabChange = useCallback(
     (tab) => {
@@ -202,13 +421,17 @@ const AssetsMenu = () => {
       const r = await assetsData.bulkActivate(ids, activate);
       if (r.success && isMountedRef.current) {
         const count = r.data || ids.length;
-        toast.success(`${count} asset(s) ${actionText}d successfully`);
+        if (count > 0) {
+          await alertUtils.success('Success!', `${count} asset(s) ${actionText}d successfully`);
+        } else {
+          await alertUtils.info('Info', `No asset(s) were ${actionText}d. They may already be ${actionText}d.`);
+        }
         clearSelection();
         queryClient.invalidateQueries({ queryKey: ['assets'] });
         reload();
       }
     },
-    [reload, queryClient, toast, confirm, clearSelection]
+    [reload, queryClient, confirm, clearSelection]
   );
 
   const handleImport = useCallback(
@@ -219,16 +442,16 @@ const AssetsMenu = () => {
       if (r.success && isMountedRef.current) {
         setImportResult(r.data);
         if (r.data?.errorCount > 0) {
-          toast.warning(`Import completed: ${r.data.successCount} success, ${r.data.errorCount} errors`);
+          await alertUtils.info('Info', `Import completed: ${r.data.successCount} success, ${r.data.errorCount} errors`);
         } else {
-          toast.success(`Import completed: ${r.data?.successCount || 0} assets imported`);
+          await alertUtils.success('Success!', `Import completed: ${r.data?.successCount || 0} assets imported`);
         }
         queryClient.invalidateQueries({ queryKey: ['assets'] });
         reload();
         clearSelection();
       }
     },
-    [reload, queryClient, toast, clearSelection]
+    [reload, queryClient, clearSelection]
   );
 
   const handleDownloadTemplate = useCallback(async () => {
@@ -237,8 +460,16 @@ const AssetsMenu = () => {
 
   const handleGridAction = useCallback(
     (actionType, row) => {
-      if (actionType === ACTION_TYPES.EDIT) handleEdit(row);
-      else if (actionType === ACTION_TYPES.DELETE) handleDelete(row);
+      if (actionType === ACTION_TYPES.EDIT) {
+        // Reset file state when editing
+        setPhotoFile(null);
+        setPhotoPreview(null);
+        setAttachmentFiles([]);
+        setIsEditMode(true);
+        handleEdit(row);
+      } else if (actionType === ACTION_TYPES.DELETE) {
+        handleDelete(row);
+      }
     },
     [handleEdit, handleDelete]
   );
@@ -256,10 +487,6 @@ const AssetsMenu = () => {
     getConditionalActions,
     rowIdField: 'assetId',
   });
-
-  const categoryOptions = useOptions(categories, 'Select Category');
-  const supplierOptions = useOptions(suppliers, 'Select Supplier');
-  const conditionPurchaseOptions = useOptions(assetConditionPurchases, 'Select Purchase Condition');
 
   const columns = useMemo(
     () => [
@@ -315,7 +542,7 @@ const AssetsMenu = () => {
           onClick={() => setShowBulkActivateModal(true)}
           className="u-inline-flex u-btn-gap"
         >
-          <FiCheckSquare size={16} /> {activeTab === 'Active' ? 'Deactivate' : 'Activate'} ({selectionCount})
+          <FiCheckSquare size={16} /> {activeTab === 'active' ? 'Deactivate' : 'Activate'} ({selectionCount})
         </Button>
       )}
     </>
@@ -323,18 +550,28 @@ const AssetsMenu = () => {
 
   if (loading && !assets.length) return <div className="page-loading"><Spinner size="lg" /></div>;
 
-  const bulkActivateValue = activeTab === 'Active' ? false : true;
+  const bulkActivateValue = activeTab === 'active' ? false : true;
   const bulkTitle = bulkActivateValue ? 'Activate Assets' : 'Deactivate Assets';
   const bulkDescription = `This action will ${bulkActivateValue ? 'activate' : 'deactivate'} the selected assets.`;
+
+  // Determine if we should show file upload sections (ONLY for EDIT mode)
+  const showFileUploads = isEditMode && editingAsset?.assetId;
 
   return (
     <div className="assets-menu">
       <GridView
         title="Asset Management"
-        tabs={ASSET_GRID_TABS}
+        tabs={ASSET_TABS}
         activeTab={activeTab}
         onTabChange={handleTabChange}
-        onCreate={handleCreate}
+        onCreate={() => {
+          setIsEditMode(false);
+          setPhotoFile(null);
+          setPhotoPreview(null);
+          setAttachmentFiles([]);
+          setExistingAttachments([]);
+          handleCreate();
+        }}
         columns={columns}
         data={assets}
         loading={loading}
@@ -350,17 +587,124 @@ const AssetsMenu = () => {
         createButtonText="Add Asset"
         ariaLabel="Assets data table"
         extraActions={extraActions}
+        filterComponent={
+          <Box className="assets-menu__filters">
+            <Select
+              label="Category"
+              value={filterCategoryId}
+              onChange={(e) => setFilterCategoryId(e.target.value)}
+              options={categoryFilterOptions}
+              size="small"
+              className="assets-menu__filter-item"
+            />
+            <Select
+              label="Supplier"
+              value={filterSupplierId}
+              onChange={(e) => setFilterSupplierId(e.target.value)}
+              options={supplierFilterOptions}
+              size="small"
+              className="assets-menu__filter-item"
+            />
+            {(filterCategoryId || filterSupplierId) && (
+              <Button
+                variant="text"
+                size="small"
+                onClick={() => {
+                  setFilterCategoryId('');
+                  setFilterSupplierId('');
+                  setPage(1);
+                }}
+                className="assets-menu__filter-clear"
+              >
+                Clear
+              </Button>
+            )}
+          </Box>
+        }
       />
 
       <CrudModal
         isOpen={showModal}
         onClose={handleClose}
         title={editingAsset ? 'Edit Asset' : 'Add Asset'}
-        onSubmit={onSubmit}
+        onSubmit={handleFormSubmit}
         isSubmitting={isSubmitting}
         submitText={editingAsset ? 'Update' : 'Create'}
         size="xl"
       >
+        {/* ============================================================ */}
+        {/* PROFILE PHOTO — ONLY IN EDIT MODE */}
+        {/* ============================================================ */}
+        {showFileUploads && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 3, pb: 3, borderBottom: '1px solid var(--border)' }}>
+            <Box sx={{ position: 'relative' }}>
+              <Avatar
+                src={photoPreview || (editingAsset?.photoProfileUrl) || undefined}
+                sx={{
+                  width: 100,
+                  height: 100,
+                  bgcolor: 'var(--primary)',
+                  fontSize: 40,
+                  fontWeight: 600,
+                  border: '3px solid var(--border)',
+                }}
+              >
+                {!photoPreview && !editingAsset?.photoProfileUrl && (formData.assetName?.charAt(0) || 'A')}
+              </Avatar>
+              <Box sx={{ position: 'absolute', bottom: -4, right: -4 }}>
+                <label htmlFor="asset-photo-upload" style={{ cursor: 'pointer' }}>
+                  <IconButton
+                    component="span"
+                    size="small"
+                    sx={{
+                      bgcolor: 'var(--primary)',
+                      color: 'white',
+                      '&:hover': { bgcolor: 'var(--primary-hover)' },
+                      width: 32,
+                      height: 32,
+                    }}
+                  >
+                    <FiCamera size={16} />
+                  </IconButton>
+                  <input
+                    id="asset-photo-upload"
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    style={{ display: 'none' }}
+                    onChange={handlePhotoChange}
+                  />
+                </label>
+                {photoPreview && (
+                  <IconButton
+                    size="small"
+                    onClick={handleRemovePhoto}
+                    sx={{
+                      position: 'absolute',
+                      top: -8,
+                      right: -8,
+                      bgcolor: 'var(--error)',
+                      color: 'white',
+                      '&:hover': { bgcolor: 'var(--error-dark)' },
+                      width: 24,
+                      height: 24,
+                    }}
+                  >
+                    <FiX size={14} />
+                  </IconButton>
+                )}
+              </Box>
+            </Box>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={600}>
+                Update Photo
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Click the camera icon to upload or change photo. Max 5MB.
+              </Typography>
+            </Box>
+          </Box>
+        )}
+
         <FormSection title="Basic Information" description="Asset code, name, and category">
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
@@ -384,7 +728,7 @@ const AssetsMenu = () => {
                 label="Category"
                 value={formData.categoryId || ''}
                 onChange={(e) => setFormField('categoryId')(e.target.value)}
-                options={categoryOptions}
+                options={categoryFormOptions}
                 required
               />
             </Grid>
@@ -393,7 +737,7 @@ const AssetsMenu = () => {
                 label="Supplier"
                 value={formData.supplierId || ''}
                 onChange={(e) => setFormField('supplierId')(e.target.value)}
-                options={supplierOptions}
+                options={supplierFormOptions}
               />
             </Grid>
           </Grid>
@@ -511,13 +855,75 @@ const AssetsMenu = () => {
                 rows={3}
               />
             </Grid>
-            <Grid item xs={12}>
-              <FileUploader
-                uploadEndpoint={editingAsset?.assetId ? `/Asset/${editingAsset.assetId}/photo` : null}
-                referenceId={editingAsset?.assetId}
-                onUploadComplete={reload}
-              />
-            </Grid>
+            
+            {/* ============================================================ */}
+            {/* ATTACHMENTS — ONLY IN EDIT MODE */}
+            {/* ============================================================ */}
+            {showFileUploads && (
+              <Grid item xs={12}>
+                <Box className="attachment-section">
+                  <Typography variant="subtitle2" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <FiPaperclip /> Attachments
+                    {attachmentFiles.length > 0 && (
+                      <span className="attachment-count">({attachmentFiles.length} new)</span>
+                    )}
+                    {existingAttachments.length > 0 && (
+                      <span className="attachment-count">({existingAttachments.length} existing)</span>
+                    )}
+                  </Typography>
+                  
+                  {/* Existing Attachments */}
+                  {existingAttachments.length > 0 && (
+                    <Box className="attachment-list" sx={{ mb: 2 }}>
+                      {existingAttachments.map((att) => (
+                        <Box key={att.fileAttachmentId} className="attachment-item">
+                          <FiFile size={16} />
+                          <span className="attachment-name">{att.originalFileName || att.fileName}</span>
+                          <button
+                            type="button"
+                            className="attachment-delete"
+                            onClick={() => handleRemoveExistingAttachment(att.fileAttachmentId)}
+                          >
+                            <FiX size={14} />
+                          </button>
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                  
+                  {/* New Attachments */}
+                  {attachmentFiles.length > 0 && (
+                    <Box className="attachment-list" sx={{ mb: 2 }}>
+                      {attachmentFiles.map((file, index) => (
+                        <Box key={index} className="attachment-item attachment-item--new">
+                          <FiPaperclip size={16} />
+                          <span className="attachment-name">{file.name}</span>
+                          <span className="attachment-size">{(file.size / 1024).toFixed(1)} KB</span>
+                          <button
+                            type="button"
+                            className="attachment-delete"
+                            onClick={() => handleRemoveAttachment(index)}
+                          >
+                            <FiX size={14} />
+                          </button>
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                  
+                  <label className="attachment-upload-btn">
+                    <FiUpload size={14} /> Add Files
+                    <input
+                      type="file"
+                      multiple
+                      onChange={handleAttachmentChange}
+                      accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                </Box>
+              </Grid>
+            )}
           </Grid>
         </FormSection>
       </CrudModal>

@@ -24,7 +24,7 @@ public class CategoryReps : ICategoryReps
 
     public async Task<CategoryEntity?> GetByIdRawAsync(int categoryId)
     {
-        const string sql = "SELECT * FROM Category WHERE CategoryId = @CategoryId AND IsActive = 1";
+        const string sql = "SELECT * FROM Category WHERE CategoryId = @CategoryId";
         return await _context.QueryFirstOrDefaultAsync<CategoryEntity>(sql, new { CategoryId = categoryId });
     }
 

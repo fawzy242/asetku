@@ -19,7 +19,7 @@ public interface IAssetService
     Task<ServiceResult<IEnumerable<AssetListView>>> GetAllAsync();
     Task<ServiceResult<IEnumerable<AssetListView>>> GetByCategoryAsync(int categoryId);
     Task<ServiceResult<AssetDetailView>> CreateAsync(AssetCreateViewModel model);
-    Task<ServiceResult<AssetDetailView>> UpdateAsync(int id, AssetUpdateViewModel model);
+    Task<ServiceResult<AssetDetailView>> UpdateAsync(int id, AssetUpdateFormDto model);
     Task<ServiceResult> DeleteAsync(int id);
     Task<ServiceResult> SoftDeleteAsync(int id);
 
@@ -49,4 +49,12 @@ public interface IAssetService
     Task<ServiceResult> AddPhotoProfileAsync(int assetId, IFormFile file);
     Task<ServiceResult> DeletePhotoProfileAsync(int assetId);
     Task<ServiceResult<byte[]>> GetPhotoProfileAsync(int assetId);
+
+    // ============================================================
+    // ASSET ATTACHMENT
+    // ============================================================
+
+    Task<ServiceResult<AssetAttachmentEntity>> AddAttachmentAsync(int assetId, IFormFile file, string? description = null, int order = 0);
+    Task<ServiceResult<IEnumerable<AssetAttachmentEntity>>> GetAttachmentsAsync(int assetId);
+    Task<ServiceResult> DeleteAttachmentAsync(int assetId, int attachmentId);
 }

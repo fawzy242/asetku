@@ -64,6 +64,9 @@ const ReportsMenu = () => {
 
   const buildParams = useCallback(() => {
     const params = {};
+    // FIX: Format selalu excel
+    params.format = 'excel';
+    
     if (currentReport.hasDateRange) {
       if (dateRange.startDate) params.startDate = dateRange.startDate;
       if (dateRange.endDate) params.endDate = dateRange.endDate;

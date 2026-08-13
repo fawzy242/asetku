@@ -1,22 +1,61 @@
 // src/pages/Assets/Assets.scss
 @use '../../styles/variables' as *;
 @use '../../styles/mixins' as *;
-@use '../../styles/shared';
 
 .assets-menu {
     color: var(--text-primary);
 
     &__filters {
-        >* {
-            min-width: 200px;
+        background-color: var(--surface);
+        padding: $spacing-sm $spacing-md;
+        border-radius: $radius-md;
+        border: 1px solid var(--border);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: $spacing-sm;
+        margin-bottom: $spacing-md;
+
+        @include respond-to('sm') {
+            padding: $spacing-sm;
+            gap: $spacing-xs;
         }
     }
 
-    &__table {
-        background-color: var(--card-bg);
-        border-radius: $radius-lg;
-        overflow: hidden;
-        margin-bottom: $spacing-lg;
-        border: 1px solid var(--border);
+    &__filter-item {
+        min-width: 140px;
+        max-width: 200px;
+        flex: 1 1 auto;
+
+        @include respond-to('sm') {
+            min-width: 100px;
+            max-width: 100%;
+            flex: 1 1 45%;
+        }
+
+        .MuiOutlinedInput-root {
+            height: 36px;
+        }
+    }
+
+    &__filter-clear {
+        font-size: $font-size-xs;
+        padding: 0 $spacing-sm;
+        color: var(--text-secondary);
+        height: 32px;
+        flex-shrink: 0;
+
+        &:hover {
+            color: var(--error);
+        }
+    }
+}
+
+[data-theme='dark'] {
+    .assets-menu {
+        &__filters {
+            background-color: #1f2937;
+            border-color: #374151;
+        }
     }
 }

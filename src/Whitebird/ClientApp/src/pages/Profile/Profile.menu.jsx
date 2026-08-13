@@ -1,7 +1,7 @@
 // src/pages/Profile/Profile.menu.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FiUser, FiMail, FiShield, FiLock, FiSave, FiX, FiBriefcase, FiCalendar, FiEdit2, FiCheck, FiCamera, FiTrash2 } from 'react-icons/fi';
-import { Grid, Box, Avatar, Typography, IconButton, CircularProgress } from '@mui/material';
+import { Grid, Box, Typography, Avatar, IconButton, CircularProgress } from '@mui/material';
 import { useAuth } from '../../context/AuthContext';
 import ProfileData from './Profile.data';
 import apiClient from '../../core/api/apiClient';
@@ -12,6 +12,7 @@ import Spinner from '../../components/atoms/Spinner/Spinner';
 import FormSection from '../../components/atoms/FormSection/FormSection';
 import InfoRow from '../../components/molecules/InfoRow/InfoRow';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
+import { alertUtils } from '../../lib/sweetAlert';
 import utilsHelper from '../../core/utils/utils.helper';
 import './Profile.scss';
 
@@ -28,36 +29,59 @@ const ProfileMenu = () => {
   const [passwordData, setPasswordData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const [formData, setFormData] = useState({ fullName: '', email: '', phoneNumber: '', username: '' });
   const [errors, setErrors] = useState({});
-  const { refreshUser: refreshAuth } = useAuth();
-  const { toast } = useSweetAlert();
+  const { refreshUser: refreshAuth, user } = useAuth();
+  const { toast, confirm } = useSweetAlert();
+  
+  // FIX: Ref untuk tracking request ID agar request yang dibatalkan tidak diproses
+  const loadProfileIdRef = useRef(0);
 
   useEffect(() => { loadProfile(); }, []);
 
   const loadProfile = async () => {
+    // Increment ID untuk tracking request
+    const currentRequestId = ++loadProfileIdRef.current;
+    
     setLoading(true);
     const r = await profileData.fetchProfile();
-    if (r.success) {
-      setProfile(r.data);
+    
+    // FIX: Jika ada request baru yang lebih tinggi, abaikan response ini
+    if (currentRequestId !== loadProfileIdRef.current) {
+      return;
+    }
+    
+    // FIX: Jika request dibatalkan, jangan tampilkan error
+    if (r.isCanceled) {
+      setLoading(false);
+      return;
+    }
+    
+    if (r.success && r.data) {
+      const profileData = r.data;
+      setProfile(profileData);
       setFormData({
-        fullName: r.data.fullName || '',
-        email: r.data.email || '',
-        phoneNumber: r.data.phoneNumber || '',
-        username: r.data.username || '',
+        fullName: profileData.fullName || '',
+        email: profileData.email || '',
+        phoneNumber: profileData.phoneNumber || '',
+        username: profileData.username || '',
       });
       loadProfilePhoto();
     } else {
-      toast.error(r.error || 'Failed to load profile');
+      // FIX: Hanya tampilkan error jika bukan canceled
+      if (r.error && r.error !== 'canceled' && r.error !== 'not found' && !r.isNotFound) {
+        await alertUtils.error('Error', r.error || 'Failed to load profile');
+      }
     }
     setLoading(false);
   };
 
-  // FIX: Gunakan apiClient.user.getPhoto() (tanpa userId)
   const loadProfilePhoto = async () => {
     try {
       const response = await apiClient.user.getPhoto();
       if (response.data && response.data.size > 0) {
         const url = URL.createObjectURL(response.data);
         setProfilePhotoUrl(url);
+      } else {
+        setProfilePhotoUrl(null);
       }
     } catch {
       setProfilePhotoUrl(null);
@@ -68,52 +92,84 @@ const ProfileMenu = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Reset input agar bisa upload file yang sama lagi
+    event.target.value = '';
+
     if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
+      await alertUtils.error('Error', 'Please select an image file');
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB');
+      await alertUtils.error('Error', 'Image size must be less than 5MB');
       return;
     }
+
+    // Konfirmasi sebelum upload
+    const confirmed = await confirm({
+      title: 'Update Profile Photo',
+      text: `Are you sure you want to update your profile photo with "${file.name}"?`,
+      icon: 'question',
+      confirmButtonText: 'Yes, Upload',
+      confirmButtonColor: '#dc2626',
+    });
+
+    if (!confirmed) return;
 
     setUploadingPhoto(true);
     const formDataUpload = new FormData();
     formDataUpload.append('file', file);
 
     try {
-      // FIX: Gunakan apiClient.user.uploadPhoto
       const response = await apiClient.user.uploadPhoto(formDataUpload);
       if (response.data?.isSuccess) {
-        toast.success('Profile photo updated');
+        await alertUtils.success('Success!', 'Profile photo updated successfully');
+        
+        await loadProfilePhoto();
         await refreshAuth();
-        loadProfilePhoto();
+        
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('profile-photo-updated'));
+        }, 200);
       } else {
-        toast.error(response.data?.message || 'Failed to upload photo');
+        const errorMsg = response.data?.errors?.join('\n') || response.data?.message || 'Failed to upload photo';
+        await alertUtils.error('Error', errorMsg);
       }
-    } catch {
-      toast.error('Failed to upload photo');
+    } catch (error) {
+      const errorMsg = error.userMessage || error.message || 'Failed to upload photo';
+      await alertUtils.error('Error', errorMsg);
     } finally {
       setUploadingPhoto(false);
     }
   };
 
   const handleDeletePhoto = async () => {
-    const confirmed = await toast.confirmDelete?.() || window.confirm('Delete profile photo?');
+    const confirmed = await confirm({
+      title: 'Delete Profile Photo',
+      text: 'Are you sure you want to delete your profile photo?',
+      icon: 'warning',
+      confirmButtonText: 'Yes, Delete',
+      confirmButtonColor: '#ef4444',
+    });
+    
     if (!confirmed) return;
 
     try {
-      // FIX: Gunakan apiClient.user.deletePhoto
       const response = await apiClient.user.deletePhoto();
       if (response.data?.isSuccess) {
-        toast.success('Profile photo deleted');
+        await alertUtils.success('Success!', 'Profile photo deleted successfully');
         setProfilePhotoUrl(null);
         await refreshAuth();
+        
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('profile-photo-updated'));
+        }, 200);
       } else {
-        toast.error(response.data?.message || 'Failed to delete photo');
+        const errorMsg = response.data?.errors?.join('\n') || response.data?.message || 'Failed to delete photo';
+        await alertUtils.error('Error', errorMsg);
       }
-    } catch {
-      toast.error('Failed to delete photo');
+    } catch (error) {
+      const errorMsg = error.userMessage || error.message || 'Failed to delete photo';
+      await alertUtils.error('Error', errorMsg);
     }
   };
 
@@ -140,7 +196,11 @@ const ProfileMenu = () => {
     e.preventDefault();
     if (!validatePassword()) return;
 
-    const confirmed = await toast.confirm?.({ title: 'Change Password', text: 'Are you sure?', confirmButtonText: 'Yes, Change' }) || window.confirm('Change password?');
+    const confirmed = await confirm({
+      title: 'Change Password',
+      text: 'Are you sure you want to change your password?',
+      confirmButtonText: 'Yes, Change',
+    });
     if (!confirmed) return;
 
     setSaving(true);
@@ -148,7 +208,7 @@ const ProfileMenu = () => {
     setSaving(false);
 
     if (r.success) {
-      toast.success('Password changed successfully');
+      await alertUtils.success('Success!', 'Password changed successfully');
       setShowPasswordForm(false);
       setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
       setErrors({});
@@ -160,7 +220,6 @@ const ProfileMenu = () => {
     if (!validateProfile()) return;
 
     setSaving(true);
-    // Simulate API call (update profile via /User/profile)
     try {
       const response = await apiClient.user.updateProfile({
         fullName: formData.fullName,
@@ -176,15 +235,17 @@ const ProfileMenu = () => {
           const updatedUser = { ...storedUser, ...formData };
           utilsHelper.setLocalStorage('user', updatedUser);
         }
-        toast.success('Profile updated successfully');
+        await alertUtils.success('Success!', 'Profile updated successfully');
         await refreshAuth();
       } else {
         setSaving(false);
-        toast.error(response.data?.message || 'Failed to update profile');
+        const errorMsg = response.data?.errors?.join('\n') || response.data?.message || 'Failed to update profile';
+        await alertUtils.error('Error', errorMsg);
       }
-    } catch {
+    } catch (error) {
       setSaving(false);
-      toast.error('Failed to update profile');
+      const errorMsg = error.userMessage || error.message || 'Failed to update profile';
+      await alertUtils.error('Error', errorMsg);
     }
   };
 
@@ -259,7 +320,7 @@ const ProfileMenu = () => {
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <InfoRow icon={FiUser} label="Full Name" value={profile?.fullName} />
                 <InfoRow icon={FiMail} label="Email" value={profile?.email} />
-                <InfoRow icon={FiBriefcase} label="Username" value={`@${profile?.username}`} />
+                <InfoRow icon={FiBriefcase} label="Username" value={profile?.username || '-'} />
                 <InfoRow icon={FiShield} label="Role" value={profile?.roleId || 'User'} />
                 {profile?.phoneNumber && <InfoRow icon={FiBriefcase} label="Phone" value={profile?.phoneNumber} />}
               </Box>

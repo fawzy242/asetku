@@ -24,6 +24,7 @@ class EmployeeSummaryData extends BaseData {
 
   async fetchEmployeeDetail(id) {
     try {
+      // FIX: Gunakan endpoint yang benar - /EmployeeSummary/{employeeId}
       const r = await this.api.getDetail(id);
       if (r.data?.isSuccess !== undefined) {
         return r.data.isSuccess
@@ -41,6 +42,7 @@ class EmployeeSummaryData extends BaseData {
 
   async fetchAssetSummary(id) {
     try {
+      // FIX: Gunakan endpoint yang benar - /EmployeeSummary/{employeeId}/stats
       const r = await this.api.getStats(id);
       if (r.data?.isSuccess !== undefined) {
         return r.data.isSuccess

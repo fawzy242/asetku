@@ -21,7 +21,7 @@ public interface IEmployeeService
     Task<ServiceResult<EmployeeDetailView>> GetByIdAsync(int id);
     Task<ServiceResult<IEnumerable<EmployeeListView>>> GetAllAsync();
     Task<ServiceResult<EmployeeDetailView>> CreateAsync(EmployeeCreateViewModel model);
-    Task<ServiceResult<EmployeeDetailView>> UpdateAsync(int id, EmployeeUpdateViewModel model);
+    Task<ServiceResult<EmployeeDetailView>> UpdateAsync(int id, EmployeeUpdateFormDto model);
     Task<ServiceResult> DeleteAsync(int id);
     Task<ServiceResult> SoftDeleteAsync(int id);
 
@@ -54,4 +54,12 @@ public interface IEmployeeService
     Task<ServiceResult> AddPhotoProfileAsync(int employeeId, IFormFile file);
     Task<ServiceResult> DeletePhotoProfileAsync(int employeeId);
     Task<ServiceResult<byte[]>> GetPhotoProfileAsync(int employeeId);
+
+    // ============================================================
+    // EMPLOYEE ATTACHMENT
+    // ============================================================
+
+    Task<ServiceResult<EmployeeAttachmentEntity>> AddAttachmentAsync(int employeeId, IFormFile file, string? description = null, int order = 0);
+    Task<ServiceResult<IEnumerable<EmployeeAttachmentEntity>>> GetAttachmentsAsync(int employeeId);
+    Task<ServiceResult> DeleteAttachmentAsync(int employeeId, int attachmentId);
 }

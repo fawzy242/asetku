@@ -105,24 +105,13 @@ const historyColumns = [
       return <span>{value}</span>;
     },
   },
-  // FIX: Backend hanya punya fromEmployeeName dan toEmployeeName
   {
-    field: 'fromEmployeeName',
-    headerName: 'From',
+    field: 'employeeName',
+    headerName: 'Employee',
     width: 150,
     renderCell: (params) => {
       const row = params?.row || {};
-      const value = row.fromEmployeeName || row.fromName || '-';
-      return <span>{value}</span>;
-    },
-  },
-  {
-    field: 'toEmployeeName',
-    headerName: 'To',
-    width: 150,
-    renderCell: (params) => {
-      const row = params?.row || {};
-      const value = row.toEmployeeName || row.toName || '-';
+      const value = row.employeeName || row.employee || '-';
       return <span>{value}</span>;
     },
   },
@@ -207,7 +196,6 @@ const EmployeeSummaryMenu = () => {
         if (isMountedRef.current) {
           if (detailRes.success) setEmployeeDetail(detailRes.data);
           if (summaryRes.success) {
-            // FIX: Pastikan response mapping sesuai backend
             const data = summaryRes.data;
             setAssetSummary({
               currentlyHeldAssets: data.currentlyHeldAssets || 0,

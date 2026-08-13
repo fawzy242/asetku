@@ -175,4 +175,49 @@ public class EmployeeReps : IEmployeeReps
 
         return await _context.QueryAsync<EmployeeDropdownView>(sql);
     }
+
+    // ============================================================
+    // EMPLOYEE ATTACHMENT
+    // ============================================================
+
+    public async Task<int> InsertAttachmentAsync(EmployeeAttachmentEntity entity)
+    {
+        const string sql = @"
+            INSERT INTO EmployeeAttachment (
+                EmployeeId, FileAttachmentId, [Order], IsActive, CreatedDate, CreatedBy
+            ) VALUES (
+                @EmployeeId, @FileAttachmentId, @Order, 1, GETDATE(), @CreatedBy
+            );
+            SELECT CAST(SCOPE_IDENTITY() AS INT);";
+
+        return await _context.ExecuteScalarAsync<int>(sql, entity);
+    }
+
+    public async Task<IEnumerable<EmployeeAttachmentEntity>> GetAttachmentsByEmployeeIdAsync(int employeeId)
+    {
+        const string sql = @"
+            SELECT * FROM EmployeeAttachment 
+            WHERE EmployeeId = @EmployeeId AND IsActive = 1
+            ORDER BY [Order] ASC, CreatedDate DESC";
+
+        return await _context.QueryAsync<EmployeeAttachmentEntity>(sql, new { EmployeeId = employeeId });
+    }
+
+    public async Task<EmployeeAttachmentEntity?> GetAttachmentByIdAsync(int attachmentId)
+    {
+        const string sql = "SELECT * FROM EmployeeAttachment WHERE EmployeeAttachmentId = @AttachmentId AND IsActive = 1";
+        return await _context.QueryFirstOrDefaultAsync<EmployeeAttachmentEntity>(sql, new { AttachmentId = attachmentId });
+    }
+
+    public async Task<int> DeleteAttachmentAsync(int attachmentId)
+    {
+        const string sql = "UPDATE EmployeeAttachment SET IsActive = 0, ModifiedDate = GETDATE() WHERE EmployeeAttachmentId = @AttachmentId";
+        return await _context.ExecuteAsync(sql, new { AttachmentId = attachmentId });
+    }
+
+    public async Task<int> DeleteAttachmentsByEmployeeIdAsync(int employeeId)
+    {
+        const string sql = "UPDATE EmployeeAttachment SET IsActive = 0, ModifiedDate = GETDATE() WHERE EmployeeId = @EmployeeId";
+        return await _context.ExecuteAsync(sql, new { EmployeeId = employeeId });
+    }
 }

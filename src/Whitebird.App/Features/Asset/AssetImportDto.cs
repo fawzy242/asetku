@@ -18,15 +18,8 @@ public class AssetImportDto
     public int? SupplierId { get; set; }
     public int? WarrantyPeriod { get; set; }
     public DateTime? WarrantyExpiryDate { get; set; }
-    public string? AssetCondition { get; set; }
     public string? AssetConditionPurchase { get; set; }
-    public string? OfficeName { get; set; }
-    public int? OfficeId { get; set; }
     public string? Hostname { get; set; }
     public string? IpAddress { get; set; }
-    public bool? OperasionalOffice { get; set; }
-    public decimal? ResidualValue { get; set; }
-    public int? UsefulLife { get; set; }
-    public DateTime? DepreciationStartDate { get; set; }
     public string? Notes { get; set; }
 }

@@ -40,8 +40,11 @@ public class EmployeeController : ControllerBase
         return this.HandleResult(await _employeeService.CreateAsync(model), nameof(GetById));
     }
 
+    /// <summary>
+    /// Update employee — support JSON dengan base64 file
+    /// </summary>
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(int id, [FromBody] EmployeeUpdateViewModel model)
+    public async Task<IActionResult> Update(int id, [FromBody] EmployeeUpdateFormDto model)
     {
         var validation = this.HandleModelState();
         if (validation != null) return validation;
@@ -155,4 +158,27 @@ public class EmployeeController : ControllerBase
 
         return File(result.Data, "image/jpeg");
     }
+
+    // ============================================================
+    // EMPLOYEE ATTACHMENT
+    // ============================================================
+
+    [HttpPost("{id:int}/attachment")]
+    public async Task<IActionResult> AddAttachment(int id, IFormFile file, [FromForm] string? description = null, [FromForm] int order = 0)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest("No file provided");
+        }
+
+        return this.HandleResult(await _employeeService.AddAttachmentAsync(id, file, description, order));
+    }
+
+    [HttpGet("{id:int}/attachment")]
+    public async Task<IActionResult> GetAttachments(int id)
+        => this.HandleResult(await _employeeService.GetAttachmentsAsync(id));
+
+    [HttpDelete("{id:int}/attachment/{attachmentId:int}")]
+    public async Task<IActionResult> DeleteAttachment(int id, int attachmentId)
+        => this.HandleResult(await _employeeService.DeleteAttachmentAsync(id, attachmentId));
 }

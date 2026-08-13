@@ -4,8 +4,10 @@ using Whitebird.App.Features.Auth;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.FileAttachment;
 using Whitebird.Domain.Features.Common;
+using Whitebird.Domain.Features.FileAttachment;
 using Whitebird.Domain.Features.Users;
 using Whitebird.Infra.Features.Auth;
+using Whitebird.Infra.Features.FileAttachment;
 using Whitebird.Infra.Features.User;
 
 namespace Whitebird.App.Features.User;
@@ -17,6 +19,7 @@ public class UserService : BaseService, IUserService
 {
     private readonly IUserReps _userReps;
     private readonly IAuthReps _authReps;
+    private readonly IFileAttachmentReps _fileAttachmentReps;
     private readonly IStorageService _storageService;
     private readonly IActivityLogService _activityLogService;
     private readonly ICurrentUserService _currentUserService;
@@ -25,6 +28,7 @@ public class UserService : BaseService, IUserService
     public UserService(
         IUserReps userReps,
         IAuthReps authReps,
+        IFileAttachmentReps fileAttachmentReps,
         IStorageService storageService,
         IActivityLogService activityLogService,
         ICurrentUserService currentUserService,
@@ -33,6 +37,7 @@ public class UserService : BaseService, IUserService
     {
         _userReps = userReps;
         _authReps = authReps;
+        _fileAttachmentReps = fileAttachmentReps;
         _storageService = storageService;
         _activityLogService = activityLogService;
         _currentUserService = currentUserService;
@@ -50,7 +55,7 @@ public class UserService : BaseService, IUserService
             }
 
             var request = _httpContextAccessor.HttpContext?.Request;
-            var profilePhotoUrl = !string.IsNullOrEmpty(user.ProfilePhotoPath) && request != null
+            var profilePhotoUrl = request != null
                 ? $"{request.Scheme}://{request.Host}/api/User/profile-photo"
                 : null;
 
@@ -77,7 +82,7 @@ public class UserService : BaseService, IUserService
             }
 
             var request = _httpContextAccessor.HttpContext?.Request;
-            var profilePhotoUrl = !string.IsNullOrEmpty(user.ProfilePhotoPath) && request != null
+            var profilePhotoUrl = request != null
                 ? $"{request.Scheme}://{request.Host}/api/User/profile-photo"
                 : null;
 
@@ -120,13 +125,13 @@ public class UserService : BaseService, IUserService
             }
 
             await _activityLogService.LogUpdateAsync(
-                "Users",
+                TableNames.Users,
                 userId,
                 $"Profile updated: Name '{oldFullName}' -> '{request.FullName}', Email '{oldEmail}' -> '{request.Email}', Phone '{oldPhoneNumber}' -> '{request.PhoneNumber}'",
                 _currentUserService.GetDisplayName());
 
             var requestContext = _httpContextAccessor.HttpContext?.Request;
-            var profilePhotoUrl = !string.IsNullOrEmpty(user.ProfilePhotoPath) && requestContext != null
+            var profilePhotoUrl = requestContext != null
                 ? $"{requestContext.Scheme}://{requestContext.Host}/api/User/profile-photo"
                 : null;
 
@@ -163,7 +168,7 @@ public class UserService : BaseService, IUserService
             if (updated)
             {
                 await _activityLogService.LogUpdateAsync(
-                    "Users",
+                    TableNames.Users,
                     userId,
                     $"Password changed for user '{user.Username}'",
                     _currentUserService.GetDisplayName());
@@ -201,26 +206,69 @@ public class UserService : BaseService, IUserService
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            if (!string.IsNullOrEmpty(user.ProfilePhotoPath))
+            // 1. Delete existing photo profile (soft delete)
+            var existingPhoto = await _userReps.GetPhotoProfileByUserIdAsync(userId);
+            if (existingPhoto != null)
             {
-                await _storageService.DeleteFileAsync(user.ProfilePhotoPath);
+                // Soft delete from UsersPhotoProfileAttachment
+                await _userReps.DeletePhotoProfileByUserIdAsync(userId);
+                // Soft delete from FileAttachment
+                await _fileAttachmentReps.DeleteAsync(existingPhoto.FileAttachmentId);
+                // Delete physical file
+                var fileEntity = await _fileAttachmentReps.GetByIdAsync(existingPhoto.FileAttachmentId);
+                if (fileEntity != null)
+                {
+                    await _storageService.DeleteFileAsync(fileEntity.FilePath);
+                }
             }
 
+            // 2. Save physical file
             var subDirectory = Path.Combine("Users", userId.ToString(), "Profile");
             var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
 
-            user.ProfilePhotoPath = savedPath;
-            user.ProfilePhotoFileName = file.FileName;
+            // 3. Insert to FileAttachment
+            var fileAttachmentEntity = new FileAttachmentEntity
+            {
+                FileCategory = "ProfilePhoto",
+                FileName = Path.GetFileName(savedPath),
+                OriginalFileName = file.FileName,
+                FileExtension = extension,
+                FileMimeType = _storageService.GetMimeType(file.FileName),
+                FilePath = savedPath,
+                FileSize = file.Length,
+                FileHash = _storageService.ComputeFileHash(file),
+                Description = $"Profile photo for user {user.Username}",
+                VersionNumber = 1,
+                IsPrimary = true,
+                IsActive = true,
+                CreatedDate = DateTime.Now,
+                CreatedBy = _currentUserService.GetDisplayName()
+            };
+
+            var fileAttachmentId = await _fileAttachmentReps.InsertAsync(fileAttachmentEntity);
+
+            // 4. Insert to UsersPhotoProfileAttachment
+            var photoProfileEntity = new UsersPhotoProfileAttachmentEntity
+            {
+                UserId = userId,
+                FileAttachmentId = fileAttachmentId,
+                IsActive = true,
+                CreatedDate = DateTime.Now,
+                CreatedBy = _currentUserService.GetDisplayName()
+            };
+
+            await _userReps.InsertPhotoProfileAsync(photoProfileEntity);
+
+            // 5. Update user ModifiedDate
             user.ModifiedDate = DateTime.Now;
             user.ModifiedBy = _currentUserService.GetDisplayName();
-
             await _userReps.UpdateUserAsync(user);
 
             var request = _httpContextAccessor.HttpContext?.Request;
             var photoUrl = request != null ? $"{request.Scheme}://{request.Host}/api/User/profile-photo" : null;
 
             await _activityLogService.LogUpdateAsync(
-                "Users",
+                TableNames.Users,
                 userId,
                 $"Profile photo uploaded for user '{user.Username}'",
                 _currentUserService.GetDisplayName());
@@ -239,12 +287,22 @@ public class UserService : BaseService, IUserService
                 return ServiceResult<byte[]>.NotFound("User not found");
             }
 
-            if (string.IsNullOrEmpty(user.ProfilePhotoPath))
+            // 1. Get photo profile from UsersPhotoProfileAttachment
+            var photoProfile = await _userReps.GetPhotoProfileByUserIdAsync(userId);
+            if (photoProfile == null)
             {
                 return ServiceResult<byte[]>.NotFound("Profile photo not found");
             }
 
-            var fileBytes = await _storageService.ReadFileAsync(user.ProfilePhotoPath);
+            // 2. Get file attachment
+            var fileEntity = await _fileAttachmentReps.GetByIdAsync(photoProfile.FileAttachmentId);
+            if (fileEntity == null)
+            {
+                return ServiceResult<byte[]>.NotFound("Profile photo not found");
+            }
+
+            // 3. Read physical file
+            var fileBytes = await _storageService.ReadFileAsync(fileEntity.FilePath);
             return ServiceResult<byte[]>.Success(fileBytes);
         }, "get profile photo");
     }
@@ -259,22 +317,35 @@ public class UserService : BaseService, IUserService
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            if (string.IsNullOrEmpty(user.ProfilePhotoPath))
+            // 1. Get photo profile
+            var photoProfile = await _userReps.GetPhotoProfileByUserIdAsync(userId);
+            if (photoProfile == null)
             {
                 return ServiceResult.Success("No profile photo to delete");
             }
 
-            await _storageService.DeleteFileAsync(user.ProfilePhotoPath);
+            // 2. Get file attachment
+            var fileEntity = await _fileAttachmentReps.GetByIdAsync(photoProfile.FileAttachmentId);
 
-            user.ProfilePhotoPath = null;
-            user.ProfilePhotoFileName = null;
+            // 3. Soft delete from UsersPhotoProfileAttachment
+            await _userReps.DeletePhotoProfileByUserIdAsync(userId);
+
+            // 4. Soft delete from FileAttachment
+            await _fileAttachmentReps.DeleteAsync(photoProfile.FileAttachmentId);
+
+            // 5. Delete physical file
+            if (fileEntity != null)
+            {
+                await _storageService.DeleteFileAsync(fileEntity.FilePath);
+            }
+
+            // 6. Update user ModifiedDate
             user.ModifiedDate = DateTime.Now;
             user.ModifiedBy = _currentUserService.GetDisplayName();
-
             await _userReps.UpdateUserAsync(user);
 
             await _activityLogService.LogUpdateAsync(
-                "Users",
+                TableNames.Users,
                 userId,
                 $"Profile photo deleted for user '{user.Username}'",
                 _currentUserService.GetDisplayName());

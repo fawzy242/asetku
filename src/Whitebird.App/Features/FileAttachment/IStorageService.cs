@@ -13,4 +13,5 @@ public interface IStorageService
     string GetFileExtension(string fileName);
     string GetMimeType(string fileName);
     long GetFileSize(IFormFile file);
+    string GetBasePath();
 }

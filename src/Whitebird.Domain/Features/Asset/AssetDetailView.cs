@@ -32,7 +32,7 @@ public class AssetDetailView
     public string CreatedBy { get; set; } = "System";
     public DateTime? ModifiedDate { get; set; }
     public string? ModifiedBy { get; set; }
-    
+
     // Software Installation
     public SoftwareInstallationView? SoftwareInstallation { get; set; }
 }

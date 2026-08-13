@@ -12,8 +12,15 @@
         flex-wrap: wrap;
     }
 
-    &__date-filter-container {
-        margin-bottom: $spacing-md;
+    &__filter-container {
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-md;
+        margin-bottom: $spacing-lg;
+
+        .search-toolbar {
+            margin-bottom: 0;
+        }
     }
 
     &__grid-card {
@@ -21,6 +28,16 @@
 
         &:last-child {
             margin-bottom: 0;
+        }
+    }
+}
+
+// Dark mode specific fixes
+[data-theme='dark'] {
+    .transactions-menu {
+        &__pending-card {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, transparent 100%);
+            border-left-color: #f59e0b;
         }
     }
 }

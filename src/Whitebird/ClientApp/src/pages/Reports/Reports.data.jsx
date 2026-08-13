@@ -16,7 +16,9 @@ class ReportsData extends BaseData {
    */
   async _exportReport(exportFn, params, fileNamePrefix) {
     try {
-      const blob = await exportFn(params);
+      // FIX: Pastikan format selalu dikirim
+      const exportParams = { ...params, format: 'excel' };
+      const blob = await exportFn(exportParams);
       
       if (!(blob instanceof Blob) || blob.size === 0) {
         throw new Error('Empty response from server');

@@ -41,7 +41,11 @@ const apiClient = {
     getById: (id) => apiService.get(`/Asset/${id}`),
     getGrid: (params) => apiService.get('/Asset/grid', { params }),
     create: (data) => apiService.post('/Asset', data),
-    update: (id, data) => apiService.put(`/Asset/${id}`, data),
+    update: (id, data) => {
+      // Biarkan axios yang set Content-Type otomatis
+      // Jika data adalah FormData, axios akan set multipart/form-data
+      return apiService.put(`/Asset/${id}`, data);
+    },
     delete: (id) => apiService.delete(`/Asset/${id}`),
     softDelete: (id) => apiService.delete(`/Asset/${id}/soft`),
     // Bulk operations
@@ -56,7 +60,7 @@ const apiClient = {
       });
     },
     getImportTemplate: () => apiService.get('/Asset/import/template', { responseType: 'blob' }),
-    // Asset dropdown for transaction - BUTUH PARAMETER transactionType
+    // Asset dropdown for transaction
     listByTransaction: (transactionType) => 
       apiService.get(`/Asset/list-by-transaction?transactionType=${transactionType}`),
     // Photo profile
@@ -69,6 +73,19 @@ const apiClient = {
     },
     getPhoto: (id) => apiService.get(`/Asset/${id}/photo`, { responseType: 'blob' }),
     deletePhoto: (id) => apiService.delete(`/Asset/${id}/photo`),
+    // Attachment
+    uploadAttachment: (id, file, description, order) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      if (description) fd.append('description', description);
+      if (order !== undefined) fd.append('order', order);
+      return apiService.post(`/Asset/${id}/attachment`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    },
+    getAttachments: (id) => apiService.get(`/Asset/${id}/attachment`),
+    deleteAttachment: (id, attachmentId) =>
+      apiService.delete(`/Asset/${id}/attachment/${attachmentId}`),
   },
 
   // ============================================================
@@ -79,7 +96,11 @@ const apiClient = {
     getById: (id) => apiService.get(`/Employee/${id}`),
     getGrid: (params) => apiService.get('/Employee/grid', { params }),
     create: (data) => apiService.post('/Employee', data),
-    update: (id, data) => apiService.put(`/Employee/${id}`, data),
+    update: (id, data) => {
+      // Biarkan axios yang set Content-Type otomatis
+      // Jika data adalah FormData, axios akan set multipart/form-data
+      return apiService.put(`/Employee/${id}`, data);
+    },
     delete: (id) => apiService.delete(`/Employee/${id}`),
     softDelete: (id) => apiService.delete(`/Employee/${id}/soft`),
     // Bulk operations
@@ -110,6 +131,19 @@ const apiClient = {
     },
     getPhoto: (id) => apiService.get(`/Employee/${id}/photo`, { responseType: 'blob' }),
     deletePhoto: (id) => apiService.delete(`/Employee/${id}/photo`),
+    // Attachment
+    uploadAttachment: (id, file, description, order) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      if (description) fd.append('description', description);
+      if (order !== undefined) fd.append('order', order);
+      return apiService.post(`/Employee/${id}/attachment`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    },
+    getAttachments: (id) => apiService.get(`/Employee/${id}/attachment`),
+    deleteAttachment: (id, attachmentId) =>
+      apiService.delete(`/Employee/${id}/attachment/${attachmentId}`),
   },
 
   // ============================================================

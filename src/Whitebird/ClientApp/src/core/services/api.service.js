@@ -1,7 +1,7 @@
-// src/core/api/api.service.js
+// src/core/services/api.service.js
 import axios from 'axios';
 import { API_CONFIG } from '../constants/appConstants';
-import { handleApiError, shouldIgnoreError } from '../services/apiErrorHandler';
+import { handleApiError, shouldIgnoreError } from './apiErrorHandler';
 
 class ApiService {
   constructor() {
@@ -18,7 +18,6 @@ class ApiService {
   }
 
   setupInterceptors() {
-    // Request interceptor
     this.instance.interceptors.request.use(
       (config) => {
         const token = localStorage.getItem(API_CONFIG.SESSION_TOKEN_KEY);
@@ -30,13 +29,45 @@ class ApiService {
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor
     this.instance.interceptors.response.use(
       (response) => response,
       (error) => {
-        // Skip cancellation errors
+        // FIX: Skip cancellation errors - JANGAN reject ke consumer
         if (axios.isCancel(error) || shouldIgnoreError(error)) {
-          return Promise.reject(error);
+          return Promise.resolve({
+            data: null,
+            isCanceled: true,
+            status: 0,
+          });
+        }
+
+        // FIX: Skip error handler untuk blob responses (download template, export reports)
+        // Blob response yang error biasanya memiliki status 200 dengan data kosong
+        // atau status error dengan responseType blob
+        if (error.config?.responseType === 'blob') {
+          // Jika status 200 dengan blob data kosong, jangan tampilkan error
+          if (error.response?.status === 200) {
+            return Promise.resolve({
+              data: null,
+              status: 200,
+            });
+          }
+          // Untuk blob error, biarkan handler error normal tapi jangan tampilkan toast
+          // return Promise.reject(error) dengan flag untuk skip toast
+          return Promise.reject({
+            ...error,
+            __skipToast: true,
+          });
+        }
+
+        // Skip 404 untuk User/profile-photo (tidak ada photo)
+        if (error.response?.status === 404 && 
+            error.config?.url?.includes('/User/profile-photo')) {
+          return Promise.resolve({
+            data: null,
+            isNotFound: true,
+            status: 404,
+          });
         }
 
         // Handle API error centrally
@@ -44,7 +75,6 @@ class ApiService {
           showToast: true,
         });
 
-        // Reject with enriched error
         return Promise.reject({
           ...error,
           handled: handledError.handled,
@@ -57,8 +87,6 @@ class ApiService {
   }
 
   handleError(error) {
-    // This method is kept for backward compatibility
-    // but actual handling is done in interceptors
     if (error.handled) {
       return error.userMessage;
     }

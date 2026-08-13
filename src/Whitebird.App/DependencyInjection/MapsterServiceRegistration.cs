@@ -55,10 +55,6 @@ public static class MapsterServiceRegistration
             .Ignore(dest => dest.ModifiedDate)
             .Ignore(dest => dest.ModifiedBy);
 
-        TypeAdapterConfig<AssetUpdateViewModel, AssetEntity>.NewConfig()
-            .Ignore(dest => dest.CreatedDate)
-            .Ignore(dest => dest.CreatedBy);
-
         // ========== ASSET TRANSACTION MAPPINGS ==========
         TypeAdapterConfig<AssetTransactionListView, AssetTransactionListViewModel>.NewConfig()
             .Map(dest => dest.AssetTransactionId, src => src.AssetTransactionId)

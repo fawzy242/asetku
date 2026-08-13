@@ -1,12 +1,4 @@
-/**
- * CENTRALIZED ASSET STATUS CONSTANTS
- * Single source of truth untuk semua asset status options.
- * 
- * NOTE: Status ini untuk DISPLAY SAJA. Backend mengirim currentStatus dari active transaction.
- * 
- * Usage:
- *   import { ASSET_STATUS_OPTIONS, ASSET_STATUS_FILTER_OPTIONS } from '../../core/constants/assetStatuses';
- */
+// src/core/constants/assetStatuses.js
 
 export const ASSET_STATUSES = {
   AVAILABLE: 'Available',
@@ -19,9 +11,6 @@ export const ASSET_STATUSES = {
   INACTIVE: 'Inactive',
 };
 
-/**
- * Full asset status options untuk form create/edit.
- */
 export const ASSET_STATUS_OPTIONS = [
   { value: ASSET_STATUSES.AVAILABLE, label: 'Available' },
   { value: ASSET_STATUSES.ASSIGNED, label: 'Assigned' },
@@ -32,65 +21,27 @@ export const ASSET_STATUS_OPTIONS = [
   { value: ASSET_STATUSES.DISPOSED, label: 'Disposed' },
 ];
 
-/**
- * Asset status options untuk filter dropdown (include "All").
- */
 export const ASSET_STATUS_FILTER_OPTIONS = [
   { value: '', label: 'All Statuses' },
   ...ASSET_STATUS_OPTIONS,
 ];
 
-/**
- * UPDATED: Asset status tabs untuk navigation
- * REMOVED: Under Repair (not in backend)
- */
-export const ASSET_STATUS_TABS = [
-  { id: 'all', label: 'All Assets' },
-  { id: 'Available', label: 'Available' },
-  { id: 'Assigned', label: 'Assigned' },
-  { id: 'On Loan', label: 'On Loan' },
-  { id: 'In Maintenance', label: 'In Maintenance' },
-  { id: 'Damaged', label: 'Damaged' },
+// FIX: Asset tabs - sesuai spesifikasi
+export const ASSET_TABS = [
+  { id: 'all', label: 'All' },
+  { id: 'active', label: 'Active' },
+  { id: 'available', label: 'Available' },
+  { id: 'assigned', label: 'Assigned' },
+  { id: 'onloan', label: 'On Loan' },
+  { id: 'inmaintenance', label: 'In Maintenance' },
+  { id: 'damaged', label: 'Damaged' },
+  { id: 'inactive', label: 'Inactive' },
 ];
 
-/**
- * Asset status options untuk tab navigation (untuk grid filter)
- */
-export const ASSET_GRID_TABS = [
-  { id: 'all', label: 'All Assets' },
-  { id: 'Available', label: 'Available' },
-  { id: 'Assigned', label: 'Assigned' },
-  { id: 'On Loan', label: 'On Loan' },
-  { id: 'In Maintenance', label: 'In Maintenance' },
-  { id: 'Damaged', label: 'Damaged' },
-];
+export const ASSET_GRID_TABS = ASSET_TABS;
 
-/**
- * Transaction status filter options.
- */
-export const TRANSACTION_STATUS_FILTER_OPTIONS = [
-  { value: '', label: 'All Statuses' },
-  { value: 'Pending', label: 'Pending' },
-  { value: 'Approved', label: 'Approved' },
-  { value: 'Rejected', label: 'Rejected' },
-  { value: 'Completed', label: 'Completed' },
-  { value: 'Cancelled', label: 'Cancelled' },
-];
+export const ASSET_STATUS_TABS = ASSET_TABS;
 
-/**
- * UPDATED: Transaction tabs
- */
-export const TRANSACTION_TABS = [
-  { id: 'pending', label: 'Pending' },
-  { id: 'approved', label: 'Approved' },
-  { id: 'rejected', label: 'Rejected' },
-  { id: 'active-loans', label: 'Active Loans' },
-  { id: 'overdue-loans', label: 'Overdue Loans' },
-];
-
-/**
- * Dashboard chart color mapping untuk asset status.
- */
 export const ASSET_STATUS_CHART_COLORS = {
   'Available': '#10b981',
   'Assigned': '#3b82f6',
@@ -101,10 +52,6 @@ export const ASSET_STATUS_CHART_COLORS = {
   'Disposed': '#4b5563',
 };
 
-/**
- * Asset Condition Mapping (from MasterData)
- * Untuk form create/edit asset
- */
 export const ASSET_CONDITION_OPTIONS = [
   { value: '', label: 'Select Condition' },
   { value: '1', label: 'Good' },
@@ -112,23 +59,14 @@ export const ASSET_CONDITION_OPTIONS = [
   { value: '3', label: 'Damaged' },
 ];
 
-/**
- * Asset Condition Purchase Mapping
- */
 export const ASSET_CONDITION_PURCHASE_OPTIONS = [
   { value: '', label: 'Select' },
   { value: '1', label: 'New' },
   { value: '2', label: 'Second Hand' },
 ];
 
-/**
- * Condition options untuk dropdown (deprecated, use ASSET_CONDITION_OPTIONS)
- */
 export const CONDITION_OPTIONS = ASSET_CONDITION_OPTIONS;
 
-/**
- * Get asset status from transaction type
- */
 export const getAssetStatusFromTransactionType = (transactionType) => {
   switch (transactionType) {
     case 1: // HANDOVER

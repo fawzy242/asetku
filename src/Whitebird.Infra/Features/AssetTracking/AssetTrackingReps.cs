@@ -140,7 +140,7 @@ public class AssetTrackingReps : IAssetTrackingReps
     }
 
     // ============================================================
-    // TIMELINE - FIXED
+    // TIMELINE - FIXED (hapus FromEmployeeId dan ToEmployeeId)
     // ============================================================
 
     public async Task<IEnumerable<AssetTimelineEntry>> GetTimelineAsync(int assetId)
@@ -151,10 +151,8 @@ public class AssetTrackingReps : IAssetTrackingReps
             t.TransactionDate as Date,
             mdType.MasterDataName as ActivityType,
             COALESCE(t.Notes, '') as Description,
-            NULL as PreviousHolder,
-            e.FullName as NewHolder,
-            NULL as PreviousStatus,
-            mdCondition.MasterDataName as NewStatus,
+            e.FullName as EmployeeName,
+            mdCondition.MasterDataName as Status,
             t.Notes
         FROM AssetTransaction t
         LEFT JOIN Employee e ON t.EmployeeId = e.EmployeeId

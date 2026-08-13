@@ -1,17 +1,9 @@
-import { useState, useCallback } from 'react';
+// src/hooks/useCrudFormBase.js
+// Cari bagian handleSubmit - perbaiki agar handleSuccess hanya dipanggil sekali
 
-/**
- * Enhanced CRUD form hook for consistent form handling across all entities
- * @param {Object} initialFormData - Default form values
- * @param {Object} dataService - Instance of BaseData service
- * @param {Object} options - Additional options
- * @param {string} options.idField - Nama field ID (default: auto-detect from entity)
- * @param {Function} options.onBeforeSubmit - Hook sebelum submit
- * @param {Function} options.onAfterSubmit - Hook setelah submit berhasil
- * @param {Function} options.transformFormData - Transform form data sebelum submit
- * @param {Function} options.onSuccess - Callback after successful submit
- * @param {Function} options.onError - Callback after failed submit
- */
+import { useState, useCallback } from 'react';
+import { handleSuccess } from '../core/services/successHandler';
+
 export const useCrudFormBase = (initialFormData, dataService, options = {}) => {
   const {
     idField,
@@ -31,7 +23,6 @@ export const useCrudFormBase = (initialFormData, dataService, options = {}) => {
   const getRecordId = useCallback((record) => {
     if (!record) return null;
     if (idField && record[idField] !== undefined) return record[idField];
-    // Auto-detect ID field
     const possibleIdFields = ['id', `${record.constructor?.name?.toLowerCase()}Id`];
     for (const field of possibleIdFields) {
       if (record[field] !== undefined) return record[field];
@@ -78,7 +69,6 @@ export const useCrudFormBase = (initialFormData, dataService, options = {}) => {
 
   const setFieldValue = useCallback((field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error for this field when user types
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
@@ -106,7 +96,6 @@ export const useCrudFormBase = (initialFormData, dataService, options = {}) => {
       ? transformFormData({ ...formData }) 
       : { ...formData };
 
-    // Remove empty strings and undefined values for ID fields
     Object.keys(submitData).forEach(key => {
       if (submitData[key] === '' || submitData[key] === undefined) {
         submitData[key] = null;
@@ -120,12 +109,26 @@ export const useCrudFormBase = (initialFormData, dataService, options = {}) => {
     setIsSubmitting(false);
 
     if (result.success) {
-      setShowModal(false);
-      setEditingRecord(null);
-      setFormData({ ...initialFormData });
-      setErrors({});
-      if (onAfterSubmit) onAfterSubmit(result);
-      if (onSuccess) onSuccess(result);
+      // FIX: Hanya panggil handleSuccess SEKALI di sini
+      const operation = editingRecord ? 'update' : 'create';
+      const entityName = dataService.getEntityName ? dataService.getEntityName() : 'record';
+      
+      handleSuccess({
+        operation: operation,
+        entityName: entityName,
+        result: result,
+        onCloseModal: () => {
+          setShowModal(false);
+          setEditingRecord(null);
+          setFormData({ ...initialFormData });
+          setErrors({});
+        },
+        onRefreshData: () => {
+          if (onAfterSubmit) onAfterSubmit(result);
+          if (onSuccess) onSuccess(result);
+        },
+      });
+      
       return true;
     } else if (!result.cancelled) {
       if (result.errors) {
@@ -143,27 +146,20 @@ export const useCrudFormBase = (initialFormData, dataService, options = {}) => {
   }, [initialFormData]);
 
   return {
-    // State
     showModal,
     editingRecord,
     isSubmitting,
     formData,
     errors,
-    
-    // Setters
     setFormData,
     setErrors,
     setFieldValue,
     setFormField,
-    
-    // Actions
     handleCreate,
     handleEdit,
     handleClose,
     handleSubmit,
     resetForm,
-    
-    // Helpers
     getRecordId,
   };
 };

@@ -18,6 +18,11 @@ public class StorageService : IStorageService
         _logger.LogInformation("Storage path initialized: {BasePath}", _basePath);
     }
 
+    public string GetBasePath()
+    {
+        return _basePath;
+    }
+
     public async Task<string> SaveFileAsync(IFormFile file, string subDirectory)
     {
         var directoryPath = Path.Combine(_basePath, subDirectory);

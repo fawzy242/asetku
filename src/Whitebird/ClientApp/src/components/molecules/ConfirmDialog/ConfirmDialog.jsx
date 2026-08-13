@@ -58,16 +58,28 @@ class ConfirmDialog {
   // FIX: Gunakan toastr langsung dari sweetAlert
   static toast = {
     success: (msg) => {
-      if (msg) toastr.success(msg);
+      if (msg) {
+        console.log('[ConfirmDialog.toast.success]', msg);
+        toastr.success(msg);
+      }
     },
     error: (msg) => {
-      if (msg) toastr.error(msg);
+      if (msg) {
+        console.log('[ConfirmDialog.toast.error]', msg);
+        toastr.error(msg);
+      }
     },
     info: (msg) => {
-      if (msg) toastr.info(msg);
+      if (msg) {
+        console.log('[ConfirmDialog.toast.info]', msg);
+        toastr.info(msg);
+      }
     },
     warning: (msg) => {
-      if (msg) toastr.warning(msg);
+      if (msg) {
+        console.log('[ConfirmDialog.toast.warning]', msg);
+        toastr.warning(msg);
+      }
     },
   };
 

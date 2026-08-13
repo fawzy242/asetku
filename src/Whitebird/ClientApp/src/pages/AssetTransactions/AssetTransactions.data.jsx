@@ -266,12 +266,23 @@ class AssetTransactionsData extends BaseData {
     }
   }
 
+  /**
+   * Download import template
+   * OVERRIDE: Perbaiki blob handling
+   */
   async downloadTemplate() {
     try {
-      const blob = await this.api.getImportTemplate();
-      if (!(blob instanceof Blob) || blob.size === 0) {
-        throw new Error('Empty template');
+      const response = await this.api.getImportTemplate();
+      
+      // FIX: Ambil data dari response (axios response wrapper)
+      const blob = response?.data;
+      
+      if (!blob || !(blob instanceof Blob) || blob.size === 0) {
+        console.warn('[AssetTransactionsData.downloadTemplate] Empty or invalid blob:', blob);
+        ConfirmDialog.toast.error('Template file is empty. Please try again.');
+        return { success: false };
       }
+      
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -280,11 +291,30 @@ class AssetTransactionsData extends BaseData {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      ConfirmDialog.toast.success('Template downloaded');
+      
+      ConfirmDialog.toast.success('Template downloaded successfully');
       return { success: true };
     } catch (error) {
-      ConfirmDialog.toast.error(error.message || 'Failed to download template');
-      return { success: false };
+      if (this.isCanceledError(error)) {
+        return { success: false, error: 'canceled', isCanceled: true };
+      }
+      
+      if (error.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const parsed = JSON.parse(text);
+          if (parsed.message) {
+            ConfirmDialog.toast.error(parsed.message);
+            return { success: false, error: parsed.message };
+          }
+        } catch {
+          // Not JSON, continue
+        }
+      }
+      
+      const errorMsg = error.userMessage || error.message || 'Failed to download template';
+      ConfirmDialog.toast.error(errorMsg);
+      return { success: false, error: errorMsg };
     }
   }
 

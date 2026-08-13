@@ -41,8 +41,11 @@ public class AssetController : ControllerBase
         return this.HandleResult(await _assetService.CreateAsync(model), nameof(GetById));
     }
 
+    /// <summary>
+    /// Update asset — support JSON dengan base64 file
+    /// </summary>
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(int id, [FromBody] AssetUpdateViewModel model)
+    public async Task<IActionResult> Update(int id, [FromBody] AssetUpdateFormDto model)
     {
         var validation = this.HandleModelState();
         if (validation != null) return validation;
@@ -150,4 +153,27 @@ public class AssetController : ControllerBase
     [HttpGet("list-by-transaction")]
     public async Task<IActionResult> GetDropdownListByTransactionType([FromQuery] int transactionType)
         => this.HandleResult(await _assetService.GetDropdownListByTransactionTypeAsync(transactionType));
+
+    // ============================================================
+    // ASSET ATTACHMENT
+    // ============================================================
+
+    [HttpPost("{id:int}/attachment")]
+    public async Task<IActionResult> AddAttachment(int id, IFormFile file, [FromForm] string? description = null, [FromForm] int order = 0)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest("No file provided");
+        }
+
+        return this.HandleResult(await _assetService.AddAttachmentAsync(id, file, description, order));
+    }
+
+    [HttpGet("{id:int}/attachment")]
+    public async Task<IActionResult> GetAttachments(int id)
+        => this.HandleResult(await _assetService.GetAttachmentsAsync(id));
+
+    [HttpDelete("{id:int}/attachment/{attachmentId:int}")]
+    public async Task<IActionResult> DeleteAttachment(int id, int attachmentId)
+        => this.HandleResult(await _assetService.DeleteAttachmentAsync(id, attachmentId));
 }
