@@ -28,6 +28,12 @@ public interface IAssetTransactionReps
     Task<PaginatedResult<AssetTransactionPendingApprovalView>> GetGridPendingApprovalAsync(AssetTransactionGridRequest request);
 
     // ============================================================
+    // COMPLETE TRANSACTIONS (NEW)
+    // ============================================================
+
+    Task<PaginatedResult<AssetTransactionListView>> GetCompleteTransactionsAsync(AssetTransactionGridRequest request);
+
+    // ============================================================
     // OUTSTANDING (VIEW ONLY)
     // ============================================================
 

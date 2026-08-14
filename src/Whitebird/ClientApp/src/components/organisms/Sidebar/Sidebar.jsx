@@ -4,7 +4,8 @@ import {
   FiHome, FiBox, FiRefreshCw, FiUsers, FiFolder, FiBarChart2,
   FiChevronDown, FiChevronLeft, FiGrid, FiTruck, FiMapPin,
   FiMenu, FiCrosshair, FiUserCheck, FiBriefcase, FiDatabase,
-  FiCalendar, FiArrowRight, FiArrowLeft, FiTool
+  FiCalendar, FiArrowRight, FiArrowLeft, FiTool,
+  FiActivity, FiSettings // Ikon untuk sub-menu transaction
 } from 'react-icons/fi';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './Sidebar.scss';
@@ -12,13 +13,24 @@ import './Sidebar.scss';
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: FiHome, path: '/dashboard' },
   { id: 'assets', label: 'Assets', icon: FiBox, path: '/assets' },
-  { id: 'transactions', label: 'Transactions', icon: FiRefreshCw, path: '/transactions' },
+  // ============================================================
+  // TRANSACTIONS — Sekarang parent dengan child
+  // ============================================================
+  {
+    id: 'transactions',
+    label: 'Asset Transactions',
+    icon: FiRefreshCw,
+    path: null,
+    children: [
+      { id: 'transactions-monitoring', label: 'Monitoring', icon: FiActivity, path: '/transactions/monitoring' },
+      { id: 'transactions-management', label: 'Management', icon: FiSettings, path: '/transactions/management' },
+    ]
+  },
   { id: 'tracking', label: 'Asset Tracking', icon: FiCrosshair, path: '/tracking' },
   { id: 'employees', label: 'Employees', icon: FiUsers, path: '/employees' },
   { id: 'employee-summary', label: 'Employee Summary', icon: FiUserCheck, path: '/employee-summary' },
-
   // ============================================================
-  // MASTER DATA — TETAP ADA (tidak dihapus)
+  // MASTER DATA
   // ============================================================
   {
     id: 'master-data',
@@ -32,9 +44,8 @@ const menuItems = [
       { id: 'offices', label: 'Offices', icon: FiMapPin, path: '/offices' },
     ]
   },
-
   // ============================================================
-  // SCHEDULE — MENU BARU (3 child)
+  // SCHEDULE
   // ============================================================
   {
     id: 'schedule',
@@ -47,7 +58,6 @@ const menuItems = [
       { id: 'schedule-maintenance', label: 'Maintenance', icon: FiTool, path: '/schedule-maintenance' },
     ]
   },
-
   { id: 'reports', label: 'Reports', icon: FiBarChart2, path: '/reports' },
 ];
 

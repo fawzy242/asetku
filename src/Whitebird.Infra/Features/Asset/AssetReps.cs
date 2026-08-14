@@ -3,6 +3,7 @@ using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.Asset;
 using Whitebird.Domain.Features.MasterData;
 using Whitebird.Domain.Features.Common;
+using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.Asset;
 
@@ -686,6 +687,42 @@ public class AssetReps : IAssetReps
     public async Task<int> DeleteAttachmentsByAssetIdAsync(int assetId)
     {
         const string sql = "UPDATE AssetAttachment SET IsActive = 0, ModifiedDate = GETDATE() WHERE AssetId = @AssetId";
+        return await _context.ExecuteAsync(sql, new { AssetId = assetId });
+    }
+
+    // ============================================================
+    // ASSET PHOTO PROFILE (NEW)
+    // ============================================================
+
+    public async Task<int> InsertPhotoProfileAsync(AssetPhotoProfileAttachmentEntity entity)
+    {
+        const string sql = @"
+            INSERT INTO AssetPhotoProfileAttachment (
+                AssetId, FileAttachmentId, IsActive, CreatedDate, CreatedBy
+            ) VALUES (
+                @AssetId, @FileAttachmentId, 1, GETDATE(), @CreatedBy
+            );
+            SELECT CAST(SCOPE_IDENTITY() AS INT);";
+
+        return await _context.ExecuteScalarAsync<int>(sql, entity);
+    }
+
+    public async Task<AssetPhotoProfileAttachmentEntity?> GetPhotoProfileByAssetIdAsync(int assetId)
+    {
+        const string sql = @"
+            SELECT * FROM AssetPhotoProfileAttachment 
+            WHERE AssetId = @AssetId AND IsActive = 1";
+
+        return await _context.QueryFirstOrDefaultAsync<AssetPhotoProfileAttachmentEntity>(sql, new { AssetId = assetId });
+    }
+
+    public async Task<int> DeletePhotoProfileByAssetIdAsync(int assetId)
+    {
+        const string sql = @"
+            UPDATE AssetPhotoProfileAttachment 
+            SET IsActive = 0, ModifiedDate = GETDATE() 
+            WHERE AssetId = @AssetId AND IsActive = 1";
+
         return await _context.ExecuteAsync(sql, new { AssetId = assetId });
     }
 }

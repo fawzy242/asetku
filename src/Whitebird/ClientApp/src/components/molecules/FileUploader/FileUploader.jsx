@@ -13,20 +13,16 @@ import {
 import {
   Box,
   Chip,
-  LinearProgress,
   IconButton,
   Typography,
   Dialog,
   DialogContent,
   IconButton as MuiIconButton,
 } from "@mui/material";
-import apiService from "../../../core/services/api.service";
 import ConfirmDialog from "../ConfirmDialog/ConfirmDialog";
-import { handleSuccess } from "../../../core/services/successHandler";
 import Button from "../../atoms/Button/Button";
 import "./FileUploader.scss";
 
-// Allowed file extensions for preview
 const PREVIEW_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.txt', '.doc', '.docx', '.xls', '.xlsx'];
 
 const isPreviewable = (fileName) => {
@@ -39,17 +35,9 @@ const getFileIcon = (fileName) => {
   if (!fileName) return FiFile;
   const ext = `.${fileName.split('.').pop()?.toLowerCase()}`;
   if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext)) return FiImage;
-  if (['.pdf'].includes(ext)) return FiFile;
-  if (['.doc', '.docx'].includes(ext)) return FiFile;
-  if (['.xls', '.xlsx'].includes(ext)) return FiFile;
-  if (['.txt'].includes(ext)) return FiFile;
   return FiFile;
 };
 
-/**
- * Generic File Uploader Component with Drop Zone
- * FIX: Hanya menambahkan file ke state, TIDAK langsung upload
- */
 const FileUploader = ({
   referenceType,
   referenceId,
@@ -65,42 +53,47 @@ const FileUploader = ({
   existingFiles = [],
   onFilesChange,
 }) => {
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState(null);
-  const [previewFile, setPreviewFile] = useState(null);
   const [fileList, setFileList] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [fileToDelete, setFileToDelete] = useState(null);
   const isMountedRef = useRef(true);
   const fileInputRef = useRef(null);
   const dropRef = useRef(null);
 
-  // Load existing files from parent
+  // 🔥 FIX: Hanya set initial files sekali saat komponen mount
+  // Jangan re-run ketika existingFiles berubah dari parent
+  const hasInitializedRef = useRef(false);
   useEffect(() => {
-    if (existingFiles && Array.isArray(existingFiles)) {
+    if (!hasInitializedRef.current && existingFiles && Array.isArray(existingFiles) && existingFiles.length > 0) {
       setFileList(existingFiles);
+      hasInitializedRef.current = true;
     }
   }, [existingFiles]);
 
-  // Notify parent when files change
+  // 🔥 FIX: Hanya notify parent ketika fileList berubah DARI internal (bukan dari parent)
+  // Gunakan ref untuk track apakah perubahan berasal dari internal
+  const internalUpdateRef = useRef(false);
+  
   useEffect(() => {
-    if (onFilesChange) {
-      onFilesChange(fileList);
+    // Jika perubahan berasal dari internal update, notify parent
+    if (internalUpdateRef.current) {
+      if (onFilesChange) {
+        onFilesChange(fileList);
+      }
+      internalUpdateRef.current = false;
     }
   }, [fileList, onFilesChange]);
 
   // ============================================================
-  // FIX: HANDLE FILE SELECT - TAMBAHKAN KE STATE, JANGAN UPLOAD
+  // HANDLE FILE SELECT
   // ============================================================
   const handleFileSelect = useCallback(
     async (files) => {
       if (!files || files.length === 0) return;
 
-      // Validate each file
       const validFiles = [];
       const invalidFiles = [];
       for (const file of files) {
@@ -123,10 +116,8 @@ const FileUploader = ({
       if (invalidFiles.length > 0) {
         ConfirmDialog.toast.error(`Invalid files: ${invalidFiles.join(', ')}`);
       }
-
       if (validFiles.length === 0) return;
 
-      // Show confirmation before adding files
       const fileNames = validFiles.map(f => f.name).join('\n');
       const confirmed = await ConfirmDialog.show({
         title: `Add ${validFiles.length} File(s)`,
@@ -138,35 +129,26 @@ const FileUploader = ({
 
       if (!confirmed) return;
 
-      // ============================================================
-      // FIX: TAMBAHKAN FILE KE STATE, JANGAN UPLOAD LANGSUNG
-      // File akan dikirim saat user klik Submit/Update
-      // ============================================================
       const newFiles = validFiles.map(file => ({
         file: file,
         isNew: true,
         fileName: file.name,
         originalFileName: file.name,
         fileSize: file.size,
-        fileAttachmentId: Date.now() + Math.random() * 1000,
+        fileAttachmentId: `new-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       }));
 
-      // Update local state
+      // 🔥 FIX: Update state dengan flag internal update
+      internalUpdateRef.current = true;
       setFileList(prev => [...prev, ...newFiles]);
 
-      // Notify parent
-      if (onFilesChange) {
-        onFilesChange([...fileList, ...newFiles]);
-      }
-
-      // Notify parent that files are ready to be saved
       if (onUploadComplete) {
         onUploadComplete(newFiles);
       }
 
       ConfirmDialog.toast.success(`${validFiles.length} file(s) added. Click Save/Update to upload.`);
     },
-    [allowedTypes, maxSizeMB, fileList, onFilesChange, onUploadComplete]
+    [allowedTypes, maxSizeMB, onUploadComplete]
   );
 
   const handleDeleteFile = useCallback(async (file) => {
@@ -174,7 +156,6 @@ const FileUploader = ({
       ConfirmDialog.toast.warning("Delete is not available for this entity");
       return;
     }
-
     setFileToDelete(file);
     setShowDeleteConfirm(true);
   }, [disableDelete]);
@@ -186,34 +167,31 @@ const FileUploader = ({
     const file = fileToDelete;
     
     try {
-      // If it's a new file (not yet saved to server), just remove from list
       if (file.isNew) {
+        internalUpdateRef.current = true;
         setFileList(prev => prev.filter(f => f.fileAttachmentId !== file.fileAttachmentId));
         if (onFileDeleted) onFileDeleted();
-        if (onFilesChange) onFilesChange(fileList.filter(f => f.fileAttachmentId !== file.fileAttachmentId));
         ConfirmDialog.toast.success("File removed");
         setFileToDelete(null);
         return;
       }
 
-      // For existing files, mark for removal
+      internalUpdateRef.current = true;
       setFileList(prev => prev.filter(f => f.fileAttachmentId !== file.fileAttachmentId));
       if (onFileDeleted) onFileDeleted();
-      if (onFilesChange) onFilesChange(fileList.filter(f => f.fileAttachmentId !== file.fileAttachmentId));
       ConfirmDialog.toast.success("File removed. Click Save/Update to apply changes.");
     } catch (error) {
       const errorMsg = error.userMessage || error.message || "Failed to delete";
       ConfirmDialog.toast.error(errorMsg);
     }
     setFileToDelete(null);
-  }, [fileToDelete, fileList, onFileDeleted, onFilesChange]);
+  }, [fileToDelete, onFileDeleted]);
 
   const handlePreview = useCallback((file) => {
     if (disablePreview) {
       ConfirmDialog.toast.warning("Preview is not available");
       return;
     }
-
     setPreviewFile(file);
     setPreviewOpen(true);
   }, [disablePreview]);
@@ -221,11 +199,7 @@ const FileUploader = ({
   const handleClosePreview = useCallback(() => {
     setPreviewOpen(false);
     setPreviewFile(null);
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(null);
-    }
-  }, [previewUrl]);
+  }, []);
 
   const handleDragEnter = useCallback((e) => {
     e.preventDefault();
@@ -295,6 +269,7 @@ const FileUploader = ({
         <div className="file-uploader__file-actions">
           {isPreviewableFile && !disablePreview && (
             <button
+              type="button"
               className="file-uploader__file-action file-uploader__file-action--preview"
               onClick={() => handlePreview(file)}
               title="Preview"
@@ -304,6 +279,7 @@ const FileUploader = ({
           )}
           {!disableDelete && (
             <button
+              type="button"
               className="file-uploader__file-action file-uploader__file-action--delete"
               onClick={() => handleDeleteFile(file)}
               title="Delete"
@@ -343,7 +319,6 @@ const FileUploader = ({
         </Typography>
       </div>
 
-      {/* DROP ZONE */}
       <div
         ref={dropRef}
         className={`file-uploader__dropzone ${isDragging ? 'file-uploader__dropzone--dragging' : ''} ${fileCount > 0 ? 'file-uploader__dropzone--has-files' : ''}`}
@@ -365,7 +340,6 @@ const FileUploader = ({
           accept={allowedTypes.filter(t => t.startsWith('.')).join(',')}
           multiple={isAttachment}
           className="file-uploader__file-input"
-          disabled={uploading}
         />
         
         <div className="file-uploader__dropzone-content">
@@ -379,7 +353,8 @@ const FileUploader = ({
               : `Max ${maxSizeMB}MB, supported: ${allowedTypes.join(', ')}`
             }
           </Typography>
-          <button 
+          <button
+            type="button"
             className="file-uploader__dropzone-btn"
             onClick={(e) => {
               e.stopPropagation();
@@ -391,14 +366,12 @@ const FileUploader = ({
         </div>
       </div>
 
-      {/* FILE LIST */}
       {fileCount > 0 && (
         <div className="file-uploader__file-list">
           {fileList.map((file, index) => renderFileCard(file, index))}
         </div>
       )}
 
-      {/* DELETE CONFIRM DIALOG */}
       <Dialog
         open={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
@@ -448,7 +421,6 @@ const FileUploader = ({
         </DialogContent>
       </Dialog>
 
-      {/* PREVIEW DIALOG */}
       <Dialog
         open={previewOpen}
         onClose={handleClosePreview}
@@ -528,16 +500,6 @@ const FileUploader = ({
                     >
                       Download / View PDF
                     </Button>
-                  </Box>
-                );
-              }
-              
-              if (ext === '.txt') {
-                return (
-                  <Box sx={{ width: '100%', maxHeight: '100%', overflow: 'auto', p: 3, backgroundColor: 'var(--surface)', borderRadius: 1 }}>
-                    <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                      {previewFile.textContent || 'No content available'}
-                    </Typography>
                   </Box>
                 );
               }

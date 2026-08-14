@@ -37,7 +37,7 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
     }
 
     // ============================================================
-    // COMPLETE SUMMARY
+    // COMPLETE SUMMARY — FIX: Hapus ORDER BY yang tidak valid
     // ============================================================
 
     public async Task<EmployeeSummaryView?> GetSummaryAsync(int employeeId)
@@ -173,7 +173,7 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
     }
 
     // ============================================================
-    // CURRENT HOLDING - Using GridRequest
+    // CURRENT HOLDING
     // ============================================================
 
     public async Task<PaginatedResult<EmployeeCurrentHoldingDto>> GetCurrentHoldingAsync(EmployeeSummaryGridRequest request)
@@ -258,7 +258,7 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
     }
 
     // ============================================================
-    // ASSETS HISTORY - Using GridRequest
+    // ASSETS HISTORY
     // ============================================================
 
     public async Task<PaginatedResult<EmployeeAssetsHistoryDto>> GetAssetsHistoryAsync(EmployeeSummaryGridRequest request)
@@ -340,7 +340,7 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
     }
 
     // ============================================================
-    // TRANSACTION HISTORY - Using GridRequest
+    // TRANSACTION HISTORY
     // ============================================================
 
     public async Task<PaginatedResult<EmployeeTransactionHistoryDto>> GetTransactionHistoryAsync(EmployeeSummaryGridRequest request)

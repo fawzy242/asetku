@@ -1,7 +1,7 @@
 // src/app.jsx
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast'; // TAMBAHKAN IMPORT INI
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -19,7 +19,9 @@ import Dashboard from './pages/Dashboard/Dashboard';
 
 // Lazy loaded pages
 const Assets = lazy(() => import('./pages/Assets/Assets'));
-const AssetTransactions = lazy(() => import('./pages/AssetTransactions/AssetTransactions'));
+// Asset Transactions - split into two pages
+const AssetTransactionsMonitoring = lazy(() => import('./pages/AssetTransactions/AssetTransactionsMonitoring'));
+const AssetTransactionsManagement = lazy(() => import('./pages/AssetTransactions/AssetTransactionsManagement'));
 const AssetTracking = lazy(() => import('./pages/AssetTracking/AssetTracking'));
 const Employees = lazy(() => import('./pages/Employees/Employees'));
 const EmployeeSummary = lazy(() => import('./pages/EmployeeSummary/EmployeeSummary'));
@@ -82,7 +84,11 @@ const AppRoutes = () => (
       <Route index element={<Navigate to="/dashboard" replace />} />
       <Route path="dashboard" element={<LazyPage><Dashboard /></LazyPage>} />
       <Route path="assets" element={<LazyPage><Assets /></LazyPage>} />
-      <Route path="transactions" element={<LazyPage><AssetTransactions /></LazyPage>} />
+      {/* Transaction routes split */}
+      <Route path="transactions/monitoring" element={<LazyPage><AssetTransactionsMonitoring /></LazyPage>} />
+      <Route path="transactions/management" element={<LazyPage><AssetTransactionsManagement /></LazyPage>} />
+      {/* Redirect /transactions to monitoring */}
+      <Route path="transactions" element={<Navigate to="/transactions/monitoring" replace />} />
       <Route path="tracking" element={<LazyPage><AssetTracking /></LazyPage>} />
       <Route path="employees" element={<LazyPage><Employees /></LazyPage>} />
       <Route path="employee-summary" element={<LazyPage><EmployeeSummary /></LazyPage>} />
@@ -110,7 +116,6 @@ const App = () => (
             <BrowserRouter>
               <div className="app">
                 <AppRoutes />
-                {/* TAMBAHKAN Toaster DI SINI */}
                 <Toaster
                   position="bottom-right"
                   toastOptions={{

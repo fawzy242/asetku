@@ -47,7 +47,49 @@ class EmployeesData extends BaseData {
       };
 
       // ============================================================
-      // FIX 1: KONVERSI PHOTO KE BASE64 - KIRIM photoFileBase64
+      // 🔥 FIX: KONVERSI ATTACHMENTS KE BASE64
+      // ============================================================
+      if (data.attachmentFiles && data.attachmentFiles.length > 0) {
+        console.log('📎 Processing attachmentFiles:', data.attachmentFiles);
+        
+        submitData.attachmentFilesBase64 = [];
+        submitData.attachmentFileNames = [];
+        submitData.replaceAttachments = data.replaceAttachments !== undefined ? data.replaceAttachments : true;
+        
+        for (const item of data.attachmentFiles) {
+          // 🔥 FIX: Cek apakah item adalah File object atau object dengan properti file
+          let fileToProcess = null;
+          
+          if (item instanceof File) {
+            fileToProcess = item;
+          } else if (item && item.file instanceof File) {
+            fileToProcess = item.file;
+          } else if (item && item.isNew && item.file) {
+            fileToProcess = item.file;
+          }
+          
+          if (fileToProcess && fileToProcess.size > 0) {
+            try {
+              const base64 = await this.fileToBase64(fileToProcess);
+              submitData.attachmentFilesBase64.push(base64);
+              submitData.attachmentFileNames.push(fileToProcess.name || item.fileName || 'file');
+              console.log('📎 Attachment converted to base64:', fileToProcess.name, 'size:', base64.length);
+            } catch (err) {
+              console.error('Failed to convert attachment to base64:', err);
+            }
+          } else {
+            console.warn('⚠️ Skipping invalid attachment item:', item);
+          }
+        }
+      } else {
+        // Jika tidak ada file baru, tetap kirim array kosong
+        submitData.attachmentFilesBase64 = [];
+        submitData.attachmentFileNames = [];
+        submitData.replaceAttachments = data.replaceAttachments !== undefined ? data.replaceAttachments : false;
+      }
+
+      // ============================================================
+      // PHOTO PROFILE
       // ============================================================
       if (data.photoFile instanceof File && data.photoFile.size > 0) {
         try {
@@ -60,38 +102,14 @@ class EmployeesData extends BaseData {
         }
       }
 
-      // ============================================================
-      // KONVERSI ATTACHMENTS KE BASE64
-      // ============================================================
-      if (data.attachmentFiles && data.attachmentFiles.length > 0) {
-        submitData.attachmentFilesBase64 = [];
-        submitData.attachmentFileNames = [];
-        for (const file of data.attachmentFiles) {
-          if (file instanceof File && file.size > 0) {
-            try {
-              const base64 = await this.fileToBase64(file);
-              submitData.attachmentFilesBase64.push(base64);
-              submitData.attachmentFileNames.push(file.name);
-              console.log('📎 Attachment converted to base64:', file.name, 'size:', base64.length);
-            } catch (err) {
-              console.error('Failed to convert attachment to base64:', err);
-            }
-          }
-        }
-      }
-
       // Attachment IDs to keep
       if (data.attachmentIdsToKeep && data.attachmentIdsToKeep.length > 0) {
         submitData.attachmentIdsToKeep = data.attachmentIdsToKeep;
       }
 
-      // Replace attachments flag
-      if (data.replaceAttachments !== undefined) {
-        submitData.replaceAttachments = data.replaceAttachments;
-      }
-
       console.log('📤 Submitting employee update with base64 files');
       console.log('📤 Payload keys:', Object.keys(submitData));
+      console.log('📤 attachmentFilesBase64 count:', submitData.attachmentFilesBase64?.length || 0);
       console.log('📤 Has photoFileBase64?', !!submitData.photoFileBase64);
 
       // Kirim sebagai JSON biasa

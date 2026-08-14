@@ -276,12 +276,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
             }
 
-            // Validate if can update
-            if (existing.Approved != null && model.Approved == null)
-            {
-                // Can't un-approve if already approved/rejected
-            }
-
             // Update basic fields
             existing.AssetId = model.AssetId;
             existing.TransactionType = model.TransactionType;
@@ -690,6 +684,19 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             var result = await _transactionReps.GetGridPendingApprovalAsync(request);
             return ServiceResult<PaginatedResult<AssetTransactionPendingApprovalView>>.Success(result);
         }, "get grid pending approval");
+    }
+
+    // ============================================================
+    // COMPLETE TRANSACTIONS (NEW)
+    // ============================================================
+
+    public async Task<ServiceResult<PaginatedResult<AssetTransactionListView>>> GetCompleteTransactionsAsync(AssetTransactionGridRequest request)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var result = await _transactionReps.GetCompleteTransactionsAsync(request);
+            return ServiceResult<PaginatedResult<AssetTransactionListView>>.Success(result);
+        }, "get complete transactions");
     }
 
     // ============================================================
@@ -1120,25 +1127,30 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
     private async Task AddAttachmentFromBase64Async(int transactionId, string base64String, string fileName, int order)
     {
-        var bytes = Convert.FromBase64String(base64String);
-        using var stream = new MemoryStream(bytes);
-        var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
+        try
         {
-            Headers = new HeaderDictionary(),
-            ContentType = GetContentType(fileName)
-        };
+            var bytes = Convert.FromBase64String(base64String);
+            using var stream = new MemoryStream(bytes);
+            var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
+            {
+                Headers = new HeaderDictionary(),
+                ContentType = GetContentType(fileName)
+            };
 
-        var uploadModel = new FileAttachmentUploadDto
-        {
-            File = file,
-            FileCategory = "AssetTransaction",
-            Description = $"Attachment: {fileName}",
-            IsPrimary = false
-        };
+            var uploadModel = new FileAttachmentUploadDto
+            {
+                File = file,
+                FileCategory = "AssetTransaction",
+                Description = $"Attachment: {fileName}",
+                IsPrimary = false
+            };
 
-        var fileResult = await _fileAttachmentService.UploadAsync("AssetTransaction", transactionId, uploadModel);
-        if (fileResult.IsSuccess && fileResult.Data != null)
-        {
+            var fileResult = await _fileAttachmentService.UploadAsync("AssetTransaction", transactionId, uploadModel);
+            if (!fileResult.IsSuccess || fileResult.Data == null)
+            {
+                throw new Exception($"Upload attachment failed: {string.Join(", ", fileResult.Errors)}");
+            }
+
             var attachmentEntity = new AssetTransactionAttachmentEntity
             {
                 AssetTransactionId = transactionId,
@@ -1150,29 +1162,39 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             };
             await _transactionReps.InsertAttachmentAsync(attachmentEntity);
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding attachment for Transaction {TransactionId}", transactionId);
+            throw;
+        }
     }
 
     private async Task AddApproveAttachmentFromBase64Async(int transactionId, string base64String, string fileName, int documentType, int order)
     {
-        var bytes = Convert.FromBase64String(base64String);
-        using var stream = new MemoryStream(bytes);
-        var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
+        try
         {
-            Headers = new HeaderDictionary(),
-            ContentType = GetContentType(fileName)
-        };
+            var bytes = Convert.FromBase64String(base64String);
+            using var stream = new MemoryStream(bytes);
+            var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
+            {
+                Headers = new HeaderDictionary(),
+                ContentType = GetContentType(fileName)
+            };
 
-        var uploadModel = new FileAttachmentUploadDto
-        {
-            File = file,
-            FileCategory = "ApproveDocument",
-            Description = $"Approve document: {fileName}",
-            IsPrimary = false
-        };
+            var uploadModel = new FileAttachmentUploadDto
+            {
+                File = file,
+                FileCategory = "ApproveDocument",
+                Description = $"Approve document: {fileName}",
+                IsPrimary = false
+            };
 
-        var fileResult = await _fileAttachmentService.UploadAsync("AssetTransactionApprove", transactionId, uploadModel);
-        if (fileResult.IsSuccess && fileResult.Data != null)
-        {
+            var fileResult = await _fileAttachmentService.UploadAsync("AssetTransactionApprove", transactionId, uploadModel);
+            if (!fileResult.IsSuccess || fileResult.Data == null)
+            {
+                throw new Exception($"Upload approve attachment failed: {string.Join(", ", fileResult.Errors)}");
+            }
+
             var attachmentEntity = new AssetTransactionApproveAttachmentEntity
             {
                 AssetTransactionId = transactionId,
@@ -1186,6 +1208,11 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 CreatedBy = _currentUserService.GetDisplayName()
             };
             await _transactionReps.InsertApproveAttachmentAsync(attachmentEntity);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding approve attachment for Transaction {TransactionId}", transactionId);
+            throw;
         }
     }
 

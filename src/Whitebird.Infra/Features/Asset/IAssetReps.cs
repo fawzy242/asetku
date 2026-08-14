@@ -63,7 +63,7 @@ public interface IAssetReps
     Task<int> DeleteSoftwareInstallationByAssetIdAsync(int assetId);
 
     // ============================================================
-    // ASSET ATTACHMENT (NEW)
+    // ASSET ATTACHMENT
     // ============================================================
 
     Task<int> InsertAttachmentAsync(AssetAttachmentEntity entity);
@@ -71,4 +71,12 @@ public interface IAssetReps
     Task<AssetAttachmentEntity?> GetAttachmentByIdAsync(int attachmentId);
     Task<int> DeleteAttachmentAsync(int attachmentId);
     Task<int> DeleteAttachmentsByAssetIdAsync(int assetId);
+
+    // ============================================================
+    // ASSET PHOTO PROFILE (NEW)
+    // ============================================================
+
+    Task<int> InsertPhotoProfileAsync(AssetPhotoProfileAttachmentEntity entity);
+    Task<AssetPhotoProfileAttachmentEntity?> GetPhotoProfileByAssetIdAsync(int assetId);
+    Task<int> DeletePhotoProfileByAssetIdAsync(int assetId);
 }

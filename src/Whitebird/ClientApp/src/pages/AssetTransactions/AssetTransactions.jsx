@@ -1,10 +1,10 @@
 // src/pages/AssetTransactions/AssetTransactions.jsx
 import React from 'react';
-import AssetTransactionsMenu from './AssetTransactions.menu';
-import './AssetTransactions.scss';
+import { Navigate } from 'react-router-dom';
 
 const AssetTransactions = () => {
-  return <AssetTransactionsMenu />;
+  // Redirect ke monitoring sebagai default
+  return <Navigate to="/transactions/monitoring" replace />;
 };
 
 export default AssetTransactions;

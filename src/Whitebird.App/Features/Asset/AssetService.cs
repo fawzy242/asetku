@@ -198,11 +198,14 @@ public class AssetService : BaseService, IAssetService
         }, "create asset");
     }
 
-    // ============================================================
-    // FIX 1: UPDATE — Handle base64 file upload dengan benar
-    // ============================================================
     public async Task<ServiceResult<AssetDetailView>> UpdateAsync(int id, AssetUpdateFormDto model)
     {
+        var codeExists = await _assetReps.IsAssetCodeExistsAsync(model.AssetCode, id);
+        if (codeExists)
+        {
+            return ServiceResult<AssetDetailView>.Conflict($"Asset code '{model.AssetCode}' already exists");
+        }
+
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _assetReps.GetByIdRawAsync(id);
@@ -211,16 +214,7 @@ public class AssetService : BaseService, IAssetService
                 return ServiceResult<AssetDetailView>.NotFound($"Asset with id {id} not found");
             }
 
-            var codeExists = await _assetReps.IsAssetCodeExistsAsync(model.AssetCode, id);
-            if (codeExists)
-            {
-                return ServiceResult<AssetDetailView>.Conflict($"Asset code '{model.AssetCode}' already exists");
-            }
-
-            var oldCode = existing.AssetCode;
-            var oldName = existing.AssetName;
-
-            // Map manual
+            // Update basic fields
             existing.AssetCode = model.AssetCode;
             existing.AssetName = model.AssetName;
             existing.CategoryId = model.CategoryId;
@@ -242,16 +236,12 @@ public class AssetService : BaseService, IAssetService
             existing.ModifiedDate = DateTime.Now;
             existing.ModifiedBy = _currentUserService.GetDisplayName();
 
-            var result = await _repository.UpdateAsync(existing);
-            if (result <= 0)
-            {
-                return ServiceResult<AssetDetailView>.Failure("Failed to update asset");
-            }
+            await _repository.UpdateAsync(existing);
 
+            // Software Installation
             if (model.SoftwareInstallation != null)
             {
                 var existingSoftware = await _assetReps.GetSoftwareInstallationByAssetIdAsync(id);
-
                 if (existingSoftware != null)
                 {
                     model.SoftwareInstallation.Adapt(existingSoftware);
@@ -271,36 +261,24 @@ public class AssetService : BaseService, IAssetService
             }
 
             // ============================================================
-            // FIX 1: PHOTO PROFILE - PASTIKAN UPLOAD BERHASIL
+            // PHOTO PROFILE
             // ============================================================
             if (!string.IsNullOrEmpty(model.PhotoFileBase64))
             {
-                try
+                // Hapus foto lama
+                var oldPhoto = await _assetReps.GetPhotoProfileByAssetIdAsync(id);
+                if (oldPhoto != null)
                 {
-                    // Delete existing photo
-                    var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("AssetPhotoProfile", id);
-                    if (existingPhotos.IsSuccess && existingPhotos.Data != null && existingPhotos.Data.Any())
-                    {
-                        foreach (var photo in existingPhotos.Data)
-                        {
-                            await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
-                        }
-                    }
-
-                    // Convert base64 to file and upload
-                    await AddPhotoProfileFromBase64Async(id, model.PhotoFileBase64, model.PhotoFileName ?? "photo.jpg");
-
-                    _logger.LogInformation("Photo profile uploaded successfully for Asset {AssetId}", id);
+                    await _fileAttachmentService.DeleteAsync(oldPhoto.FileAttachmentId);
+                    await _assetReps.DeletePhotoProfileByAssetIdAsync(id);
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to upload photo profile for Asset {AssetId}", id);
-                    // Jangan gagalkan update hanya karena photo gagal upload
-                }
+
+                // Upload foto baru dan insert pivot
+                await AddPhotoProfileFromBase64Async(id, model.PhotoFileBase64, model.PhotoFileName ?? "photo.jpg");
             }
 
             // ============================================================
-            // ATTACHMENTS (base64)
+            // ATTACHMENTS
             // ============================================================
             if (model.ReplaceAttachments || (model.AttachmentFilesBase64 != null && model.AttachmentFilesBase64.Any()))
             {
@@ -337,7 +315,7 @@ public class AssetService : BaseService, IAssetService
             await _activityLogService.LogUpdateAsync(
                 TableNames.Asset,
                 id,
-                $"Asset updated: Code '{oldCode}' -> '{model.AssetCode}', Name '{oldName}' -> '{model.AssetName}'",
+                $"Asset updated: Code '{model.AssetCode}', Name '{model.AssetName}'",
                 _currentUserService.GetDisplayName());
 
             return ServiceResult<AssetDetailView>.Success(updated!, "Asset updated successfully");
@@ -508,7 +486,7 @@ public class AssetService : BaseService, IAssetService
     }
 
     // ============================================================
-    // PRIVATE METHODS FOR BASE64 UPLOAD
+    // PRIVATE METHODS — BASE64 UPLOAD (THROW EXCEPTION ON FAILURE)
     // ============================================================
 
     private async Task AddPhotoProfileFromBase64Async(int assetId, string base64String, string fileName)
@@ -523,10 +501,6 @@ public class AssetService : BaseService, IAssetService
                 ContentType = GetContentType(fileName)
             };
 
-            var subDirectory = Path.Combine("Asset", assetId.ToString(), "Profile");
-            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
-            var fileHash = _storageService.ComputeFileHash(file);
-
             var uploadModel = new FileAttachmentUploadDto
             {
                 File = file,
@@ -536,19 +510,26 @@ public class AssetService : BaseService, IAssetService
             };
 
             var result = await _fileAttachmentService.UploadAsync("AssetPhotoProfile", assetId, uploadModel);
-            if (result.IsSuccess)
+            if (!result.IsSuccess || result.Data == null)
             {
-                await _activityLogService.LogUpdateAsync(
-                    TableNames.Asset,
-                    assetId,
-                    $"Profile photo uploaded",
-                    _currentUserService.GetDisplayName());
-                _logger.LogInformation("Photo uploaded successfully for Asset {AssetId}", assetId);
+                throw new Exception($"Upload profile photo failed: {string.Join(", ", result.Errors)}");
             }
-            else
+
+            var entity = new AssetPhotoProfileAttachmentEntity
             {
-                _logger.LogWarning("Failed to upload photo for Asset {AssetId}: {Error}", assetId, result.Message);
-            }
+                AssetId = assetId,
+                FileAttachmentId = result.Data.FileAttachmentId,
+                IsActive = true,
+                CreatedDate = DateTime.Now,
+                CreatedBy = _currentUserService.GetDisplayName()
+            };
+            await _assetReps.InsertPhotoProfileAsync(entity);
+
+            await _activityLogService.LogUpdateAsync(
+                TableNames.Asset,
+                assetId,
+                $"Profile photo uploaded",
+                _currentUserService.GetDisplayName());
         }
         catch (Exception ex)
         {
@@ -569,10 +550,6 @@ public class AssetService : BaseService, IAssetService
                 ContentType = GetContentType(fileName)
             };
 
-            var subDirectory = Path.Combine("Asset", assetId.ToString(), "Attachments");
-            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
-            var fileHash = _storageService.ComputeFileHash(file);
-
             var uploadModel = new FileAttachmentUploadDto
             {
                 File = file,
@@ -582,26 +559,28 @@ public class AssetService : BaseService, IAssetService
             };
 
             var fileResult = await _fileAttachmentService.UploadAsync("Asset", assetId, uploadModel);
-            if (fileResult.IsSuccess && fileResult.Data != null)
+            if (!fileResult.IsSuccess || fileResult.Data == null)
             {
-                var attachmentEntity = new AssetAttachmentEntity
-                {
-                    AssetId = assetId,
-                    FileAttachmentId = fileResult.Data.FileAttachmentId,
-                    Order = order,
-                    IsActive = true,
-                    CreatedDate = DateTime.Now,
-                    CreatedBy = _currentUserService.GetDisplayName()
-                };
-
-                await _assetReps.InsertAttachmentAsync(attachmentEntity);
-
-                await _activityLogService.LogCreateAsync(
-                    TableNames.Asset,
-                    assetId,
-                    $"Attachment added: {fileName}",
-                    _currentUserService.GetDisplayName());
+                throw new Exception($"Upload attachment failed: {string.Join(", ", fileResult.Errors)}");
             }
+
+            var attachmentEntity = new AssetAttachmentEntity
+            {
+                AssetId = assetId,
+                FileAttachmentId = fileResult.Data.FileAttachmentId,
+                Order = order,
+                IsActive = true,
+                CreatedDate = DateTime.Now,
+                CreatedBy = _currentUserService.GetDisplayName()
+            };
+
+            await _assetReps.InsertAttachmentAsync(attachmentEntity);
+
+            await _activityLogService.LogCreateAsync(
+                TableNames.Asset,
+                assetId,
+                $"Attachment added: {fileName}",
+                _currentUserService.GetDisplayName());
         }
         catch (Exception ex)
         {

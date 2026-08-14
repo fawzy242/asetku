@@ -2,7 +2,7 @@
 import apiClient from '../../core/api/apiClient';
 import BaseData from '../../core/services/BaseData';
 import ConfirmDialog from '../../components/molecules/ConfirmDialog/ConfirmDialog';
-import { handleSuccess, handleApiError } from '../../core/services';
+import { handleSuccess } from '../../core/services/successHandler';
 
 class AssetsData extends BaseData {
   constructor() {
@@ -54,7 +54,7 @@ class AssetsData extends BaseData {
       };
 
       // ============================================================
-      // FIX 1: KONVERSI PHOTO KE BASE64 - KIRIM photoFileBase64
+      // 🔥 FIX: KONVERSI PHOTO KE BASE64
       // ============================================================
       if (data.photoFile instanceof File && data.photoFile.size > 0) {
         try {
@@ -68,23 +68,45 @@ class AssetsData extends BaseData {
       }
 
       // ============================================================
-      // KONVERSI ATTACHMENTS KE BASE64
+      // 🔥 FIX: KONVERSI ATTACHMENTS KE BASE64
       // ============================================================
       if (data.attachmentFiles && data.attachmentFiles.length > 0) {
+        console.log('📎 Processing attachmentFiles:', data.attachmentFiles);
+        
         submitData.attachmentFilesBase64 = [];
         submitData.attachmentFileNames = [];
-        for (const file of data.attachmentFiles) {
-          if (file instanceof File && file.size > 0) {
+        submitData.replaceAttachments = data.replaceAttachments !== undefined ? data.replaceAttachments : true;
+        
+        for (const item of data.attachmentFiles) {
+          // 🔥 FIX: Cek apakah item adalah File object atau object dengan properti file
+          let fileToProcess = null;
+          
+          if (item instanceof File) {
+            fileToProcess = item;
+          } else if (item && item.file instanceof File) {
+            fileToProcess = item.file;
+          } else if (item && item.isNew && item.file) {
+            fileToProcess = item.file;
+          }
+          
+          if (fileToProcess && fileToProcess.size > 0) {
             try {
-              const base64 = await this.fileToBase64(file);
+              const base64 = await this.fileToBase64(fileToProcess);
               submitData.attachmentFilesBase64.push(base64);
-              submitData.attachmentFileNames.push(file.name);
-              console.log('📎 Attachment converted to base64:', file.name, 'size:', base64.length);
+              submitData.attachmentFileNames.push(fileToProcess.name || item.fileName || 'file');
+              console.log('📎 Attachment converted to base64:', fileToProcess.name, 'size:', base64.length);
             } catch (err) {
               console.error('Failed to convert attachment to base64:', err);
             }
+          } else {
+            console.warn('⚠️ Skipping invalid attachment item:', item);
           }
         }
+      } else {
+        // Jika tidak ada file baru, tetap kirim array kosong
+        submitData.attachmentFilesBase64 = [];
+        submitData.attachmentFileNames = [];
+        submitData.replaceAttachments = data.replaceAttachments !== undefined ? data.replaceAttachments : false;
       }
 
       // Attachment IDs to keep
@@ -92,13 +114,9 @@ class AssetsData extends BaseData {
         submitData.attachmentIdsToKeep = data.attachmentIdsToKeep;
       }
 
-      // Replace attachments flag
-      if (data.replaceAttachments !== undefined) {
-        submitData.replaceAttachments = data.replaceAttachments;
-      }
-
       console.log('📤 Submitting asset update with base64 files');
       console.log('📤 Payload keys:', Object.keys(submitData));
+      console.log('📤 attachmentFilesBase64 count:', submitData.attachmentFilesBase64?.length || 0);
       console.log('📤 Has photoFileBase64?', !!submitData.photoFileBase64);
 
       // Kirim sebagai JSON biasa
@@ -244,6 +262,94 @@ class AssetsData extends BaseData {
       }
       
       const errorMsg = error.userMessage || error.message || 'Failed to download template';
+      ConfirmDialog.toast.error(errorMsg);
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  // ============================================================
+  // CREATE — Override untuk handle base64 jika perlu
+  // ============================================================
+  async create(data) {
+    try {
+      // Base data
+      const submitData = {
+        assetCode: data.assetCode || '',
+        assetName: data.assetName || '',
+        categoryId: data.categoryId ? parseInt(data.categoryId, 10) : 0,
+        brand: data.brand || null,
+        model: data.model || null,
+        serialNumber: data.serialNumber || null,
+        imei: data.imei || null,
+        macAddress: data.macAddress || null,
+        hostname: data.hostname || null,
+        ipAddress: data.ipAddress || null,
+        purchaseDate: data.purchaseDate || null,
+        purchasePrice: data.purchasePrice ? parseFloat(data.purchasePrice) : null,
+        invoiceNumber: data.invoiceNumber || null,
+        supplierId: data.supplierId ? parseInt(data.supplierId, 10) : null,
+        warrantyPeriod: data.warrantyPeriod ? parseInt(data.warrantyPeriod, 10) : null,
+        assetConditionPurchase: data.assetConditionPurchase ? parseInt(data.assetConditionPurchase, 10) : null,
+        notes: data.notes || null,
+      };
+
+      // Photo profile (untuk create, biasanya tidak ada, tapi tetap support)
+      if (data.photoFile instanceof File && data.photoFile.size > 0) {
+        try {
+          const base64 = await this.fileToBase64(data.photoFile);
+          submitData.photoFileBase64 = base64;
+          submitData.photoFileName = data.photoFile.name;
+        } catch (err) {
+          console.error('Failed to convert photo to base64:', err);
+        }
+      }
+
+      // Attachments (untuk create)
+      if (data.attachmentFiles && data.attachmentFiles.length > 0) {
+        submitData.attachmentFilesBase64 = [];
+        submitData.attachmentFileNames = [];
+        
+        for (const item of data.attachmentFiles) {
+          let fileToProcess = null;
+          
+          if (item instanceof File) {
+            fileToProcess = item;
+          } else if (item && item.file instanceof File) {
+            fileToProcess = item.file;
+          } else if (item && item.isNew && item.file) {
+            fileToProcess = item.file;
+          }
+          
+          if (fileToProcess && fileToProcess.size > 0) {
+            try {
+              const base64 = await this.fileToBase64(fileToProcess);
+              submitData.attachmentFilesBase64.push(base64);
+              submitData.attachmentFileNames.push(fileToProcess.name || item.fileName || 'file');
+            } catch (err) {
+              console.error('Failed to convert attachment to base64:', err);
+            }
+          }
+        }
+      }
+
+      console.log('📤 Creating asset with data:', submitData);
+
+      const result = await this.api.create(submitData);
+
+      if (result.data?.isSuccess !== undefined) {
+        if (!result.data.isSuccess) {
+          const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Failed to create';
+          ConfirmDialog.toast.error(errorMsg);
+          return { success: false, errors: result.data.errors };
+        }
+        return { success: true, data: result.data.data };
+      }
+      return { success: true, data: result.data };
+    } catch (error) {
+      if (this.isCanceledError(error)) {
+        return { success: false, error: 'canceled', isCanceled: true };
+      }
+      const errorMsg = error.userMessage || error.message || 'Failed to create';
       ConfirmDialog.toast.error(errorMsg);
       return { success: false, error: errorMsg };
     }

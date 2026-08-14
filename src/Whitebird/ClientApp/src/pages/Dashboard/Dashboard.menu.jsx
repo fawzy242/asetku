@@ -174,9 +174,6 @@ const expiredWarrantyColumns = [
   },
 ];
 
-// ============================================================
-// FIX 4: TAMBAHKAN KOLOM UNTUK SCHEDULE STATS
-// ============================================================
 const scheduleStatsColumns = [
   {
     field: 'scheduleDate',
@@ -205,9 +202,6 @@ const scheduleStatsColumns = [
   },
 ];
 
-// ============================================================
-// FIX 4: TAMBAHKAN KOLOM UNTUK CATEGORY BREAKDOWN (TABEL)
-// ============================================================
 const categoryBreakdownColumns = [
   { field: 'category', headerName: 'Category', flex: 1, minWidth: 200 },
   { field: 'assetCount', headerName: 'Asset Count', width: 130 },
@@ -223,9 +217,6 @@ const categoryBreakdownColumns = [
   },
 ];
 
-// ============================================================
-// FIX 4: TAMBAHKAN KOLOM UNTUK MONTHLY STATS (TABEL)
-// ============================================================
 const monthlyStatsColumns = [
   {
     field: 'month',
@@ -443,7 +434,7 @@ const DashboardMenu = () => {
   const activeEmployees = stats.activeEmployees || 0;
 
   // ============================================================
-  // FIX 4: TAMBAHKAN STAT CARDS UNTUK EMPLOYEE & OFFICE
+  // FIX: Update endpoint for Pending Approvals drilldown
   // ============================================================
   const statCardsConfig = [
     { icon: FiPackage, label: 'Total Assets', value: stats.totalAssets || 0, endpoint: '/Asset/grid', params: {}, color: '#dc2626', bg: 'rgba(220, 38, 38, 0.1)' },
@@ -452,15 +443,13 @@ const DashboardMenu = () => {
     { icon: FiLayers, label: 'On Loan', value: stats.assetsOnLoan || 0, endpoint: '/Asset/grid', params: { status: 'On Loan' }, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
     { icon: FiTool, label: 'In Maintenance', value: stats.assetsInMaintenance || 0, endpoint: '/Asset/grid', params: { status: 'In Maintenance' }, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
     { icon: FiShield, label: 'Damaged', value: damagedCount, endpoint: '/Asset/grid', params: { status: 'Damaged' }, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
-    { icon: FiClock, label: 'Pending Approvals', value: pendingApprovalsCount, endpoint: '/AssetTransaction/grid-pending-approval', params: {}, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+    // FIX: Update endpoint for Pending Approvals drilldown
+    { icon: FiClock, label: 'Pending Approvals', value: pendingApprovalsCount, endpoint: '/AssetTransaction/grid-uncomplete', params: {}, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
     { icon: FiAlertTriangle, label: 'Overdue Loans', value: stats.overdueLoanCount || 0, endpoint: '/AssetTransaction/overdue-loans', params: {}, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
     { icon: FiDollarSign, label: 'Total Value', value: utilsHelper.formatCurrency(stats.totalAssetValue), noDrilldown: true, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
     { icon: FiTrendingUp, label: 'Utilization', value: `${assetUtilizationRate.toFixed(1)}%`, noDrilldown: true, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },
     { icon: FiBarChart2, label: 'This Month', value: thisMonthCount, endpoint: '/AssetTransaction/grid-add', params: {}, color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)' },
     { icon: FiCalendar, label: 'Upcoming Maintenance', value: safeScheduleStats.upcomingMaintenance || 0, noDrilldown: true, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
-    // ============================================================
-    // FIX 4: TAMBAHKAN CARD UNTUK EMPLOYEE & OFFICE
-    // ============================================================
     { icon: FiUsers, label: 'Total Employees', value: totalEmployees, noDrilldown: true, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
     { icon: FiUser, label: 'Active Employees', value: activeEmployees, noDrilldown: true, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
     { icon: FiBriefcase, label: 'Departments', value: stats.totalDepartments || 0, noDrilldown: true, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
@@ -539,11 +528,7 @@ const DashboardMenu = () => {
             </div>
           )}
 
-          {/* ============================================================ */}
-          {/* FIX 4: TAMBAHKAN SUMMARY TABEL DI BAWAH CARDS */}
-          {/* ============================================================ */}
           <div className="dashboard__summary-tables">
-            {/* Monthly Stats */}
             {safeMonthlyStats.length > 0 && (
               <Card title="Monthly Transaction Statistics" className="dashboard__summary-card">
                 <DataTable
@@ -561,7 +546,6 @@ const DashboardMenu = () => {
               </Card>
             )}
 
-            {/* Category Breakdown */}
             {safeCategoryBreakdown.length > 0 && (
               <Card title="Asset Value by Category" className="dashboard__summary-card">
                 <DataTable
@@ -579,7 +563,6 @@ const DashboardMenu = () => {
               </Card>
             )}
 
-            {/* Schedule Stats */}
             {safeScheduleStats && (
               <Card title="Schedule Statistics" className="dashboard__summary-card">
                 <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 2 }}>
@@ -646,9 +629,6 @@ const DashboardMenu = () => {
             </Card>
           </div>
 
-          {/* ============================================================ */}
-          {/* FIX 4: TAMBAHKAN TABEL DI BAWAH CHART UNTUK CHARTS TAB */}
-          {/* ============================================================ */}
           <div className="dashboard__summary-tables">
             {safeCategoryBreakdown.length > 0 && (
               <Card title="Category Breakdown Details" className="dashboard__summary-card">
@@ -689,9 +669,6 @@ const DashboardMenu = () => {
             </div>
           </Card>
 
-          {/* ============================================================ */}
-          {/* FIX 4: TAMBAHKAN EXPIRED WARRANTY DI RECENT TAB */}
-          {/* ============================================================ */}
           {safeExpiredWarranty.length > 0 && (
             <Card title="Expired Warranty Assets" className="dashboard__summary-card">
               <DataTable

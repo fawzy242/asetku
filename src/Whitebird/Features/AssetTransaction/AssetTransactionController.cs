@@ -180,8 +180,12 @@ public class AssetTransactionController : ControllerBase
         return this.HandleResult(await _transactionService.GetGridReturnAsync(request));
     }
 
-    [HttpGet("grid-pending-approval")]
-    public async Task<IActionResult> GetGridPendingApproval(
+    // ============================================================
+    // RENAMED: grid-pending-approval → grid-uncomplete
+    // ============================================================
+
+    [HttpGet("grid-uncomplete")]
+    public async Task<IActionResult> GetUncompleteTransactions(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string? search = null,
@@ -208,6 +212,39 @@ public class AssetTransactionController : ControllerBase
         };
 
         return this.HandleResult(await _transactionService.GetGridPendingApprovalAsync(request));
+    }
+
+    // ============================================================
+    // COMPLETE TRANSACTIONS (NEW)
+    // ============================================================
+
+    [HttpGet("grid-complete")]
+    public async Task<IActionResult> GetCompleteTransactions(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? search = null,
+        [FromQuery] DateTime? dateFrom = null,
+        [FromQuery] DateTime? dateTo = null,
+        [FromQuery] int? employeeId = null,
+        [FromQuery] int? assetId = null,
+        [FromQuery] int? transactionType = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] bool sortDescending = true)
+    {
+        var request = new AssetTransactionGridRequest
+        {
+            Page = page,
+            PageSize = pageSize,
+            Search = search,
+            DateFrom = dateFrom,
+            DateTo = dateTo,
+            EmployeeId = employeeId,
+            AssetId = assetId,
+            TransactionType = transactionType,
+            SortBy = sortBy,
+            SortDescending = sortDescending
+        };
+        return this.HandleResult(await _transactionService.GetCompleteTransactionsAsync(request));
     }
 
     // ============================================================
@@ -378,15 +415,4 @@ public class AssetTransactionController : ControllerBase
 
         return File(result.Data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Transaction_Import_Template.xlsx");
     }
-
-    // ============================================================
-    // REMOVED ENDPOINTS (moved to update payload):
-    // - POST /{id}/attachment
-    // - DELETE /{id}/attachment/{attachmentId}
-    // - POST /{id}/approve-attachment
-    // - DELETE /{id}/approve-attachment/{attachmentId}
-    // - POST /{id}/approve-attachment/{attachmentId}/action
-    // 
-    // These are now handled via the Update/UpdateApproval endpoints with base64 payload
-    // ============================================================
 }

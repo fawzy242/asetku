@@ -1074,4 +1074,117 @@ public class AssetTransactionReps : IAssetTransactionReps
         var count = await _context.ExecuteScalarAsync<int>(sql, new { TransactionId = transactionId });
         return count == 0;
     }
+    // ============================================================
+    // COMPLETE TRANSACTIONS (NEW) — Tambahkan di akhir class
+    // ============================================================
+
+    public async Task<PaginatedResult<AssetTransactionListView>> GetCompleteTransactionsAsync(AssetTransactionGridRequest request)
+    {
+        var conditions = new List<string>
+    {
+        "t.IsActive = 1",
+        "t.Approved = 1",
+        "t.Completed = 1"
+    };
+        var parameters = new DynamicParameters();
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            conditions.Add(@"(a.AssetCode LIKE @Search OR a.AssetName LIKE @Search OR e.FullName LIKE @Search OR e.EmployeeCode LIKE @Search OR t.AssetTransactionCode LIKE @Search)");
+            parameters.Add("@Search", $"%{request.Search}%");
+        }
+
+        if (request.DateFrom.HasValue)
+        {
+            conditions.Add("t.TransactionDate >= @DateFrom");
+            parameters.Add("@DateFrom", request.DateFrom.Value);
+        }
+
+        if (request.DateTo.HasValue)
+        {
+            conditions.Add("t.TransactionDate <= @DateTo");
+            parameters.Add("@DateTo", request.DateTo.Value);
+        }
+
+        if (request.EmployeeId.HasValue)
+        {
+            conditions.Add("t.EmployeeId = @EmployeeId");
+            parameters.Add("@EmployeeId", request.EmployeeId.Value);
+        }
+
+        if (request.AssetId.HasValue)
+        {
+            conditions.Add("t.AssetId = @AssetId");
+            parameters.Add("@AssetId", request.AssetId.Value);
+        }
+
+        if (request.TransactionType.HasValue)
+        {
+            conditions.Add("t.TransactionType = @TransactionType");
+            parameters.Add("@TransactionType", request.TransactionType.Value);
+        }
+
+        var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
+
+        var sortBy = string.IsNullOrEmpty(request.SortBy) ? "t.TransactionDate" : request.SortBy;
+        if (!sortBy.StartsWith("t.") && !sortBy.StartsWith("a.") && !sortBy.StartsWith("e."))
+        {
+            sortBy = $"t.{sortBy}";
+        }
+
+        var orderBy = $"ORDER BY {sortBy} {(request.SortDescending ? "DESC" : "ASC")}";
+
+        var countSql = $@"
+        SELECT COUNT(*)
+        FROM AssetTransaction t
+        LEFT JOIN Asset a ON t.AssetId = a.AssetId
+        LEFT JOIN Employee e ON t.EmployeeId = e.EmployeeId
+        {whereClause}";
+
+        var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
+
+        var offset = (request.Page - 1) * request.PageSize;
+        parameters.Add("@Offset", offset);
+        parameters.Add("@PageSize", request.PageSize);
+
+        var selectClause = @"
+        SELECT 
+            t.AssetTransactionId, t.AssetTransactionCode, t.AssetId, t.TransactionType, 
+            t.TransactionDate, t.ExpectedLoanReturnDate, t.Notes, t.Condition,
+            t.Approved, t.ApprovedBy, t.Completed, t.CompletedBy,
+            t.MaintenanceType, t.MaintenanceCost, t.FromAssetTransactionId, t.IsActive,
+            t.CreatedDate, t.CreatedBy, t.ModifiedDate, t.ModifiedBy,
+            a.AssetCode, a.AssetName,
+            e.EmployeeId, e.EmployeeCode, e.FullName as EmployeeName,
+            md1.MasterDataName as TransactionTypeName,
+            md2.MasterDataName as ConditionName,
+            md3.MasterDataName as MaintenanceTypeName,
+            0 as CanEdit, 0 as CanDelete, 0 as CanReturn, 0 as CanPost";
+
+        var fromClause = @"
+        FROM AssetTransaction t
+        LEFT JOIN Asset a ON t.AssetId = a.AssetId
+        LEFT JOIN Employee e ON t.EmployeeId = e.EmployeeId
+        LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
+        LEFT JOIN MasterData md2 ON t.Condition = md2.ReferenceCode AND md2.ReferenceName = 'AssetCondition' AND md2.IsActive = 1
+        LEFT JOIN MasterData md3 ON t.MaintenanceType = md3.ReferenceCode AND md3.ReferenceName = 'MaintenanceType' AND md3.IsActive = 1";
+
+        var dataSql = $@"
+        {selectClause}
+        {fromClause}
+        {whereClause}
+        {orderBy}
+        OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+
+        var data = await _context.QueryAsync<AssetTransactionListView>(dataSql, parameters);
+
+        return new PaginatedResult<AssetTransactionListView>
+        {
+            Data = data.ToList(),
+            TotalCount = totalCount,
+            PageNumber = request.Page,
+            PageSize = request.PageSize,
+            TotalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize)
+        };
+    }
 }

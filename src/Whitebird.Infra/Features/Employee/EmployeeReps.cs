@@ -261,4 +261,40 @@ public class EmployeeReps : IEmployeeReps
         const string sql = "UPDATE EmployeeAttachment SET IsActive = 0, ModifiedDate = GETDATE() WHERE EmployeeId = @EmployeeId";
         return await _context.ExecuteAsync(sql, new { EmployeeId = employeeId });
     }
+
+    // ============================================================
+    // EMPLOYEE PHOTO PROFILE (NEW)
+    // ============================================================
+
+    public async Task<int> InsertPhotoProfileAsync(EmployeePhotoProfileAttachmentEntity entity)
+    {
+        const string sql = @"
+            INSERT INTO EmployeePhotoProfileAttachment (
+                EmployeeId, FileAttachmentId, IsActive, CreatedDate, CreatedBy
+            ) VALUES (
+                @EmployeeId, @FileAttachmentId, 1, GETDATE(), @CreatedBy
+            );
+            SELECT CAST(SCOPE_IDENTITY() AS INT);";
+
+        return await _context.ExecuteScalarAsync<int>(sql, entity);
+    }
+
+    public async Task<EmployeePhotoProfileAttachmentEntity?> GetPhotoProfileByEmployeeIdAsync(int employeeId)
+    {
+        const string sql = @"
+            SELECT * FROM EmployeePhotoProfileAttachment 
+            WHERE EmployeeId = @EmployeeId AND IsActive = 1";
+
+        return await _context.QueryFirstOrDefaultAsync<EmployeePhotoProfileAttachmentEntity>(sql, new { EmployeeId = employeeId });
+    }
+
+    public async Task<int> DeletePhotoProfileByEmployeeIdAsync(int employeeId)
+    {
+        const string sql = @"
+            UPDATE EmployeePhotoProfileAttachment 
+            SET IsActive = 0, ModifiedDate = GETDATE() 
+            WHERE EmployeeId = @EmployeeId AND IsActive = 1";
+
+        return await _context.ExecuteAsync(sql, new { EmployeeId = employeeId });
+    }
 }

@@ -48,16 +48,13 @@ import './AssetTransactions.scss';
 const transactionsData = new AssetTransactionsData();
 transactionsData.transformFormData = cleanTransactionFormData;
 
-const MAIN_TABS = [
-  { id: 'monitoring', label: '📊 Monitoring' },
-  { id: 'management', label: '⚙️ Management' },
-];
-
+// FIX: Hanya sub-tabs berdasarkan main tab
 const MONITORING_SUB_TABS = [
-  { id: 'pending-approval', label: 'Pending Approval' },
+  { id: 'uncomplete', label: 'Uncomplete' },
   { id: 'active-loans', label: 'Active Loans' },
   { id: 'overdue-loans', label: 'Overdue Loans' },
   { id: 'under-maintenance', label: 'Under Maintenance' },
+  { id: 'complete', label: 'Complete' },
 ];
 
 const MANAGEMENT_SUB_TABS = [
@@ -80,9 +77,12 @@ const INITIAL_FORM_DATA = {
   transactionDate: new Date().toISOString(),
 };
 
-const AssetTransactionsMenu = () => {
-  const [activeMainTab, setActiveMainTab] = useState('monitoring');
-  const [activeSubTab, setActiveSubTab] = useState('pending-approval');
+const AssetTransactionsMenu = ({ initialMainTab = 'monitoring' }) => {
+  // Gunakan initialMainTab dari props, tanpa tab utama
+  const [activeMainTab] = useState(initialMainTab);
+  // Default sub tab berdasarkan main tab
+  const defaultSubTab = initialMainTab === 'monitoring' ? 'uncomplete' : 'approved';
+  const [activeSubTab, setActiveSubTab] = useState(defaultSubTab);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilterStart, setDateFilterStart] = useState('');
   const [dateFilterEnd, setDateFilterEnd] = useState('');
@@ -195,8 +195,11 @@ const AssetTransactionsMenu = () => {
 
     let result;
     switch (activeSubTab) {
-      case 'pending-approval':
-        result = await transactionsData.api.getGridPendingApproval(requestParams);
+      case 'uncomplete':
+        result = await transactionsData.api.getGridUncomplete(requestParams);
+        break;
+      case 'complete':
+        result = await transactionsData.api.getGridComplete(requestParams);
         break;
       case 'active-loans':
         result = await transactionsData.api.getActiveLoans(requestParams);
@@ -208,7 +211,7 @@ const AssetTransactionsMenu = () => {
         result = await transactionsData.api.getUnderMaintenance(requestParams);
         break;
       default:
-        result = await transactionsData.api.getGridPendingApproval(requestParams);
+        result = await transactionsData.api.getGridUncomplete(requestParams);
     }
 
     return {
@@ -231,7 +234,6 @@ const AssetTransactionsMenu = () => {
     reload: reloadMonitoring,
   } = useGridData(['monitoring', activeSubTab, searchTerm, dateFilterStart, dateFilterEnd], fetchMonitoringData);
 
-  // FIX 3: buildManagementFilters dengan parameter "status"
   const buildManagementFilters = useCallback(() => {
     const filters = {};
     if (activeSubTab === 'pending') {
@@ -538,6 +540,32 @@ const AssetTransactionsMenu = () => {
     console.log('Files added for upload:', newFiles);
   }, []);
 
+  // ============================================================
+  // FIX: DEFINISI handleImport DAN handleDownloadTemplate
+  // ============================================================
+  const handleImport = useCallback(async (file) => {
+    setIsImporting(true);
+    const r = await transactionsData.importTransactions(file);
+    setIsImporting(false);
+    if (r.success && isMountedRef.current) {
+      setImportResult(r.data);
+      if (r.data.errorCount === 0) {
+        toast.success(`Import completed: ${r.data.successCount} transactions`);
+      } else {
+        toast.warning(`Import completed: ${r.data.successCount} success, ${r.data.errorCount} errors`);
+      }
+      reloadManagement();
+      reloadManagementReturn();
+      reloadMonitoring();
+      clearPrimarySelection();
+      clearSecondarySelection();
+    }
+  }, [reloadManagement, reloadManagementReturn, reloadMonitoring, toast, clearPrimarySelection, clearSecondarySelection]);
+
+  const handleDownloadTemplate = useCallback(async () => {
+    await transactionsData.downloadTemplate();
+  }, []);
+
   const onSubmit = useCallback(async () => {
     const submitData = {
       ...formData,
@@ -582,13 +610,13 @@ const AssetTransactionsMenu = () => {
       return success;
     }
   }, [
-    crudHandleSubmit, 
-    reloadManagement, 
-    reloadManagementReturn, 
-    reloadMonitoring, 
-    toast, 
-    editingTransaction, 
-    clearPrimarySelection, 
+    crudHandleSubmit,
+    reloadManagement,
+    reloadManagementReturn,
+    reloadMonitoring,
+    toast,
+    editingTransaction,
+    clearPrimarySelection,
     clearSecondarySelection,
     isEditMode,
     attachmentFiles,
@@ -598,53 +626,8 @@ const AssetTransactionsMenu = () => {
     queryClient
   ]);
 
-  const handleMainTabChange = useCallback((tab) => {
-    setActiveMainTab(tab);
-    setActiveSubTab(tab === 'monitoring' ? 'pending-approval' : 'approved');
-    setSearchTerm('');
-    setDateFilterStart('');
-    setDateFilterEnd('');
-    clearPrimarySelection();
-    clearSecondarySelection();
-    setMonitoringPage(1);
-    setManagementPage(1);
-    setManagementReturnPage(1);
-  }, [clearPrimarySelection, clearSecondarySelection, setMonitoringPage, setManagementPage, setManagementReturnPage]);
-
-  const handleSubTabChange = useCallback((tab) => {
-    setActiveSubTab(tab);
-    setSearchTerm('');
-    setDateFilterStart('');
-    setDateFilterEnd('');
-    clearPrimarySelection();
-    clearSecondarySelection();
-    setMonitoringPage(1);
-    setManagementPage(1);
-    setManagementReturnPage(1);
-  }, [clearPrimarySelection, clearSecondarySelection, setMonitoringPage, setManagementPage, setManagementReturnPage]);
-
-  const handleImport = useCallback(async (file) => {
-    setIsImporting(true);
-    const r = await transactionsData.importTransactions(file);
-    setIsImporting(false);
-    if (r.success && isMountedRef.current) {
-      setImportResult(r.data);
-      if (r.data.errorCount === 0) toast.success(`Import completed: ${r.data.successCount} transactions`);
-      else toast.warning(`Import completed: ${r.data.successCount} success, ${r.data.errorCount} errors`);
-      reloadManagement();
-      reloadManagementReturn();
-      reloadMonitoring();
-      clearPrimarySelection();
-      clearSecondarySelection();
-    }
-  }, [reloadManagement, reloadManagementReturn, reloadMonitoring, toast, clearPrimarySelection, clearSecondarySelection]);
-
-  const handleDownloadTemplate = useCallback(async () => {
-    await transactionsData.downloadTemplate();
-  }, []);
-
   // ============================================================
-  // FIX 3: GRID ACTIONS - TAMBAHKAN VIEW ACTION
+  // GRID ACTIONS
   // ============================================================
   const getMonitoringActions = useCallback((row) => {
     const actions = [];
@@ -652,17 +635,16 @@ const AssetTransactionsMenu = () => {
     const isApproved = row.approved === true;
     const isCompleted = row.completed === true;
 
-    // Selalu ada View action
     actions.push(ACTION_TYPES.VIEW);
 
-    if (isPending && activeSubTab === 'pending-approval') {
+    if (isPending && activeSubTab === 'uncomplete') {
       actions.push(ACTION_TYPES.EDIT);
       actions.push(ACTION_TYPES.DELETE);
     }
-    if (isApproved && !isCompleted && activeSubTab === 'pending-approval') {
+    if (isApproved && !isCompleted && activeSubTab === 'uncomplete') {
       actions.push('complete');
     }
-    if (isCompleted && activeSubTab === 'pending-approval') {
+    if (isCompleted && activeSubTab === 'uncomplete') {
       actions.push('uncomplete');
     }
     return actions;
@@ -670,9 +652,7 @@ const AssetTransactionsMenu = () => {
 
   const handleMonitoringAction = useCallback((actionType, row) => {
     if (actionType === ACTION_TYPES.VIEW) {
-      // FIX 3: Show transaction detail modal atau navigasi ke detail page
       handleEdit(row);
-      // Atau bisa juga menggunakan modal detail terpisah
       toast.info(`Viewing transaction ${row.assetTransactionCode || row.assetTransactionId}`);
       return;
     }
@@ -710,9 +690,8 @@ const AssetTransactionsMenu = () => {
     const hasPair = row.fromAssetTransactionId !== null && row.fromAssetTransactionId !== undefined;
 
     const actions = [];
-    // Selalu ada View action
     actions.push(ACTION_TYPES.VIEW);
-    
+
     if (isPending) {
       actions.push(ACTION_TYPES.EDIT);
       actions.push(ACTION_TYPES.DELETE);
@@ -761,7 +740,6 @@ const AssetTransactionsMenu = () => {
   const getManagementReturnActions = useCallback((row) => {
     const isPending = row.approved === null;
     const actions = [];
-    // Selalu ada View action
     actions.push(ACTION_TYPES.VIEW);
     if (isPending) {
       actions.push(ACTION_TYPES.EDIT);
@@ -855,7 +833,7 @@ const AssetTransactionsMenu = () => {
       },
     ];
 
-    if (activeSubTab === 'pending-approval') {
+    if (activeSubTab === 'uncomplete' || activeSubTab === 'complete') {
       return [
         ...baseColumns,
         {
@@ -865,24 +843,26 @@ const AssetTransactionsMenu = () => {
           renderCell: (p) => <span>{p?.row?.conditionName ?? p?.value ?? '-'}</span>,
         },
         ...statusColumns,
-        {
-          field: 'hasNeedToChange',
-          headerName: 'Need Revision',
-          width: 130,
-          renderCell: (p) => {
-            const hasNeedToChange = p?.row?.hasNeedToChange || false;
-            return hasNeedToChange ? <Chip label="⚠️ Need Revision" size="small" color="warning" /> : <Chip label="✓ OK" size="small" color="success" />;
+        ...(activeSubTab === 'uncomplete' ? [
+          {
+            field: 'hasNeedToChange',
+            headerName: 'Need Revision',
+            width: 130,
+            renderCell: (p) => {
+              const hasNeedToChange = p?.row?.hasNeedToChange || false;
+              return hasNeedToChange ? <Chip label="⚠️ Need Revision" size="small" color="warning" /> : <Chip label="✓ OK" size="small" color="success" />;
+            },
           },
-        },
-        {
-          field: 'allAttachmentsApproved',
-          headerName: 'Docs Approved',
-          width: 130,
-          renderCell: (p) => {
-            const allApproved = p?.row?.allAttachmentsApproved || false;
-            return allApproved ? <Chip label="✓ All Approved" size="small" color="success" /> : <Chip label="⏳ Pending" size="small" color="warning" />;
+          {
+            field: 'allAttachmentsApproved',
+            headerName: 'Docs Approved',
+            width: 130,
+            renderCell: (p) => {
+              const allApproved = p?.row?.allAttachmentsApproved || false;
+              return allApproved ? <Chip label="✓ All Approved" size="small" color="success" /> : <Chip label="⏳ Pending" size="small" color="warning" />;
+            },
           },
-        },
+        ] : []),
         monitoringActionColumn,
       ];
     }
@@ -1022,18 +1002,24 @@ const AssetTransactionsMenu = () => {
     <div className="transactions-menu">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Asset Transactions</h1>
-          <p className="page-description">Manage asset transaction history and approvals</p>
+          <h1 className="page-title">
+            {isMonitoring ? 'Asset Transactions - Monitoring' : 'Asset Transactions - Management'}
+          </h1>
+          <p className="page-description">
+            {isMonitoring 
+              ? 'Monitor transaction status, loans, maintenance, and pending completions'
+              : 'Manage primary and secondary transactions with approvals'
+            }
+          </p>
         </div>
         <div className="transactions-menu__header-actions">{headerActions}</div>
       </div>
 
-      <Tabs tabs={MAIN_TABS} activeTab={activeMainTab} onTabChange={handleMainTabChange} />
-
+      {/* Hanya sub-tabs yang sesuai */}
       {isMonitoring ? (
-        <Tabs tabs={MONITORING_SUB_TABS} activeTab={activeSubTab} onTabChange={handleSubTabChange} />
+        <Tabs tabs={MONITORING_SUB_TABS} activeTab={activeSubTab} onTabChange={setActiveSubTab} />
       ) : (
-        <Tabs tabs={MANAGEMENT_SUB_TABS} activeTab={activeSubTab} onTabChange={handleSubTabChange} />
+        <Tabs tabs={MANAGEMENT_SUB_TABS} activeTab={activeSubTab} onTabChange={setActiveSubTab} />
       )}
 
       <div className="transactions-menu__filter-container">
@@ -1052,13 +1038,15 @@ const AssetTransactionsMenu = () => {
         <Card
           className="transactions-menu__grid-card"
           title={
-            activeSubTab === 'pending-approval' ? '📋 Pending Approval' :
+            activeSubTab === 'uncomplete' ? '📋 Uncomplete Transactions' :
+            activeSubTab === 'complete' ? '✅ Completed Transactions' :
             activeSubTab === 'active-loans' ? '📌 Active Loans' :
             activeSubTab === 'overdue-loans' ? '⚠️ Overdue Loans' :
             '🔧 Under Maintenance'
           }
           subtitle={
-            activeSubTab === 'pending-approval' ? 'Transactions awaiting document approval and completion' :
+            activeSubTab === 'uncomplete' ? 'Approved transactions pending completion' :
+            activeSubTab === 'complete' ? 'Transactions that have been fully completed' :
             activeSubTab === 'active-loans' ? 'Currently active loan transactions' :
             activeSubTab === 'overdue-loans' ? 'Loan transactions past expected return date' :
             'Assets currently under maintenance'

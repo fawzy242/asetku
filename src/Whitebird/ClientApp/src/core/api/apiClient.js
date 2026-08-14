@@ -57,7 +57,7 @@ const apiClient = {
     },
     getImportTemplate: () => apiService.get('/Asset/import/template', { responseType: 'blob' }),
     // Asset dropdown for transaction
-    listByTransaction: (transactionType) => 
+    listByTransaction: (transactionType) =>
       apiService.get(`/Asset/list-by-transaction?transactionType=${transactionType}`),
     // ============================================================
     // REMOVED: uploadPhoto, getPhoto, deletePhoto, uploadAttachment, getAttachments, deleteAttachment
@@ -178,8 +178,12 @@ const apiClient = {
     // Grids
     getGridAdd: (params) => apiService.get('/AssetTransaction/grid-add', { params }),
     getGridReturn: (params) => apiService.get('/AssetTransaction/grid-return', { params }),
-    getGridPendingApproval: (params) =>
-      apiService.get('/AssetTransaction/grid-pending-approval', { params }),
+    // FIX: Endpoint changed from grid-pending-approval to grid-uncomplete
+    getGridUncomplete: (params) =>
+      apiService.get('/AssetTransaction/grid-uncomplete', { params }),
+    // NEW: Complete transactions
+    getGridComplete: (params) =>
+      apiService.get('/AssetTransaction/grid-complete', { params }),
     // Outstanding
     getActiveLoans: (params) => apiService.get('/AssetTransaction/active-loans', { params }),
     getOverdueLoans: (params) => apiService.get('/AssetTransaction/overdue-loans', { params }),

@@ -36,7 +36,7 @@ public interface IEmployeeReps
     Task<IEnumerable<EmployeeDropdownView>> GetDropdownListAsync();
 
     // ============================================================
-    // EMPLOYEE ATTACHMENT (NEW)
+    // EMPLOYEE ATTACHMENT
     // ============================================================
 
     Task<int> InsertAttachmentAsync(EmployeeAttachmentEntity entity);
@@ -44,4 +44,12 @@ public interface IEmployeeReps
     Task<EmployeeAttachmentEntity?> GetAttachmentByIdAsync(int attachmentId);
     Task<int> DeleteAttachmentAsync(int attachmentId);
     Task<int> DeleteAttachmentsByEmployeeIdAsync(int employeeId);
+
+    // ============================================================
+    // EMPLOYEE PHOTO PROFILE (NEW)
+    // ============================================================
+
+    Task<int> InsertPhotoProfileAsync(EmployeePhotoProfileAttachmentEntity entity);
+    Task<EmployeePhotoProfileAttachmentEntity?> GetPhotoProfileByEmployeeIdAsync(int employeeId);
+    Task<int> DeletePhotoProfileByEmployeeIdAsync(int employeeId);
 }

@@ -86,7 +86,7 @@ public class AssetTrackingReps : IAssetTrackingReps
     }
 
     // ============================================================
-    // STATS HEADER
+    // STATS HEADER — FIX: Tambahkan EmployeeId, OfficeId, Condition di subquery lt
     // ============================================================
 
     public async Task<AssetStatsView?> GetAssetStatsAsync(int assetId)
@@ -120,8 +120,14 @@ public class AssetTrackingReps : IAssetTrackingReps
         LEFT JOIN Office o ON lt.OfficeId = o.OfficeId AND o.IsActive = 1
         LEFT JOIN MasterData mdCondition ON lt.Condition = mdCondition.ReferenceCode AND mdCondition.ReferenceName = 'AssetCondition' AND mdCondition.IsActive = 1
         LEFT JOIN (
-            SELECT AssetId, TransactionType, EmployeeId, OfficeId, Condition, ExpectedLoanReturnDate,
-                   ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
+            SELECT 
+                AssetId, 
+                TransactionType, 
+                EmployeeId, 
+                OfficeId, 
+                Condition, 
+                ExpectedLoanReturnDate,
+                ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
             FROM AssetTransaction
             WHERE Approved = 1 AND IsActive = 1 AND FromAssetTransactionId IS NULL
         ) lt ON a.AssetId = lt.AssetId AND lt.rn = 1
@@ -140,7 +146,7 @@ public class AssetTrackingReps : IAssetTrackingReps
     }
 
     // ============================================================
-    // TIMELINE - FIXED (hapus FromEmployeeId dan ToEmployeeId)
+    // TIMELINE
     // ============================================================
 
     public async Task<IEnumerable<AssetTimelineEntry>> GetTimelineAsync(int assetId)
@@ -221,7 +227,7 @@ public class AssetTrackingReps : IAssetTrackingReps
     }
 
     // ============================================================
-    // SCHEDULE STATS - Using GridRequest
+    // SCHEDULE STATS
     // ============================================================
 
     public async Task<PaginatedResult<AssetTrackingScheduleStatsDto>> GetScheduleStatsAsync(AssetTrackingGridRequest request)
@@ -352,7 +358,7 @@ public class AssetTrackingReps : IAssetTrackingReps
     }
 
     // ============================================================
-    // EMPLOYEE HISTORY - Using GridRequest
+    // EMPLOYEE HISTORY
     // ============================================================
 
     public async Task<PaginatedResult<AssetTrackingEmployeeHistoryDto>> GetEmployeeHistoryAsync(AssetTrackingGridRequest request)

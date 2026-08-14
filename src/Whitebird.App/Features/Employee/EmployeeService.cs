@@ -158,9 +158,6 @@ public class EmployeeService : BaseService, IEmployeeService
         }, "create employee");
     }
 
-    // ============================================================
-    // FIX 1: UPDATE — Handle base64 file upload dengan benar
-    // ============================================================
     public async Task<ServiceResult<EmployeeDetailView>> UpdateAsync(int id, EmployeeUpdateFormDto model)
     {
         var codeExists = await _employeeReps.IsEmployeeCodeExistsAsync(model.EmployeeCode, id);
@@ -177,11 +174,7 @@ public class EmployeeService : BaseService, IEmployeeService
                 return ServiceResult<EmployeeDetailView>.NotFound($"Employee with id {id} not found");
             }
 
-            var oldCode = existing.EmployeeCode;
-            var oldName = existing.FullName;
-            var oldStatus = existing.EmploymentStatus;
-
-            // Map manual
+            // Update basic fields
             existing.EmployeeCode = model.EmployeeCode;
             existing.FullName = model.FullName;
             existing.Address = model.Address;
@@ -197,49 +190,34 @@ public class EmployeeService : BaseService, IEmployeeService
             existing.ModifiedDate = DateTime.Now;
             existing.ModifiedBy = _currentUserService.GetDisplayName();
 
-            var result = await _repository.UpdateAsync(existing);
-            if (result <= 0)
-            {
-                return ServiceResult<EmployeeDetailView>.Failure("Failed to update employee");
-            }
+            await _repository.UpdateAsync(existing);
 
             // ============================================================
-            // FIX 1: PHOTO PROFILE - PASTIKAN UPLOAD BERHASIL
+            // PHOTO PROFILE
             // ============================================================
             if (!string.IsNullOrEmpty(model.PhotoFileBase64))
             {
-                try
+                // 1. Hapus foto lama (soft delete)
+                var oldPhoto = await _employeeReps.GetPhotoProfileByEmployeeIdAsync(id);
+                if (oldPhoto != null)
                 {
-                    // Delete existing photo
-                    var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("EmployeePhotoProfile", id);
-                    if (existingPhotos.IsSuccess && existingPhotos.Data != null && existingPhotos.Data.Any())
-                    {
-                        foreach (var photo in existingPhotos.Data)
-                        {
-                            await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
-                        }
-                    }
-
-                    // Convert base64 to file and upload
-                    await AddPhotoProfileFromBase64Async(id, model.PhotoFileBase64, model.PhotoFileName ?? "photo.jpg");
-
-                    _logger.LogInformation("Photo profile uploaded successfully for Employee {EmployeeId}", id);
+                    await _fileAttachmentService.DeleteAsync(oldPhoto.FileAttachmentId);
+                    await _employeeReps.DeletePhotoProfileByEmployeeIdAsync(id);
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to upload photo profile for Employee {EmployeeId}", id);
-                    // Jangan gagalkan update hanya karena photo gagal upload
-                }
+
+                // 2. Upload foto baru dan insert ke pivot
+                await AddPhotoProfileFromBase64Async(id, model.PhotoFileBase64, model.PhotoFileName ?? "photo.jpg");
             }
 
             // ============================================================
-            // ATTACHMENTS (base64)
+            // ATTACHMENTS
             // ============================================================
             if (model.ReplaceAttachments || (model.AttachmentFilesBase64 != null && model.AttachmentFilesBase64.Any()))
             {
                 var existingAttachments = await _employeeReps.GetAttachmentsByEmployeeIdAsync(id);
                 var keepIds = model.AttachmentIdsToKeep ?? new List<int>();
 
+                // Hapus yang tidak di-keep
                 foreach (var att in existingAttachments)
                 {
                     if (!keepIds.Contains(att.FileAttachmentId))
@@ -249,6 +227,7 @@ public class EmployeeService : BaseService, IEmployeeService
                     }
                 }
 
+                // Upload attachment baru
                 if (model.AttachmentFilesBase64 != null && model.AttachmentFilesBase64.Any())
                 {
                     int order = existingAttachments.Count(a => keepIds.Contains(a.FileAttachmentId));
@@ -270,7 +249,7 @@ public class EmployeeService : BaseService, IEmployeeService
             await _activityLogService.LogUpdateAsync(
                 TableNames.Employee,
                 id,
-                $"Employee updated: Code '{oldCode}', Name '{oldName}' -> '{model.FullName}', Status '{oldStatus}' -> '{model.EmploymentStatus}'",
+                $"Employee updated: Code '{model.EmployeeCode}', Name '{model.FullName}'",
                 _currentUserService.GetDisplayName());
 
             return ServiceResult<EmployeeDetailView>.Success(updated!, "Employee updated successfully");
@@ -468,15 +447,13 @@ public class EmployeeService : BaseService, IEmployeeService
                 return ServiceResult<byte[]>.NotFound($"Employee with id {employeeId} not found");
             }
 
-            var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("EmployeePhotoProfile", employeeId);
-            if (!existingPhotos.IsSuccess || existingPhotos.Data == null || !existingPhotos.Data.Any())
+            var photo = await _employeeReps.GetPhotoProfileByEmployeeIdAsync(employeeId);
+            if (photo == null)
             {
                 return ServiceResult<byte[]>.NotFound("Profile photo not found");
             }
 
-            var primaryPhoto = existingPhotos.Data.FirstOrDefault(p => p.IsPrimary) ?? existingPhotos.Data.First();
-
-            var fileResult = await _fileAttachmentService.GetByIdAsync(primaryPhoto.FileAttachmentId);
+            var fileResult = await _fileAttachmentService.GetByIdAsync(photo.FileAttachmentId);
             if (!fileResult.IsSuccess || fileResult.Data == null)
             {
                 return ServiceResult<byte[]>.NotFound("Profile photo file not found");
@@ -503,7 +480,7 @@ public class EmployeeService : BaseService, IEmployeeService
     }
 
     // ============================================================
-    // PRIVATE METHODS FOR BASE64 UPLOAD
+    // PRIVATE METHODS — BASE64 UPLOAD (THROW EXCEPTION ON FAILURE)
     // ============================================================
 
     private async Task AddPhotoProfileFromBase64Async(int employeeId, string base64String, string fileName)
@@ -518,10 +495,6 @@ public class EmployeeService : BaseService, IEmployeeService
                 ContentType = GetContentType(fileName)
             };
 
-            var subDirectory = Path.Combine("Employee", employeeId.ToString(), "Profile");
-            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
-            var fileHash = _storageService.ComputeFileHash(file);
-
             var uploadModel = new FileAttachmentUploadDto
             {
                 File = file,
@@ -531,19 +504,26 @@ public class EmployeeService : BaseService, IEmployeeService
             };
 
             var result = await _fileAttachmentService.UploadAsync("EmployeePhotoProfile", employeeId, uploadModel);
-            if (result.IsSuccess)
+            if (!result.IsSuccess || result.Data == null)
             {
-                await _activityLogService.LogUpdateAsync(
-                    TableNames.Employee,
-                    employeeId,
-                    $"Profile photo uploaded",
-                    _currentUserService.GetDisplayName());
-                _logger.LogInformation("Photo uploaded successfully for Employee {EmployeeId}", employeeId);
+                throw new Exception($"Upload profile photo failed: {string.Join(", ", result.Errors)}");
             }
-            else
+
+            var entity = new EmployeePhotoProfileAttachmentEntity
             {
-                _logger.LogWarning("Failed to upload photo for Employee {EmployeeId}: {Error}", employeeId, result.Message);
-            }
+                EmployeeId = employeeId,
+                FileAttachmentId = result.Data.FileAttachmentId,
+                IsActive = true,
+                CreatedDate = DateTime.Now,
+                CreatedBy = _currentUserService.GetDisplayName()
+            };
+            await _employeeReps.InsertPhotoProfileAsync(entity);
+
+            await _activityLogService.LogUpdateAsync(
+                TableNames.Employee,
+                employeeId,
+                $"Profile photo uploaded",
+                _currentUserService.GetDisplayName());
         }
         catch (Exception ex)
         {
@@ -564,10 +544,6 @@ public class EmployeeService : BaseService, IEmployeeService
                 ContentType = GetContentType(fileName)
             };
 
-            var subDirectory = Path.Combine("Employee", employeeId.ToString(), "Attachments");
-            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
-            var fileHash = _storageService.ComputeFileHash(file);
-
             var uploadModel = new FileAttachmentUploadDto
             {
                 File = file,
@@ -577,26 +553,28 @@ public class EmployeeService : BaseService, IEmployeeService
             };
 
             var fileResult = await _fileAttachmentService.UploadAsync("Employee", employeeId, uploadModel);
-            if (fileResult.IsSuccess && fileResult.Data != null)
+            if (!fileResult.IsSuccess || fileResult.Data == null)
             {
-                var attachmentEntity = new EmployeeAttachmentEntity
-                {
-                    EmployeeId = employeeId,
-                    FileAttachmentId = fileResult.Data.FileAttachmentId,
-                    Order = order,
-                    IsActive = true,
-                    CreatedDate = DateTime.Now,
-                    CreatedBy = _currentUserService.GetDisplayName()
-                };
-
-                await _employeeReps.InsertAttachmentAsync(attachmentEntity);
-
-                await _activityLogService.LogCreateAsync(
-                    TableNames.Employee,
-                    employeeId,
-                    $"Attachment added: {fileName}",
-                    _currentUserService.GetDisplayName());
+                throw new Exception($"Upload attachment failed: {string.Join(", ", fileResult.Errors)}");
             }
+
+            var attachmentEntity = new EmployeeAttachmentEntity
+            {
+                EmployeeId = employeeId,
+                FileAttachmentId = fileResult.Data.FileAttachmentId,
+                Order = order,
+                IsActive = true,
+                CreatedDate = DateTime.Now,
+                CreatedBy = _currentUserService.GetDisplayName()
+            };
+
+            await _employeeReps.InsertAttachmentAsync(attachmentEntity);
+
+            await _activityLogService.LogCreateAsync(
+                TableNames.Employee,
+                employeeId,
+                $"Attachment added: {fileName}",
+                _currentUserService.GetDisplayName());
         }
         catch (Exception ex)
         {
