@@ -262,6 +262,215 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     }
 
     // ============================================================
+    // UPDATE WITH ATTACHMENTS (Standar)
+    // ============================================================
+
+    public async Task<ServiceResult<AssetTransactionDetailView>> UpdateWithAttachmentsAsync(
+        int id, AssetTransactionUpdateFormDto model)
+    {
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var existing = await _transactionReps.GetByIdRawAsync(id);
+            if (existing == null)
+            {
+                return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
+            }
+
+            // Validate if can update
+            if (existing.Approved != null && model.Approved == null)
+            {
+                // Can't un-approve if already approved/rejected
+            }
+
+            // Update basic fields
+            existing.AssetId = model.AssetId;
+            existing.TransactionType = model.TransactionType;
+            existing.EmployeeId = model.EmployeeId;
+            existing.OfficeId = model.OfficeId;
+            existing.TransactionDate = model.TransactionDate;
+            existing.ExpectedLoanReturnDate = model.ExpectedLoanReturnDate;
+            existing.Notes = model.Notes;
+            existing.Condition = model.Condition;
+            existing.Approved = model.Approved;
+            existing.ApprovedBy = model.ApprovedBy;
+            existing.Completed = model.Completed;
+            existing.CompletedBy = model.CompletedBy;
+            existing.MaintenanceType = model.MaintenanceType;
+            existing.MaintenanceCost = model.MaintenanceCost;
+            existing.IsActive = model.IsActive;
+            existing.ModifiedDate = DateTime.Now;
+            existing.ModifiedBy = _currentUserService.GetDisplayName();
+
+            await _transactionReps.UpdateAsync(existing);
+
+            // ============================================================
+            // HANDLE ATTACHMENTS (base64)
+            // ============================================================
+            if (model.ReplaceAttachments || (model.AttachmentFilesBase64 != null && model.AttachmentFilesBase64.Any()))
+            {
+                var existingAttachments = await _transactionReps.GetAttachmentsByTransactionIdAsync(id);
+                var keepIds = model.AttachmentIdsToKeep ?? new List<int>();
+
+                foreach (var att in existingAttachments)
+                {
+                    if (!keepIds.Contains(att.FileAttachmentId))
+                    {
+                        await _fileAttachmentService.DeleteAsync(att.FileAttachmentId);
+                        var attEntity = await _transactionReps.GetAttachmentByIdAsync(att.AssetTransactionAttachmentId);
+                        if (attEntity != null)
+                        {
+                            await _transactionReps.DeleteAttachmentAsync(attEntity.AssetTransactionAttachmentId);
+                        }
+                    }
+                }
+
+                if (model.AttachmentFilesBase64 != null && model.AttachmentFilesBase64.Any())
+                {
+                    int order = existingAttachments.Count(a => keepIds.Contains(a.FileAttachmentId));
+                    for (int i = 0; i < model.AttachmentFilesBase64.Count; i++)
+                    {
+                        var base64 = model.AttachmentFilesBase64[i];
+                        var fileName = model.AttachmentFileNames?[i] ?? $"attachment_{i}.pdf";
+                        if (!string.IsNullOrEmpty(base64))
+                        {
+                            await AddAttachmentFromBase64Async(id, base64, fileName, order);
+                            order++;
+                        }
+                    }
+                }
+            }
+
+            // ============================================================
+            // HANDLE APPROVE ATTACHMENTS
+            // ============================================================
+            if (model.ReplaceApproveAttachments || (model.ApproveAttachments != null && model.ApproveAttachments.Any()))
+            {
+                var existingApproveAttachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(id);
+                var keepIds = model.ApproveAttachmentIdsToKeep ?? new List<int>();
+
+                foreach (var att in existingApproveAttachments)
+                {
+                    if (!keepIds.Contains(att.FileAttachmentId))
+                    {
+                        await _fileAttachmentService.DeleteAsync(att.FileAttachmentId);
+                        var attEntity = await _transactionReps.GetApproveAttachmentByIdAsync(att.AssetTransactionApproveAttachmentId);
+                        if (attEntity != null)
+                        {
+                            await _transactionReps.DeleteApproveAttachmentAsync(attEntity.AssetTransactionApproveAttachmentId);
+                        }
+                    }
+                }
+
+                if (model.ApproveAttachments != null && model.ApproveAttachments.Any())
+                {
+                    int order = existingApproveAttachments.Count(a => keepIds.Contains(a.FileAttachmentId));
+                    foreach (var approveAtt in model.ApproveAttachments)
+                    {
+                        if (!string.IsNullOrEmpty(approveAtt.FileBase64))
+                        {
+                            await AddApproveAttachmentFromBase64Async(id, approveAtt.FileBase64, approveAtt.FileName, approveAtt.DocumentType, order);
+                            order++;
+                        }
+                    }
+                }
+            }
+
+            var updated = await _transactionReps.GetDetailByIdAsync(id);
+
+            await _activityLogService.LogUpdateAsync(
+                TableNames.AssetTransaction,
+                id,
+                $"Transaction updated with attachments",
+                _currentUserService.GetDisplayName());
+
+            return ServiceResult<AssetTransactionDetailView>.Success(updated!, "Transaction updated successfully");
+        }, "update transaction with attachments");
+    }
+
+    // ============================================================
+    // UPDATE APPROVAL WITH ATTACHMENTS
+    // ============================================================
+
+    public async Task<ServiceResult<AssetTransactionDetailView>> UpdateApprovalWithAttachmentsAsync(
+        int id, AssetTransactionUpdateApprovalFormDto model)
+    {
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var existing = await _transactionReps.GetByIdRawAsync(id);
+            if (existing == null)
+            {
+                return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
+            }
+
+            // Update basic fields
+            existing.AssetId = model.AssetId;
+            existing.TransactionType = model.TransactionType;
+            existing.EmployeeId = model.EmployeeId;
+            existing.OfficeId = model.OfficeId;
+            existing.TransactionDate = model.TransactionDate;
+            existing.ExpectedLoanReturnDate = model.ExpectedLoanReturnDate;
+            existing.Notes = model.Notes;
+            existing.Condition = model.Condition;
+            existing.Approved = model.Approved;
+            existing.ApprovedBy = model.ApprovedBy;
+            existing.Completed = model.Completed;
+            existing.CompletedBy = model.CompletedBy;
+            existing.MaintenanceType = model.MaintenanceType;
+            existing.MaintenanceCost = model.MaintenanceCost;
+            existing.IsActive = model.IsActive;
+            existing.ModifiedDate = DateTime.Now;
+            existing.ModifiedBy = _currentUserService.GetDisplayName();
+
+            await _transactionReps.UpdateAsync(existing);
+
+            // ============================================================
+            // HANDLE APPROVE ATTACHMENTS
+            // ============================================================
+            if (model.ReplaceApproveAttachments || (model.ApproveAttachments != null && model.ApproveAttachments.Any()))
+            {
+                var existingApproveAttachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(id);
+                var keepIds = model.ApproveAttachmentIdsToKeep ?? new List<int>();
+
+                foreach (var att in existingApproveAttachments)
+                {
+                    if (!keepIds.Contains(att.FileAttachmentId))
+                    {
+                        await _fileAttachmentService.DeleteAsync(att.FileAttachmentId);
+                        var attEntity = await _transactionReps.GetApproveAttachmentByIdAsync(att.AssetTransactionApproveAttachmentId);
+                        if (attEntity != null)
+                        {
+                            await _transactionReps.DeleteApproveAttachmentAsync(attEntity.AssetTransactionApproveAttachmentId);
+                        }
+                    }
+                }
+
+                if (model.ApproveAttachments != null && model.ApproveAttachments.Any())
+                {
+                    int order = existingApproveAttachments.Count(a => keepIds.Contains(a.FileAttachmentId));
+                    foreach (var approveAtt in model.ApproveAttachments)
+                    {
+                        if (!string.IsNullOrEmpty(approveAtt.FileBase64))
+                        {
+                            await AddApproveAttachmentFromBase64Async(id, approveAtt.FileBase64, approveAtt.FileName, approveAtt.DocumentType, order);
+                            order++;
+                        }
+                    }
+                }
+            }
+
+            var updated = await _transactionReps.GetDetailByIdAsync(id);
+
+            await _activityLogService.LogUpdateAsync(
+                TableNames.AssetTransaction,
+                id,
+                $"Transaction approval updated with attachments",
+                _currentUserService.GetDisplayName());
+
+            return ServiceResult<AssetTransactionDetailView>.Success(updated!, "Transaction approval updated successfully");
+        }, "update transaction approval with attachments");
+    }
+
+    // ============================================================
     // BULK APPROVAL
     // ============================================================
 
@@ -657,295 +866,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     }
 
     // ============================================================
-    // ATTACHMENT (UMUM)
-    // ============================================================
-
-    public async Task<ServiceResult<AssetTransactionAttachmentView>> UploadAttachmentAsync(int transactionId, AssetTransactionAttachmentUploadDto model)
-    {
-        var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
-        if (transaction == null || transaction.IsActive == false)
-        {
-            return ServiceResult<AssetTransactionAttachmentView>.NotFound($"Transaction with id {transactionId} not found");
-        }
-
-        var file = model.File;
-        if (file == null || file.Length == 0)
-        {
-            return ServiceResult<AssetTransactionAttachmentView>.BadRequest("No file provided");
-        }
-
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!FileSizeConstants.IsAllowedAssetExtension(extension))
-        {
-            return ServiceResult<AssetTransactionAttachmentView>.BadRequest($"File type '{extension}' is not allowed");
-        }
-
-        if (file.Length > FileSizeConstants.MaxAssetAttachmentBytes)
-        {
-            return ServiceResult<AssetTransactionAttachmentView>.BadRequest($"File size exceeds {FileSizeConstants.MaxAssetAttachmentMB}MB limit");
-        }
-
-        return await ExecuteWithTransactionAsync(async () =>
-        {
-            var subDirectory = Path.Combine("AssetTransaction", transactionId.ToString());
-            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
-            var fileHash = _storageService.ComputeFileHash(file);
-
-            var uploadModel = new FileAttachmentUploadDto
-            {
-                File = file,
-                FileCategory = model.FileCategory ?? "AssetTransaction",
-                Description = model.Description,
-                IsPrimary = false
-            };
-
-            var fileResult = await _fileAttachmentService.UploadAsync("AssetTransaction", transactionId, uploadModel);
-            if (!fileResult.IsSuccess || fileResult.Data == null)
-            {
-                return ServiceResult<AssetTransactionAttachmentView>.Failure("Failed to upload file");
-            }
-
-            var attachmentEntity = new AssetTransactionAttachmentEntity
-            {
-                AssetTransactionId = transactionId,
-                FileAttachmentId = fileResult.Data.FileAttachmentId,
-                Order = model.Order,
-                IsActive = true,
-                CreatedDate = DateTime.Now,
-                CreatedBy = _currentUserService.GetDisplayName()
-            };
-
-            await _transactionReps.InsertAttachmentAsync(attachmentEntity);
-
-            var attachments = await _transactionReps.GetAttachmentsByTransactionIdAsync(transactionId);
-            var created = attachments.FirstOrDefault(a => a.FileAttachmentId == fileResult.Data.FileAttachmentId);
-
-            await _activityLogService.LogCreateAsync(
-                TableNames.AssetTransaction,
-                transactionId,
-                $"Attachment uploaded: {file.FileName}",
-                _currentUserService.GetDisplayName());
-
-            return ServiceResult<AssetTransactionAttachmentView>.Success(created!, "Attachment uploaded successfully");
-        }, "upload attachment");
-    }
-
-    public async Task<ServiceResult<IEnumerable<AssetTransactionAttachmentView>>> GetAttachmentsAsync(int transactionId)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var attachments = await _transactionReps.GetAttachmentsByTransactionIdAsync(transactionId);
-            return ServiceResult<IEnumerable<AssetTransactionAttachmentView>>.Success(attachments);
-        }, "get attachments");
-    }
-
-    public async Task<ServiceResult> DeleteAttachmentAsync(int transactionId, int attachmentId)
-    {
-        return await ExecuteWithTransactionAsync(async () =>
-        {
-            var attachment = await _transactionReps.GetAttachmentByIdAsync(attachmentId);
-            if (attachment == null || attachment.AssetTransactionId != transactionId)
-            {
-                return ServiceResult.NotFound($"Attachment with id {attachmentId} not found for transaction {transactionId}");
-            }
-
-            var fileResult = await _fileAttachmentService.DeleteAsync(attachment.FileAttachmentId);
-            if (!fileResult.IsSuccess)
-            {
-                return ServiceResult.Failure("Failed to delete file attachment");
-            }
-
-            await _transactionReps.DeleteAttachmentAsync(attachmentId);
-
-            await _activityLogService.LogDeleteAsync(
-                TableNames.AssetTransaction,
-                transactionId,
-                $"Attachment {attachmentId} deleted",
-                _currentUserService.GetDisplayName());
-
-            return ServiceResult.Success("Attachment deleted successfully");
-        }, "delete attachment");
-    }
-
-    // ============================================================
-    // APPROVE ATTACHMENT
-    // ============================================================
-
-    public async Task<ServiceResult<AssetTransactionApproveAttachmentView>> UploadApproveAttachmentAsync(
-        int transactionId, AssetTransactionApproveAttachmentUploadDto model)
-    {
-        var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
-        if (transaction == null || transaction.IsActive == false)
-        {
-            return ServiceResult<AssetTransactionApproveAttachmentView>.NotFound($"Transaction with id {transactionId} not found");
-        }
-
-        if (transaction.Approved != true)
-        {
-            return ServiceResult<AssetTransactionApproveAttachmentView>.BadRequest("Transaction must be approved before uploading approve attachment");
-        }
-
-        var file = model.File;
-        if (file == null || file.Length == 0)
-        {
-            return ServiceResult<AssetTransactionApproveAttachmentView>.BadRequest("No file provided");
-        }
-
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!FileSizeConstants.IsAllowedAssetExtension(extension))
-        {
-            return ServiceResult<AssetTransactionApproveAttachmentView>.BadRequest($"File type '{extension}' is not allowed");
-        }
-
-        if (file.Length > FileSizeConstants.MaxAssetAttachmentBytes)
-        {
-            return ServiceResult<AssetTransactionApproveAttachmentView>.BadRequest($"File size exceeds {FileSizeConstants.MaxAssetAttachmentMB}MB limit");
-        }
-
-        var docTypeExists = await _masterDataService.GetValueAsync("ApproveDocumentType", model.DocumentType);
-        if (!docTypeExists.IsSuccess || docTypeExists.Data == null)
-        {
-            return ServiceResult<AssetTransactionApproveAttachmentView>.BadRequest($"Invalid DocumentType: {model.DocumentType}");
-        }
-
-        return await ExecuteWithTransactionAsync(async () =>
-        {
-            var subDirectory = Path.Combine("AssetTransaction", transactionId.ToString(), "Approve");
-            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
-            var fileHash = _storageService.ComputeFileHash(file);
-
-            var uploadModel = new FileAttachmentUploadDto
-            {
-                File = file,
-                FileCategory = "ApproveDocument",
-                Description = model.Description,
-                IsPrimary = false
-            };
-
-            var fileResult = await _fileAttachmentService.UploadAsync("AssetTransactionApprove", transactionId, uploadModel);
-            if (!fileResult.IsSuccess || fileResult.Data == null)
-            {
-                return ServiceResult<AssetTransactionApproveAttachmentView>.Failure("Failed to upload file");
-            }
-
-            var attachmentEntity = new AssetTransactionApproveAttachmentEntity
-            {
-                AssetTransactionId = transactionId,
-                FileAttachmentId = fileResult.Data.FileAttachmentId,
-                Order = model.Order,
-                DocumentType = model.DocumentType,
-                NeedToChange = false,
-                Approved = false,
-                IsActive = true,
-                CreatedDate = DateTime.Now,
-                CreatedBy = _currentUserService.GetDisplayName()
-            };
-
-            await _transactionReps.InsertApproveAttachmentAsync(attachmentEntity);
-
-            var attachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(transactionId);
-            var created = attachments.FirstOrDefault(a => a.FileAttachmentId == fileResult.Data.FileAttachmentId);
-
-            await _activityLogService.LogCreateAsync(
-                TableNames.AssetTransaction,
-                transactionId,
-                $"Approve attachment uploaded: {file.FileName} (DocumentType: {model.DocumentType})",
-                _currentUserService.GetDisplayName());
-
-            return ServiceResult<AssetTransactionApproveAttachmentView>.Success(created!, "Approve attachment uploaded successfully");
-        }, "upload approve attachment");
-    }
-
-    public async Task<ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>> GetApproveAttachmentsAsync(int transactionId)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var attachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(transactionId);
-            return ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>.Success(attachments);
-        }, "get approve attachments");
-    }
-
-    public async Task<ServiceResult> DeleteApproveAttachmentAsync(int transactionId, int attachmentId)
-    {
-        return await ExecuteWithTransactionAsync(async () =>
-        {
-            var attachment = await _transactionReps.GetApproveAttachmentByIdAsync(attachmentId);
-            if (attachment == null || attachment.AssetTransactionId != transactionId)
-            {
-                return ServiceResult.NotFound($"Approve attachment with id {attachmentId} not found for transaction {transactionId}");
-            }
-
-            var fileResult = await _fileAttachmentService.DeleteAsync(attachment.FileAttachmentId);
-            if (!fileResult.IsSuccess)
-            {
-                return ServiceResult.Failure("Failed to delete file attachment");
-            }
-
-            await _transactionReps.DeleteApproveAttachmentAsync(attachmentId);
-
-            await _activityLogService.LogDeleteAsync(
-                TableNames.AssetTransaction,
-                transactionId,
-                $"Approve attachment {attachmentId} deleted",
-                _currentUserService.GetDisplayName());
-
-            return ServiceResult.Success("Approve attachment deleted successfully");
-        }, "delete approve attachment");
-    }
-
-    public async Task<ServiceResult> ApproveAttachmentActionAsync(int transactionId, int attachmentId, ApproveAttachmentActionDto model)
-    {
-        return await ExecuteWithTransactionAsync(async () =>
-        {
-            var attachment = await _transactionReps.GetApproveAttachmentByIdAsync(attachmentId);
-            if (attachment == null || attachment.AssetTransactionId != transactionId)
-            {
-                return ServiceResult.NotFound($"Approve attachment with id {attachmentId} not found for transaction {transactionId}");
-            }
-
-            if (model.Action == "NeedToChange")
-            {
-                attachment.NeedToChange = true;
-                attachment.Approved = false;
-                await _activityLogService.LogUpdateAsync(
-                    TableNames.AssetTransaction,
-                    transactionId,
-                    $"Approve attachment {attachmentId} marked as NeedToChange",
-                    _currentUserService.GetDisplayName());
-            }
-            else if (model.Action == "Approve")
-            {
-                attachment.NeedToChange = false;
-                attachment.Approved = true;
-                await _activityLogService.LogUpdateAsync(
-                    TableNames.AssetTransaction,
-                    transactionId,
-                    $"Approve attachment {attachmentId} approved",
-                    _currentUserService.GetDisplayName());
-            }
-            else
-            {
-                return ServiceResult.BadRequest($"Invalid action: {model.Action}. Allowed: NeedToChange, Approve");
-            }
-
-            attachment.ModifiedDate = DateTime.Now;
-            attachment.ModifiedBy = _currentUserService.GetDisplayName();
-            await _transactionReps.UpdateApproveAttachmentAsync(attachment);
-
-            return ServiceResult.Success($"Approve attachment {model.Action.ToLower()}ed successfully");
-        }, "approve attachment action");
-    }
-
-    public async Task<ServiceResult<IEnumerable<RequiredDocumentTypeDto>>> GetRequiredDocumentTypesAsync(int transactionId)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var result = await _transactionReps.GetRequiredDocumentTypesAsync(transactionId);
-            return ServiceResult<IEnumerable<RequiredDocumentTypeDto>>.Success(result);
-        }, "get required document types");
-    }
-
-    // ============================================================
     // DROPDOWN
     // ============================================================
 
@@ -1196,5 +1116,94 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         var randomPart = new Random().Next(1000, 9999).ToString();
 
         return $"{prefix}-{datePart}-{randomPart}";
+    }
+
+    private async Task AddAttachmentFromBase64Async(int transactionId, string base64String, string fileName, int order)
+    {
+        var bytes = Convert.FromBase64String(base64String);
+        using var stream = new MemoryStream(bytes);
+        var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = GetContentType(fileName)
+        };
+
+        var uploadModel = new FileAttachmentUploadDto
+        {
+            File = file,
+            FileCategory = "AssetTransaction",
+            Description = $"Attachment: {fileName}",
+            IsPrimary = false
+        };
+
+        var fileResult = await _fileAttachmentService.UploadAsync("AssetTransaction", transactionId, uploadModel);
+        if (fileResult.IsSuccess && fileResult.Data != null)
+        {
+            var attachmentEntity = new AssetTransactionAttachmentEntity
+            {
+                AssetTransactionId = transactionId,
+                FileAttachmentId = fileResult.Data.FileAttachmentId,
+                Order = order,
+                IsActive = true,
+                CreatedDate = DateTime.Now,
+                CreatedBy = _currentUserService.GetDisplayName()
+            };
+            await _transactionReps.InsertAttachmentAsync(attachmentEntity);
+        }
+    }
+
+    private async Task AddApproveAttachmentFromBase64Async(int transactionId, string base64String, string fileName, int documentType, int order)
+    {
+        var bytes = Convert.FromBase64String(base64String);
+        using var stream = new MemoryStream(bytes);
+        var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = GetContentType(fileName)
+        };
+
+        var uploadModel = new FileAttachmentUploadDto
+        {
+            File = file,
+            FileCategory = "ApproveDocument",
+            Description = $"Approve document: {fileName}",
+            IsPrimary = false
+        };
+
+        var fileResult = await _fileAttachmentService.UploadAsync("AssetTransactionApprove", transactionId, uploadModel);
+        if (fileResult.IsSuccess && fileResult.Data != null)
+        {
+            var attachmentEntity = new AssetTransactionApproveAttachmentEntity
+            {
+                AssetTransactionId = transactionId,
+                FileAttachmentId = fileResult.Data.FileAttachmentId,
+                Order = order,
+                DocumentType = documentType,
+                NeedToChange = false,
+                Approved = false,
+                IsActive = true,
+                CreatedDate = DateTime.Now,
+                CreatedBy = _currentUserService.GetDisplayName()
+            };
+            await _transactionReps.InsertApproveAttachmentAsync(attachmentEntity);
+        }
+    }
+
+    private string GetContentType(string fileName)
+    {
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        return ext switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".gif" => "image/gif",
+            ".pdf" => "application/pdf",
+            ".doc" => "application/msword",
+            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".xls" => "application/vnd.ms-excel",
+            ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".txt" => "text/plain",
+            _ => "application/octet-stream"
+        };
     }
 }

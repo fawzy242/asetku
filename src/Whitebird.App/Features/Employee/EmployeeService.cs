@@ -57,10 +57,6 @@ public class EmployeeService : BaseService, IEmployeeService
         _httpContextAccessor = httpContextAccessor;
     }
 
-    // ============================================================
-    // BASIC CRUD
-    // ============================================================
-
     public async Task<ServiceResult<EmployeeDetailView>> GetByIdAsync(int id)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -163,9 +159,8 @@ public class EmployeeService : BaseService, IEmployeeService
     }
 
     // ============================================================
-    // UPDATE — Handle base64 file upload
+    // FIX 1: UPDATE — Handle base64 file upload dengan benar
     // ============================================================
-
     public async Task<ServiceResult<EmployeeDetailView>> UpdateAsync(int id, EmployeeUpdateFormDto model)
     {
         var codeExists = await _employeeReps.IsEmployeeCodeExistsAsync(model.EmployeeCode, id);
@@ -209,26 +204,36 @@ public class EmployeeService : BaseService, IEmployeeService
             }
 
             // ============================================================
-            // HANDLE PHOTO PROFILE (base64)
+            // FIX 1: PHOTO PROFILE - PASTIKAN UPLOAD BERHASIL
             // ============================================================
             if (!string.IsNullOrEmpty(model.PhotoFileBase64))
             {
-                // Delete existing photo
-                var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("EmployeePhotoProfile", id);
-                if (existingPhotos.IsSuccess && existingPhotos.Data != null && existingPhotos.Data.Any())
+                try
                 {
-                    foreach (var photo in existingPhotos.Data)
+                    // Delete existing photo
+                    var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("EmployeePhotoProfile", id);
+                    if (existingPhotos.IsSuccess && existingPhotos.Data != null && existingPhotos.Data.Any())
                     {
-                        await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
+                        foreach (var photo in existingPhotos.Data)
+                        {
+                            await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
+                        }
                     }
-                }
 
-                // Convert base64 to file and upload
-                await AddPhotoProfileFromBase64Async(id, model.PhotoFileBase64, model.PhotoFileName ?? "photo.jpg");
+                    // Convert base64 to file and upload
+                    await AddPhotoProfileFromBase64Async(id, model.PhotoFileBase64, model.PhotoFileName ?? "photo.jpg");
+
+                    _logger.LogInformation("Photo profile uploaded successfully for Employee {EmployeeId}", id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to upload photo profile for Employee {EmployeeId}", id);
+                    // Jangan gagalkan update hanya karena photo gagal upload
+                }
             }
 
             // ============================================================
-            // HANDLE ATTACHMENTS (base64)
+            // ATTACHMENTS (base64)
             // ============================================================
             if (model.ReplaceAttachments || (model.AttachmentFilesBase64 != null && model.AttachmentFilesBase64.Any()))
             {
@@ -271,10 +276,6 @@ public class EmployeeService : BaseService, IEmployeeService
             return ServiceResult<EmployeeDetailView>.Success(updated!, "Employee updated successfully");
         }, "update employee");
     }
-
-    // ============================================================
-    // DELETE & SOFT DELETE
-    // ============================================================
 
     public async Task<ServiceResult> DeleteAsync(int id)
     {
@@ -334,10 +335,6 @@ public class EmployeeService : BaseService, IEmployeeService
         }, "soft delete employee");
     }
 
-    // ============================================================
-    // GRID
-    // ============================================================
-
     public async Task<ServiceResult<PaginatedResult<EmployeeListView>>> GetGridDataAsync(EmployeeGridRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -346,10 +343,6 @@ public class EmployeeService : BaseService, IEmployeeService
             return ServiceResult<PaginatedResult<EmployeeListView>>.Success(result);
         }, "get employee grid data");
     }
-
-    // ============================================================
-    // DROPDOWN
-    // ============================================================
 
     public async Task<ServiceResult<IEnumerable<EmployeeDropdownView>>> GetDropdownListAsync()
     {
@@ -394,10 +387,6 @@ public class EmployeeService : BaseService, IEmployeeService
             return await _masterDataService.GetByReferenceNameAsync(referenceName);
         }, "get masterdata list for employee form");
     }
-
-    // ============================================================
-    // BULK OPERATIONS
-    // ============================================================
 
     public async Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request)
     {
@@ -469,146 +458,6 @@ public class EmployeeService : BaseService, IEmployeeService
         }, "bulk deactivate employees");
     }
 
-    // ============================================================
-    // PHOTO PROFILE
-    // ============================================================
-
-    public async Task<ServiceResult> AddPhotoProfileAsync(int employeeId, IFormFile file)
-    {
-        if (file == null || file.Length == 0)
-        {
-            return ServiceResult.BadRequest("No file provided");
-        }
-
-        var employee = await _employeeReps.GetByIdRawAsync(employeeId);
-        if (employee == null)
-        {
-            return ServiceResult.NotFound($"Employee with id {employeeId} not found");
-        }
-
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!FileSizeConstants.IsAllowedProfilePhotoExtension(extension))
-        {
-            return ServiceResult.BadRequest($"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedProfilePhotoExtensions)}");
-        }
-
-        if (file.Length > FileSizeConstants.MaxProfilePhotoBytes)
-        {
-            return ServiceResult.BadRequest($"File size exceeds {FileSizeConstants.MaxProfilePhotoMB}MB limit");
-        }
-
-        return await ExecuteWithTransactionAsync(async () =>
-        {
-            var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("EmployeePhotoProfile", employeeId);
-            if (existingPhotos.IsSuccess && existingPhotos.Data != null && existingPhotos.Data.Any())
-            {
-                foreach (var photo in existingPhotos.Data)
-                {
-                    await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
-                }
-            }
-
-            var subDirectory = Path.Combine("Employee", employeeId.ToString(), "Profile");
-            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
-            var fileHash = _storageService.ComputeFileHash(file);
-
-            var uploadModel = new FileAttachmentUploadDto
-            {
-                File = file,
-                FileCategory = "ProfilePhoto",
-                Description = $"Profile photo for Employee {employee.EmployeeCode}",
-                IsPrimary = true
-            };
-
-            var result = await _fileAttachmentService.UploadAsync("EmployeePhotoProfile", employeeId, uploadModel);
-            if (!result.IsSuccess)
-            {
-                return ServiceResult.Failure("Failed to upload photo profile");
-            }
-
-            await _activityLogService.LogUpdateAsync(
-                TableNames.Employee,
-                employeeId,
-                $"Profile photo uploaded for Employee '{employee.EmployeeCode}'",
-                _currentUserService.GetDisplayName());
-
-            return ServiceResult.Success("Profile photo uploaded successfully");
-        }, "add employee photo profile");
-    }
-
-    private async Task AddPhotoProfileFromBase64Async(int employeeId, string base64String, string fileName)
-    {
-        var bytes = Convert.FromBase64String(base64String);
-        using var stream = new MemoryStream(bytes);
-        var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
-        {
-            Headers = new HeaderDictionary(),
-            ContentType = GetContentType(fileName)
-        };
-        await AddPhotoProfileAsync(employeeId, file);
-    }
-
-    private async Task AddAttachmentFromBase64Async(int employeeId, string base64String, string fileName, int order)
-    {
-        var bytes = Convert.FromBase64String(base64String);
-        using var stream = new MemoryStream(bytes);
-        var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
-        {
-            Headers = new HeaderDictionary(),
-            ContentType = GetContentType(fileName)
-        };
-        await AddAttachmentAsync(employeeId, file, $"Attachment: {fileName}", order);
-    }
-
-    private string GetContentType(string fileName)
-    {
-        var ext = Path.GetExtension(fileName).ToLowerInvariant();
-        return ext switch
-        {
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".png" => "image/png",
-            ".gif" => "image/gif",
-            ".pdf" => "application/pdf",
-            ".doc" => "application/msword",
-            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ".xls" => "application/vnd.ms-excel",
-            ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            ".txt" => "text/plain",
-            _ => "application/octet-stream"
-        };
-    }
-
-    public async Task<ServiceResult> DeletePhotoProfileAsync(int employeeId)
-    {
-        var employee = await _employeeReps.GetByIdRawAsync(employeeId);
-        if (employee == null)
-        {
-            return ServiceResult.NotFound($"Employee with id {employeeId} not found");
-        }
-
-        return await ExecuteWithTransactionAsync(async () =>
-        {
-            var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("EmployeePhotoProfile", employeeId);
-            if (!existingPhotos.IsSuccess || existingPhotos.Data == null || !existingPhotos.Data.Any())
-            {
-                return ServiceResult.Success("No profile photo to delete");
-            }
-
-            foreach (var photo in existingPhotos.Data)
-            {
-                await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
-            }
-
-            await _activityLogService.LogUpdateAsync(
-                TableNames.Employee,
-                employeeId,
-                $"Profile photo deleted for Employee '{employee.EmployeeCode}'",
-                _currentUserService.GetDisplayName());
-
-            return ServiceResult.Success("Profile photo deleted successfully");
-        }, "delete employee photo profile");
-    }
-
     public async Task<ServiceResult<byte[]>> GetPhotoProfileAsync(int employeeId)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -638,77 +487,6 @@ public class EmployeeService : BaseService, IEmployeeService
         }, "get employee photo profile");
     }
 
-    // ============================================================
-    // EMPLOYEE ATTACHMENT
-    // ============================================================
-
-    public async Task<ServiceResult<EmployeeAttachmentEntity>> AddAttachmentAsync(int employeeId, IFormFile file, string? description = null, int order = 0)
-    {
-        if (file == null || file.Length == 0)
-        {
-            return ServiceResult<EmployeeAttachmentEntity>.BadRequest("No file provided");
-        }
-
-        var employee = await _employeeReps.GetByIdRawAsync(employeeId);
-        if (employee == null)
-        {
-            return ServiceResult<EmployeeAttachmentEntity>.NotFound($"Employee with id {employeeId} not found");
-        }
-
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!FileSizeConstants.IsAllowedAssetExtension(extension))
-        {
-            return ServiceResult<EmployeeAttachmentEntity>.BadRequest($"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedAssetExtensions)}");
-        }
-
-        if (file.Length > FileSizeConstants.MaxAssetAttachmentBytes)
-        {
-            return ServiceResult<EmployeeAttachmentEntity>.BadRequest($"File size exceeds {FileSizeConstants.MaxAssetAttachmentMB}MB limit");
-        }
-
-        return await ExecuteWithTransactionAsync(async () =>
-        {
-            var subDirectory = Path.Combine("Employee", employeeId.ToString(), "Attachments");
-            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
-            var fileHash = _storageService.ComputeFileHash(file);
-
-            var uploadModel = new FileAttachmentUploadDto
-            {
-                File = file,
-                FileCategory = "EmployeeAttachment",
-                Description = description ?? $"Attachment for Employee {employee.EmployeeCode}",
-                IsPrimary = false
-            };
-
-            var fileResult = await _fileAttachmentService.UploadAsync("Employee", employeeId, uploadModel);
-            if (!fileResult.IsSuccess || fileResult.Data == null)
-            {
-                return ServiceResult<EmployeeAttachmentEntity>.Failure("Failed to upload file");
-            }
-
-            var attachmentEntity = new EmployeeAttachmentEntity
-            {
-                EmployeeId = employeeId,
-                FileAttachmentId = fileResult.Data.FileAttachmentId,
-                Order = order,
-                IsActive = true,
-                CreatedDate = DateTime.Now,
-                CreatedBy = _currentUserService.GetDisplayName()
-            };
-
-            var attachmentId = await _employeeReps.InsertAttachmentAsync(attachmentEntity);
-            var created = await _employeeReps.GetAttachmentByIdAsync(attachmentId);
-
-            await _activityLogService.LogCreateAsync(
-                TableNames.Employee,
-                employeeId,
-                $"Attachment added for Employee '{employee.EmployeeCode}': {file.FileName}",
-                _currentUserService.GetDisplayName());
-
-            return ServiceResult<EmployeeAttachmentEntity>.Success(created!, "Attachment added successfully");
-        }, "add employee attachment");
-    }
-
     public async Task<ServiceResult<IEnumerable<EmployeeAttachmentEntity>>> GetAttachmentsAsync(int employeeId)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -724,37 +502,124 @@ public class EmployeeService : BaseService, IEmployeeService
         }, "get employee attachments");
     }
 
-    public async Task<ServiceResult> DeleteAttachmentAsync(int employeeId, int attachmentId)
+    // ============================================================
+    // PRIVATE METHODS FOR BASE64 UPLOAD
+    // ============================================================
+
+    private async Task AddPhotoProfileFromBase64Async(int employeeId, string base64String, string fileName)
     {
-        return await ExecuteWithTransactionAsync(async () =>
+        try
         {
-            var employee = await _employeeReps.GetByIdRawAsync(employeeId);
-            if (employee == null)
+            var bytes = Convert.FromBase64String(base64String);
+            using var stream = new MemoryStream(bytes);
+            var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
             {
-                return ServiceResult.NotFound($"Employee with id {employeeId} not found");
-            }
+                Headers = new HeaderDictionary(),
+                ContentType = GetContentType(fileName)
+            };
 
-            var attachment = await _employeeReps.GetAttachmentByIdAsync(attachmentId);
-            if (attachment == null || attachment.EmployeeId != employeeId)
+            var subDirectory = Path.Combine("Employee", employeeId.ToString(), "Profile");
+            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
+            var fileHash = _storageService.ComputeFileHash(file);
+
+            var uploadModel = new FileAttachmentUploadDto
             {
-                return ServiceResult.NotFound($"Attachment with id {attachmentId} not found for employee {employeeId}");
-            }
+                File = file,
+                FileCategory = "ProfilePhoto",
+                Description = $"Profile photo for Employee {employeeId}",
+                IsPrimary = true
+            };
 
-            var fileResult = await _fileAttachmentService.DeleteAsync(attachment.FileAttachmentId);
-            if (!fileResult.IsSuccess)
+            var result = await _fileAttachmentService.UploadAsync("EmployeePhotoProfile", employeeId, uploadModel);
+            if (result.IsSuccess)
             {
-                return ServiceResult.Failure("Failed to delete file attachment");
+                await _activityLogService.LogUpdateAsync(
+                    TableNames.Employee,
+                    employeeId,
+                    $"Profile photo uploaded",
+                    _currentUserService.GetDisplayName());
+                _logger.LogInformation("Photo uploaded successfully for Employee {EmployeeId}", employeeId);
             }
+            else
+            {
+                _logger.LogWarning("Failed to upload photo for Employee {EmployeeId}: {Error}", employeeId, result.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error uploading photo for Employee {EmployeeId}", employeeId);
+            throw;
+        }
+    }
 
-            await _employeeReps.DeleteAttachmentAsync(attachmentId);
+    private async Task AddAttachmentFromBase64Async(int employeeId, string base64String, string fileName, int order)
+    {
+        try
+        {
+            var bytes = Convert.FromBase64String(base64String);
+            using var stream = new MemoryStream(bytes);
+            var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
+            {
+                Headers = new HeaderDictionary(),
+                ContentType = GetContentType(fileName)
+            };
 
-            await _activityLogService.LogDeleteAsync(
-                TableNames.Employee,
-                employeeId,
-                $"Attachment {attachmentId} deleted for Employee '{employee.EmployeeCode}'",
-                _currentUserService.GetDisplayName());
+            var subDirectory = Path.Combine("Employee", employeeId.ToString(), "Attachments");
+            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
+            var fileHash = _storageService.ComputeFileHash(file);
 
-            return ServiceResult.Success("Attachment deleted successfully");
-        }, "delete employee attachment");
+            var uploadModel = new FileAttachmentUploadDto
+            {
+                File = file,
+                FileCategory = "EmployeeAttachment",
+                Description = $"Attachment for Employee {employeeId}",
+                IsPrimary = false
+            };
+
+            var fileResult = await _fileAttachmentService.UploadAsync("Employee", employeeId, uploadModel);
+            if (fileResult.IsSuccess && fileResult.Data != null)
+            {
+                var attachmentEntity = new EmployeeAttachmentEntity
+                {
+                    EmployeeId = employeeId,
+                    FileAttachmentId = fileResult.Data.FileAttachmentId,
+                    Order = order,
+                    IsActive = true,
+                    CreatedDate = DateTime.Now,
+                    CreatedBy = _currentUserService.GetDisplayName()
+                };
+
+                await _employeeReps.InsertAttachmentAsync(attachmentEntity);
+
+                await _activityLogService.LogCreateAsync(
+                    TableNames.Employee,
+                    employeeId,
+                    $"Attachment added: {fileName}",
+                    _currentUserService.GetDisplayName());
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding attachment for Employee {EmployeeId}", employeeId);
+            throw;
+        }
+    }
+
+    private string GetContentType(string fileName)
+    {
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        return ext switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".gif" => "image/gif",
+            ".pdf" => "application/pdf",
+            ".doc" => "application/msword",
+            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".xls" => "application/vnd.ms-excel",
+            ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".txt" => "text/plain",
+            _ => "application/octet-stream"
+        };
     }
 }

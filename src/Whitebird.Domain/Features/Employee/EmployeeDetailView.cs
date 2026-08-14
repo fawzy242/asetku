@@ -26,4 +26,26 @@ public class EmployeeDetailView
     public string CreatedBy { get; set; } = "System";
     public DateTime? ModifiedDate { get; set; }
     public string? ModifiedBy { get; set; }
+
+    // ============================================================
+    // NEW: Photo Profile & Attachments
+    // ============================================================
+    public string? PhotoProfileUrl { get; set; }
+    public List<EmployeeAttachmentViewDto> Attachments { get; set; } = new();
+}
+
+/// <summary>
+/// DTO for employee attachment in detail view
+/// </summary>
+public class EmployeeAttachmentViewDto
+{
+    public int EmployeeAttachmentId { get; set; }
+    public int FileAttachmentId { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public string OriginalFileName { get; set; } = string.Empty;
+    public string? FileUrl { get; set; }
+    public string? FileCategory { get; set; }
+    public bool IsPrimary { get; set; }
+    public int Order { get; set; }
+    public DateTime CreatedDate { get; set; }
 }

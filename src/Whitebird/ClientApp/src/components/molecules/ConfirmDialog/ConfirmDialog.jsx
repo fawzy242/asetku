@@ -32,7 +32,7 @@ export const ConfirmDialogProvider = ({ children }) => {
 };
 
 // ============================================================
-// STATIC API - FIXED: Gunakan toastr langsung
+// STATIC API
 // ============================================================
 class ConfirmDialog {
   static show(options = {}) {
@@ -55,7 +55,32 @@ class ConfirmDialog {
   static showError = (title, text) =>
     alertUtils.error(title, text);
 
-  // FIX: Gunakan toastr langsung dari sweetAlert
+  // ============================================================
+  // File Upload/Delete Confirmation
+  // ============================================================
+  static confirmFileUpload = (fileNames, count) => {
+    const names = Array.isArray(fileNames) ? fileNames.join(', ') : fileNames;
+    return ConfirmDialog.show({
+      title: `Upload ${count || 1} File(s)`,
+      text: `Are you sure you want to upload:\n${names}`,
+      icon: 'question',
+      confirmButtonText: 'Yes, Upload',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#dc2626',
+    });
+  };
+
+  static confirmFileDelete = (fileName) => {
+    return ConfirmDialog.show({
+      title: 'Delete File',
+      text: `Are you sure you want to delete "${fileName}"?`,
+      icon: 'warning',
+      confirmButtonText: 'Yes, Delete',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ef4444',
+    });
+  };
+
   static toast = {
     success: (msg) => {
       if (msg) {

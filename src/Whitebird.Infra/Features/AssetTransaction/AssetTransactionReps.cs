@@ -115,7 +115,7 @@ public class AssetTransactionReps : IAssetTransactionReps
     // ============================================================
 
     private async Task<PaginatedResult<AssetTransactionListView>> GetGridBaseAsync(
-        AssetTransactionGridRequest request, int[] transactionTypes, bool isReturnGrid)
+    AssetTransactionGridRequest request, int[] transactionTypes, bool isReturnGrid)
     {
         var conditions = new List<string>();
         var parameters = new DynamicParameters();
@@ -123,6 +123,32 @@ public class AssetTransactionReps : IAssetTransactionReps
         conditions.Add("t.TransactionType IN @TransactionTypes");
         parameters.Add("@TransactionTypes", transactionTypes);
         conditions.Add("t.IsActive = 1");
+
+        // ============================================================
+        // NEW: Status Filter
+        // ============================================================
+        if (!string.IsNullOrWhiteSpace(request.Status))
+        {
+            switch (request.Status.ToLower())
+            {
+                case "approve":
+                    conditions.Add("t.Approved = 1");
+                    conditions.Remove("t.IsActive = 1"); // Approve harus IsActive = 1, tapi kita sudah punya
+                    break;
+                case "pending":
+                    conditions.Add("t.Approved IS NULL");
+                    // IsActive = 1 sudah ada
+                    break;
+                case "reject":
+                    conditions.Remove("t.IsActive = 1"); // Reject: IsActive = 0
+                    conditions.Add("t.IsActive = 0");
+                    conditions.Add("t.Approved = 0");
+                    break;
+                default:
+                    // No filter
+                    break;
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
@@ -171,11 +197,11 @@ public class AssetTransactionReps : IAssetTransactionReps
         var orderBy = $"ORDER BY {sortBy} {(request.SortDescending ? "DESC" : "ASC")}";
 
         var countSql = $@"
-            SELECT COUNT(*)
-            FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId
-            LEFT JOIN Employee e ON t.EmployeeId = e.EmployeeId
-            {whereClause}";
+        SELECT COUNT(*)
+        FROM AssetTransaction t
+        LEFT JOIN Asset a ON t.AssetId = a.AssetId
+        LEFT JOIN Employee e ON t.EmployeeId = e.EmployeeId
+        {whereClause}";
 
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
@@ -184,33 +210,33 @@ public class AssetTransactionReps : IAssetTransactionReps
         parameters.Add("@PageSize", request.PageSize);
 
         var selectClause = @"
-            SELECT 
-                t.AssetTransactionId, t.AssetTransactionCode, t.AssetId, t.TransactionType, 
-                t.TransactionDate, t.ExpectedLoanReturnDate, t.Notes, t.Condition,
-                t.Approved, t.ApprovedBy, t.Completed, t.CompletedBy,
-                t.MaintenanceType, t.MaintenanceCost, t.FromAssetTransactionId, t.IsActive,
-                t.CreatedDate, t.CreatedBy, t.ModifiedDate, t.ModifiedBy,
-                a.AssetCode, a.AssetName,
-                e.EmployeeId, e.EmployeeCode, e.FullName as EmployeeName,
-                md1.MasterDataName as TransactionTypeName,
-                md2.MasterDataName as ConditionName,
-                md3.MasterDataName as MaintenanceTypeName,
-                0 as CanEdit, 0 as CanDelete, 0 as CanReturn, 0 as CanPost";
+        SELECT 
+            t.AssetTransactionId, t.AssetTransactionCode, t.AssetId, t.TransactionType, 
+            t.TransactionDate, t.ExpectedLoanReturnDate, t.Notes, t.Condition,
+            t.Approved, t.ApprovedBy, t.Completed, t.CompletedBy,
+            t.MaintenanceType, t.MaintenanceCost, t.FromAssetTransactionId, t.IsActive,
+            t.CreatedDate, t.CreatedBy, t.ModifiedDate, t.ModifiedBy,
+            a.AssetCode, a.AssetName,
+            e.EmployeeId, e.EmployeeCode, e.FullName as EmployeeName,
+            md1.MasterDataName as TransactionTypeName,
+            md2.MasterDataName as ConditionName,
+            md3.MasterDataName as MaintenanceTypeName,
+            0 as CanEdit, 0 as CanDelete, 0 as CanReturn, 0 as CanPost";
 
         var fromClause = @"
-            FROM AssetTransaction t
-            LEFT JOIN Asset a ON t.AssetId = a.AssetId
-            LEFT JOIN Employee e ON t.EmployeeId = e.EmployeeId
-            LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
-            LEFT JOIN MasterData md2 ON t.Condition = md2.ReferenceCode AND md2.ReferenceName = 'AssetCondition' AND md2.IsActive = 1
-            LEFT JOIN MasterData md3 ON t.MaintenanceType = md3.ReferenceCode AND md3.ReferenceName = 'MaintenanceType' AND md3.IsActive = 1";
+        FROM AssetTransaction t
+        LEFT JOIN Asset a ON t.AssetId = a.AssetId
+        LEFT JOIN Employee e ON t.EmployeeId = e.EmployeeId
+        LEFT JOIN MasterData md1 ON t.TransactionType = md1.ReferenceCode AND md1.ReferenceName = 'TransactionType' AND md1.IsActive = 1
+        LEFT JOIN MasterData md2 ON t.Condition = md2.ReferenceCode AND md2.ReferenceName = 'AssetCondition' AND md2.IsActive = 1
+        LEFT JOIN MasterData md3 ON t.MaintenanceType = md3.ReferenceCode AND md3.ReferenceName = 'MaintenanceType' AND md3.IsActive = 1";
 
         var dataSql = $@"
-            {selectClause}
-            {fromClause}
-            {whereClause}
-            {orderBy}
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+        {selectClause}
+        {fromClause}
+        {whereClause}
+        {orderBy}
+        OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
         var data = await _context.QueryAsync<AssetTransactionListView>(dataSql, parameters);
 
@@ -222,6 +248,35 @@ public class AssetTransactionReps : IAssetTransactionReps
             item.CanDelete = flags.CanDelete;
             item.CanReturn = flags.CanReturn;
             item.CanPost = flags.CanPost;
+
+            // ============================================================
+            // NEW: Get Attachments for each transaction
+            // ============================================================
+            var attachments = await GetAttachmentsByTransactionIdAsync(item.AssetTransactionId);
+            item.Attachments = attachments.Select(a => new AssetTransactionAttachmentInfoDto
+            {
+                AssetTransactionAttachmentId = a.AssetTransactionAttachmentId,
+                FileAttachmentId = a.FileAttachmentId,
+                FileName = a.FileName ?? string.Empty,
+                OriginalFileName = a.OriginalFileName ?? string.Empty,
+                FileUrl = a.FileUrl,
+                Order = a.Order
+            }).ToList();
+
+            var approveAttachments = await GetApproveAttachmentsByTransactionIdAsync(item.AssetTransactionId);
+            item.ApproveAttachments = approveAttachments.Select(a => new AssetTransactionApproveAttachmentInfoDto
+            {
+                AssetTransactionApproveAttachmentId = a.AssetTransactionApproveAttachmentId,
+                FileAttachmentId = a.FileAttachmentId,
+                FileName = a.FileName ?? string.Empty,
+                OriginalFileName = a.OriginalFileName ?? string.Empty,
+                FileUrl = a.FileUrl,
+                DocumentType = a.DocumentType,
+                DocumentTypeName = a.DocumentTypeName,
+                NeedToChange = a.NeedToChange,
+                Approved = a.Approved,
+                Order = a.Order
+            }).ToList();
         }
 
         return new PaginatedResult<AssetTransactionListView>

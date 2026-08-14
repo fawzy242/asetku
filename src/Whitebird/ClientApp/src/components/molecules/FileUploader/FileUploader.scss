@@ -1,95 +1,254 @@
 // src/components/molecules/FileUploader/FileUploader.scss
 @use '../../../styles/variables' as *;
+@use '../../../styles/mixins' as *;
 
 .file-uploader {
     margin-top: $spacing-md;
     padding: $spacing-md;
-    border: 1px dashed var(--border);
-    border-radius: $radius-md;
+    border: 1px solid var(--border);
+    border-radius: $radius-lg;
     background-color: var(--surface);
+    transition: all $transition-fast;
 
     &__header {
         display: flex;
         justify-content: space-between;
         align-items: center;
         margin-bottom: $spacing-md;
+
+        &-title {
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
     }
 
-    &__status {
-        color: var(--success);
-        font-weight: 500;
-        margin-left: $spacing-sm;
+    &__file-count {
+        color: var(--text-secondary);
+        font-weight: 400;
+        margin-left: $spacing-xs;
+        font-size: $font-size-xs;
     }
 
-    &__actions {
+    &__progress {
+        margin-bottom: $spacing-md;
+
+        .MuiLinearProgress-root {
+            height: 6px;
+            border-radius: $radius-sm;
+        }
+    }
+
+    &__dropzone {
+        border: 2px dashed var(--border);
+        border-radius: $radius-lg;
+        padding: $spacing-xl;
+        text-align: center;
+        transition: all $transition-fast;
+        cursor: pointer;
+        background-color: var(--card-bg);
+        position: relative;
+        min-height: 160px;
         display: flex;
         align-items: center;
-        gap: $spacing-xs;
-    }
-
-    &__action-btn {
-        color: var(--text-secondary);
-        transition: color $transition-fast;
+        justify-content: center;
 
         &:hover {
-            color: var(--primary);
+            border-color: var(--primary);
+            background-color: rgba(220, 38, 38, 0.02);
         }
 
-        &--danger:hover {
-            color: var(--error);
+        &--dragging {
+            border-color: var(--primary);
+            background-color: rgba(220, 38, 38, 0.05);
+            transform: scale(1.01);
+        }
+
+        &--has-files {
+            min-height: 100px;
+            padding: $spacing-lg;
         }
     }
 
-    &__button {
+    &__dropzone-content {
         display: flex;
+        flex-direction: column;
         align-items: center;
-        gap: $spacing-xs;
-        padding: $spacing-xs $spacing-md;
+        gap: $spacing-sm;
+        pointer-events: none;
+        width: 100%;
+    }
+
+    &__dropzone-icon {
+        color: var(--text-secondary);
+        opacity: 0.5;
+    }
+
+    &__dropzone-text {
+        color: var(--text-primary);
+        font-weight: 500;
+    }
+
+    &__dropzone-hint {
+        color: var(--text-secondary);
+        font-size: $font-size-xs;
+    }
+
+    &__dropzone-btn {
+        pointer-events: auto;
+        padding: $spacing-sm $spacing-xl;
         background-color: var(--primary);
         color: white;
         border-radius: $radius-md;
         font-size: $font-size-sm;
+        font-weight: 500;
+        transition: all $transition-fast;
+        border: none;
         cursor: pointer;
-        transition: background-color $transition-fast;
+        margin-top: $spacing-xs;
 
         &:hover {
             background-color: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: $shadow-md;
         }
     }
 
-    &__empty {
+    &__file-input {
+        display: none;
+    }
+
+    // ============================================================
+    // FILE LIST - Card-based file display
+    // ============================================================
+    &__file-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: $spacing-md;
+        margin-top: $spacing-md;
+        padding-top: $spacing-md;
+        border-top: 1px solid var(--border);
+    }
+
+    &__file-card {
         display: flex;
-        flex-direction: column;
+        align-items: center;
+        justify-content: space-between;
+        padding: $spacing-md;
+        background-color: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: $radius-md;
+        transition: all $transition-fast;
+        min-height: 64px;
+        cursor: default;
+
+        &:hover {
+            border-color: var(--primary);
+            box-shadow: $shadow-sm;
+        }
+
+        &-content {
+            display: flex;
+            align-items: center;
+            gap: $spacing-md;
+            flex: 1;
+            min-width: 0;
+        }
+    }
+
+    &__file-icon {
+        display: flex;
         align-items: center;
         justify-content: center;
-        padding: $spacing-xl;
-        gap: $spacing-sm;
+        width: 40px;
+        height: 40px;
+        background-color: var(--surface);
+        border-radius: $radius-md;
+        color: var(--text-secondary);
+        flex-shrink: 0;
+    }
+
+    &__file-info {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        flex: 1;
+    }
+
+    &__file-name {
+        font-size: $font-size-sm;
+        font-weight: 500;
+        color: var(--text-primary);
+        @include truncate;
+    }
+
+    &__file-size {
+        font-size: $font-size-xs;
         color: var(--text-secondary);
     }
 
-    &__photo-preview {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: $spacing-sm;
-        background-color: var(--card-bg);
-        border-radius: $radius-md;
-        border: 1px solid var(--border);
-        min-height: 100px;
-        max-height: 200px;
-        overflow: hidden;
+    &__file-badge {
+        margin-left: $spacing-xs;
+        font-size: 10px;
+        height: 20px;
     }
 
-    &__photo-img {
-        max-width: 100%;
-        max-height: 180px;
-        object-fit: contain;
+    &__file-actions {
+        display: flex;
+        align-items: center;
+        gap: $spacing-xs;
+        flex-shrink: 0;
+    }
+
+    &__file-action {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
         border-radius: $radius-sm;
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+        transition: all $transition-fast;
+        cursor: pointer;
+
+        &:hover {
+            background-color: var(--surface);
+        }
+
+        &--preview:hover {
+            color: var(--primary);
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+
+        &--delete:hover {
+            color: var(--error);
+            background-color: rgba(239, 68, 68, 0.1);
+        }
+    }
+
+    // ============================================================
+    // EMPTY STATE (for when no files)
+    // ============================================================
+    &__empty {
+        text-align: center;
+        padding: $spacing-xl;
+        color: var(--text-secondary);
+
+        svg {
+            margin-bottom: $spacing-md;
+            opacity: 0.5;
+        }
     }
 }
 
+// ============================================================
+// PLACEHOLDER - ketika belum ada referenceId
+// ============================================================
 .file-uploader-placeholder {
-    padding: $spacing-md;
+    padding: $spacing-lg;
     text-align: center;
     border: 1px dashed var(--border);
     border-radius: $radius-md;
@@ -97,21 +256,71 @@
     background-color: var(--surface);
 }
 
-// Dark mode specific fixes
+// ============================================================
+// DARK MODE
+// ============================================================
 [data-theme='dark'] {
     .file-uploader {
         background-color: #1f2937;
-        border-color: #4b5563;
+        border-color: #374151;
 
-        &__photo-preview {
-            background-color: #374151;
+        &__dropzone {
+            background-color: #1f2937;
             border-color: #4b5563;
+
+            &:hover {
+                border-color: #ef4444;
+                background-color: rgba(239, 68, 68, 0.05);
+            }
+
+            &--dragging {
+                border-color: #ef4444;
+                background-color: rgba(239, 68, 68, 0.1);
+            }
+        }
+
+        &__dropzone-text {
+            color: #f9fafb;
+        }
+
+        &__dropzone-icon {
+            color: #9ca3af;
+        }
+
+        &__dropzone-btn {
+            background-color: #ef4444;
+
+            &:hover {
+                background-color: #dc2626;
+            }
+        }
+
+        &__file-card {
+            background-color: #1f2937;
+            border-color: #374151;
+
+            &:hover {
+                border-color: #ef4444;
+            }
+        }
+
+        &__file-icon {
+            background-color: #374151;
+            color: #9ca3af;
+        }
+
+        &__file-name {
+            color: #f9fafb;
+        }
+
+        &__file-size {
+            color: #9ca3af;
         }
     }
 
     .file-uploader-placeholder {
         background-color: #1f2937;
-        border-color: #4b5563;
+        border-color: #374151;
         color: #9ca3af;
     }
 }

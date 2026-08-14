@@ -43,18 +43,14 @@ public interface IAssetService
     Task<ServiceResult<IEnumerable<AssetDropdownView>>> GetDropdownListByTransactionTypeAsync(int transactionType);
 
     // ============================================================
-    // PHOTO PROFILE
+    // REMOVED METHODS (moved to internal/private):
+    // - AddPhotoProfileAsync
+    // - DeletePhotoProfileAsync
+    // - GetPhotoProfileAsync
+    // - AddAttachmentAsync
+    // - GetAttachmentsAsync
+    // - DeleteAttachmentAsync
+    // 
+    // These are now handled internally via UpdateAsync with base64 payload
     // ============================================================
-
-    Task<ServiceResult> AddPhotoProfileAsync(int assetId, IFormFile file);
-    Task<ServiceResult> DeletePhotoProfileAsync(int assetId);
-    Task<ServiceResult<byte[]>> GetPhotoProfileAsync(int assetId);
-
-    // ============================================================
-    // ASSET ATTACHMENT
-    // ============================================================
-
-    Task<ServiceResult<AssetAttachmentEntity>> AddAttachmentAsync(int assetId, IFormFile file, string? description = null, int order = 0);
-    Task<ServiceResult<IEnumerable<AssetAttachmentEntity>>> GetAttachmentsAsync(int assetId);
-    Task<ServiceResult> DeleteAttachmentAsync(int assetId, int attachmentId);
 }

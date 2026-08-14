@@ -31,7 +31,6 @@ import {
   TRANSACTION_TYPES_REQUIRING_OFFICE,
   TRANSACTION_TYPES_RETURNABLE,
   isPrimaryTransactionType,
-  isSecondaryTransactionType,
   getTransactionTypeName,
   getTransactionTypeColor,
 } from '../../core/constants/transactionTypes';
@@ -49,9 +48,6 @@ import './AssetTransactions.scss';
 const transactionsData = new AssetTransactionsData();
 transactionsData.transformFormData = cleanTransactionFormData;
 
-// ============================================================
-// TAB DEFINITIONS
-// ============================================================
 const MAIN_TABS = [
   { id: 'monitoring', label: '📊 Monitoring' },
   { id: 'management', label: '⚙️ Management' },
@@ -85,18 +81,12 @@ const INITIAL_FORM_DATA = {
 };
 
 const AssetTransactionsMenu = () => {
-  // ============================================================
-  // TAB STATE
-  // ============================================================
   const [activeMainTab, setActiveMainTab] = useState('monitoring');
   const [activeSubTab, setActiveSubTab] = useState('pending-approval');
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilterStart, setDateFilterStart] = useState('');
   const [dateFilterEnd, setDateFilterEnd] = useState('');
 
-  // ============================================================
-  // MODAL STATE
-  // ============================================================
   const [showImportModal, setShowImportModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
@@ -119,15 +109,17 @@ const AssetTransactionsMenu = () => {
   const [pairedTransactionOptions, setPairedTransactionOptions] = useState([]);
   const [loadingPairedOptions, setLoadingPairedOptions] = useState(false);
 
+  const [attachmentFiles, setAttachmentFiles] = useState([]);
+  const [existingAttachments, setExistingAttachments] = useState([]);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [currentTransactionId, setCurrentTransactionId] = useState(null);
+
   const isMountedRef = useRef(true);
   const queryClient = useQueryClient();
   const { toast, confirm, confirmDelete } = useSweetAlert();
 
   const { employees, offices, assets: refAssets, conditions, maintenanceTypes } = useReferenceData();
 
-  // ============================================================
-  // CRUD FORM
-  // ============================================================
   const {
     showModal,
     editingRecord: editingTransaction,
@@ -135,7 +127,7 @@ const AssetTransactionsMenu = () => {
     formData,
     setFormField,
     handleCreate,
-    handleEdit,
+    handleEdit: handleEditBase,
     handleClose,
     handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, transactionsData, {
@@ -143,12 +135,33 @@ const AssetTransactionsMenu = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['monitoring'] });
+      setAttachmentFiles([]);
+      setExistingAttachments([]);
+      setIsEditMode(false);
+      setCurrentTransactionId(null);
     },
   });
 
-  // ============================================================
-  // BULK SELECTION — MANAGEMENT TAB
-  // ============================================================
+  const handleEdit = useCallback(async (record) => {
+    const recordId = record?.assetTransactionId;
+    if (!recordId) return;
+    setIsEditMode(true);
+    setCurrentTransactionId(recordId);
+    try {
+      const response = await apiClient.transaction.getById(recordId);
+      const data = response.data?.data || response.data || {};
+      if (data.attachments && Array.isArray(data.attachments)) {
+        setExistingAttachments(data.attachments);
+      } else {
+        setExistingAttachments([]);
+      }
+    } catch (error) {
+      console.warn('Failed to fetch attachments:', error);
+      setExistingAttachments([]);
+    }
+    handleEditBase(record);
+  }, [handleEditBase]);
+
   const {
     selectedRowIds: selectedPrimaryIds,
     selectionCount: primarySelectionCount,
@@ -167,9 +180,6 @@ const AssetTransactionsMenu = () => {
     getSelectedIds: getSecondarySelectedIds,
   } = useBulkSelection({ idField: 'assetTransactionId' });
 
-  // ============================================================
-  // MONITORING TAB — GRID DATA
-  // ============================================================
   const fetchMonitoringData = useCallback(async (params) => {
     const filters = {};
     if (searchTerm) filters.search = searchTerm;
@@ -221,15 +231,16 @@ const AssetTransactionsMenu = () => {
     reload: reloadMonitoring,
   } = useGridData(['monitoring', activeSubTab, searchTerm, dateFilterStart, dateFilterEnd], fetchMonitoringData);
 
-  // ============================================================
-  // MANAGEMENT TAB — GRID DATA
-  // ============================================================
+  // FIX 3: buildManagementFilters dengan parameter "status"
   const buildManagementFilters = useCallback(() => {
     const filters = {};
-    if (activeSubTab === 'pending') filters.approved = null;
-    else if (activeSubTab === 'approved') filters.approved = true;
-    else if (activeSubTab === 'rejected') filters.approved = false;
-
+    if (activeSubTab === 'pending') {
+      filters.status = 'pending';
+    } else if (activeSubTab === 'approved') {
+      filters.status = 'approve';
+    } else if (activeSubTab === 'rejected') {
+      filters.status = 'reject';
+    }
     if (searchTerm) filters.search = searchTerm;
     if (dateFilterStart) filters.startDate = dateFilterStart;
     if (dateFilterEnd) filters.endDate = dateFilterEnd;
@@ -245,7 +256,6 @@ const AssetTransactionsMenu = () => {
         ...filters,
         ...params,
       };
-
       const result = await transactionsData.api.getGridAdd(requestParams);
       return {
         success: true,
@@ -269,9 +279,6 @@ const AssetTransactionsMenu = () => {
     reload: reloadManagement,
   } = useGridData(['management', activeSubTab, searchTerm, dateFilterStart, dateFilterEnd], fetchManagementData);
 
-  // ============================================================
-  // MANAGEMENT — SECONDARY GRID (RETURN types)
-  // ============================================================
   const fetchManagementReturnData = useCallback(
     async (params) => {
       const filters = buildManagementFilters();
@@ -281,7 +288,6 @@ const AssetTransactionsMenu = () => {
         ...filters,
         ...params,
       };
-
       const result = await transactionsData.api.getGridReturn(requestParams);
       return {
         success: true,
@@ -305,9 +311,6 @@ const AssetTransactionsMenu = () => {
     reload: reloadManagementReturn,
   } = useGridData(['management-return', activeSubTab, searchTerm, dateFilterStart, dateFilterEnd], fetchManagementReturnData);
 
-  // ============================================================
-  // EFFECTS — RELOAD ON TAB CHANGE
-  // ============================================================
   useEffect(() => {
     isMountedRef.current = true;
     clearPrimarySelection();
@@ -321,9 +324,6 @@ const AssetTransactionsMenu = () => {
     return () => { isMountedRef.current = false; };
   }, [activeMainTab, activeSubTab, reloadMonitoring, reloadManagement, reloadManagementReturn]);
 
-  // ============================================================
-  // FETCH PAIRED TRANSACTION OPTIONS
-  // ============================================================
   useEffect(() => {
     const type = parseInt(formData.transactionType);
     if (formData.assetId && TRANSACTION_TYPES_REQUIRING_PAIR.includes(type)) {
@@ -357,9 +357,6 @@ const AssetTransactionsMenu = () => {
     }
   }, [formData.transactionType, formData.assetId, setFormField]);
 
-  // ============================================================
-  // HANDLERS — SEARCH & FILTER
-  // ============================================================
   const handleSearch = useCallback((search) => {
     setSearchTerm(search);
     setMonitoringPage(1);
@@ -379,9 +376,6 @@ const AssetTransactionsMenu = () => {
     clearSecondarySelection();
   }, [setMonitoringPage, setManagementPage, setManagementReturnPage, clearPrimarySelection, clearSecondarySelection]);
 
-  // ============================================================
-  // HANDLERS — COMPLETE / UNCOMPLETE
-  // ============================================================
   const handleComplete = useCallback(async (id) => {
     const confirmed = await confirm({
       title: 'Complete Transaction',
@@ -389,7 +383,6 @@ const AssetTransactionsMenu = () => {
       confirmButtonText: 'Yes, Complete',
     });
     if (!confirmed) return;
-
     const r = await transactionsData.complete(id);
     if (r.success && isMountedRef.current) {
       toast.success('Transaction completed successfully');
@@ -408,7 +401,6 @@ const AssetTransactionsMenu = () => {
       confirmButtonColor: '#f59e0b',
     });
     if (!confirmed) return;
-
     const r = await transactionsData.uncomplete(id);
     if (r.success && isMountedRef.current) {
       toast.success('Transaction uncompleted successfully');
@@ -418,9 +410,6 @@ const AssetTransactionsMenu = () => {
     }
   }, [reloadMonitoring, reloadManagement, reloadManagementReturn, toast, confirm]);
 
-  // ============================================================
-  // HANDLERS — BULK APPROVAL
-  // ============================================================
   const handleBulkApprove = useCallback(async (ids, gridType = 'primary') => {
     const confirmed = await confirm({
       title: 'Approve Transactions',
@@ -477,9 +466,6 @@ const AssetTransactionsMenu = () => {
     }
   }, [reloadManagement, reloadManagementReturn, reloadMonitoring, toast, confirm, clearPrimarySelection, clearSecondarySelection]);
 
-  // ============================================================
-  // HANDLERS — SHORTCUTS
-  // ============================================================
   const handleReturnShortcut = useCallback((tx) => {
     setSelectedTransaction(tx);
     setReturnData({
@@ -540,25 +526,78 @@ const AssetTransactionsMenu = () => {
     }
   }, [selectedTransaction, isPostMaintenanceSubmitting, postMaintenanceData, reloadMonitoring, reloadManagement, reloadManagementReturn, clearPrimarySelection, clearSecondarySelection]);
 
-  // ============================================================
-  // HANDLERS — CRUD SUBMIT
-  // ============================================================
-  const onSubmit = useCallback(async () => {
-    const success = await crudHandleSubmit();
-    if (success && isMountedRef.current) {
-      toast.success(editingTransaction ? 'Transaction updated' : 'Transaction created (Pending approval)');
-      reloadManagement();
-      reloadManagementReturn();
-      reloadMonitoring();
-      clearPrimarySelection();
-      clearSecondarySelection();
+  const handleFilesChange = useCallback((files) => {
+    setAttachmentFiles(files.filter(f => f.isNew));
+    const existing = files.filter(f => !f.isNew);
+    if (existing.length > 0) {
+      setExistingAttachments(existing);
     }
-    return success;
-  }, [crudHandleSubmit, reloadManagement, reloadManagementReturn, reloadMonitoring, toast, editingTransaction, clearPrimarySelection, clearSecondarySelection]);
+  }, []);
 
-  // ============================================================
-  // HANDLERS — TAB CHANGE
-  // ============================================================
+  const handleUploadComplete = useCallback((newFiles) => {
+    console.log('Files added for upload:', newFiles);
+  }, []);
+
+  const onSubmit = useCallback(async () => {
+    const submitData = {
+      ...formData,
+      attachmentFiles: attachmentFiles,
+      attachmentIdsToKeep: isEditMode ? existingAttachments.map(a => a.fileAttachmentId) : [],
+      replaceAttachments: isEditMode ? true : false,
+    };
+
+    if (isEditMode && editingTransaction) {
+      const result = await transactionsData.updateWithAttachments(editingTransaction.assetTransactionId, submitData);
+      if (result.success) {
+        setAttachmentFiles([]);
+        setExistingAttachments([]);
+        setIsEditMode(false);
+        setCurrentTransactionId(null);
+        handleClose();
+        queryClient.invalidateQueries({ queryKey: ['transactions'] });
+        queryClient.invalidateQueries({ queryKey: ['monitoring'] });
+        reloadManagement();
+        reloadManagementReturn();
+        reloadMonitoring();
+        clearPrimarySelection();
+        clearSecondarySelection();
+        toast.success('Transaction updated successfully');
+        return true;
+      }
+      return false;
+    } else {
+      const success = await crudHandleSubmit();
+      if (success && isMountedRef.current) {
+        toast.success('Transaction created (Pending approval)');
+        reloadManagement();
+        reloadManagementReturn();
+        reloadMonitoring();
+        clearPrimarySelection();
+        clearSecondarySelection();
+        setAttachmentFiles([]);
+        setExistingAttachments([]);
+        setIsEditMode(false);
+        setCurrentTransactionId(null);
+      }
+      return success;
+    }
+  }, [
+    crudHandleSubmit, 
+    reloadManagement, 
+    reloadManagementReturn, 
+    reloadMonitoring, 
+    toast, 
+    editingTransaction, 
+    clearPrimarySelection, 
+    clearSecondarySelection,
+    isEditMode,
+    attachmentFiles,
+    existingAttachments,
+    formData,
+    handleClose,
+    queryClient
+  ]);
+
   const handleMainTabChange = useCallback((tab) => {
     setActiveMainTab(tab);
     setActiveSubTab(tab === 'monitoring' ? 'pending-approval' : 'approved');
@@ -584,9 +623,6 @@ const AssetTransactionsMenu = () => {
     setManagementReturnPage(1);
   }, [clearPrimarySelection, clearSecondarySelection, setMonitoringPage, setManagementPage, setManagementReturnPage]);
 
-  // ============================================================
-  // HANDLERS — IMPORT
-  // ============================================================
   const handleImport = useCallback(async (file) => {
     setIsImporting(true);
     const r = await transactionsData.importTransactions(file);
@@ -608,7 +644,7 @@ const AssetTransactionsMenu = () => {
   }, []);
 
   // ============================================================
-  // GRID ACTIONS — MONITORING
+  // FIX 3: GRID ACTIONS - TAMBAHKAN VIEW ACTION
   // ============================================================
   const getMonitoringActions = useCallback((row) => {
     const actions = [];
@@ -616,26 +652,30 @@ const AssetTransactionsMenu = () => {
     const isApproved = row.approved === true;
     const isCompleted = row.completed === true;
 
-    // Jika pending, bisa edit dan delete
+    // Selalu ada View action
+    actions.push(ACTION_TYPES.VIEW);
+
     if (isPending && activeSubTab === 'pending-approval') {
       actions.push(ACTION_TYPES.EDIT);
       actions.push(ACTION_TYPES.DELETE);
     }
-
-    // Jika approved dan belum completed, bisa complete
     if (isApproved && !isCompleted && activeSubTab === 'pending-approval') {
       actions.push('complete');
     }
-
-    // Jika sudah completed, bisa uncomplete
     if (isCompleted && activeSubTab === 'pending-approval') {
       actions.push('uncomplete');
     }
-
     return actions;
   }, [activeSubTab]);
 
   const handleMonitoringAction = useCallback((actionType, row) => {
+    if (actionType === ACTION_TYPES.VIEW) {
+      // FIX 3: Show transaction detail modal atau navigasi ke detail page
+      handleEdit(row);
+      // Atau bisa juga menggunakan modal detail terpisah
+      toast.info(`Viewing transaction ${row.assetTransactionCode || row.assetTransactionId}`);
+      return;
+    }
     if (actionType === ACTION_TYPES.EDIT) {
       handleEdit(row);
     } else if (actionType === ACTION_TYPES.DELETE) {
@@ -657,15 +697,12 @@ const AssetTransactionsMenu = () => {
   }, [handleEdit, handleComplete, handleUncomplete, toast, reloadMonitoring, reloadManagement, reloadManagementReturn, clearPrimarySelection, clearSecondarySelection, confirmDelete]);
 
   const { actionColumn: monitoringActionColumn } = useGridActions({
-    actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
+    actions: [ACTION_TYPES.VIEW, ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
     onAction: handleMonitoringAction,
     getConditionalActions: getMonitoringActions,
     rowIdField: 'assetTransactionId',
   });
 
-  // ============================================================
-  // GRID ACTIONS — MANAGEMENT
-  // ============================================================
   const getManagementActions = useCallback((row) => {
     const isPending = row.approved === null;
     const isApproved = row.approved === true;
@@ -673,6 +710,9 @@ const AssetTransactionsMenu = () => {
     const hasPair = row.fromAssetTransactionId !== null && row.fromAssetTransactionId !== undefined;
 
     const actions = [];
+    // Selalu ada View action
+    actions.push(ACTION_TYPES.VIEW);
+    
     if (isPending) {
       actions.push(ACTION_TYPES.EDIT);
       actions.push(ACTION_TYPES.DELETE);
@@ -691,6 +731,10 @@ const AssetTransactionsMenu = () => {
   }, []);
 
   const handleManagementAction = useCallback((actionType, row) => {
+    if (actionType === ACTION_TYPES.VIEW) {
+      toast.info(`Viewing transaction ${row.assetTransactionCode || row.assetTransactionId}`);
+      return;
+    }
     if (actionType === ACTION_TYPES.EDIT) handleEdit(row);
     else if (actionType === ACTION_TYPES.DELETE) {
       confirmDelete('Cancel Transaction', `Cancel transaction for ${row.assetCode}?`).then(confirmed => {
@@ -708,18 +752,17 @@ const AssetTransactionsMenu = () => {
   }, [handleEdit, confirmDelete, toast, reloadManagement, reloadManagementReturn, reloadMonitoring, clearPrimarySelection, clearSecondarySelection, handleReturnShortcut, handlePostMaintenanceShortcut]);
 
   const { actionColumn: managementActionColumn } = useGridActions({
-    actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
+    actions: [ACTION_TYPES.VIEW, ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
     onAction: handleManagementAction,
     getConditionalActions: getManagementActions,
     rowIdField: 'assetTransactionId',
   });
 
-  // ============================================================
-  // GRID ACTIONS — MANAGEMENT RETURN
-  // ============================================================
   const getManagementReturnActions = useCallback((row) => {
     const isPending = row.approved === null;
     const actions = [];
+    // Selalu ada View action
+    actions.push(ACTION_TYPES.VIEW);
     if (isPending) {
       actions.push(ACTION_TYPES.EDIT);
       actions.push(ACTION_TYPES.DELETE);
@@ -728,6 +771,10 @@ const AssetTransactionsMenu = () => {
   }, []);
 
   const handleManagementReturnAction = useCallback((actionType, row) => {
+    if (actionType === ACTION_TYPES.VIEW) {
+      toast.info(`Viewing transaction ${row.assetTransactionCode || row.assetTransactionId}`);
+      return;
+    }
     if (actionType === ACTION_TYPES.EDIT) handleEdit(row);
     else if (actionType === ACTION_TYPES.DELETE) {
       confirmDelete('Cancel Transaction', `Cancel transaction for ${row.assetCode}?`).then(confirmed => {
@@ -744,15 +791,12 @@ const AssetTransactionsMenu = () => {
   }, [handleEdit, confirmDelete, toast, reloadManagement, reloadManagementReturn, reloadMonitoring, clearPrimarySelection, clearSecondarySelection]);
 
   const { actionColumn: managementReturnActionColumn } = useGridActions({
-    actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
+    actions: [ACTION_TYPES.VIEW, ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
     onAction: handleManagementReturnAction,
     getConditionalActions: getManagementReturnActions,
     rowIdField: 'assetTransactionId',
   });
 
-  // ============================================================
-  // COLUMN DEFINITIONS
-  // ============================================================
   const baseColumns = [
     {
       field: 'transactionDate',
@@ -811,7 +855,6 @@ const AssetTransactionsMenu = () => {
       },
     ];
 
-    // Tambahkan kolom khusus untuk pending-approval
     if (activeSubTab === 'pending-approval') {
       return [
         ...baseColumns,
@@ -844,7 +887,6 @@ const AssetTransactionsMenu = () => {
       ];
     }
 
-    // Untuk active-loans, overdue-loans, under-maintenance
     return [
       ...baseColumns,
       {
@@ -925,9 +967,6 @@ const AssetTransactionsMenu = () => {
     ];
   }, [baseColumns, managementReturnActionColumn]);
 
-  // ============================================================
-  // BULK ACTIONS (Management Tab)
-  // ============================================================
   const bulkAction = activeSubTab === 'pending' ? 'approve' : activeSubTab === 'approved' ? 'reject' : '';
   const bulkActionLabel = bulkAction === 'approve' ? 'Approve' : bulkAction === 'reject' ? 'Reject' : '';
 
@@ -943,9 +982,6 @@ const AssetTransactionsMenu = () => {
     );
   };
 
-  // ============================================================
-  // HEADER ACTIONS
-  // ============================================================
   const headerActions = (
     <>
       <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)} className="u-inline-flex u-btn-gap">
@@ -957,9 +993,6 @@ const AssetTransactionsMenu = () => {
     </>
   );
 
-  // ============================================================
-  // FORM HELPERS
-  // ============================================================
   const showEmployee = TRANSACTION_TYPES_REQUIRING_EMPLOYEE.includes(parseInt(formData.transactionType));
   const showOffice = TRANSACTION_TYPES_REQUIRING_OFFICE.includes(parseInt(formData.transactionType));
   const showPaired = TRANSACTION_TYPES_REQUIRING_PAIR.includes(parseInt(formData.transactionType));
@@ -975,9 +1008,6 @@ const AssetTransactionsMenu = () => {
     return [{ value: '', label: 'Select Asset' }, ...refAssets.map(a => ({ value: a.value, label: a.label }))];
   }, [refAssets]);
 
-  // ============================================================
-  // RENDER
-  // ============================================================
   const isMonitoring = activeMainTab === 'monitoring';
 
   if (managementLoading && !managementData.length) return <div className="page-loading"><Spinner size="lg" /></div>;
@@ -986,6 +1016,7 @@ const AssetTransactionsMenu = () => {
   const secondaryData = managementReturnData;
 
   const showCheckbox = activeSubTab === 'pending' || activeSubTab === 'approved';
+  const showFileUploads = isEditMode && currentTransactionId;
 
   return (
     <div className="transactions-menu">
@@ -997,23 +1028,14 @@ const AssetTransactionsMenu = () => {
         <div className="transactions-menu__header-actions">{headerActions}</div>
       </div>
 
-      {/* ============================================================ */}
-      {/* MAIN TABS — Monitoring | Management */}
-      {/* ============================================================ */}
       <Tabs tabs={MAIN_TABS} activeTab={activeMainTab} onTabChange={handleMainTabChange} />
 
-      {/* ============================================================ */}
-      {/* SUB TABS */}
-      {/* ============================================================ */}
       {isMonitoring ? (
         <Tabs tabs={MONITORING_SUB_TABS} activeTab={activeSubTab} onTabChange={handleSubTabChange} />
       ) : (
         <Tabs tabs={MANAGEMENT_SUB_TABS} activeTab={activeSubTab} onTabChange={handleSubTabChange} />
       )}
 
-      {/* ============================================================ */}
-      {/* FILTERS */}
-      {/* ============================================================ */}
       <div className="transactions-menu__filter-container">
         <TransactionFilter
           startDate={dateFilterStart}
@@ -1026,9 +1048,6 @@ const AssetTransactionsMenu = () => {
         <SearchToolbar onSearch={handleSearch} placeholder="Search transactions..." />
       </div>
 
-      {/* ============================================================ */}
-      {/* MONITORING TAB — 1 GRID */}
-      {/* ============================================================ */}
       {isMonitoring && (
         <Card
           className="transactions-menu__grid-card"
@@ -1062,12 +1081,8 @@ const AssetTransactionsMenu = () => {
         </Card>
       )}
 
-      {/* ============================================================ */}
-      {/* MANAGEMENT TAB — 2 GRIDS */}
-      {/* ============================================================ */}
       {!isMonitoring && (
         <>
-          {/* Grid Primary (ADD types) */}
           <Card
             className="transactions-menu__grid-card"
             title="Primary Transactions"
@@ -1091,7 +1106,6 @@ const AssetTransactionsMenu = () => {
             />
           </Card>
 
-          {/* Grid Secondary (RETURN types) */}
           <Card
             className="transactions-menu__grid-card"
             title="Secondary Transactions"
@@ -1117,11 +1131,6 @@ const AssetTransactionsMenu = () => {
         </>
       )}
 
-      {/* ============================================================ */}
-      {/* MODALS */}
-      {/* ============================================================ */}
-
-      {/* CRUD Modal */}
       <CrudModal
         isOpen={showModal}
         onClose={handleClose}
@@ -1243,22 +1252,37 @@ const AssetTransactionsMenu = () => {
                 rows={3}
               />
             </Grid>
-            <Grid item xs={12}>
-              <FileUploader
-                referenceTable="AssetTransaction"
-                referenceId={editingTransaction?.assetTransactionId}
-                onUploadComplete={() => {
-                  reloadMonitoring();
-                  reloadManagement();
-                  reloadManagementReturn();
-                }}
-              />
-            </Grid>
+            {showFileUploads && (
+              <Grid item xs={12}>
+                <FileUploader
+                  referenceType="AssetTransaction"
+                  referenceId={currentTransactionId}
+                  entityType="transaction"
+                  isAttachment={true}
+                  existingFiles={[...existingAttachments, ...attachmentFiles]}
+                  onFilesChange={handleFilesChange}
+                  onUploadComplete={handleUploadComplete}
+                  onFileDeleted={() => {
+                    const fetchAttachments = async () => {
+                      try {
+                        const response = await apiClient.transaction.getById(currentTransactionId);
+                        const data = response.data?.data || response.data || {};
+                        if (data.attachments && Array.isArray(data.attachments)) {
+                          setExistingAttachments(data.attachments);
+                        }
+                      } catch (error) {
+                        console.warn('Failed to refresh attachments:', error);
+                      }
+                    };
+                    fetchAttachments();
+                  }}
+                />
+              </Grid>
+            )}
           </Grid>
         </FormSection>
       </CrudModal>
 
-      {/* Return Modal */}
       <Modal isOpen={showReturnModal} onClose={() => !isReturnSubmitting && setShowReturnModal(false)} title="Return Asset" size="md">
         <ReturnModalContent
           transaction={selectedTransaction}
@@ -1271,7 +1295,6 @@ const AssetTransactionsMenu = () => {
         />
       </Modal>
 
-      {/* Post Maintenance Modal */}
       <Modal isOpen={showPostMaintenanceModal} onClose={() => !isPostMaintenanceSubmitting && setShowPostMaintenanceModal(false)} title="Post Maintenance" size="md">
         <PostMaintenanceModalContent
           transaction={selectedTransaction}
@@ -1284,7 +1307,6 @@ const AssetTransactionsMenu = () => {
         />
       </Modal>
 
-      {/* Import Modal */}
       <ImportModal
         isOpen={showImportModal}
         onClose={() => { setShowImportModal(false); setImportResult(null); }}

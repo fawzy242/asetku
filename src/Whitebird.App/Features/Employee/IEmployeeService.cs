@@ -48,18 +48,24 @@ public interface IEmployeeService
     Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request);
 
     // ============================================================
-    // PHOTO PROFILE
+    // GET PHOTO PROFILE (PUBLIC - For display only)
     // ============================================================
 
-    Task<ServiceResult> AddPhotoProfileAsync(int employeeId, IFormFile file);
-    Task<ServiceResult> DeletePhotoProfileAsync(int employeeId);
     Task<ServiceResult<byte[]>> GetPhotoProfileAsync(int employeeId);
 
     // ============================================================
-    // EMPLOYEE ATTACHMENT
+    // GET ATTACHMENTS (PUBLIC - For display only)
     // ============================================================
 
-    Task<ServiceResult<EmployeeAttachmentEntity>> AddAttachmentAsync(int employeeId, IFormFile file, string? description = null, int order = 0);
     Task<ServiceResult<IEnumerable<EmployeeAttachmentEntity>>> GetAttachmentsAsync(int employeeId);
-    Task<ServiceResult> DeleteAttachmentAsync(int employeeId, int attachmentId);
+
+    // ============================================================
+    // REMOVED METHODS (moved to internal/private):
+    // - AddPhotoProfileAsync
+    // - DeletePhotoProfileAsync
+    // - AddAttachmentAsync
+    // - DeleteAttachmentAsync
+    // 
+    // These are now handled internally via UpdateAsync with base64 payload
+    // ============================================================
 }

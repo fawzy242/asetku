@@ -44,4 +44,40 @@ public class AssetTransactionListView
     public bool CanDelete { get; set; }
     public bool CanReturn { get; set; }
     public bool CanPost { get; set; }
+
+    // ============================================================
+    // NEW: Attachments for grid (preview)
+    // ============================================================
+    public List<AssetTransactionAttachmentInfoDto> Attachments { get; set; } = new();
+    public List<AssetTransactionApproveAttachmentInfoDto> ApproveAttachments { get; set; } = new();
+}
+
+/// <summary>
+/// Attachment info for transaction grid
+/// </summary>
+public class AssetTransactionAttachmentInfoDto
+{
+    public int AssetTransactionAttachmentId { get; set; }
+    public int FileAttachmentId { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public string OriginalFileName { get; set; } = string.Empty;
+    public string? FileUrl { get; set; }
+    public int Order { get; set; }
+}
+
+/// <summary>
+/// Approve attachment info for transaction grid
+/// </summary>
+public class AssetTransactionApproveAttachmentInfoDto
+{
+    public int AssetTransactionApproveAttachmentId { get; set; }
+    public int FileAttachmentId { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public string OriginalFileName { get; set; } = string.Empty;
+    public string? FileUrl { get; set; }
+    public int DocumentType { get; set; }
+    public string? DocumentTypeName { get; set; }
+    public bool NeedToChange { get; set; }
+    public bool Approved { get; set; }
+    public int Order { get; set; }
 }

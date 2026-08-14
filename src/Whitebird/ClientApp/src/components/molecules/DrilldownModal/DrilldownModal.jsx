@@ -1,3 +1,4 @@
+// src/components/molecules/DrilldownModal/DrilldownModal.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Typography, Chip } from '@mui/material';
 import Modal from '../Modal/Modal';
@@ -64,7 +65,10 @@ const DrilldownModal = ({
         }
       });
 
-      const url = `${endpoint}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      // FIX: Jika endpoint sudah mengandung query string, gunakan langsung
+      const url = endpoint.includes('?') 
+        ? `${endpoint}&${queryParams.toString()}`
+        : `${endpoint}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
       const response = await apiService.get(url, {
         signal: abortControllerRef.current.signal
@@ -189,6 +193,27 @@ const DrilldownModal = ({
           }
 
           return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
+        }
+      },
+      {
+        field: "employeeName",
+        headerName: "Employee",
+        width: 150,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const value = row.employeeName || row.employee || params?.value || '-';
+          return <span>{value}</span>;
+        }
+      },
+      {
+        field: "purchasePrice",
+        headerName: "Price",
+        width: 130,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const value = row.purchasePrice || params?.value;
+          if (value === null || value === undefined) return <span className="u-text-muted">-</span>;
+          return <span>{utilsHelper.formatCurrency(value)}</span>;
         }
       },
     ];

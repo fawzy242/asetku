@@ -15,4 +15,15 @@ public class AssetTransactionGridRequest
     public int? TransactionType { get; set; }
     public string? SortBy { get; set; }
     public bool SortDescending { get; set; } = true;
+
+    // ============================================================
+    // NEW: Status filter for grid
+    // ============================================================
+    /// <summary>
+    /// Filter by status: Approve, Pending, Reject
+    /// - Approve: IsActive = 1 AND Approved = 1
+    /// - Pending: IsActive = 1 AND Approved IS NULL
+    /// - Reject: IsActive = 0 AND Approved = 0
+    /// </summary>
+    public string? Status { get; set; }
 }

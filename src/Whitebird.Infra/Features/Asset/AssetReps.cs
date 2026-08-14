@@ -50,24 +50,65 @@ public class AssetReps : IAssetReps
     public async Task<AssetDetailView?> GetDetailByIdAsync(int assetId)
     {
         const string sql = @"
-            SELECT 
-                a.AssetId, a.AssetCode, a.AssetName, a.CategoryId,
-                c.CategoryName,
-                a.Brand, a.Model, a.SerialNumber, a.Imei, a.MacAddress,
-                a.PurchaseDate, a.PurchasePrice, a.InvoiceNumber,
-                a.SupplierId, s.SupplierName,
-                a.WarrantyPeriod, a.WarrantyExpiryDate,
-                a.AssetConditionPurchase, md.MasterDataName as AssetConditionPurchaseName,
-                a.Notes, a.IsActive,
-                a.Hostname, a.IpAddress,
-                a.CreatedDate, a.CreatedBy, a.ModifiedDate, a.ModifiedBy
-            FROM Asset a
-            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
-            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
-            LEFT JOIN MasterData md ON a.AssetConditionPurchase = md.ReferenceCode AND md.ReferenceName = 'AssetConditionPurchase' AND md.IsActive = 1
-            WHERE a.AssetId = @AssetId";
+        SELECT 
+            a.AssetId, a.AssetCode, a.AssetName, a.CategoryId,
+            c.CategoryName,
+            a.Brand, a.Model, a.SerialNumber, a.Imei, a.MacAddress,
+            a.PurchaseDate, a.PurchasePrice, a.InvoiceNumber,
+            a.SupplierId, s.SupplierName,
+            a.WarrantyPeriod, a.WarrantyExpiryDate,
+            a.AssetConditionPurchase, md.MasterDataName as AssetConditionPurchaseName,
+            a.Notes, a.IsActive,
+            a.Hostname, a.IpAddress,
+            a.CreatedDate, a.CreatedBy, a.ModifiedDate, a.ModifiedBy
+        FROM Asset a
+        LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
+        LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
+        LEFT JOIN MasterData md ON a.AssetConditionPurchase = md.ReferenceCode AND md.ReferenceName = 'AssetConditionPurchase' AND md.IsActive = 1
+        WHERE a.AssetId = @AssetId";
 
-        return await _context.QueryFirstOrDefaultAsync<AssetDetailView>(sql, new { AssetId = assetId });
+        var result = await _context.QueryFirstOrDefaultAsync<AssetDetailView>(sql, new { AssetId = assetId });
+
+        if (result != null)
+        {
+            // Get Photo Profile
+            var photoSql = @"
+            SELECT TOP 1
+                fa.FileAttachmentId,
+                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl
+            FROM AssetPhotoProfileAttachment appa
+            INNER JOIN FileAttachment fa ON appa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
+            WHERE appa.AssetId = @AssetId AND appa.IsActive = 1
+            ORDER BY fa.IsPrimary DESC, fa.CreatedDate DESC";
+
+            var photo = await _context.QueryFirstOrDefaultAsync<dynamic>(photoSql, new { AssetId = assetId });
+            if (photo != null)
+            {
+                result.PhotoProfileUrl = photo.FileUrl;
+            }
+
+            // Get Attachments
+            var attSql = @"
+            SELECT 
+                aa.AssetAttachmentId,
+                aa.FileAttachmentId,
+                fa.FileName,
+                fa.OriginalFileName,
+                fa.FileCategory,
+                fa.IsPrimary,
+                aa.[Order],
+                aa.CreatedDate,
+                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl
+            FROM AssetAttachment aa
+            INNER JOIN FileAttachment fa ON aa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
+            WHERE aa.AssetId = @AssetId AND aa.IsActive = 1
+            ORDER BY aa.[Order] ASC, fa.CreatedDate DESC";
+
+            var attachments = await _context.QueryAsync<AssetAttachmentViewDto>(attSql, new { AssetId = assetId });
+            result.Attachments = attachments.ToList();
+        }
+
+        return result;
     }
 
     public async Task<IEnumerable<AssetListView>> GetAllListViewAsync()

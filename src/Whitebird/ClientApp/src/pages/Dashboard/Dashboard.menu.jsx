@@ -2,7 +2,11 @@
 import React, { useEffect, useState } from 'react';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler } from 'chart.js';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
-import { FiPackage, FiCheckCircle, FiUser, FiTool, FiDollarSign, FiClock, FiAlertTriangle, FiCalendar, FiLayers, FiShield, FiTrendingUp, FiBarChart2, FiGrid, FiPieChart, FiList } from 'react-icons/fi';
+import {
+  FiPackage, FiCheckCircle, FiUser, FiTool, FiDollarSign, FiClock, FiAlertTriangle,
+  FiCalendar, FiLayers, FiShield, FiTrendingUp, FiBarChart2, FiGrid, FiPieChart, FiList,
+  FiFileText, FiUsers, FiBriefcase, FiMapPin
+} from 'react-icons/fi';
 import { Chip, Box, Typography } from '@mui/material';
 import DashboardData from './Dashboard.data';
 import Card from '../../components/atoms/Card/Card';
@@ -170,6 +174,73 @@ const expiredWarrantyColumns = [
   },
 ];
 
+// ============================================================
+// FIX 4: TAMBAHKAN KOLOM UNTUK SCHEDULE STATS
+// ============================================================
+const scheduleStatsColumns = [
+  {
+    field: 'scheduleDate',
+    headerName: 'Schedule Date',
+    width: 180,
+    renderCell: (params) => {
+      const val = params?.row?.scheduleDate || params?.value;
+      return val ? <span>{utilsHelper.formatDateTime(val)}</span> : <span className="u-text-muted">-</span>;
+    },
+  },
+  { field: 'assetCode', headerName: 'Asset Code', width: 120 },
+  { field: 'assetName', headerName: 'Asset Name', flex: 1, minWidth: 180 },
+  { field: 'employeeName', headerName: 'Employee', width: 150 },
+  { field: 'type', headerName: 'Type', width: 120 },
+  {
+    field: 'status',
+    headerName: 'Status',
+    width: 120,
+    renderCell: (params) => {
+      const val = params?.row?.status || 'Pending';
+      const isCompleted = val === 'Completed';
+      return isCompleted ?
+        <Chip label="Completed" size="small" color="success" /> :
+        <Chip label="Pending" size="small" color="warning" />;
+    },
+  },
+];
+
+// ============================================================
+// FIX 4: TAMBAHKAN KOLOM UNTUK CATEGORY BREAKDOWN (TABEL)
+// ============================================================
+const categoryBreakdownColumns = [
+  { field: 'category', headerName: 'Category', flex: 1, minWidth: 200 },
+  { field: 'assetCount', headerName: 'Asset Count', width: 130 },
+  {
+    field: 'totalValue',
+    headerName: 'Total Value',
+    width: 180,
+    renderCell: (params) => {
+      const value = params?.row?.totalValue || params?.value;
+      if (!value) return <span className="u-text-muted">-</span>;
+      return <span>{utilsHelper.formatCurrency(value)}</span>;
+    },
+  },
+];
+
+// ============================================================
+// FIX 4: TAMBAHKAN KOLOM UNTUK MONTHLY STATS (TABEL)
+// ============================================================
+const monthlyStatsColumns = [
+  {
+    field: 'month',
+    headerName: 'Month',
+    width: 120,
+    renderCell: (params) => {
+      const monthMap = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const val = params?.row?.month || params?.value;
+      return <span>{monthMap[val - 1] || val}</span>;
+    },
+  },
+  { field: 'transactionCount', headerName: 'Transactions', width: 130 },
+  { field: 'uniqueAssetsCount', headerName: 'Unique Assets', width: 130 },
+];
+
 const DashboardMenu = () => {
   const [activeTab, setActiveTab] = useState('summary');
   const [loading, setLoading] = useState(true);
@@ -184,6 +255,9 @@ const DashboardMenu = () => {
   const [drilldown, setDrilldown] = useState({ isOpen: false, title: '', endpoint: '', params: {} });
   const [expiredWarrantyPage, setExpiredWarrantyPage] = useState(1);
   const [recentPage, setRecentPage] = useState(1);
+  const [monthlyStatsPage, setMonthlyStatsPage] = useState(1);
+  const [categoryBreakdownPage, setCategoryBreakdownPage] = useState(1);
+  const [scheduleStatsPage, setScheduleStatsPage] = useState(1);
   const theme = useUIStore((s) => s.theme);
   const isDark = theme === 'dark';
   const textColor = isDark ? '#f9fafb' : '#111827';
@@ -191,7 +265,6 @@ const DashboardMenu = () => {
 
   const { stats, monthlyStats, categoryBreakdown, recentTransactions, expiredWarranty, scheduleStats } = dashboardData_;
 
-  // FIX: Guard untuk semua data yang seharusnya array
   const safeMonthlyStats = Array.isArray(monthlyStats) ? monthlyStats : [];
   const safeCategoryBreakdown = Array.isArray(categoryBreakdown) ? categoryBreakdown : [];
   const safeRecentTransactions = Array.isArray(recentTransactions) ? recentTransactions : [];
@@ -220,7 +293,6 @@ const DashboardMenu = () => {
 
   const monthlyLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const monthlyDataMap = {};
-  
   safeMonthlyStats.forEach(item => {
     monthlyDataMap[item.month - 1] = item.transactionCount;
   });
@@ -230,7 +302,6 @@ const DashboardMenu = () => {
   const categoryValues = safeCategoryBreakdown.map(item => item.totalValue || 0);
   const categoryColors = ['#dc2626', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ef4444', '#6b7280'];
 
-  // FIX: Hapus retiredAssets - tidak ada di backend
   const statusLabels = ['Available', 'Assigned', 'On Loan', 'In Maintenance', 'Damaged'];
   const statusDataValues = [
     stats.availableAssets || 0,
@@ -368,7 +439,12 @@ const DashboardMenu = () => {
 
   const pendingApprovalsCount = stats.pendingApprovals || 0;
   const damagedCount = stats.damagedAssets || 0;
+  const totalEmployees = stats.totalEmployees || 0;
+  const activeEmployees = stats.activeEmployees || 0;
 
+  // ============================================================
+  // FIX 4: TAMBAHKAN STAT CARDS UNTUK EMPLOYEE & OFFICE
+  // ============================================================
   const statCardsConfig = [
     { icon: FiPackage, label: 'Total Assets', value: stats.totalAssets || 0, endpoint: '/Asset/grid', params: {}, color: '#dc2626', bg: 'rgba(220, 38, 38, 0.1)' },
     { icon: FiCheckCircle, label: 'Available', value: stats.availableAssets || 0, endpoint: '/Asset/grid', params: { status: 'Available' }, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
@@ -382,6 +458,13 @@ const DashboardMenu = () => {
     { icon: FiTrendingUp, label: 'Utilization', value: `${assetUtilizationRate.toFixed(1)}%`, noDrilldown: true, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },
     { icon: FiBarChart2, label: 'This Month', value: thisMonthCount, endpoint: '/AssetTransaction/grid-add', params: {}, color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)' },
     { icon: FiCalendar, label: 'Upcoming Maintenance', value: safeScheduleStats.upcomingMaintenance || 0, noDrilldown: true, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+    // ============================================================
+    // FIX 4: TAMBAHKAN CARD UNTUK EMPLOYEE & OFFICE
+    // ============================================================
+    { icon: FiUsers, label: 'Total Employees', value: totalEmployees, noDrilldown: true, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
+    { icon: FiUser, label: 'Active Employees', value: activeEmployees, noDrilldown: true, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
+    { icon: FiBriefcase, label: 'Departments', value: stats.totalDepartments || 0, noDrilldown: true, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+    { icon: FiMapPin, label: 'Offices', value: stats.totalOffices || 0, noDrilldown: true, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
   ];
 
   const handleCardClick = (card) => {
@@ -398,6 +481,8 @@ const DashboardMenu = () => {
 
   const paginatedExpiredWarranty = safeExpiredWarranty.slice((expiredWarrantyPage - 1) * 10, expiredWarrantyPage * 10);
   const paginatedRecent = safeRecentTransactions.slice((recentPage - 1) * 10, recentPage * 10);
+  const paginatedMonthlyStats = safeMonthlyStats.slice((monthlyStatsPage - 1) * 10, monthlyStatsPage * 10);
+  const paginatedCategoryBreakdown = safeCategoryBreakdown.slice((categoryBreakdownPage - 1) * 10, categoryBreakdownPage * 10);
 
   return (
     <div className="dashboard fade-transition">
@@ -425,6 +510,7 @@ const DashboardMenu = () => {
             ))}
           </div>
 
+          {/* Expired Warranty Alert */}
           {safeExpiredWarranty.length > 0 && (
             <div className="dashboard__alert-wrapper">
               <Card className="dashboard__alert-card">
@@ -452,6 +538,79 @@ const DashboardMenu = () => {
               </Card>
             </div>
           )}
+
+          {/* ============================================================ */}
+          {/* FIX 4: TAMBAHKAN SUMMARY TABEL DI BAWAH CARDS */}
+          {/* ============================================================ */}
+          <div className="dashboard__summary-tables">
+            {/* Monthly Stats */}
+            {safeMonthlyStats.length > 0 && (
+              <Card title="Monthly Transaction Statistics" className="dashboard__summary-card">
+                <DataTable
+                  rows={paginatedMonthlyStats}
+                  columns={monthlyStatsColumns}
+                  pageSize={10}
+                  page={monthlyStatsPage}
+                  onPageChange={setMonthlyStatsPage}
+                  getRowId={(row) => row?.month || `month-${Math.random()}`}
+                  hideFooter={false}
+                  ariaLabel="Monthly stats table"
+                  paginationMode="client"
+                  autoHeight={false}
+                />
+              </Card>
+            )}
+
+            {/* Category Breakdown */}
+            {safeCategoryBreakdown.length > 0 && (
+              <Card title="Asset Value by Category" className="dashboard__summary-card">
+                <DataTable
+                  rows={paginatedCategoryBreakdown}
+                  columns={categoryBreakdownColumns}
+                  pageSize={10}
+                  page={categoryBreakdownPage}
+                  onPageChange={setCategoryBreakdownPage}
+                  getRowId={(row) => row?.category || `cat-${Math.random()}`}
+                  hideFooter={false}
+                  ariaLabel="Category breakdown table"
+                  paginationMode="client"
+                  autoHeight={false}
+                />
+              </Card>
+            )}
+
+            {/* Schedule Stats */}
+            {safeScheduleStats && (
+              <Card title="Schedule Statistics" className="dashboard__summary-card">
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 2 }}>
+                  <Box className="dashboard__stat-item">
+                    <Typography variant="caption" color="text.secondary">Total Handover</Typography>
+                    <Typography variant="h6" fontWeight={600}>{safeScheduleStats.totalHandover || 0}</Typography>
+                  </Box>
+                  <Box className="dashboard__stat-item">
+                    <Typography variant="caption" color="text.secondary">Total Return</Typography>
+                    <Typography variant="h6" fontWeight={600}>{safeScheduleStats.totalReturn || 0}</Typography>
+                  </Box>
+                  <Box className="dashboard__stat-item">
+                    <Typography variant="caption" color="text.secondary">Total Maintenance</Typography>
+                    <Typography variant="h6" fontWeight={600}>{safeScheduleStats.totalMaintenance || 0}</Typography>
+                  </Box>
+                  <Box className="dashboard__stat-item">
+                    <Typography variant="caption" color="text.secondary">Upcoming Handover</Typography>
+                    <Typography variant="h6" fontWeight={600} color="warning.main">{safeScheduleStats.upcomingHandover || 0}</Typography>
+                  </Box>
+                  <Box className="dashboard__stat-item">
+                    <Typography variant="caption" color="text.secondary">Upcoming Return</Typography>
+                    <Typography variant="h6" fontWeight={600} color="warning.main">{safeScheduleStats.upcomingReturn || 0}</Typography>
+                  </Box>
+                  <Box className="dashboard__stat-item">
+                    <Typography variant="caption" color="text.secondary">Upcoming Maintenance</Typography>
+                    <Typography variant="h6" fontWeight={600} color="warning.main">{safeScheduleStats.upcomingMaintenance || 0}</Typography>
+                  </Box>
+                </Box>
+              </Card>
+            )}
+          </div>
         </div>
       )}
 
@@ -486,6 +645,28 @@ const DashboardMenu = () => {
               </div>
             </Card>
           </div>
+
+          {/* ============================================================ */}
+          {/* FIX 4: TAMBAHKAN TABEL DI BAWAH CHART UNTUK CHARTS TAB */}
+          {/* ============================================================ */}
+          <div className="dashboard__summary-tables">
+            {safeCategoryBreakdown.length > 0 && (
+              <Card title="Category Breakdown Details" className="dashboard__summary-card">
+                <DataTable
+                  rows={paginatedCategoryBreakdown}
+                  columns={categoryBreakdownColumns}
+                  pageSize={10}
+                  page={categoryBreakdownPage}
+                  onPageChange={setCategoryBreakdownPage}
+                  getRowId={(row) => row?.category || `cat-${Math.random()}`}
+                  hideFooter={false}
+                  ariaLabel="Category breakdown table"
+                  paginationMode="client"
+                  autoHeight={false}
+                />
+              </Card>
+            )}
+          </div>
         </div>
       )}
 
@@ -507,6 +688,26 @@ const DashboardMenu = () => {
               />
             </div>
           </Card>
+
+          {/* ============================================================ */}
+          {/* FIX 4: TAMBAHKAN EXPIRED WARRANTY DI RECENT TAB */}
+          {/* ============================================================ */}
+          {safeExpiredWarranty.length > 0 && (
+            <Card title="Expired Warranty Assets" className="dashboard__summary-card">
+              <DataTable
+                rows={paginatedExpiredWarranty}
+                columns={expiredWarrantyColumns}
+                pageSize={10}
+                page={expiredWarrantyPage}
+                onPageChange={setExpiredWarrantyPage}
+                getRowId={(row) => row?.assetId || `ew-${Math.random()}`}
+                hideFooter={false}
+                ariaLabel="Expired warranty table"
+                paginationMode="client"
+                autoHeight={false}
+              />
+            </Card>
+          )}
         </div>
       )}
 

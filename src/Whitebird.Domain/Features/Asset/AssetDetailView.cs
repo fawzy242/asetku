@@ -35,4 +35,26 @@ public class AssetDetailView
 
     // Software Installation
     public SoftwareInstallationView? SoftwareInstallation { get; set; }
+
+    // ============================================================
+    // NEW: Photo Profile & Attachments
+    // ============================================================
+    public string? PhotoProfileUrl { get; set; }
+    public List<AssetAttachmentViewDto> Attachments { get; set; } = new();
+}
+
+/// <summary>
+/// DTO for asset attachment in detail view
+/// </summary>
+public class AssetAttachmentViewDto
+{
+    public int AssetAttachmentId { get; set; }
+    public int FileAttachmentId { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public string OriginalFileName { get; set; } = string.Empty;
+    public string? FileUrl { get; set; }
+    public string? FileCategory { get; set; }
+    public bool IsPrimary { get; set; }
+    public int Order { get; set; }
+    public DateTime CreatedDate { get; set; }
 }

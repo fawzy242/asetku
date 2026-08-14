@@ -11,6 +11,8 @@ export const ACTION_TYPES = {
   REJECT: 'reject',
   RETURN: 'return',
   POST_MAINTENANCE: 'postMaintenance',
+  COMPLETE: 'complete',
+  UNCOMPLETE: 'uncomplete',
 };
 
 export const getActionConfig = (type) => {
@@ -22,6 +24,8 @@ export const getActionConfig = (type) => {
     [ACTION_TYPES.REJECT]: { icon: FiX, label: 'Reject', color: 'error' },
     [ACTION_TYPES.RETURN]: { icon: FiRotateCcw, label: 'Return', color: 'warning' },
     [ACTION_TYPES.POST_MAINTENANCE]: { icon: FiTool, label: 'Post Maintenance', color: 'info' },
+    [ACTION_TYPES.COMPLETE]: { icon: FiCheck, label: 'Complete', color: 'success' },
+    [ACTION_TYPES.UNCOMPLETE]: { icon: FiRotateCcw, label: 'Uncomplete', color: 'warning' },
   };
   return configs[type] || configs[ACTION_TYPES.VIEW];
 };
@@ -35,13 +39,10 @@ export const getActionConfig = (type) => {
  * @param {Function} options.getConditionalActions - Optional function to filter actions per row
  * @param {string} options.rowIdField - Field name for row ID (default: 'id')
  * @param {Array} options.defaultActions - Default actions jika row tidak memiliki flag
- * 
- * PERBAIKAN: Prioritaskan row data (CanEdit, CanDelete, CanReturn, CanPost)
- *            dari backend daripada actions default.
  */
-export const useGridActions = ({ 
-  actions = [], 
-  onAction, 
+export const useGridActions = ({
+  actions = [],
+  onAction,
   getConditionalActions = null,
   rowIdField = 'id',
   defaultActions = [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE]
@@ -79,45 +80,56 @@ export const useGridActions = ({
       renderCell: (params) => {
         const row = params.row;
         let visibleActions = [];
-        
+
         // ============================================================
         // PRIORITAS: Gunakan row data dari backend terlebih dahulu
         // Backend mengembalikan CanEdit, CanDelete, CanReturn, CanPost
         // ============================================================
-        if (row.canEdit !== undefined || row.canDelete !== undefined || 
+        if (row.canEdit !== undefined || row.canDelete !== undefined ||
             row.canReturn !== undefined || row.canPost !== undefined) {
-          
+
           // Gunakan flag dari row data
           if (row.canEdit) visibleActions.push(ACTION_TYPES.EDIT);
           if (row.canDelete) visibleActions.push(ACTION_TYPES.DELETE);
           if (row.canReturn) visibleActions.push(ACTION_TYPES.RETURN);
           if (row.canPost) visibleActions.push(ACTION_TYPES.POST_MAINTENANCE);
-          
-          // Jika tidak ada action yang tersedia, tampilkan View saja sebagai fallback
+
+          // FIX: Jika tidak ada action yang tersedia, tampilkan View saja sebagai fallback
           if (visibleActions.length === 0) {
             visibleActions.push(ACTION_TYPES.VIEW);
           }
-        } 
+        }
         // ============================================================
         // FALLBACK: Gunakan getConditionalActions jika disediakan
         // ============================================================
         else if (getConditionalActions) {
           visibleActions = getConditionalActions(row);
+          // FIX: Pastikan VIEW selalu ada jika tidak ada action lain
+          if (visibleActions.length === 0) {
+            visibleActions.push(ACTION_TYPES.VIEW);
+          }
         }
         // ============================================================
         // FALLBACK TERAKHIR: Gunakan actions default
         // ============================================================
         else {
           visibleActions = actions.length > 0 ? actions : defaultActions;
+          // FIX: Pastikan VIEW selalu ada
+          if (!visibleActions.includes(ACTION_TYPES.VIEW)) {
+            visibleActions = [ACTION_TYPES.VIEW, ...visibleActions];
+          }
         }
-        
+
+        // Remove duplicates
+        visibleActions = [...new Set(visibleActions)];
+
         if (!visibleActions || visibleActions.length === 0) {
           return null;
         }
 
         const rowId = row[rowIdField] || row.id || row.assetId || row.employeeId || row.assetTransactionId;
         const isMenuOpen = menuOpen && selectedRow?.[rowIdField] === rowId;
-        
+
         return (
           <div className="table-actions">
             <IconButton
@@ -149,9 +161,9 @@ export const useGridActions = ({
                     key={actionType}
                     onClick={() => handleActionClick(actionType, row)}
                     sx={{
-                      color: config.color === 'error' ? 'var(--error)' : 
-                             config.color === 'success' ? 'var(--success)' : 
-                             config.color === 'warning' ? 'var(--warning)' : 
+                      color: config.color === 'error' ? 'var(--error)' :
+                             config.color === 'success' ? 'var(--success)' :
+                             config.color === 'warning' ? 'var(--warning)' :
                              'var(--text-primary)',
                     }}
                   >

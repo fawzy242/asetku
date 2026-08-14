@@ -100,33 +100,6 @@ public class AssetController : ControllerBase
     }
 
     // ============================================================
-    // PHOTO PROFILE
-    // ============================================================
-
-    [HttpPost("{id:int}/photo")]
-    public async Task<IActionResult> AddPhotoProfile(int id, IFormFile file)
-    {
-        if (file == null || file.Length == 0)
-            return BadRequest("No file provided");
-
-        return this.HandleResult(await _assetService.AddPhotoProfileAsync(id, file));
-    }
-
-    [HttpDelete("{id:int}/photo")]
-    public async Task<IActionResult> DeletePhotoProfile(int id)
-        => this.HandleResult(await _assetService.DeletePhotoProfileAsync(id));
-
-    [HttpGet("{id:int}/photo")]
-    public async Task<IActionResult> GetPhotoProfile(int id)
-    {
-        var result = await _assetService.GetPhotoProfileAsync(id);
-        if (!result.IsSuccess || result.Data == null)
-            return this.HandleResult(result);
-
-        return File(result.Data, "image/jpeg");
-    }
-
-    // ============================================================
     // BULK OPERATIONS
     // ============================================================
 
@@ -155,25 +128,12 @@ public class AssetController : ControllerBase
         => this.HandleResult(await _assetService.GetDropdownListByTransactionTypeAsync(transactionType));
 
     // ============================================================
-    // ASSET ATTACHMENT
+    // REMOVED ENDPOINTS (moved to update payload):
+    // - POST /{id}/photo
+    // - DELETE /{id}/photo
+    // - POST /{id}/attachment
+    // - DELETE /{id}/attachment/{attachmentId}
+    // 
+    // These are now handled via the Update endpoint with base64 payload
     // ============================================================
-
-    [HttpPost("{id:int}/attachment")]
-    public async Task<IActionResult> AddAttachment(int id, IFormFile file, [FromForm] string? description = null, [FromForm] int order = 0)
-    {
-        if (file == null || file.Length == 0)
-        {
-            return BadRequest("No file provided");
-        }
-
-        return this.HandleResult(await _assetService.AddAttachmentAsync(id, file, description, order));
-    }
-
-    [HttpGet("{id:int}/attachment")]
-    public async Task<IActionResult> GetAttachments(int id)
-        => this.HandleResult(await _assetService.GetAttachmentsAsync(id));
-
-    [HttpDelete("{id:int}/attachment/{attachmentId:int}")]
-    public async Task<IActionResult> DeleteAttachment(int id, int attachmentId)
-        => this.HandleResult(await _assetService.DeleteAttachmentAsync(id, attachmentId));
 }

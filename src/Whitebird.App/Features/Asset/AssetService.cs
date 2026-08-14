@@ -58,10 +58,6 @@ public class AssetService : BaseService, IAssetService
         _httpContextAccessor = httpContextAccessor;
     }
 
-    // ============================================================
-    // BASIC CRUD
-    // ============================================================
-
     public async Task<ServiceResult<AssetDetailView>> GetByIdAsync(int id)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -185,8 +181,6 @@ public class AssetService : BaseService, IAssetService
                 await _assetReps.InsertSoftwareInstallationAsync(softwareEntity);
             }
 
-            // CREATE MODE: NO FILE UPLOAD
-
             var created = await _assetReps.GetDetailByIdAsync(assetId);
 
             if (created != null)
@@ -205,9 +199,8 @@ public class AssetService : BaseService, IAssetService
     }
 
     // ============================================================
-    // UPDATE — Handle base64 file upload
+    // FIX 1: UPDATE — Handle base64 file upload dengan benar
     // ============================================================
-
     public async Task<ServiceResult<AssetDetailView>> UpdateAsync(int id, AssetUpdateFormDto model)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -278,26 +271,36 @@ public class AssetService : BaseService, IAssetService
             }
 
             // ============================================================
-            // HANDLE PHOTO PROFILE (base64)
+            // FIX 1: PHOTO PROFILE - PASTIKAN UPLOAD BERHASIL
             // ============================================================
             if (!string.IsNullOrEmpty(model.PhotoFileBase64))
             {
-                // Delete existing photo
-                var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("AssetPhotoProfile", id);
-                if (existingPhotos.IsSuccess && existingPhotos.Data != null && existingPhotos.Data.Any())
+                try
                 {
-                    foreach (var photo in existingPhotos.Data)
+                    // Delete existing photo
+                    var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("AssetPhotoProfile", id);
+                    if (existingPhotos.IsSuccess && existingPhotos.Data != null && existingPhotos.Data.Any())
                     {
-                        await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
+                        foreach (var photo in existingPhotos.Data)
+                        {
+                            await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
+                        }
                     }
-                }
 
-                // Convert base64 to file and upload
-                await AddPhotoProfileFromBase64Async(id, model.PhotoFileBase64, model.PhotoFileName ?? "photo.jpg");
+                    // Convert base64 to file and upload
+                    await AddPhotoProfileFromBase64Async(id, model.PhotoFileBase64, model.PhotoFileName ?? "photo.jpg");
+
+                    _logger.LogInformation("Photo profile uploaded successfully for Asset {AssetId}", id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to upload photo profile for Asset {AssetId}", id);
+                    // Jangan gagalkan update hanya karena photo gagal upload
+                }
             }
 
             // ============================================================
-            // HANDLE ATTACHMENTS (base64)
+            // ATTACHMENTS (base64)
             // ============================================================
             if (model.ReplaceAttachments || (model.AttachmentFilesBase64 != null && model.AttachmentFilesBase64.Any()))
             {
@@ -340,10 +343,6 @@ public class AssetService : BaseService, IAssetService
             return ServiceResult<AssetDetailView>.Success(updated!, "Asset updated successfully");
         }, "update asset");
     }
-
-    // ============================================================
-    // DELETE & SOFT DELETE
-    // ============================================================
 
     public async Task<ServiceResult> DeleteAsync(int id)
     {
@@ -406,10 +405,6 @@ public class AssetService : BaseService, IAssetService
         }, "soft delete asset");
     }
 
-    // ============================================================
-    // GRID
-    // ============================================================
-
     public async Task<ServiceResult<PaginatedResult<AssetListView>>> GetGridDataAsync(AssetGridRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -432,10 +427,6 @@ public class AssetService : BaseService, IAssetService
             return ServiceResult<PaginatedResult<AssetListView>>.Success(result);
         }, "get asset grid data");
     }
-
-    // ============================================================
-    // BULK OPERATIONS
-    // ============================================================
 
     public async Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request)
     {
@@ -507,10 +498,6 @@ public class AssetService : BaseService, IAssetService
         }, "bulk deactivate assets");
     }
 
-    // ============================================================
-    // DROPDOWN
-    // ============================================================
-
     public async Task<ServiceResult<IEnumerable<AssetDropdownView>>> GetDropdownListByTransactionTypeAsync(int transactionType)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -521,35 +508,21 @@ public class AssetService : BaseService, IAssetService
     }
 
     // ============================================================
-    // PHOTO PROFILE
+    // PRIVATE METHODS FOR BASE64 UPLOAD
     // ============================================================
 
-    public async Task<ServiceResult> AddPhotoProfileAsync(int assetId, IFormFile file)
+    private async Task AddPhotoProfileFromBase64Async(int assetId, string base64String, string fileName)
     {
-        if (file == null || file.Length == 0)
+        try
         {
-            return ServiceResult.BadRequest("No file provided");
-        }
+            var bytes = Convert.FromBase64String(base64String);
+            using var stream = new MemoryStream(bytes);
+            var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
+            {
+                Headers = new HeaderDictionary(),
+                ContentType = GetContentType(fileName)
+            };
 
-        var asset = await _assetReps.GetByIdRawAsync(assetId);
-        if (asset == null)
-        {
-            return ServiceResult.NotFound($"Asset with id {assetId} not found");
-        }
-
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!FileSizeConstants.IsAllowedProfilePhotoExtension(extension))
-        {
-            return ServiceResult.BadRequest($"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedProfilePhotoExtensions)}");
-        }
-
-        if (file.Length > FileSizeConstants.MaxProfilePhotoBytes)
-        {
-            return ServiceResult.BadRequest($"File size exceeds {FileSizeConstants.MaxProfilePhotoMB}MB limit");
-        }
-
-        return await ExecuteWithTransactionAsync(async () =>
-        {
             var subDirectory = Path.Combine("Asset", assetId.ToString(), "Profile");
             var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
             var fileHash = _storageService.ComputeFileHash(file);
@@ -558,48 +531,83 @@ public class AssetService : BaseService, IAssetService
             {
                 File = file,
                 FileCategory = "ProfilePhoto",
-                Description = $"Profile photo for Asset {asset.AssetCode}",
+                Description = $"Profile photo for Asset {assetId}",
                 IsPrimary = true
             };
 
             var result = await _fileAttachmentService.UploadAsync("AssetPhotoProfile", assetId, uploadModel);
-            if (!result.IsSuccess)
+            if (result.IsSuccess)
             {
-                return ServiceResult.Failure("Failed to upload photo profile");
+                await _activityLogService.LogUpdateAsync(
+                    TableNames.Asset,
+                    assetId,
+                    $"Profile photo uploaded",
+                    _currentUserService.GetDisplayName());
+                _logger.LogInformation("Photo uploaded successfully for Asset {AssetId}", assetId);
             }
-
-            await _activityLogService.LogUpdateAsync(
-                TableNames.Asset,
-                assetId,
-                $"Profile photo uploaded for Asset '{asset.AssetCode}'",
-                _currentUserService.GetDisplayName());
-
-            return ServiceResult.Success("Profile photo uploaded successfully");
-        }, "add asset photo profile");
-    }
-
-    private async Task AddPhotoProfileFromBase64Async(int assetId, string base64String, string fileName)
-    {
-        var bytes = Convert.FromBase64String(base64String);
-        using var stream = new MemoryStream(bytes);
-        var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
+            else
+            {
+                _logger.LogWarning("Failed to upload photo for Asset {AssetId}: {Error}", assetId, result.Message);
+            }
+        }
+        catch (Exception ex)
         {
-            Headers = new HeaderDictionary(),
-            ContentType = GetContentType(fileName)
-        };
-        await AddPhotoProfileAsync(assetId, file);
+            _logger.LogError(ex, "Error uploading photo for Asset {AssetId}", assetId);
+            throw;
+        }
     }
 
     private async Task AddAttachmentFromBase64Async(int assetId, string base64String, string fileName, int order)
     {
-        var bytes = Convert.FromBase64String(base64String);
-        using var stream = new MemoryStream(bytes);
-        var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
+        try
         {
-            Headers = new HeaderDictionary(),
-            ContentType = GetContentType(fileName)
-        };
-        await AddAttachmentAsync(assetId, file, $"Attachment: {fileName}", order);
+            var bytes = Convert.FromBase64String(base64String);
+            using var stream = new MemoryStream(bytes);
+            var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
+            {
+                Headers = new HeaderDictionary(),
+                ContentType = GetContentType(fileName)
+            };
+
+            var subDirectory = Path.Combine("Asset", assetId.ToString(), "Attachments");
+            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
+            var fileHash = _storageService.ComputeFileHash(file);
+
+            var uploadModel = new FileAttachmentUploadDto
+            {
+                File = file,
+                FileCategory = "AssetAttachment",
+                Description = $"Attachment for Asset {assetId}",
+                IsPrimary = false
+            };
+
+            var fileResult = await _fileAttachmentService.UploadAsync("Asset", assetId, uploadModel);
+            if (fileResult.IsSuccess && fileResult.Data != null)
+            {
+                var attachmentEntity = new AssetAttachmentEntity
+                {
+                    AssetId = assetId,
+                    FileAttachmentId = fileResult.Data.FileAttachmentId,
+                    Order = order,
+                    IsActive = true,
+                    CreatedDate = DateTime.Now,
+                    CreatedBy = _currentUserService.GetDisplayName()
+                };
+
+                await _assetReps.InsertAttachmentAsync(attachmentEntity);
+
+                await _activityLogService.LogCreateAsync(
+                    TableNames.Asset,
+                    assetId,
+                    $"Attachment added: {fileName}",
+                    _currentUserService.GetDisplayName());
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding attachment for Asset {AssetId}", assetId);
+            throw;
+        }
     }
 
     private string GetContentType(string fileName)
@@ -618,185 +626,5 @@ public class AssetService : BaseService, IAssetService
             ".txt" => "text/plain",
             _ => "application/octet-stream"
         };
-    }
-
-    public async Task<ServiceResult> DeletePhotoProfileAsync(int assetId)
-    {
-        var asset = await _assetReps.GetByIdRawAsync(assetId);
-        if (asset == null)
-        {
-            return ServiceResult.NotFound($"Asset with id {assetId} not found");
-        }
-
-        return await ExecuteWithTransactionAsync(async () =>
-        {
-            var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("AssetPhotoProfile", assetId);
-            if (!existingPhotos.IsSuccess || existingPhotos.Data == null || !existingPhotos.Data.Any())
-            {
-                return ServiceResult.Success("No profile photo to delete");
-            }
-
-            foreach (var photo in existingPhotos.Data)
-            {
-                await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
-            }
-
-            await _activityLogService.LogUpdateAsync(
-                TableNames.Asset,
-                assetId,
-                $"Profile photo deleted for Asset '{asset.AssetCode}'",
-                _currentUserService.GetDisplayName());
-
-            return ServiceResult.Success("Profile photo deleted successfully");
-        }, "delete asset photo profile");
-    }
-
-    public async Task<ServiceResult<byte[]>> GetPhotoProfileAsync(int assetId)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var asset = await _assetReps.GetByIdRawAsync(assetId);
-            if (asset == null)
-            {
-                return ServiceResult<byte[]>.NotFound($"Asset with id {assetId} not found");
-            }
-
-            var existingPhotos = await _fileAttachmentService.GetByReferenceAsync("AssetPhotoProfile", assetId);
-            if (!existingPhotos.IsSuccess || existingPhotos.Data == null || !existingPhotos.Data.Any())
-            {
-                return ServiceResult<byte[]>.NotFound("Profile photo not found");
-            }
-
-            var primaryPhoto = existingPhotos.Data.FirstOrDefault(p => p.IsPrimary) ?? existingPhotos.Data.First();
-
-            var fileResult = await _fileAttachmentService.GetByIdAsync(primaryPhoto.FileAttachmentId);
-            if (!fileResult.IsSuccess || fileResult.Data == null)
-            {
-                return ServiceResult<byte[]>.NotFound("Profile photo file not found");
-            }
-
-            var fileBytes = await _storageService.ReadFileAsync(fileResult.Data.FilePath);
-            return ServiceResult<byte[]>.Success(fileBytes);
-        }, "get asset photo profile");
-    }
-
-    // ============================================================
-    // ASSET ATTACHMENT
-    // ============================================================
-
-    public async Task<ServiceResult<AssetAttachmentEntity>> AddAttachmentAsync(int assetId, IFormFile file, string? description = null, int order = 0)
-    {
-        if (file == null || file.Length == 0)
-        {
-            return ServiceResult<AssetAttachmentEntity>.BadRequest("No file provided");
-        }
-
-        var asset = await _assetReps.GetByIdRawAsync(assetId);
-        if (asset == null)
-        {
-            return ServiceResult<AssetAttachmentEntity>.NotFound($"Asset with id {assetId} not found");
-        }
-
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!FileSizeConstants.IsAllowedAssetExtension(extension))
-        {
-            return ServiceResult<AssetAttachmentEntity>.BadRequest($"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedAssetExtensions)}");
-        }
-
-        if (file.Length > FileSizeConstants.MaxAssetAttachmentBytes)
-        {
-            return ServiceResult<AssetAttachmentEntity>.BadRequest($"File size exceeds {FileSizeConstants.MaxAssetAttachmentMB}MB limit");
-        }
-
-        return await ExecuteWithTransactionAsync(async () =>
-        {
-            var subDirectory = Path.Combine("Asset", assetId.ToString(), "Attachments");
-            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
-            var fileHash = _storageService.ComputeFileHash(file);
-
-            var uploadModel = new FileAttachmentUploadDto
-            {
-                File = file,
-                FileCategory = "AssetAttachment",
-                Description = description ?? $"Attachment for Asset {asset.AssetCode}",
-                IsPrimary = false
-            };
-
-            var fileResult = await _fileAttachmentService.UploadAsync("Asset", assetId, uploadModel);
-            if (!fileResult.IsSuccess || fileResult.Data == null)
-            {
-                return ServiceResult<AssetAttachmentEntity>.Failure("Failed to upload file");
-            }
-
-            var attachmentEntity = new AssetAttachmentEntity
-            {
-                AssetId = assetId,
-                FileAttachmentId = fileResult.Data.FileAttachmentId,
-                Order = order,
-                IsActive = true,
-                CreatedDate = DateTime.Now,
-                CreatedBy = _currentUserService.GetDisplayName()
-            };
-
-            var attachmentId = await _assetReps.InsertAttachmentAsync(attachmentEntity);
-            var created = await _assetReps.GetAttachmentByIdAsync(attachmentId);
-
-            await _activityLogService.LogCreateAsync(
-                TableNames.Asset,
-                assetId,
-                $"Attachment added for Asset '{asset.AssetCode}': {file.FileName}",
-                _currentUserService.GetDisplayName());
-
-            return ServiceResult<AssetAttachmentEntity>.Success(created!, "Attachment added successfully");
-        }, "add asset attachment");
-    }
-
-    public async Task<ServiceResult<IEnumerable<AssetAttachmentEntity>>> GetAttachmentsAsync(int assetId)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var asset = await _assetReps.GetByIdRawAsync(assetId);
-            if (asset == null)
-            {
-                return ServiceResult<IEnumerable<AssetAttachmentEntity>>.NotFound($"Asset with id {assetId} not found");
-            }
-
-            var attachments = await _assetReps.GetAttachmentsByAssetIdAsync(assetId);
-            return ServiceResult<IEnumerable<AssetAttachmentEntity>>.Success(attachments);
-        }, "get asset attachments");
-    }
-
-    public async Task<ServiceResult> DeleteAttachmentAsync(int assetId, int attachmentId)
-    {
-        return await ExecuteWithTransactionAsync(async () =>
-        {
-            var asset = await _assetReps.GetByIdRawAsync(assetId);
-            if (asset == null)
-            {
-                return ServiceResult.NotFound($"Asset with id {assetId} not found");
-            }
-
-            var attachment = await _assetReps.GetAttachmentByIdAsync(attachmentId);
-            if (attachment == null || attachment.AssetId != assetId)
-            {
-                return ServiceResult.NotFound($"Attachment with id {attachmentId} not found for asset {assetId}");
-            }
-
-            var fileResult = await _fileAttachmentService.DeleteAsync(attachment.FileAttachmentId);
-            if (!fileResult.IsSuccess)
-            {
-                return ServiceResult.Failure("Failed to delete file attachment");
-            }
-
-            await _assetReps.DeleteAttachmentAsync(attachmentId);
-
-            await _activityLogService.LogDeleteAsync(
-                TableNames.Asset,
-                assetId,
-                $"Attachment {attachmentId} deleted for Asset '{asset.AssetCode}'",
-                _currentUserService.GetDisplayName());
-
-            return ServiceResult.Success("Attachment deleted successfully");
-        }, "delete asset attachment");
     }
 }

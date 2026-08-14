@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Grid, Box, Avatar, Typography, IconButton } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
-import { FiCamera, FiX, FiPaperclip, FiFile, FiUpload } from 'react-icons/fi';
+import { FiCamera, FiX, FiPaperclip, FiFile, FiUpload, FiCheckSquare } from 'react-icons/fi';
 import EmployeesData from './Employees.data';
 import GridView from '../../components/organisms/GridView/GridView';
 import CrudModal from '../../components/molecules/CrudModal/CrudModal';
@@ -16,7 +16,7 @@ import BulkActivateModal from '../../components/molecules/BulkActivateModal/Bulk
 import Button from '../../components/atoms/Button/Button';
 import StatusChip from '../../components/atoms/StatusChip/StatusChip';
 import EmploymentStatusChip from '../../components/atoms/EmploymentStatusChip/EmploymentStatusChip';
-import { FiCheckSquare } from 'react-icons/fi';
+import FileUploader from '../../components/molecules/FileUploader/FileUploader';
 import { ACTION_TYPES, useGridActions } from '../../hooks/useGridActions';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
@@ -64,12 +64,13 @@ const EmployeesMenu = () => {
 
   const { departments, offices, employeePositions, employeeStatuses } = useReferenceData();
 
-  // File state - ONLY for EDIT mode
+  // File state
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [attachmentFiles, setAttachmentFiles] = useState([]);
   const [existingAttachments, setExistingAttachments] = useState([]);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [currentEmployeeId, setCurrentEmployeeId] = useState(null);
 
   const {
     showModal,
@@ -84,12 +85,12 @@ const EmployeesMenu = () => {
     idField: 'employeeId',
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
-      // Reset file state
       setPhotoFile(null);
       setPhotoPreview(null);
       setAttachmentFiles([]);
       setExistingAttachments([]);
       setIsEditMode(false);
+      setCurrentEmployeeId(null);
     },
   });
 
@@ -104,26 +105,61 @@ const EmployeesMenu = () => {
   useEffect(() => {
     if (editingEmployee?.employeeId) {
       setIsEditMode(true);
+      setCurrentEmployeeId(editingEmployee.employeeId);
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      
       const fetchAttachments = async () => {
         try {
-          const response = await apiClient.employee.getAttachments(editingEmployee.employeeId);
-          const files = response.data?.data || response.data || [];
-          if (Array.isArray(files)) {
-            setExistingAttachments(files);
+          const response = await apiClient.employee.getById(editingEmployee.employeeId);
+          const data = response.data?.data || response.data || {};
+          if (data.attachments && Array.isArray(data.attachments)) {
+            setExistingAttachments(data.attachments);
+          } else {
+            setExistingAttachments([]);
           }
         } catch (error) {
           console.warn('Failed to fetch attachments:', error);
+          setExistingAttachments([]);
         }
       };
       fetchAttachments();
     } else {
       setIsEditMode(false);
+      setCurrentEmployeeId(null);
       setExistingAttachments([]);
+      setAttachmentFiles([]);
       setPhotoFile(null);
       setPhotoPreview(null);
-      setAttachmentFiles([]);
     }
   }, [editingEmployee]);
+
+  const handlePhotoChange = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+    
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setPhotoPreview(event.target.result);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }, [toast]);
+
+  const handleRemovePhoto = useCallback(() => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+  }, []);
 
   const buildFilters = useCallback(() => {
     const filters = {};
@@ -201,147 +237,6 @@ const EmployeesMenu = () => {
     [reload, queryClient, toast, confirmDelete, clearSelection]
   );
 
-  // Photo handlers - EDIT mode only
-  const handlePhotoChange = useCallback((e) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      console.warn('No file selected');
-      return;
-    }
-    
-    console.log('📸 File selected:', file.name, file.size, file.type);
-    
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB');
-      return;
-    }
-    
-    setPhotoFile(file);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setPhotoPreview(event.target.result);
-    };
-    reader.readAsDataURL(file);
-    
-    // Reset input agar bisa upload file yang sama lagi
-    e.target.value = '';
-  }, [toast]);
-
-  const handleRemovePhoto = useCallback(() => {
-    setPhotoFile(null);
-    setPhotoPreview(null);
-  }, []);
-
-  // Attachment handlers - EDIT mode only
-  const handleAttachmentChange = useCallback((e) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    
-    const newFiles = [];
-    for (const file of files) {
-      const ext = `.${file.name.split('.').pop()?.toLowerCase()}`;
-      const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt'];
-      if (!allowedExtensions.includes(ext)) {
-        toast.error(`File type not allowed: ${file.name}`);
-        continue;
-      }
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error(`File too large: ${file.name} (max 10MB)`);
-        continue;
-      }
-      newFiles.push(file);
-    }
-    if (newFiles.length > 0) {
-      setAttachmentFiles(prev => [...prev, ...newFiles]);
-    }
-    
-    // Reset input
-    e.target.value = '';
-  }, [toast]);
-
-  const handleRemoveAttachment = useCallback((index) => {
-    setAttachmentFiles(prev => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const handleRemoveExistingAttachment = useCallback((attachmentId) => {
-    setExistingAttachments(prev => prev.filter(a => a.fileAttachmentId !== attachmentId));
-  }, []);
-
-  // ============================================================
-  // HANDLE SUBMIT — Kirim data + file (base64)
-  // ============================================================
-  const handleFormSubmit = useCallback(async (event) => {
-    if (event && typeof event.preventDefault === 'function') {
-      event.preventDefault();
-    }
-    
-    if (isSubmitting) return;
-
-    // Build submit data
-    const submitData = {
-      ...formData,
-      // Kirim file state apa adanya, nanti di convert ke base64 di data layer
-      photoFile: photoFile,
-      attachmentFiles: attachmentFiles,
-      attachmentIdsToKeep: isEditMode ? existingAttachments.map(a => a.fileAttachmentId) : [],
-      replaceAttachments: isEditMode ? true : false,
-    };
-
-    // Log untuk debug
-    console.log('📤 Submitting employee with files:', {
-      hasPhoto: photoFile instanceof File,
-      photoSize: photoFile instanceof File ? photoFile.size : 0,
-      attachmentsCount: attachmentFiles.length,
-    });
-
-    try {
-      const result = isEditMode && editingEmployee
-        ? await employeesData.update(editingEmployee.employeeId, submitData)
-        : await employeesData.create(submitData);
-      
-      if (result.success) {
-        // Reset file state
-        setPhotoFile(null);
-        setPhotoPreview(null);
-        setAttachmentFiles([]);
-        setExistingAttachments([]);
-        setIsEditMode(false);
-        
-        handleClose();
-        queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
-        reload();
-        clearSelection();
-        
-        const message = isEditMode && editingEmployee 
-          ? 'Employee updated successfully' 
-          : 'Employee created successfully';
-        await alertUtils.success('Success!', message);
-      } else {
-        const errorMsg = result.error || result.errors?.join('\n') || 'Failed to save employee';
-        await alertUtils.error('Error', errorMsg);
-      }
-    } catch (error) {
-      const errorMsg = error.userMessage || error.message || 'Failed to save employee';
-      await alertUtils.error('Error', errorMsg);
-    }
-  }, [
-    formData, 
-    isEditMode, 
-    editingEmployee, 
-    photoFile, 
-    attachmentFiles, 
-    existingAttachments,
-    isSubmitting,
-    handleClose,
-    reload,
-    clearSelection,
-    queryClient
-  ]);
-
   const handleTabChange = useCallback(
     (tab) => {
       setActiveTab(tab);
@@ -397,13 +292,89 @@ const EmployeesMenu = () => {
     await employeesData.downloadTemplate();
   }, []);
 
-  const handleGridAction = useCallback(
-    (actionType, row) => {
-      if (actionType === ACTION_TYPES.EDIT) {
+  const handleFilesChange = useCallback((files) => {
+    setAttachmentFiles(files.filter(f => f.isNew));
+    const existing = files.filter(f => !f.isNew);
+    if (existing.length > 0) {
+      setExistingAttachments(existing);
+    }
+  }, []);
+
+  const handleUploadComplete = useCallback((newFiles) => {
+    console.log('Files added, ready for save:', newFiles);
+  }, []);
+
+  // ============================================================
+  // FIX: HANDLE SUBMIT
+  // ============================================================
+  const handleFormSubmit = useCallback(async (event) => {
+    if (event && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
+    
+    if (isSubmitting) return;
+
+    const submitData = {
+      ...formData,
+      photoFile: photoFile,
+      attachmentFiles: attachmentFiles,
+      attachmentIdsToKeep: isEditMode ? existingAttachments.map(a => a.fileAttachmentId) : [],
+      replaceAttachments: isEditMode ? true : false,
+    };
+
+    try {
+      const result = isEditMode && editingEmployee
+        ? await employeesData.update(editingEmployee.employeeId, submitData)
+        : await employeesData.create(submitData);
+      
+      if (result.success) {
         setPhotoFile(null);
         setPhotoPreview(null);
         setAttachmentFiles([]);
+        setExistingAttachments([]);
+        setIsEditMode(false);
+        setCurrentEmployeeId(null);
+        
+        handleClose();
+        queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
+        reload();
+        clearSelection();
+        
+        const message = isEditMode && editingEmployee 
+          ? 'Employee updated successfully' 
+          : 'Employee created successfully';
+        await alertUtils.success('Success!', message);
+      } else {
+        const errorMsg = result.error || result.errors?.join('\n') || 'Failed to save employee';
+        await alertUtils.error('Error', errorMsg);
+      }
+    } catch (error) {
+      const errorMsg = error.userMessage || error.message || 'Failed to save employee';
+      await alertUtils.error('Error', errorMsg);
+    }
+  }, [
+    formData, 
+    isEditMode, 
+    editingEmployee, 
+    photoFile,
+    attachmentFiles,
+    existingAttachments,
+    isSubmitting,
+    handleClose,
+    reload,
+    clearSelection,
+    queryClient
+  ]);
+
+  const handleGridAction = useCallback(
+    (actionType, row) => {
+      if (actionType === ACTION_TYPES.EDIT) {
+        setAttachmentFiles([]);
+        setExistingAttachments([]);
+        setPhotoFile(null);
+        setPhotoPreview(null);
         setIsEditMode(true);
+        setCurrentEmployeeId(row.employeeId);
         handleEdit(row);
       } else if (actionType === ACTION_TYPES.DELETE) {
         handleDelete(row);
@@ -496,8 +467,7 @@ const EmployeesMenu = () => {
   const bulkTitle = bulkActivateValue ? 'Activate Employees' : 'Deactivate Employees';
   const bulkDescription = `This action will ${bulkActivateValue ? 'activate' : 'deactivate'} the selected employees.`;
 
-  // Determine if we should show file upload sections (ONLY for EDIT mode)
-  const showFileUploads = isEditMode && editingEmployee?.employeeId;
+  const showFileUploads = isEditMode && currentEmployeeId;
 
   return (
     <div className="employees-menu">
@@ -508,10 +478,11 @@ const EmployeesMenu = () => {
         onTabChange={handleTabChange}
         onCreate={() => {
           setIsEditMode(false);
-          setPhotoFile(null);
-          setPhotoPreview(null);
+          setCurrentEmployeeId(null);
           setAttachmentFiles([]);
           setExistingAttachments([]);
+          setPhotoFile(null);
+          setPhotoPreview(null);
           handleCreate();
         }}
         columns={columns}
@@ -540,9 +511,7 @@ const EmployeesMenu = () => {
         submitText={editingEmployee ? 'Update' : 'Create'}
         size="xl"
       >
-        {/* ============================================================ */}
-        {/* PROFILE PHOTO — ONLY IN EDIT MODE */}
-        {/* ============================================================ */}
+        {/* PHOTO PROFILE AVATAR */}
         {showFileUploads && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 3, pb: 3, borderBottom: '1px solid var(--border)' }}>
             <Box sx={{ position: 'relative' }}>
@@ -721,72 +690,33 @@ const EmployeesMenu = () => {
 
         <FormSection title="Attachments" description="Supporting documents">
           <Grid container spacing={2}>
-            <Grid item xs={12}>
-              {/* ============================================================ */}
-              {/* ATTACHMENTS — ONLY IN EDIT MODE */}
-              {/* ============================================================ */}
-              {showFileUploads && (
-                <Box className="attachment-section">
-                  <Typography variant="subtitle2" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <FiPaperclip /> Attachments
-                    {attachmentFiles.length > 0 && (
-                      <span className="attachment-count">({attachmentFiles.length} new)</span>
-                    )}
-                    {existingAttachments.length > 0 && (
-                      <span className="attachment-count">({existingAttachments.length} existing)</span>
-                    )}
-                  </Typography>
-                  
-                  {existingAttachments.length > 0 && (
-                    <Box className="attachment-list" sx={{ mb: 2 }}>
-                      {existingAttachments.map((att) => (
-                        <Box key={att.fileAttachmentId} className="attachment-item">
-                          <FiFile size={16} />
-                          <span className="attachment-name">{att.originalFileName || att.fileName}</span>
-                          <button
-                            type="button"
-                            className="attachment-delete"
-                            onClick={() => handleRemoveExistingAttachment(att.fileAttachmentId)}
-                          >
-                            <FiX size={14} />
-                          </button>
-                        </Box>
-                      ))}
-                    </Box>
-                  )}
-                  
-                  {attachmentFiles.length > 0 && (
-                    <Box className="attachment-list" sx={{ mb: 2 }}>
-                      {attachmentFiles.map((file, index) => (
-                        <Box key={index} className="attachment-item attachment-item--new">
-                          <FiPaperclip size={16} />
-                          <span className="attachment-name">{file.name}</span>
-                          <span className="attachment-size">{(file.size / 1024).toFixed(1)} KB</span>
-                          <button
-                            type="button"
-                            className="attachment-delete"
-                            onClick={() => handleRemoveAttachment(index)}
-                          >
-                            <FiX size={14} />
-                          </button>
-                        </Box>
-                      ))}
-                    </Box>
-                  )}
-                  
-                  <label className="attachment-upload-btn">
-                    <FiUpload size={14} /> Add Files
-                    <input
-                      type="file"
-                      multiple
-                      onChange={handleAttachmentChange}
-                      accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.xls,.xlsx,.txt"
-                      style={{ display: 'none' }}
-                    />
-                  </label>
-                </Box>
-              )}
-            </Grid>
+            {showFileUploads && (
+              <Grid item xs={12}>
+                <FileUploader
+                  referenceType="Employee"
+                  referenceId={currentEmployeeId}
+                  entityType="employee"
+                  isAttachment={true}
+                  existingFiles={[...existingAttachments, ...attachmentFiles]}
+                  onFilesChange={handleFilesChange}
+                  onUploadComplete={handleUploadComplete}
+                  onFileDeleted={() => {
+                    const fetchAttachments = async () => {
+                      try {
+                        const response = await apiClient.employee.getById(currentEmployeeId);
+                        const data = response.data?.data || response.data || {};
+                        if (data.attachments && Array.isArray(data.attachments)) {
+                          setExistingAttachments(data.attachments);
+                        }
+                      } catch (error) {
+                        console.warn('Failed to refresh attachments:', error);
+                      }
+                    };
+                    fetchAttachments();
+                  }}
+                />
+              </Grid>
+            )}
           </Grid>
         </FormSection>
       </CrudModal>

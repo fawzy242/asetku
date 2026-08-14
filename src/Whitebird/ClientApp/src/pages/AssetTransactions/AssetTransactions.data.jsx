@@ -10,6 +10,24 @@ class AssetTransactionsData extends BaseData {
     this.setEntityName('transaction');
   }
 
+  // ============================================================
+  // Helper: convert file to base64
+  // ============================================================
+  fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ============================================================
+  // BULK APPROVAL
+  // ============================================================
   async bulkApprove(ids) {
     try {
       const result = await this.api.bulkApproved({ ids });
@@ -106,6 +124,9 @@ class AssetTransactionsData extends BaseData {
     }
   }
 
+  // ============================================================
+  // COMPLETE / UNCOMPLETE
+  // ============================================================
   async complete(id) {
     try {
       const result = await this.api.complete(id);
@@ -167,6 +188,9 @@ class AssetTransactionsData extends BaseData {
     }
   }
 
+  // ============================================================
+  // SHORTCUT
+  // ============================================================
   async createReturn(id, data) {
     try {
       const result = await this.api.createReturn(id, data);
@@ -229,6 +253,9 @@ class AssetTransactionsData extends BaseData {
     }
   }
 
+  // ============================================================
+  // IMPORT
+  // ============================================================
   async importTransactions(file) {
     try {
       const result = await this.api.import(file);
@@ -266,15 +293,13 @@ class AssetTransactionsData extends BaseData {
     }
   }
 
-  /**
-   * Download import template
-   * OVERRIDE: Perbaiki blob handling
-   */
+  // ============================================================
+  // DOWNLOAD TEMPLATE
+  // ============================================================
   async downloadTemplate() {
     try {
       const response = await this.api.getImportTemplate();
       
-      // FIX: Ambil data dari response (axios response wrapper)
       const blob = response?.data;
       
       if (!blob || !(blob instanceof Blob) || blob.size === 0) {
@@ -313,6 +338,110 @@ class AssetTransactionsData extends BaseData {
       }
       
       const errorMsg = error.userMessage || error.message || 'Failed to download template';
+      ConfirmDialog.toast.error(errorMsg);
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  // ============================================================
+  // UPDATE WITH ATTACHMENTS (base64) - for standard grid data
+  // ============================================================
+  async updateWithAttachments(id, data) {
+    try {
+      const submitData = {
+        assetId: data.assetId ? parseInt(data.assetId, 10) : 0,
+        transactionType: data.transactionType ? parseInt(data.transactionType, 10) : 0,
+        employeeId: data.employeeId ? parseInt(data.employeeId, 10) : null,
+        officeId: data.officeId ? parseInt(data.officeId, 10) : null,
+        transactionDate: data.transactionDate || null,
+        expectedLoanReturnDate: data.expectedLoanReturnDate || null,
+        notes: data.notes || null,
+        condition: data.condition ? parseInt(data.condition, 10) : null,
+        approved: data.approved,
+        approvedBy: data.approvedBy || null,
+        completed: data.completed,
+        completedBy: data.completedBy || null,
+        maintenanceType: data.maintenanceType ? parseInt(data.maintenanceType, 10) : null,
+        maintenanceCost: data.maintenanceCost ? parseFloat(data.maintenanceCost) : null,
+        isActive: data.isActive === true || data.isActive === 'true' || data.isActive === 1,
+      };
+
+      // ============================================================
+      // KONVERSI ATTACHMENTS KE BASE64
+      // ============================================================
+      if (data.attachmentFiles && data.attachmentFiles.length > 0) {
+        submitData.attachmentFilesBase64 = [];
+        submitData.attachmentFileNames = [];
+        for (const file of data.attachmentFiles) {
+          if (file instanceof File && file.size > 0) {
+            try {
+              const base64 = await this.fileToBase64(file);
+              submitData.attachmentFilesBase64.push(base64);
+              submitData.attachmentFileNames.push(file.name);
+            } catch (err) {
+              console.error('Failed to convert attachment to base64:', err);
+            }
+          }
+        }
+      }
+
+      // Attachment IDs to keep
+      if (data.attachmentIdsToKeep && data.attachmentIdsToKeep.length > 0) {
+        submitData.attachmentIdsToKeep = data.attachmentIdsToKeep;
+      }
+
+      // Replace attachments flag
+      if (data.replaceAttachments !== undefined) {
+        submitData.replaceAttachments = data.replaceAttachments;
+      }
+
+      // Approve attachments
+      if (data.approveAttachments && data.approveAttachments.length > 0) {
+        submitData.approveAttachments = [];
+        for (const att of data.approveAttachments) {
+          if (att.file instanceof File && att.file.size > 0) {
+            try {
+              const base64 = await this.fileToBase64(att.file);
+              submitData.approveAttachments.push({
+                documentType: att.documentType ? parseInt(att.documentType, 10) : 0,
+                fileBase64: base64,
+                fileName: att.file.name,
+                order: att.order || 0,
+              });
+            } catch (err) {
+              console.error('Failed to convert approve attachment to base64:', err);
+            }
+          }
+        }
+      }
+
+      if (data.approveAttachmentIdsToKeep && data.approveAttachmentIdsToKeep.length > 0) {
+        submitData.approveAttachmentIdsToKeep = data.approveAttachmentIdsToKeep;
+      }
+
+      if (data.replaceApproveAttachments !== undefined) {
+        submitData.replaceApproveAttachments = data.replaceApproveAttachments;
+      }
+
+      console.log('📤 Submitting transaction update with base64 attachments');
+      console.log('📤 Has attachments?', !!submitData.attachmentFilesBase64?.length);
+
+      const result = await this.api.update(id, submitData);
+
+      if (result.data?.isSuccess !== undefined) {
+        if (!result.data.isSuccess) {
+          const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Failed to update';
+          ConfirmDialog.toast.error(errorMsg);
+          return { success: false, errors: result.data.errors };
+        }
+        return { success: true, data: result.data.data };
+      }
+      return { success: true, data: result.data };
+    } catch (error) {
+      if (this.isCanceledError(error)) {
+        return { success: false, error: 'canceled', isCanceled: true };
+      }
+      const errorMsg = error.userMessage || error.message || 'Failed to update';
       ConfirmDialog.toast.error(errorMsg);
       return { success: false, error: errorMsg };
     }

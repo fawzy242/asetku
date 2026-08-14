@@ -41,11 +41,7 @@ const apiClient = {
     getById: (id) => apiService.get(`/Asset/${id}`),
     getGrid: (params) => apiService.get('/Asset/grid', { params }),
     create: (data) => apiService.post('/Asset', data),
-    update: (id, data) => {
-      // Biarkan axios yang set Content-Type otomatis
-      // Jika data adalah FormData, axios akan set multipart/form-data
-      return apiService.put(`/Asset/${id}`, data);
-    },
+    update: (id, data) => apiService.put(`/Asset/${id}`, data),
     delete: (id) => apiService.delete(`/Asset/${id}`),
     softDelete: (id) => apiService.delete(`/Asset/${id}/soft`),
     // Bulk operations
@@ -63,29 +59,10 @@ const apiClient = {
     // Asset dropdown for transaction
     listByTransaction: (transactionType) => 
       apiService.get(`/Asset/list-by-transaction?transactionType=${transactionType}`),
-    // Photo profile
-    uploadPhoto: (id, file) => {
-      const fd = new FormData();
-      fd.append('file', file);
-      return apiService.post(`/Asset/${id}/photo`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-    },
-    getPhoto: (id) => apiService.get(`/Asset/${id}/photo`, { responseType: 'blob' }),
-    deletePhoto: (id) => apiService.delete(`/Asset/${id}/photo`),
-    // Attachment
-    uploadAttachment: (id, file, description, order) => {
-      const fd = new FormData();
-      fd.append('file', file);
-      if (description) fd.append('description', description);
-      if (order !== undefined) fd.append('order', order);
-      return apiService.post(`/Asset/${id}/attachment`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-    },
-    getAttachments: (id) => apiService.get(`/Asset/${id}/attachment`),
-    deleteAttachment: (id, attachmentId) =>
-      apiService.delete(`/Asset/${id}/attachment/${attachmentId}`),
+    // ============================================================
+    // REMOVED: uploadPhoto, getPhoto, deletePhoto, uploadAttachment, getAttachments, deleteAttachment
+    // These are now handled via update endpoint with base64 payload
+    // ============================================================
   },
 
   // ============================================================
@@ -96,11 +73,7 @@ const apiClient = {
     getById: (id) => apiService.get(`/Employee/${id}`),
     getGrid: (params) => apiService.get('/Employee/grid', { params }),
     create: (data) => apiService.post('/Employee', data),
-    update: (id, data) => {
-      // Biarkan axios yang set Content-Type otomatis
-      // Jika data adalah FormData, axios akan set multipart/form-data
-      return apiService.put(`/Employee/${id}`, data);
-    },
+    update: (id, data) => apiService.put(`/Employee/${id}`, data),
     delete: (id) => apiService.delete(`/Employee/${id}`),
     softDelete: (id) => apiService.delete(`/Employee/${id}/soft`),
     // Bulk operations
@@ -121,29 +94,10 @@ const apiClient = {
     departmentList: () => apiService.get('/Employee/department-list'),
     masterDataList: (refName) =>
       apiService.get(`/Employee/masterdata-list?referenceName=${refName}`),
-    // Photo profile
-    uploadPhoto: (id, file) => {
-      const fd = new FormData();
-      fd.append('file', file);
-      return apiService.post(`/Employee/${id}/photo`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-    },
-    getPhoto: (id) => apiService.get(`/Employee/${id}/photo`, { responseType: 'blob' }),
-    deletePhoto: (id) => apiService.delete(`/Employee/${id}/photo`),
-    // Attachment
-    uploadAttachment: (id, file, description, order) => {
-      const fd = new FormData();
-      fd.append('file', file);
-      if (description) fd.append('description', description);
-      if (order !== undefined) fd.append('order', order);
-      return apiService.post(`/Employee/${id}/attachment`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-    },
-    getAttachments: (id) => apiService.get(`/Employee/${id}/attachment`),
-    deleteAttachment: (id, attachmentId) =>
-      apiService.delete(`/Employee/${id}/attachment/${attachmentId}`),
+    // ============================================================
+    // REMOVED: uploadPhoto, getPhoto, deletePhoto, uploadAttachment, getAttachments, deleteAttachment
+    // These are now handled via update endpoint with base64 payload
+    // ============================================================
   },
 
   // ============================================================
@@ -218,6 +172,7 @@ const apiClient = {
     getById: (id) => apiService.get(`/AssetTransaction/${id}`),
     create: (data) => apiService.post('/AssetTransaction', data),
     update: (id, data) => apiService.put(`/AssetTransaction/${id}`, data),
+    updateApproval: (id, data) => apiService.put(`/AssetTransaction/${id}/approval`, data),
     delete: (id) => apiService.delete(`/AssetTransaction/${id}`),
     softDelete: (id) => apiService.delete(`/AssetTransaction/${id}/soft`),
     // Grids
@@ -241,38 +196,11 @@ const apiClient = {
     createReturn: (id, data) => apiService.post(`/AssetTransaction/${id}/create-return`, data),
     createPostMaintenance: (id, data) =>
       apiService.post(`/AssetTransaction/${id}/create-post-maintenance`, data),
-    // Attachment
-    uploadAttachment: (id, file, fileCategory, description, order) => {
-      const fd = new FormData();
-      fd.append('file', file);
-      if (fileCategory) fd.append('fileCategory', fileCategory);
-      if (description) fd.append('description', description);
-      if (order !== undefined) fd.append('order', order);
-      return apiService.post(`/AssetTransaction/${id}/attachment`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-    },
-    getAttachments: (id) => apiService.get(`/AssetTransaction/${id}/attachment`),
-    deleteAttachment: (id, attId) =>
-      apiService.delete(`/AssetTransaction/${id}/attachment/${attId}`),
-    // Approve Attachment
-    uploadApproveAttachment: (id, file, docType, description, order) => {
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('documentType', docType);
-      if (description) fd.append('description', description);
-      if (order !== undefined) fd.append('order', order);
-      return apiService.post(`/AssetTransaction/${id}/approve-attachment`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-    },
-    getApproveAttachments: (id) => apiService.get(`/AssetTransaction/${id}/approve-attachment`),
-    deleteApproveAttachment: (id, attId) =>
-      apiService.delete(`/AssetTransaction/${id}/approve-attachment/${attId}`),
-    approveAttachmentAction: (id, attId, data) =>
-      apiService.post(`/AssetTransaction/${id}/approve-attachment/${attId}/action`, data),
-    getRequiredDocTypes: (id) =>
-      apiService.get(`/AssetTransaction/${id}/approve-attachment/required`),
+    // ============================================================
+    // REMOVED: uploadAttachment, getAttachments, deleteAttachment
+    // REMOVED: uploadApproveAttachment, getApproveAttachments, deleteApproveAttachment, approveAttachmentAction
+    // These are now handled via update/updateApproval endpoints with base64 payload
+    // ============================================================
     // Dropdowns
     listTransactionTypeAdd: () => apiService.get('/AssetTransaction/list-transactiontype-add'),
     listTransactionTypeReturn: () => apiService.get('/AssetTransaction/list-transactiontype-return'),

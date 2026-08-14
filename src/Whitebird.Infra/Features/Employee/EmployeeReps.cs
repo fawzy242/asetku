@@ -50,23 +50,64 @@ public class EmployeeReps : IEmployeeReps
     public async Task<EmployeeDetailView?> GetDetailByIdAsync(int employeeId)
     {
         const string sql = @"
-            SELECT 
-                e.EmployeeId, e.EmployeeCode, e.FullName, e.Address,
-                e.DepartmentId, d.DepartmentName,
-                e.Position, md1.MasterDataName as PositionName,
-                e.EmploymentStatus, md2.MasterDataName as EmploymentStatusName,
-                e.PhoneNumber, e.Email,
-                e.OfficeId, o.OfficeName,
-                e.JoinDate, e.ResignDate,
-                e.IsActive, e.CreatedDate, e.CreatedBy, e.ModifiedDate, e.ModifiedBy
-            FROM Employee e
-            LEFT JOIN Department d ON e.DepartmentId = d.DepartmentId AND d.IsActive = 1
-            LEFT JOIN Office o ON e.OfficeId = o.OfficeId AND o.IsActive = 1
-            LEFT JOIN MasterData md1 ON e.Position = md1.ReferenceCode AND md1.ReferenceName = 'Position' AND md1.IsActive = 1
-            LEFT JOIN MasterData md2 ON e.EmploymentStatus = md2.ReferenceCode AND md2.ReferenceName = 'EmployeeStatus' AND md2.IsActive = 1
-            WHERE e.EmployeeId = @EmployeeId";
+        SELECT 
+            e.EmployeeId, e.EmployeeCode, e.FullName, e.Address,
+            e.DepartmentId, d.DepartmentName,
+            e.Position, md1.MasterDataName as PositionName,
+            e.EmploymentStatus, md2.MasterDataName as EmploymentStatusName,
+            e.PhoneNumber, e.Email,
+            e.OfficeId, o.OfficeName,
+            e.JoinDate, e.ResignDate,
+            e.IsActive, e.CreatedDate, e.CreatedBy, e.ModifiedDate, e.ModifiedBy
+        FROM Employee e
+        LEFT JOIN Department d ON e.DepartmentId = d.DepartmentId AND d.IsActive = 1
+        LEFT JOIN Office o ON e.OfficeId = o.OfficeId AND o.IsActive = 1
+        LEFT JOIN MasterData md1 ON e.Position = md1.ReferenceCode AND md1.ReferenceName = 'Position' AND md1.IsActive = 1
+        LEFT JOIN MasterData md2 ON e.EmploymentStatus = md2.ReferenceCode AND md2.ReferenceName = 'EmployeeStatus' AND md2.IsActive = 1
+        WHERE e.EmployeeId = @EmployeeId";
 
-        return await _context.QueryFirstOrDefaultAsync<EmployeeDetailView>(sql, new { EmployeeId = employeeId });
+        var result = await _context.QueryFirstOrDefaultAsync<EmployeeDetailView>(sql, new { EmployeeId = employeeId });
+
+        if (result != null)
+        {
+            // Get Photo Profile
+            var photoSql = @"
+            SELECT TOP 1
+                fa.FileAttachmentId,
+                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl
+            FROM EmployeePhotoProfileAttachment eppa
+            INNER JOIN FileAttachment fa ON eppa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
+            WHERE eppa.EmployeeId = @EmployeeId AND eppa.IsActive = 1
+            ORDER BY fa.IsPrimary DESC, fa.CreatedDate DESC";
+
+            var photo = await _context.QueryFirstOrDefaultAsync<dynamic>(photoSql, new { EmployeeId = employeeId });
+            if (photo != null)
+            {
+                result.PhotoProfileUrl = photo.FileUrl;
+            }
+
+            // Get Attachments
+            var attSql = @"
+            SELECT 
+                ea.EmployeeAttachmentId,
+                ea.FileAttachmentId,
+                fa.FileName,
+                fa.OriginalFileName,
+                fa.FileCategory,
+                fa.IsPrimary,
+                ea.[Order],
+                ea.CreatedDate,
+                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl
+            FROM EmployeeAttachment ea
+            INNER JOIN FileAttachment fa ON ea.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
+            WHERE ea.EmployeeId = @EmployeeId AND ea.IsActive = 1
+            ORDER BY ea.[Order] ASC, fa.CreatedDate DESC";
+
+            var attachments = await _context.QueryAsync<EmployeeAttachmentViewDto>(attSql, new { EmployeeId = employeeId });
+            result.Attachments = attachments.ToList();
+        }
+
+        return result;
     }
 
     public async Task<IEnumerable<EmployeeListView>> GetAllListViewAsync()

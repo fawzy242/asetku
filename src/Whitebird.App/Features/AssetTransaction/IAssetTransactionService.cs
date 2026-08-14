@@ -27,6 +27,20 @@ public interface IAssetTransactionService
     Task<ServiceResult> SoftDeleteAsync(int id);
 
     // ============================================================
+    // UPDATE WITH ATTACHMENTS
+    // ============================================================
+
+    /// <summary>
+    /// Update transaction with attachments (base64) - for standard grid data
+    /// </summary>
+    Task<ServiceResult<AssetTransactionDetailView>> UpdateWithAttachmentsAsync(int id, AssetTransactionUpdateFormDto model);
+
+    /// <summary>
+    /// Update transaction approval with attachments (base64) - for pending approval grid data
+    /// </summary>
+    Task<ServiceResult<AssetTransactionDetailView>> UpdateApprovalWithAttachmentsAsync(int id, AssetTransactionUpdateApprovalFormDto model);
+
+    // ============================================================
     // BULK APPROVAL
     // ============================================================
 
@@ -63,24 +77,6 @@ public interface IAssetTransactionService
 
     Task<ServiceResult<AssetTransactionDetailView>> CreateReturnAsync(int sourceTransactionId, AssetReturnViewModel model);
     Task<ServiceResult<AssetTransactionDetailView>> CreatePostMaintenanceAsync(int sourceTransactionId, PostMaintenanceViewModel model);
-
-    // ============================================================
-    // ATTACHMENT (UMUM)
-    // ============================================================
-
-    Task<ServiceResult<AssetTransactionAttachmentView>> UploadAttachmentAsync(int transactionId, AssetTransactionAttachmentUploadDto model);
-    Task<ServiceResult<IEnumerable<AssetTransactionAttachmentView>>> GetAttachmentsAsync(int transactionId);
-    Task<ServiceResult> DeleteAttachmentAsync(int transactionId, int attachmentId);
-
-    // ============================================================
-    // APPROVE ATTACHMENT
-    // ============================================================
-
-    Task<ServiceResult<AssetTransactionApproveAttachmentView>> UploadApproveAttachmentAsync(int transactionId, AssetTransactionApproveAttachmentUploadDto model);
-    Task<ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>> GetApproveAttachmentsAsync(int transactionId);
-    Task<ServiceResult> DeleteApproveAttachmentAsync(int transactionId, int attachmentId);
-    Task<ServiceResult> ApproveAttachmentActionAsync(int transactionId, int attachmentId, ApproveAttachmentActionDto model);
-    Task<ServiceResult<IEnumerable<RequiredDocumentTypeDto>>> GetRequiredDocumentTypesAsync(int transactionId);
 
     // ============================================================
     // DROPDOWN
