@@ -1,9 +1,9 @@
 // src/pages/AssetTransactions/AssetTransactionsMonitoring.jsx
 import React from 'react';
-import AssetTransactionsMenu from './AssetTransactions.menu';
+import AssetTransactions from './AssetTransactions';
 
 const AssetTransactionsMonitoring = () => {
-  return <AssetTransactionsMenu initialMainTab="monitoring" />;
+  return <AssetTransactions initialMainTab="monitoring" />;
 };
 
 export default AssetTransactionsMonitoring;

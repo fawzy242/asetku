@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
+using Whitebird.App.Features.Asset;
 using Whitebird.App.Features.Common;
+using Whitebird.Domain.Features.Asset;
 using Whitebird.Domain.Features.AssetTracking;
 using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.AssetTracking;
@@ -13,12 +15,15 @@ namespace Whitebird.App.Features.AssetTracking;
 public class AssetTrackingService : BaseService, IAssetTrackingService
 {
     private readonly IAssetTrackingReps _assetTrackingReps;
+    private readonly IAssetService _assetService;
 
     public AssetTrackingService(
         IAssetTrackingReps assetTrackingReps,
+        IAssetService assetService,
         ILogger<AssetTrackingService> logger) : base(logger)
     {
         _assetTrackingReps = assetTrackingReps;
+        _assetService = assetService;
     }
 
     // ============================================================
@@ -129,5 +134,19 @@ public class AssetTrackingService : BaseService, IAssetTrackingService
             var result = await _assetTrackingReps.GetEmployeeHistoryAsync(request);
             return ServiceResult<PaginatedResult<AssetTrackingEmployeeHistoryDto>>.Success(result);
         }, "get employee history");
+    }
+
+    // ============================================================
+    // NEW: PHOTO & ATTACHMENTS (delegated to AssetService)
+    // ============================================================
+
+    public async Task<ServiceResult<byte[]>> GetPhotoAsync(int assetId)
+    {
+        return await _assetService.GetPhotoAsync(assetId);
+    }
+
+    public async Task<ServiceResult<IEnumerable<AssetAttachmentViewDto>>> GetAttachmentsAsync(int assetId)
+    {
+        return await _assetService.GetAttachmentsAsync(assetId);
     }
 }

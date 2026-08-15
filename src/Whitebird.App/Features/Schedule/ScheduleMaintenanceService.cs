@@ -1,13 +1,12 @@
 using Mapster;
 using Microsoft.Extensions.Logging;
+using Whitebird.App.Features.Asset;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.MasterData;
 using Whitebird.Domain.Features.Schedule;
 using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 using Whitebird.Infra.Features.Schedule;
-using Whitebird.Infra.Features.Asset;
-using Whitebird.Infra.Features.Employee;
 
 namespace Whitebird.App.Features.Schedule;
 
@@ -15,24 +14,24 @@ public class ScheduleMaintenanceService : BaseService, IScheduleMaintenanceServi
 {
     private readonly IGenericRepository<ScheduleMaintenanceEntity> _repository;
     private readonly IScheduleMaintenanceReps _scheduleReps;
-    private readonly IAssetReps _assetReps;
-    private readonly IMasterDataLookupService _masterDataLookupService;
+    private readonly IAssetService _assetService;
+    private readonly IMasterDataService _masterDataService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
 
     public ScheduleMaintenanceService(
         IGenericRepository<ScheduleMaintenanceEntity> repository,
         IScheduleMaintenanceReps scheduleReps,
-        IAssetReps assetReps,
-        IMasterDataLookupService masterDataLookupService,
+        IAssetService assetService,
+        IMasterDataService masterDataService,
         ICurrentUserService currentUserService,
         IActivityLogService activityLogService,
         ILogger<ScheduleMaintenanceService> logger) : base(logger)
     {
         _repository = repository;
         _scheduleReps = scheduleReps;
-        _assetReps = assetReps;
-        _masterDataLookupService = masterDataLookupService;
+        _assetService = assetService;
+        _masterDataService = masterDataService;
         _currentUserService = currentUserService;
         _activityLogService = activityLogService;
     }
@@ -63,8 +62,8 @@ public class ScheduleMaintenanceService : BaseService, IScheduleMaintenanceServi
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var asset = await _assetReps.GetByIdRawAsync(assetId);
-            if (asset == null)
+            var assetResult = await _assetService.GetByIdAsync(assetId);
+            if (!assetResult.IsSuccess || assetResult.Data == null)
             {
                 return ServiceResult<IEnumerable<ScheduleMaintenanceListView>>.NotFound($"Asset with id {assetId} not found");
             }
@@ -78,8 +77,8 @@ public class ScheduleMaintenanceService : BaseService, IScheduleMaintenanceServi
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var typeName = await _masterDataLookupService.GetMaintenanceTypeNameAsync(maintenanceType);
-            if (typeName.Data == null)
+            var typeName = await _masterDataService.GetValueAsync("MaintenanceType", maintenanceType);
+            if (!typeName.IsSuccess || typeName.Data == null)
             {
                 return ServiceResult<IEnumerable<ScheduleMaintenanceListView>>.BadRequest($"Invalid MaintenanceType: {maintenanceType}");
             }
@@ -91,14 +90,14 @@ public class ScheduleMaintenanceService : BaseService, IScheduleMaintenanceServi
 
     public async Task<ServiceResult<ScheduleMaintenanceView>> CreateAsync(ScheduleMaintenanceCreateDto dto)
     {
-        var asset = await _assetReps.GetByIdRawAsync(dto.AssetId);
-        if (asset == null)
+        var assetResult = await _assetService.GetByIdAsync(dto.AssetId);
+        if (!assetResult.IsSuccess || assetResult.Data == null)
         {
             return ServiceResult<ScheduleMaintenanceView>.BadRequest($"Asset with id {dto.AssetId} not found");
         }
 
-        var typeName = await _masterDataLookupService.GetMaintenanceTypeNameAsync(dto.MaintenanceType);
-        if (typeName.Data == null)
+        var typeName = await _masterDataService.GetValueAsync("MaintenanceType", dto.MaintenanceType);
+        if (!typeName.IsSuccess || typeName.Data == null)
         {
             return ServiceResult<ScheduleMaintenanceView>.BadRequest($"Invalid MaintenanceType: {dto.MaintenanceType}");
         }
@@ -122,7 +121,7 @@ public class ScheduleMaintenanceService : BaseService, IScheduleMaintenanceServi
             await _activityLogService.LogCreateAsync(
                 TableNames.ScheduleMaintenance,
                 id,
-                $"Schedule Maintenance created: Asset '{asset.AssetCode}', Type '{typeName.Data}', Date {dto.ScheduleDate:yyyy-MM-dd}",
+                $"Schedule Maintenance created: Asset '{assetResult.Data.AssetCode}', Type '{typeName.Data}', Date {dto.ScheduleDate:yyyy-MM-dd}",
                 _currentUserService.GetDisplayName());
 
             return ServiceResult<ScheduleMaintenanceView>.Success(created!, "Schedule created successfully");
@@ -137,14 +136,14 @@ public class ScheduleMaintenanceService : BaseService, IScheduleMaintenanceServi
             return ServiceResult<ScheduleMaintenanceView>.NotFound($"Schedule with id {id} not found");
         }
 
-        var asset = await _assetReps.GetByIdRawAsync(dto.AssetId);
-        if (asset == null)
+        var assetResult = await _assetService.GetByIdAsync(dto.AssetId);
+        if (!assetResult.IsSuccess || assetResult.Data == null)
         {
             return ServiceResult<ScheduleMaintenanceView>.BadRequest($"Asset with id {dto.AssetId} not found");
         }
 
-        var typeName = await _masterDataLookupService.GetMaintenanceTypeNameAsync(dto.MaintenanceType);
-        if (typeName.Data == null)
+        var typeName = await _masterDataService.GetValueAsync("MaintenanceType", dto.MaintenanceType);
+        if (!typeName.IsSuccess || typeName.Data == null)
         {
             return ServiceResult<ScheduleMaintenanceView>.BadRequest($"Invalid MaintenanceType: {dto.MaintenanceType}");
         }
@@ -167,7 +166,7 @@ public class ScheduleMaintenanceService : BaseService, IScheduleMaintenanceServi
             await _activityLogService.LogUpdateAsync(
                 TableNames.ScheduleMaintenance,
                 id,
-                $"Schedule Maintenance updated: Asset '{asset.AssetCode}', Date {dto.ScheduleDate:yyyy-MM-dd}",
+                $"Schedule Maintenance updated: Asset '{assetResult.Data.AssetCode}', Date {dto.ScheduleDate:yyyy-MM-dd}",
                 _currentUserService.GetDisplayName());
 
             return ServiceResult<ScheduleMaintenanceView>.Success(updated!, "Schedule updated successfully");
@@ -302,14 +301,14 @@ public class ScheduleMaintenanceService : BaseService, IScheduleMaintenanceServi
             return ServiceResult<ScheduleGenerateResultDto>.BadRequest("DateFrom must be less than or equal to DateTo");
         }
 
-        var asset = await _assetReps.GetByIdRawAsync(dto.AssetId);
-        if (asset == null)
+        var assetResult = await _assetService.GetByIdAsync(dto.AssetId);
+        if (!assetResult.IsSuccess || assetResult.Data == null)
         {
             return ServiceResult<ScheduleGenerateResultDto>.BadRequest($"Asset with id {dto.AssetId} not found");
         }
 
-        var typeName = await _masterDataLookupService.GetMaintenanceTypeNameAsync(dto.MaintenanceType);
-        if (typeName.Data == null)
+        var typeName = await _masterDataService.GetValueAsync("MaintenanceType", dto.MaintenanceType);
+        if (!typeName.IsSuccess || typeName.Data == null)
         {
             return ServiceResult<ScheduleGenerateResultDto>.BadRequest($"Invalid MaintenanceType: {dto.MaintenanceType}");
         }
@@ -351,7 +350,7 @@ public class ScheduleMaintenanceService : BaseService, IScheduleMaintenanceServi
             await _activityLogService.LogCreateAsync(
                 TableNames.ScheduleMaintenance,
                 0,
-                $"Generated {result.TotalGenerated} schedule(s) for Asset '{asset.AssetCode}' from {dto.DateFrom:yyyy-MM-dd} to {dto.DateTo:yyyy-MM-dd}",
+                $"Generated {result.TotalGenerated} schedule(s) for Asset '{assetResult.Data.AssetCode}' from {dto.DateFrom:yyyy-MM-dd} to {dto.DateTo:yyyy-MM-dd}",
                 _currentUserService.GetDisplayName());
 
             result.Message = $"{result.TotalGenerated} schedule(s) generated, {result.TotalSkipped} skipped (already exist)";

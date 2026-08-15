@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Whitebird.App.Features.AssetTransaction;
 using Whitebird.App.Features.Common;
@@ -9,6 +10,7 @@ namespace Whitebird.Features.AssetTransaction.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize]
 public class AssetTransactionController : ControllerBase
 {
     private readonly IAssetTransactionService _transactionService;
@@ -42,9 +44,6 @@ public class AssetTransactionController : ControllerBase
         return this.HandleResult(await _transactionService.CreateAsync(model), nameof(GetById));
     }
 
-    /// <summary>
-    /// Update transaction with attachments (base64) - for standard grid data
-    /// </summary>
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateWithAttachments(int id, [FromBody] AssetTransactionUpdateFormDto model)
     {
@@ -53,9 +52,6 @@ public class AssetTransactionController : ControllerBase
         return this.HandleResult(await _transactionService.UpdateWithAttachmentsAsync(id, model));
     }
 
-    /// <summary>
-    /// Update transaction approval with attachments (base64) - for pending approval grid data
-    /// </summary>
     [HttpPut("{id:int}/approval")]
     public async Task<IActionResult> UpdateApprovalWithAttachments(int id, [FromBody] AssetTransactionUpdateApprovalFormDto model)
     {
@@ -180,10 +176,6 @@ public class AssetTransactionController : ControllerBase
         return this.HandleResult(await _transactionService.GetGridReturnAsync(request));
     }
 
-    // ============================================================
-    // RENAMED: grid-pending-approval → grid-uncomplete
-    // ============================================================
-
     [HttpGet("grid-uncomplete")]
     public async Task<IActionResult> GetUncompleteTransactions(
         [FromQuery] int page = 1,
@@ -213,10 +205,6 @@ public class AssetTransactionController : ControllerBase
 
         return this.HandleResult(await _transactionService.GetGridPendingApprovalAsync(request));
     }
-
-    // ============================================================
-    // COMPLETE TRANSACTIONS (NEW)
-    // ============================================================
 
     [HttpGet("grid-complete")]
     public async Task<IActionResult> GetCompleteTransactions(
@@ -415,4 +403,16 @@ public class AssetTransactionController : ControllerBase
 
         return File(result.Data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Transaction_Import_Template.xlsx");
     }
+
+    // ============================================================
+    // NEW: ATTACHMENTS (standalone retrieval)
+    // ============================================================
+
+    [HttpGet("{id:int}/attachments")]
+    public async Task<IActionResult> GetAttachments(int id)
+        => this.HandleResult(await _transactionService.GetAttachmentsAsync(id));
+
+    [HttpGet("{id:int}/approve-attachments")]
+    public async Task<IActionResult> GetApproveAttachments(int id)
+        => this.HandleResult(await _transactionService.GetApproveAttachmentsAsync(id));
 }

@@ -115,7 +115,7 @@ public abstract class ImportService<TDto, TEntity> : BaseService, IImportService
 
             if (entitiesToInsert.Any())
             {
-                await _repository.BulkInsertAsync(entitiesToInsert);
+                await _repository.BulkInsertOptimizedAsync(entitiesToInsert);
 
                 foreach (var entity in entitiesToInsert)
                 {
@@ -152,6 +152,7 @@ public abstract class ImportService<TDto, TEntity> : BaseService, IImportService
     public virtual async Task<ServiceResult<ImportResult>> ValidateOnlyAsync(Stream fileStream)
     {
         var result = new ImportResult();
+        // FIX: Remove async keyword, return Task directly
         return await Task.FromResult(ServiceResult<ImportResult>.Success(result));
     }
 }

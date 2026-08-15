@@ -1,6 +1,6 @@
-// src/core/services/api.service.js
 import axios from 'axios';
 import { API_CONFIG } from '../constants/appConstants';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 import { handleApiError, shouldIgnoreError } from './apiErrorHandler';
 
 class ApiService {
@@ -20,7 +20,7 @@ class ApiService {
   setupInterceptors() {
     this.instance.interceptors.request.use(
       (config) => {
-        const token = localStorage.getItem(API_CONFIG.SESSION_TOKEN_KEY);
+        const token = localStorage.getItem(STORAGE_KEYS.SESSION_TOKEN);
         if (token) {
           config.headers['X-Session-Token'] = token;
         }
@@ -32,7 +32,6 @@ class ApiService {
     this.instance.interceptors.response.use(
       (response) => response,
       (error) => {
-        // FIX: Skip cancellation errors - JANGAN reject ke consumer
         if (axios.isCancel(error) || shouldIgnoreError(error)) {
           return Promise.resolve({
             data: null,
@@ -41,26 +40,19 @@ class ApiService {
           });
         }
 
-        // FIX: Skip error handler untuk blob responses (download template, export reports)
-        // Blob response yang error biasanya memiliki status 200 dengan data kosong
-        // atau status error dengan responseType blob
         if (error.config?.responseType === 'blob') {
-          // Jika status 200 dengan blob data kosong, jangan tampilkan error
           if (error.response?.status === 200) {
             return Promise.resolve({
               data: null,
               status: 200,
             });
           }
-          // Untuk blob error, biarkan handler error normal tapi jangan tampilkan toast
-          // return Promise.reject(error) dengan flag untuk skip toast
           return Promise.reject({
             ...error,
             __skipToast: true,
           });
         }
 
-        // Skip 404 untuk User/profile-photo (tidak ada photo)
         if (error.response?.status === 404 && 
             error.config?.url?.includes('/User/profile-photo')) {
           return Promise.resolve({
@@ -70,9 +62,8 @@ class ApiService {
           });
         }
 
-        // Handle API error centrally
         const handledError = handleApiError(error, {
-          showToast: true,
+          showToast: false, // UI handled by page
         });
 
         return Promise.reject({

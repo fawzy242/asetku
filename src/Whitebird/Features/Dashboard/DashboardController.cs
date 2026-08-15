@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.Dashboard;
@@ -9,6 +10,7 @@ namespace Whitebird.Features.Dashboard;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize]
 public class DashboardController : ControllerBase
 {
     private readonly IDashboardService _dashboardService;

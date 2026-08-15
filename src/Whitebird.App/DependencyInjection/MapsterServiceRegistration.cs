@@ -32,8 +32,10 @@ public static class MapsterServiceRegistration
 
     private static void ConfigureMappings()
     {
+        // CRITICAL FIX: Do not ignore null values globally.
+        // This allows null values from client to actually reset fields in the database.
         TypeAdapterConfig.GlobalSettings.Default.PreserveReference(true);
-        TypeAdapterConfig.GlobalSettings.Default.IgnoreNullValues(true);
+        TypeAdapterConfig.GlobalSettings.Default.IgnoreNullValues(false);
 
         // ========== ASSET MAPPINGS ==========
         TypeAdapterConfig<AssetListView, AssetListViewModel>.NewConfig()

@@ -48,7 +48,6 @@ public static class ApplicationServiceRegistration
 
         // ========== NEW MODULES ==========
         services.AddScoped<IMasterDataService, MasterDataService>();
-        services.AddScoped<IMasterDataLookupService, MasterDataLookupService>();
         services.AddScoped<IDepartmentService, DepartmentService>();
         services.AddScoped<IOfficeService, OfficeService>();
         services.AddScoped<IFileAttachmentService, FileAttachmentService>();
@@ -79,6 +78,9 @@ public static class ApplicationServiceRegistration
         services.AddScoped<AssetImportService>();
         services.AddScoped<EmployeeImportService>();
         services.AddScoped<TransactionImportService>();
+
+        // REMOVED: FirstTimeSetupService (dead code)
+        // REMOVED: IMasterDataLookupService / MasterDataLookupService (unnecessary abstraction)
 
         return services;
     }

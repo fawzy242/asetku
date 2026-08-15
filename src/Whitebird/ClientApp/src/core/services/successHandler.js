@@ -1,28 +1,24 @@
-// src/core/services/successHandler.js
-import { alertUtils } from '../../lib/sweetAlert';
-
 /**
- * Centralized Success Handler - Menggunakan SweetAlert2 Modal
+ * Centralized Success Handler - NO UI calls
+ * Returns structured success object for page to handle
  * 
  * @param {Object} options
- * @param {string} options.message - Success message to display
+ * @param {string} options.message - Success message
  * @param {string} options.operation - Operation type (create, update, delete, etc.)
  * @param {string} options.entityName - Entity name for default messages
  * @param {Function} options.onSuccess - Callback after success
- * @param {boolean} options.showAlert - Show SweetAlert modal (default: true)
  * @param {Function} options.onCloseModal - Close modal callback
  * @param {Function} options.onRefreshData - Refresh data callback
  * @param {Function} options.onResetForm - Reset form callback
  * @param {Object} options.result - API result data
- * @returns {Object} { success: true, message: string }
+ * @returns {Object} { success: true, message: string, data: any }
  */
-export const handleSuccess = async (options = {}) => {
+export const handleSuccess = (options = {}) => {
   const {
     message,
     operation = 'operation',
     entityName = 'record',
     onSuccess,
-    showAlert = true,
     onCloseModal,
     onRefreshData,
     onResetForm,
@@ -61,11 +57,6 @@ export const handleSuccess = async (options = {}) => {
     message: defaultMessage,
     data: result?.data || result,
   };
-
-  // FIX: Gunakan SweetAlert2 modal (bukan toast)
-  if (showAlert && defaultMessage) {
-    await alertUtils.success('Success!', defaultMessage);
-  }
 
   // Execute callbacks
   if (onCloseModal) {

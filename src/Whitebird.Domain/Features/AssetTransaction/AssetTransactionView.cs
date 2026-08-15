@@ -86,6 +86,9 @@ public class AssetTransactionCreateViewModel
     public decimal? MaintenanceCost { get; set; }
 
     public int? FromAssetTransactionId { get; set; }
+
+    // FIX: Added missing field from AssetTransactionEntity
+    public int? MaintenanceEmployeeId { get; set; }
 }
 
 public class AssetTransactionUpdateViewModel

@@ -24,7 +24,6 @@ public class AssetService : BaseService, IAssetService
     private readonly ICategoryReps _categoryReps;
     private readonly ISupplierReps _supplierReps;
     private readonly IMasterDataService _masterDataService;
-    private readonly IMasterDataLookupService _masterDataLookupService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
     private readonly IStorageService _storageService;
@@ -37,7 +36,6 @@ public class AssetService : BaseService, IAssetService
         ICategoryReps categoryReps,
         ISupplierReps supplierReps,
         IMasterDataService masterDataService,
-        IMasterDataLookupService masterDataLookupService,
         ICurrentUserService currentUserService,
         IActivityLogService activityLogService,
         IStorageService storageService,
@@ -50,7 +48,6 @@ public class AssetService : BaseService, IAssetService
         _categoryReps = categoryReps;
         _supplierReps = supplierReps;
         _masterDataService = masterDataService;
-        _masterDataLookupService = masterDataLookupService;
         _currentUserService = currentUserService;
         _activityLogService = activityLogService;
         _storageService = storageService;
@@ -75,22 +72,22 @@ public class AssetService : BaseService, IAssetService
 
                 if (software.OperatingSystem.HasValue)
                 {
-                    var os = await _masterDataLookupService.GetPositionNameAsync(software.OperatingSystem.Value);
+                    var os = await _masterDataService.GetValueAsync("OperatingSystem", software.OperatingSystem.Value);
                     if (os.IsSuccess) asset.SoftwareInstallation.OperatingSystemName = os.Data;
                 }
                 if (software.MicrosoftOffice.HasValue)
                 {
-                    var office = await _masterDataLookupService.GetPositionNameAsync(software.MicrosoftOffice.Value);
+                    var office = await _masterDataService.GetValueAsync("MicrosoftOffice", software.MicrosoftOffice.Value);
                     if (office.IsSuccess) asset.SoftwareInstallation.MicrosoftOfficeName = office.Data;
                 }
                 if (software.VisualStudio.HasValue)
                 {
-                    var vs = await _masterDataLookupService.GetPositionNameAsync(software.VisualStudio.Value);
+                    var vs = await _masterDataService.GetValueAsync("VisualStudio", software.VisualStudio.Value);
                     if (vs.IsSuccess) asset.SoftwareInstallation.VisualStudioName = vs.Data;
                 }
                 if (software.DBMS.HasValue)
                 {
-                    var dbms = await _masterDataLookupService.GetPositionNameAsync(software.DBMS.Value);
+                    var dbms = await _masterDataService.GetValueAsync("DBMS", software.DBMS.Value);
                     if (dbms.IsSuccess) asset.SoftwareInstallation.DBMSName = dbms.Data;
                 }
             }
@@ -265,7 +262,6 @@ public class AssetService : BaseService, IAssetService
             // ============================================================
             if (!string.IsNullOrEmpty(model.PhotoFileBase64))
             {
-                // Hapus foto lama
                 var oldPhoto = await _assetReps.GetPhotoProfileByAssetIdAsync(id);
                 if (oldPhoto != null)
                 {
@@ -273,7 +269,6 @@ public class AssetService : BaseService, IAssetService
                     await _assetReps.DeletePhotoProfileByAssetIdAsync(id);
                 }
 
-                // Upload foto baru dan insert pivot
                 await AddPhotoProfileFromBase64Async(id, model.PhotoFileBase64, model.PhotoFileName ?? "photo.jpg");
             }
 
@@ -486,7 +481,7 @@ public class AssetService : BaseService, IAssetService
     }
 
     // ============================================================
-    // PRIVATE METHODS — BASE64 UPLOAD (THROW EXCEPTION ON FAILURE)
+    // PRIVATE METHODS — BASE64 UPLOAD
     // ============================================================
 
     private async Task AddPhotoProfileFromBase64Async(int assetId, string base64String, string fileName)
@@ -605,5 +600,64 @@ public class AssetService : BaseService, IAssetService
             ".txt" => "text/plain",
             _ => "application/octet-stream"
         };
+    }
+
+    // ============================================================
+    // NEW: PHOTO & ATTACHMENTS (for AssetTracking and standalone use)
+    // ============================================================
+
+    public async Task<ServiceResult<byte[]>> GetPhotoAsync(int assetId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var asset = await _assetReps.GetByIdRawAsync(assetId);
+            if (asset == null)
+            {
+                return ServiceResult<byte[]>.NotFound($"Asset with id {assetId} not found");
+            }
+
+            var photo = await _assetReps.GetPhotoProfileByAssetIdAsync(assetId);
+            if (photo == null)
+            {
+                return ServiceResult<byte[]>.NotFound("Profile photo not found");
+            }
+
+            var fileResult = await _fileAttachmentService.GetByIdAsync(photo.FileAttachmentId);
+            if (!fileResult.IsSuccess || fileResult.Data == null)
+            {
+                return ServiceResult<byte[]>.NotFound("Profile photo file not found");
+            }
+
+            var fileBytes = await _storageService.ReadFileAsync(fileResult.Data.FilePath);
+            return ServiceResult<byte[]>.Success(fileBytes);
+        }, "get asset photo");
+    }
+
+    public async Task<ServiceResult<IEnumerable<AssetAttachmentViewDto>>> GetAttachmentsAsync(int assetId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var asset = await _assetReps.GetByIdRawAsync(assetId);
+            if (asset == null)
+            {
+                return ServiceResult<IEnumerable<AssetAttachmentViewDto>>.NotFound($"Asset with id {assetId} not found");
+            }
+
+            // Get attachments from repository (joins with FileAttachment)
+            var attachments = await _assetReps.GetAttachmentsByAssetIdAsync(assetId);
+
+            // Map to DTO using the GetDetailByIdAsync approach
+            var result = new List<AssetAttachmentViewDto>();
+
+            // Use the same query pattern as GetDetailByIdAsync for attachments
+            // We need to get FileAttachment data via the repository
+            var detail = await _assetReps.GetDetailByIdAsync(assetId);
+            if (detail != null)
+            {
+                result = detail.Attachments.ToList();
+            }
+
+            return ServiceResult<IEnumerable<AssetAttachmentViewDto>>.Success(result);
+        }, "get asset attachments");
     }
 }

@@ -1,12 +1,12 @@
 using Mapster;
 using Microsoft.Extensions.Logging;
+using Whitebird.App.Features.Asset;
 using Whitebird.App.Features.Common;
+using Whitebird.App.Features.Employee;
 using Whitebird.Domain.Features.Schedule;
 using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
 using Whitebird.Infra.Features.Schedule;
-using Whitebird.Infra.Features.Asset;
-using Whitebird.Infra.Features.Employee;
 
 namespace Whitebird.App.Features.Schedule;
 
@@ -14,24 +14,24 @@ public class ScheduleReturnService : BaseService, IScheduleReturnService
 {
     private readonly IGenericRepository<ScheduleReturnEntity> _repository;
     private readonly IScheduleReturnReps _scheduleReps;
-    private readonly IAssetReps _assetReps;
-    private readonly IEmployeeReps _employeeReps;
+    private readonly IAssetService _assetService;
+    private readonly IEmployeeService _employeeService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
 
     public ScheduleReturnService(
         IGenericRepository<ScheduleReturnEntity> repository,
         IScheduleReturnReps scheduleReps,
-        IAssetReps assetReps,
-        IEmployeeReps employeeReps,
+        IAssetService assetService,
+        IEmployeeService employeeService,
         ICurrentUserService currentUserService,
         IActivityLogService activityLogService,
         ILogger<ScheduleReturnService> logger) : base(logger)
     {
         _repository = repository;
         _scheduleReps = scheduleReps;
-        _assetReps = assetReps;
-        _employeeReps = employeeReps;
+        _assetService = assetService;
+        _employeeService = employeeService;
         _currentUserService = currentUserService;
         _activityLogService = activityLogService;
     }
@@ -62,8 +62,8 @@ public class ScheduleReturnService : BaseService, IScheduleReturnService
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var asset = await _assetReps.GetByIdRawAsync(assetId);
-            if (asset == null)
+            var assetResult = await _assetService.GetByIdAsync(assetId);
+            if (!assetResult.IsSuccess || assetResult.Data == null)
             {
                 return ServiceResult<IEnumerable<ScheduleReturnListView>>.NotFound($"Asset with id {assetId} not found");
             }
@@ -77,8 +77,8 @@ public class ScheduleReturnService : BaseService, IScheduleReturnService
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var employee = await _employeeReps.GetByIdRawAsync(employeeId);
-            if (employee == null)
+            var employeeResult = await _employeeService.GetByIdAsync(employeeId);
+            if (!employeeResult.IsSuccess || employeeResult.Data == null)
             {
                 return ServiceResult<IEnumerable<ScheduleReturnListView>>.NotFound($"Employee with id {employeeId} not found");
             }
@@ -90,14 +90,14 @@ public class ScheduleReturnService : BaseService, IScheduleReturnService
 
     public async Task<ServiceResult<ScheduleReturnView>> CreateAsync(ScheduleReturnCreateDto dto)
     {
-        var asset = await _assetReps.GetByIdRawAsync(dto.AssetId);
-        if (asset == null)
+        var assetResult = await _assetService.GetByIdAsync(dto.AssetId);
+        if (!assetResult.IsSuccess || assetResult.Data == null)
         {
             return ServiceResult<ScheduleReturnView>.BadRequest($"Asset with id {dto.AssetId} not found");
         }
 
-        var employee = await _employeeReps.GetByIdRawAsync(dto.EmployeeId);
-        if (employee == null)
+        var employeeResult = await _employeeService.GetByIdAsync(dto.EmployeeId);
+        if (!employeeResult.IsSuccess || employeeResult.Data == null)
         {
             return ServiceResult<ScheduleReturnView>.BadRequest($"Employee with id {dto.EmployeeId} not found");
         }
@@ -121,7 +121,7 @@ public class ScheduleReturnService : BaseService, IScheduleReturnService
             await _activityLogService.LogCreateAsync(
                 TableNames.ScheduleReturn,
                 id,
-                $"Schedule Return created: Asset '{asset.AssetCode}', Employee '{employee.FullName}', Date {dto.ScheduleDate:yyyy-MM-dd}",
+                $"Schedule Return created: Asset '{assetResult.Data.AssetCode}', Employee '{employeeResult.Data.FullName}', Date {dto.ScheduleDate:yyyy-MM-dd}",
                 _currentUserService.GetDisplayName());
 
             return ServiceResult<ScheduleReturnView>.Success(created!, "Schedule created successfully");
@@ -136,14 +136,14 @@ public class ScheduleReturnService : BaseService, IScheduleReturnService
             return ServiceResult<ScheduleReturnView>.NotFound($"Schedule with id {id} not found");
         }
 
-        var asset = await _assetReps.GetByIdRawAsync(dto.AssetId);
-        if (asset == null)
+        var assetResult = await _assetService.GetByIdAsync(dto.AssetId);
+        if (!assetResult.IsSuccess || assetResult.Data == null)
         {
             return ServiceResult<ScheduleReturnView>.BadRequest($"Asset with id {dto.AssetId} not found");
         }
 
-        var employee = await _employeeReps.GetByIdRawAsync(dto.EmployeeId);
-        if (employee == null)
+        var employeeResult = await _employeeService.GetByIdAsync(dto.EmployeeId);
+        if (!employeeResult.IsSuccess || employeeResult.Data == null)
         {
             return ServiceResult<ScheduleReturnView>.BadRequest($"Employee with id {dto.EmployeeId} not found");
         }
@@ -166,7 +166,7 @@ public class ScheduleReturnService : BaseService, IScheduleReturnService
             await _activityLogService.LogUpdateAsync(
                 TableNames.ScheduleReturn,
                 id,
-                $"Schedule Return updated: Asset '{asset.AssetCode}', Date {dto.ScheduleDate:yyyy-MM-dd}",
+                $"Schedule Return updated: Asset '{assetResult.Data.AssetCode}', Date {dto.ScheduleDate:yyyy-MM-dd}",
                 _currentUserService.GetDisplayName());
 
             return ServiceResult<ScheduleReturnView>.Success(updated!, "Schedule updated successfully");
@@ -301,14 +301,14 @@ public class ScheduleReturnService : BaseService, IScheduleReturnService
             return ServiceResult<ScheduleGenerateResultDto>.BadRequest("DateFrom must be less than or equal to DateTo");
         }
 
-        var asset = await _assetReps.GetByIdRawAsync(dto.AssetId);
-        if (asset == null)
+        var assetResult = await _assetService.GetByIdAsync(dto.AssetId);
+        if (!assetResult.IsSuccess || assetResult.Data == null)
         {
             return ServiceResult<ScheduleGenerateResultDto>.BadRequest($"Asset with id {dto.AssetId} not found");
         }
 
-        var employee = await _employeeReps.GetByIdRawAsync(dto.EmployeeId);
-        if (employee == null)
+        var employeeResult = await _employeeService.GetByIdAsync(dto.EmployeeId);
+        if (!employeeResult.IsSuccess || employeeResult.Data == null)
         {
             return ServiceResult<ScheduleGenerateResultDto>.BadRequest($"Employee with id {dto.EmployeeId} not found");
         }
@@ -350,7 +350,7 @@ public class ScheduleReturnService : BaseService, IScheduleReturnService
             await _activityLogService.LogCreateAsync(
                 TableNames.ScheduleReturn,
                 0,
-                $"Generated {result.TotalGenerated} schedule(s) for Asset '{asset.AssetCode}' from {dto.DateFrom:yyyy-MM-dd} to {dto.DateTo:yyyy-MM-dd}",
+                $"Generated {result.TotalGenerated} schedule(s) for Asset '{assetResult.Data.AssetCode}' from {dto.DateFrom:yyyy-MM-dd} to {dto.DateTo:yyyy-MM-dd}",
                 _currentUserService.GetDisplayName());
 
             result.Message = $"{result.TotalGenerated} schedule(s) generated, {result.TotalSkipped} skipped (already exist)";

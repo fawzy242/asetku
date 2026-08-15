@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.Employee;
@@ -9,6 +10,7 @@ namespace Whitebird.Features.Employee.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize]
 public class EmployeeController : ControllerBase
 {
     private readonly IEmployeeService _employeeService;
@@ -40,9 +42,6 @@ public class EmployeeController : ControllerBase
         return this.HandleResult(await _employeeService.CreateAsync(model), nameof(GetById));
     }
 
-    /// <summary>
-    /// Update employee — support JSON dengan base64 file
-    /// </summary>
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] EmployeeUpdateFormDto model)
     {
@@ -133,12 +132,19 @@ public class EmployeeController : ControllerBase
     }
 
     // ============================================================
-    // REMOVED ENDPOINTS (moved to update payload):
-    // - POST /{id}/photo
-    // - DELETE /{id}/photo
-    // - POST /{id}/attachment
-    // - DELETE /{id}/attachment/{attachmentId}
-    // 
-    // These are now handled via the Update endpoint with base64 payload
+    // NEW: PHOTO & ATTACHMENTS
     // ============================================================
+
+    [HttpGet("{id:int}/photo")]
+    public async Task<IActionResult> GetPhoto(int id)
+    {
+        var result = await _employeeService.GetPhotoAsync(id);
+        if (!result.IsSuccess || result.Data == null)
+            return this.HandleResult(result);
+        return File(result.Data, "image/jpeg");
+    }
+
+    [HttpGet("{id:int}/attachments")]
+    public async Task<IActionResult> GetAttachments(int id)
+        => this.HandleResult(await _employeeService.GetAttachmentsAsync(id));
 }

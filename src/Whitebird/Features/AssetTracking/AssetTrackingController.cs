@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Whitebird.App.Features.AssetTracking;
 using Whitebird.App.Features.Common;
@@ -9,6 +10,7 @@ namespace Whitebird.Features.AssetTracking;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize]
 public class AssetTrackingController : ControllerBase
 {
     private readonly IAssetTrackingService _assetTrackingService;
@@ -73,4 +75,21 @@ public class AssetTrackingController : ControllerBase
     [HttpGet("{assetId:int}/employee-history")]
     public async Task<IActionResult> GetEmployeeHistory([FromQuery] AssetTrackingGridRequest request)
         => this.HandleResult(await _assetTrackingService.GetEmployeeHistoryAsync(request));
+
+    // ============================================================
+    // NEW: PHOTO & ATTACHMENTS (delegated to AssetService)
+    // ============================================================
+
+    [HttpGet("{assetId:int}/photo")]
+    public async Task<IActionResult> GetPhoto(int assetId)
+    {
+        var result = await _assetTrackingService.GetPhotoAsync(assetId);
+        if (!result.IsSuccess || result.Data == null)
+            return this.HandleResult(result);
+        return File(result.Data, "image/jpeg");
+    }
+
+    [HttpGet("{assetId:int}/attachments")]
+    public async Task<IActionResult> GetAttachments(int assetId)
+        => this.HandleResult(await _assetTrackingService.GetAttachmentsAsync(assetId));
 }

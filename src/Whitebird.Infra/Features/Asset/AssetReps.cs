@@ -9,6 +9,7 @@ namespace Whitebird.Infra.Features.Asset;
 
 /// <summary>
 /// Repository implementation for Asset operations using Dapper
+/// (PURE INFRASTRUCTURE — NO APPLICATION DEPENDENCIES)
 /// </summary>
 public class AssetReps : IAssetReps
 {
@@ -157,41 +158,7 @@ public class AssetReps : IAssetReps
         return await _context.QueryAsync<AssetListView>(sql, new { CategoryId = categoryId });
     }
 
-    public async Task<IEnumerable<AssetListView>> GetByHolderListViewAsync(int employeeId)
-    {
-        const string sql = @"
-            SELECT DISTINCT
-                a.AssetId, a.AssetCode, a.AssetName, a.CategoryId, c.CategoryName,
-                a.Brand, a.Model, a.SerialNumber, a.Imei, a.MacAddress,
-                a.Hostname, a.IpAddress,
-                a.PurchaseDate, a.PurchasePrice, a.InvoiceNumber,
-                a.SupplierId, s.SupplierName,
-                a.WarrantyPeriod, a.WarrantyExpiryDate,
-                a.AssetConditionPurchase, md.MasterDataName as AssetConditionPurchaseName,
-                a.Notes,
-                a.IsActive, a.CreatedDate, a.CreatedBy, a.ModifiedDate, a.ModifiedBy
-            FROM Asset a
-            INNER JOIN AssetTransaction at ON a.AssetId = at.AssetId
-            LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
-            LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
-            LEFT JOIN MasterData md ON a.AssetConditionPurchase = md.ReferenceCode AND md.ReferenceName = 'AssetConditionPurchase' AND md.IsActive = 1
-            WHERE at.EmployeeId = @EmployeeId
-              AND at.Approved = 1
-              AND at.FromAssetTransactionId IS NULL
-              AND at.TransactionType IN (@HandoverType, @TransferType, @LoanType)
-              AND at.IsActive = 1
-            ORDER BY a.AssetCode";
-
-        var parameters = new
-        {
-            EmployeeId = employeeId,
-            HandoverType = TransactionTypeConstants.HANDOVER,
-            TransferType = TransactionTypeConstants.TRANSFER,
-            LoanType = TransactionTypeConstants.LOAN
-        };
-
-        return await _context.QueryAsync<AssetListView>(sql, parameters);
-    }
+    // REMOVED: GetByHolderListViewAsync (dead code)
 
     public async Task<IEnumerable<AssetListView>> GetExpiredWarrantyListViewAsync()
     {
@@ -691,7 +658,7 @@ public class AssetReps : IAssetReps
     }
 
     // ============================================================
-    // ASSET PHOTO PROFILE (NEW)
+    // ASSET PHOTO PROFILE
     // ============================================================
 
     public async Task<int> InsertPhotoProfileAsync(AssetPhotoProfileAttachmentEntity entity)

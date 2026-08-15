@@ -20,7 +20,7 @@ public class DashboardReps : IDashboardReps
     }
 
     // ============================================================
-    // MAIN STATS - FIXED (ToEmployeeId → EmployeeId)
+    // MAIN STATS
     // ============================================================
 
     public async Task<DashboardStatsViewModel> GetStatsAsync()
@@ -98,6 +98,7 @@ public class DashboardReps : IDashboardReps
         return await _context.QueryAsync<MonthlyStatDto>(sql, new { Year = year });
     }
 
+    // CRITICAL BUG FIX: Self-join was incorrect (c.CategoryId = c.CategoryId)
     public async Task<IEnumerable<CategoryBreakdownDto>> GetCategoryBreakdownAsync()
     {
         const string sql = @"
@@ -106,7 +107,7 @@ public class DashboardReps : IDashboardReps
                 COUNT(a.AssetId) as AssetCount,
                 ISNULL(SUM(a.PurchasePrice), 0) as TotalValue
             FROM Category c
-            LEFT JOIN Asset a ON c.CategoryId = c.CategoryId AND a.IsActive = 1
+            LEFT JOIN Asset a ON c.CategoryId = a.CategoryId AND a.IsActive = 1
             WHERE c.IsActive = 1
             GROUP BY c.CategoryName
             ORDER BY AssetCount DESC";

@@ -1,4 +1,5 @@
 using Whitebird.App.Features.Common;
+using Whitebird.Domain.Features.Asset;
 using Whitebird.Domain.Features.AssetTracking;
 using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
@@ -51,4 +52,18 @@ public interface IAssetTrackingService
     // ============================================================
 
     Task<ServiceResult<PaginatedResult<AssetTrackingEmployeeHistoryDto>>> GetEmployeeHistoryAsync(AssetTrackingGridRequest request);
+
+    // ============================================================
+    // NEW: PHOTO & ATTACHMENTS (delegated to AssetService)
+    // ============================================================
+
+    /// <summary>
+    /// Gets profile photo bytes for an asset (delegated to AssetService)
+    /// </summary>
+    Task<ServiceResult<byte[]>> GetPhotoAsync(int assetId);
+
+    /// <summary>
+    /// Gets attachment list for an asset (delegated to AssetService)
+    /// </summary>
+    Task<ServiceResult<IEnumerable<AssetAttachmentViewDto>>> GetAttachmentsAsync(int assetId);
 }

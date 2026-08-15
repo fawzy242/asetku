@@ -1,51 +1,30 @@
-// src/components/molecules/FileUploader/FileUploader.jsx
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
-  FiUpload,
-  FiX,
   FiImage,
-  FiFile,
-  FiTrash2,
-  FiEye,
   FiPaperclip,
-  FiDownload,
-} from "react-icons/fi";
+  FiTrash2,
+} from 'react-icons/fi';
 import {
   Box,
-  Chip,
-  IconButton,
   Typography,
   Dialog,
   DialogContent,
-  IconButton as MuiIconButton,
-} from "@mui/material";
-import ConfirmDialog from "../ConfirmDialog/ConfirmDialog";
-import Button from "../../atoms/Button/Button";
-import "./FileUploader.scss";
-
-const PREVIEW_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.txt', '.doc', '.docx', '.xls', '.xlsx'];
-
-const isPreviewable = (fileName) => {
-  if (!fileName) return false;
-  const ext = `.${fileName.split('.').pop()?.toLowerCase()}`;
-  return PREVIEW_EXTENSIONS.includes(ext);
-};
-
-const getFileIcon = (fileName) => {
-  if (!fileName) return FiFile;
-  const ext = `.${fileName.split('.').pop()?.toLowerCase()}`;
-  if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext)) return FiImage;
-  return FiFile;
-};
+} from '@mui/material';
+import ConfirmDialog from '../ConfirmDialog/ConfirmDialog';
+import Button from '../../atoms/Button/Button';
+import FileDropzone from './FileDropzone';
+import FileList from './FileList';
+import FilePreview from './FilePreview';
+import './FileUploader.scss';
 
 const FileUploader = ({
   referenceType,
   referenceId,
   onUploadComplete,
   onFileDeleted,
-  allowedTypes = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".txt"],
+  allowedTypes = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt'],
   maxSizeMB = 10,
-  entityType = "record",
+  entityType = 'record',
   disableDelete = false,
   disablePreview = false,
   title = null,
@@ -55,17 +34,15 @@ const FileUploader = ({
 }) => {
   const [fileList, setFileList] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewFile, setPreviewFile] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [fileToDelete, setFileToDelete] = useState(null);
+  const [previewFile, setPreviewFile] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const isMountedRef = useRef(true);
-  const fileInputRef = useRef(null);
-  const dropRef = useRef(null);
-
-  // 🔥 FIX: Hanya set initial files sekali saat komponen mount
-  // Jangan re-run ketika existingFiles berubah dari parent
   const hasInitializedRef = useRef(false);
+  const internalUpdateRef = useRef(false);
+
+  // Initialize files from existingFiles prop
   useEffect(() => {
     if (!hasInitializedRef.current && existingFiles && Array.isArray(existingFiles) && existingFiles.length > 0) {
       setFileList(existingFiles);
@@ -73,12 +50,8 @@ const FileUploader = ({
     }
   }, [existingFiles]);
 
-  // 🔥 FIX: Hanya notify parent ketika fileList berubah DARI internal (bukan dari parent)
-  // Gunakan ref untuk track apakah perubahan berasal dari internal
-  const internalUpdateRef = useRef(false);
-  
+  // Notify parent when fileList changes from internal updates
   useEffect(() => {
-    // Jika perubahan berasal dari internal update, notify parent
     if (internalUpdateRef.current) {
       if (onFilesChange) {
         onFilesChange(fileList);
@@ -88,7 +61,7 @@ const FileUploader = ({
   }, [fileList, onFilesChange]);
 
   // ============================================================
-  // HANDLE FILE SELECT
+  // FILE SELECT
   // ============================================================
   const handleFileSelect = useCallback(
     async (files) => {
@@ -96,11 +69,10 @@ const FileUploader = ({
 
       const validFiles = [];
       const invalidFiles = [];
+      
       for (const file of files) {
         const ext = `.${file.name.split('.').pop()?.toLowerCase()}`;
-        const isValidExt = allowedTypes.some(t => 
-          t.startsWith('.') ? t === ext : file.type === t
-        );
+        const isValidExt = allowedTypes.some(t => t.startsWith('.') ? t === ext : file.type === t);
         
         if (!isValidExt) {
           invalidFiles.push(`${file.name} (type not allowed)`);
@@ -138,7 +110,6 @@ const FileUploader = ({
         fileAttachmentId: `new-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       }));
 
-      // 🔥 FIX: Update state dengan flag internal update
       internalUpdateRef.current = true;
       setFileList(prev => [...prev, ...newFiles]);
 
@@ -151,6 +122,9 @@ const FileUploader = ({
     [allowedTypes, maxSizeMB, onUploadComplete]
   );
 
+  // ============================================================
+  // DELETE
+  // ============================================================
   const handleDeleteFile = useCallback(async (file) => {
     if (disableDelete) {
       ConfirmDialog.toast.warning("Delete is not available for this entity");
@@ -187,6 +161,9 @@ const FileUploader = ({
     setFileToDelete(null);
   }, [fileToDelete, onFileDeleted]);
 
+  // ============================================================
+  // PREVIEW
+  // ============================================================
   const handlePreview = useCallback((file) => {
     if (disablePreview) {
       ConfirmDialog.toast.warning("Preview is not available");
@@ -201,6 +178,9 @@ const FileUploader = ({
     setPreviewFile(null);
   }, []);
 
+  // ============================================================
+  // DRAG & DROP
+  // ============================================================
   const handleDragEnter = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -229,69 +209,9 @@ const FileUploader = ({
     }
   }, [handleFileSelect]);
 
-  const handleBrowseClick = useCallback(() => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  }, []);
-
-  const formatFileSize = (bytes) => {
-    if (!bytes) return '';
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const renderFileCard = (file, index) => {
-    const FileIcon = getFileIcon(file.originalFileName || file.fileName);
-    const isPreviewableFile = isPreviewable(file.originalFileName || file.fileName);
-
-    return (
-      <div key={file.fileAttachmentId || index} className="file-uploader__file-card">
-        <div className="file-uploader__file-card-content">
-          <div className="file-uploader__file-icon">
-            <FileIcon size={24} />
-          </div>
-          <div className="file-uploader__file-info">
-            <span className="file-uploader__file-name">
-              {file.originalFileName || file.fileName || 'Untitled'}
-            </span>
-            <span className="file-uploader__file-size">
-              {formatFileSize(file.fileSize)}
-            </span>
-            {file.isNew && (
-              <Chip label="New" size="small" color="info" className="file-uploader__file-badge" />
-            )}
-          </div>
-        </div>
-        <div className="file-uploader__file-actions">
-          {isPreviewableFile && !disablePreview && (
-            <button
-              type="button"
-              className="file-uploader__file-action file-uploader__file-action--preview"
-              onClick={() => handlePreview(file)}
-              title="Preview"
-            >
-              <FiEye size={16} />
-            </button>
-          )}
-          {!disableDelete && (
-            <button
-              type="button"
-              className="file-uploader__file-action file-uploader__file-action--delete"
-              onClick={() => handleDeleteFile(file)}
-              title="Delete"
-            >
-              <FiX size={16} />
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  };
-
+  // ============================================================
+  // RENDER
+  // ============================================================
   if (!referenceId) {
     return (
       <Box className="file-uploader-placeholder">
@@ -319,59 +239,30 @@ const FileUploader = ({
         </Typography>
       </div>
 
-      <div
-        ref={dropRef}
-        className={`file-uploader__dropzone ${isDragging ? 'file-uploader__dropzone--dragging' : ''} ${fileCount > 0 ? 'file-uploader__dropzone--has-files' : ''}`}
+      <FileDropzone
+        isDragging={isDragging}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        onClick={handleBrowseClick}
-      >
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={(e) => {
-            if (e.target.files && e.target.files.length > 0) {
-              handleFileSelect(e.target.files);
-            }
-            e.target.value = '';
-          }}
-          accept={allowedTypes.filter(t => t.startsWith('.')).join(',')}
-          multiple={isAttachment}
-          className="file-uploader__file-input"
-        />
-        
-        <div className="file-uploader__dropzone-content">
-          <FiUpload className="file-uploader__dropzone-icon" size={32} />
-          <Typography variant="body2" className="file-uploader__dropzone-text">
-            {isDragging ? 'Drop files here...' : 'Drag & drop files here or click to browse'}
-          </Typography>
-          <Typography variant="caption" className="file-uploader__dropzone-hint">
-            {isAttachment 
-              ? `Supported: ${allowedTypes.join(', ')} (max ${maxSizeMB}MB each)`
-              : `Max ${maxSizeMB}MB, supported: ${allowedTypes.join(', ')}`
-            }
-          </Typography>
-          <button
-            type="button"
-            className="file-uploader__dropzone-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleBrowseClick();
-            }}
-          >
-            {fileCount > 0 ? 'Add More Files' : 'Add Files'}
-          </button>
-        </div>
-      </div>
+        onFileSelect={handleFileSelect}
+        allowedTypes={allowedTypes}
+        maxSizeMB={maxSizeMB}
+        isAttachment={isAttachment}
+        hasFiles={fileCount > 0}
+      />
 
       {fileCount > 0 && (
-        <div className="file-uploader__file-list">
-          {fileList.map((file, index) => renderFileCard(file, index))}
-        </div>
+        <FileList
+          files={fileList}
+          onPreview={handlePreview}
+          onDelete={handleDeleteFile}
+          disablePreview={disablePreview}
+          disableDelete={disableDelete}
+        />
       )}
 
+      {/* Delete Confirmation Dialog */}
       <Dialog
         open={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
@@ -421,114 +312,12 @@ const FileUploader = ({
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={previewOpen}
+      {/* Preview Dialog */}
+      <FilePreview
+        isOpen={previewOpen}
+        file={previewFile}
         onClose={handleClosePreview}
-        maxWidth="lg"
-        fullWidth
-        PaperProps={{
-          sx: {
-            backgroundColor: 'var(--card-bg)',
-            borderRadius: '12px',
-          },
-        }}
-      >
-        <DialogContent sx={{ p: 0, position: 'relative', minHeight: 400 }}>
-          <MuiIconButton
-            onClick={handleClosePreview}
-            sx={{
-              position: 'absolute',
-              top: 8,
-              right: 8,
-              zIndex: 1,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              color: 'white',
-              '&:hover': { backgroundColor: 'rgba(0,0,0,0.7)' },
-            }}
-          >
-            <FiX size={20} />
-          </MuiIconButton>
-          <Box
-            sx={{
-              width: '100%',
-              height: '70vh',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              p: 2,
-            }}
-          >
-            {previewFile && (() => {
-              const fileName = previewFile.originalFileName || previewFile.fileName || '';
-              const ext = `.${fileName.split('.').pop()?.toLowerCase()}`;
-              
-              if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext)) {
-                const url = previewFile.previewUrl || previewFile.fileUrl;
-                if (url) {
-                  return (
-                    <img
-                      src={url}
-                      alt={fileName}
-                      style={{
-                        maxWidth: '100%',
-                        maxHeight: '100%',
-                        objectFit: 'contain',
-                      }}
-                    />
-                  );
-                }
-                return <Typography>Image preview not available</Typography>;
-              }
-              
-              if (ext === '.pdf') {
-                return (
-                  <Box sx={{ textAlign: 'center' }}>
-                    <FiFile size={48} style={{ color: 'var(--text-secondary)', marginBottom: 16 }} />
-                    <Typography variant="h6">{fileName}</Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      PDF preview is not available in this view
-                    </Typography>
-                    <Button
-                      variant="primary"
-                      startIcon={<FiDownload />}
-                      onClick={() => {
-                        const url = previewFile.fileUrl || previewFile.previewUrl;
-                        if (url) {
-                          window.open(url, '_blank');
-                        }
-                      }}
-                    >
-                      Download / View PDF
-                    </Button>
-                  </Box>
-                );
-              }
-              
-              return (
-                <Box sx={{ textAlign: 'center' }}>
-                  <FiFile size={48} style={{ color: 'var(--text-secondary)', marginBottom: 16 }} />
-                  <Typography variant="h6">{fileName}</Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Preview not available for this file type
-                  </Typography>
-                  <Button
-                    variant="primary"
-                    startIcon={<FiDownload />}
-                    onClick={() => {
-                      const url = previewFile.fileUrl || previewFile.previewUrl;
-                      if (url) {
-                        window.open(url, '_blank');
-                      }
-                    }}
-                  >
-                    Download
-                  </Button>
-                </Box>
-              );
-            })()}
-          </Box>
-        </DialogContent>
-      </Dialog>
+      />
     </div>
   );
 };

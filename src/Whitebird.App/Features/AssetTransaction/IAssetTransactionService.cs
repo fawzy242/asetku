@@ -95,4 +95,18 @@ public interface IAssetTransactionService
     Task<ServiceResult<IEnumerable<ApproveDocumentTypeDto>>> GetApproveDocumentTypeListAsync();
     Task<ServiceResult<IEnumerable<EmployeeDropdownView>>> GetEmployeeListAsync();
     Task<ServiceResult<IEnumerable<AssetTransactionAssetDto>>> GetAssetListAsync(int transactionTypeId);
+
+    // ============================================================
+    // NEW: ATTACHMENTS (for standalone retrieval)
+    // ============================================================
+
+    /// <summary>
+    /// Gets general attachments for a transaction
+    /// </summary>
+    Task<ServiceResult<IEnumerable<AssetTransactionAttachmentView>>> GetAttachmentsAsync(int transactionId);
+
+    /// <summary>
+    /// Gets approve attachments for a transaction
+    /// </summary>
+    Task<ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>> GetApproveAttachmentsAsync(int transactionId);
 }

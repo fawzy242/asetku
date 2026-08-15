@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.User;
@@ -9,6 +10,7 @@ namespace Whitebird.Features.User;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize]
 public class UserController : ControllerBase
 {
     private readonly IUserService _userService;

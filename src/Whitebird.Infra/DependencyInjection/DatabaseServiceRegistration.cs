@@ -12,7 +12,7 @@ public static class DatabaseServiceRegistration
         services.Configure<DatabaseSettings>(configuration.GetSection("DatabaseSettings"));
         services.AddSingleton<IDatabaseConnectionFactory, DatabaseConnectionFactory>();
         services.AddScoped<DapperContext>();
-        services.AddScoped<SqlHelper>();
+        // REMOVED: services.AddScoped<SqlHelper>(); // Dead code
         Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
         return services;
     }

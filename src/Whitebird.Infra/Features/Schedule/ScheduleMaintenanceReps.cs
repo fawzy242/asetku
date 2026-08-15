@@ -93,24 +93,6 @@ public class ScheduleMaintenanceReps : IScheduleMaintenanceReps
         return await _context.QueryAsync<ScheduleMaintenanceListView>(sql, new { MaintenanceType = maintenanceType });
     }
 
-    public async Task<IEnumerable<ScheduleMaintenanceListView>> GetByDateRangeAsync(DateTime startDate, DateTime endDate)
-    {
-        const string sql = @"
-            SELECT 
-                sm.ScheduleMaintenanceId, sm.ScheduleDate, sm.AssetId, 
-                sm.MaintenanceType, sm.MaintenanceAssetTransactionId, sm.PostAssetTransactionId,
-                sm.IsActive, sm.CreatedDate, sm.CreatedBy,
-                a.AssetCode, a.AssetName,
-                md.MasterDataName as MaintenanceTypeName
-            FROM ScheduleMaintenance sm
-            LEFT JOIN Asset a ON sm.AssetId = a.AssetId
-            LEFT JOIN MasterData md ON sm.MaintenanceType = md.ReferenceCode AND md.ReferenceName = 'MaintenanceType' AND md.IsActive = 1
-            WHERE sm.ScheduleDate BETWEEN @StartDate AND @EndDate AND sm.IsActive = 1
-            ORDER BY sm.ScheduleDate ASC";
-
-        return await _context.QueryAsync<ScheduleMaintenanceListView>(sql, new { StartDate = startDate, EndDate = endDate });
-    }
-
     public async Task<bool> IsScheduleExistsAsync(DateTime scheduleDate, int assetId, int? excludeId = null)
     {
         var sql = "SELECT COUNT(1) FROM ScheduleMaintenance WHERE ScheduleDate = @ScheduleDate AND AssetId = @AssetId AND IsActive = 1";
@@ -187,7 +169,7 @@ public class ScheduleMaintenanceReps : IScheduleMaintenanceReps
     }
 
     // ============================================================
-    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
+    // PAGINATION
     // ============================================================
 
     public async Task<PaginatedResult<ScheduleMaintenanceListView>> GetPagedListAsync(ScheduleGridRequest request)

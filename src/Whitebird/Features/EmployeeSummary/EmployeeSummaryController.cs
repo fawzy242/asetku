@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.EmployeeSummary;
@@ -9,6 +10,7 @@ namespace Whitebird.Features.EmployeeSummary;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize]
 public class EmployeeSummaryController : ControllerBase
 {
     private readonly IEmployeeSummaryService _employeeSummaryService;
@@ -89,4 +91,21 @@ public class EmployeeSummaryController : ControllerBase
     [HttpGet("{employeeId:int}/schedule-stats")]
     public async Task<IActionResult> GetScheduleStats(int employeeId)
         => this.HandleResult(await _employeeSummaryService.GetScheduleStatsAsync(employeeId));
+
+    // ============================================================
+    // NEW: PHOTO & ATTACHMENTS (delegated to EmployeeService)
+    // ============================================================
+
+    [HttpGet("{employeeId:int}/photo")]
+    public async Task<IActionResult> GetPhoto(int employeeId)
+    {
+        var result = await _employeeSummaryService.GetPhotoAsync(employeeId);
+        if (!result.IsSuccess || result.Data == null)
+            return this.HandleResult(result);
+        return File(result.Data, "image/jpeg");
+    }
+
+    [HttpGet("{employeeId:int}/attachments")]
+    public async Task<IActionResult> GetAttachments(int employeeId)
+        => this.HandleResult(await _employeeSummaryService.GetAttachmentsAsync(employeeId));
 }

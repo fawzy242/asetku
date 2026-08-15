@@ -1,9 +1,7 @@
-// src/context/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
-import apiService from "../core/services/api.service"; // FIX: Path yang benar
-import apiClient from "../core/api/apiClient"; // FIX: Path yang benar
-import utilsHelper from "../core/utils/utils.helper";
-import ConfirmDialog from "../components/molecules/ConfirmDialog/ConfirmDialog";
+import { LoginData, UserData } from "../core/services";
+import { STORAGE_KEYS } from "../core/constants/storageKeys";
+import { getStorage, setStorage, removeStorage } from "../core/utils/storage.utils";
 
 const AuthContext = createContext(null);
 
@@ -13,6 +11,9 @@ export const useAuth = () => {
   return context;
 };
 
+const loginData = new LoginData();
+const userData = new UserData();
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -21,12 +22,12 @@ export const AuthProvider = ({ children }) => {
   const mountedRef = useRef(true);
 
   const performLogout = useCallback(async () => {
-    const token = localStorage.getItem("whitebird_session_token");
+    const token = localStorage.getItem(STORAGE_KEYS.SESSION_TOKEN);
     if (token) { 
-      try { await apiService.post("/Auth/logout", { sessionToken: token }); } catch {} 
+      try { await loginData.logout(token); } catch {} 
     }
-    localStorage.removeItem("whitebird_session_token");
-    utilsHelper.removeLocalStorage("user");
+    localStorage.removeItem(STORAGE_KEYS.SESSION_TOKEN);
+    removeStorage(STORAGE_KEYS.USER);
     if (mountedRef.current) {
       setUser(null);
       setIsAuthenticated(false);
@@ -34,22 +35,22 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const refreshUser = useCallback(async () => {
-    const token = localStorage.getItem("whitebird_session_token");
+    const token = localStorage.getItem(STORAGE_KEYS.SESSION_TOKEN);
     if (!token) return false;
     
     try {
-      const response = await apiClient.user.getMe();
-      if (response.data?.isSuccess && response.data?.data) {
-        const userData = response.data.data;
+      const result = await userData.getMe();
+      if (result.success && result.data) {
+        const userDataResult = result.data;
         
         const request = { scheme: window.location.protocol.replace(':', ''), host: window.location.host };
-        const profilePhotoUrl = userData.userId 
+        const profilePhotoUrl = userDataResult.userId 
           ? `${request.scheme}://${request.host}/api/User/profile-photo`
           : null;
         
-        const updatedUser = { ...userData, profilePhotoUrl };
+        const updatedUser = { ...userDataResult, profilePhotoUrl };
         
-        utilsHelper.setLocalStorage("user", updatedUser);
+        setStorage(STORAGE_KEYS.USER, updatedUser);
         if (mountedRef.current) {
           setUser(updatedUser);
         }
@@ -66,13 +67,13 @@ export const AuthProvider = ({ children }) => {
     if (checkingRef.current) return;
     checkingRef.current = true;
 
-    const token = localStorage.getItem("whitebird_session_token");
-    const savedUser = utilsHelper.getLocalStorage("user");
+    const token = localStorage.getItem(STORAGE_KEYS.SESSION_TOKEN);
+    const savedUser = getStorage(STORAGE_KEYS.USER);
     
     if (token && savedUser) {
       try {
-        const response = await apiService.get("/Auth/validate-session");
-        const isValid = response.data?.data?.isValid || response.data?.isValid;
+        const result = await loginData.validateSession();
+        const isValid = result.success && result.data?.isValid;
         if (!mountedRef.current) return;
         if (isValid) { 
           setUser(savedUser); 
@@ -103,31 +104,28 @@ export const AuthProvider = ({ children }) => {
 
   const login = useCallback(async (username, password) => {
     try {
-      const response = await apiService.post("/Auth/login", { username, password });
-      if (response.data?.isSuccess) {
-        const { sessionToken, user: userData } = response.data.data;
+      const result = await loginData.handleLogin(username, password);
+      if (result.success) {
+        const { sessionToken, user: userDataResult } = result.data;
         
         const request = { scheme: window.location.protocol.replace(':', ''), host: window.location.host };
-        const profilePhotoUrl = userData.userId 
+        const profilePhotoUrl = userDataResult.userId 
           ? `${request.scheme}://${request.host}/api/User/profile-photo`
           : null;
         
-        const userWithPhoto = { ...userData, profilePhotoUrl };
+        const userWithPhoto = { ...userDataResult, profilePhotoUrl };
         
-        localStorage.setItem("whitebird_session_token", sessionToken);
-        utilsHelper.setLocalStorage("user", userWithPhoto);
+        localStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, sessionToken);
+        setStorage(STORAGE_KEYS.USER, userWithPhoto);
         if (mountedRef.current) {
           setUser(userWithPhoto);
           setIsAuthenticated(true);
         }
-        ConfirmDialog.toast.success(`Welcome back, ${userWithPhoto.fullName || userWithPhoto.username}!`);
         return { success: true };
       }
-      ConfirmDialog.toast.error(response.data?.message || "Login failed");
-      return { success: false, error: response.data?.message || "Login failed" };
+      return { success: false, error: result.error || "Login failed" };
     } catch (error) {
       const message = error.response?.data?.message || "Invalid username or password";
-      ConfirmDialog.toast.error(message);
       return { success: false, error: message };
     }
   }, []);

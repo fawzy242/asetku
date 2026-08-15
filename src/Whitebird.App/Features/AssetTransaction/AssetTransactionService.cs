@@ -1,6 +1,7 @@
 using Mapster;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Whitebird.App.Features.Asset;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.Department;
 using Whitebird.App.Features.Employee;
@@ -17,7 +18,6 @@ using Whitebird.Domain.Features.FileAttachment;
 using Whitebird.Domain.Features.MasterData;
 using Whitebird.Domain.Features.Office;
 using Whitebird.Domain.Features.Supplier;
-using Whitebird.Infra.Features.Asset;
 using Whitebird.Infra.Features.AssetTransaction;
 using Whitebird.Infra.Features.Common;
 
@@ -30,13 +30,12 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 {
     private readonly IGenericRepository<AssetTransactionEntity> _repository;
     private readonly IAssetTransactionReps _transactionReps;
-    private readonly IAssetReps _assetReps;
+    private readonly IAssetService _assetService;
     private readonly IEmployeeService _employeeService;
     private readonly IOfficeService _officeService;
     private readonly IDepartmentService _departmentService;
     private readonly ISupplierService _supplierService;
     private readonly IMasterDataService _masterDataService;
-    private readonly IMasterDataLookupService _masterDataLookupService;
     private readonly IFileAttachmentService _fileAttachmentService;
     private readonly IStorageService _storageService;
     private readonly ICurrentUserService _currentUserService;
@@ -46,13 +45,12 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     public AssetTransactionService(
         IGenericRepository<AssetTransactionEntity> repository,
         IAssetTransactionReps transactionReps,
-        IAssetReps assetReps,
+        IAssetService assetService,
         IEmployeeService employeeService,
         IOfficeService officeService,
         IDepartmentService departmentService,
         ISupplierService supplierService,
         IMasterDataService masterDataService,
-        IMasterDataLookupService masterDataLookupService,
         IFileAttachmentService fileAttachmentService,
         IStorageService storageService,
         ICurrentUserService currentUserService,
@@ -62,13 +60,12 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     {
         _repository = repository;
         _transactionReps = transactionReps;
-        _assetReps = assetReps;
+        _assetService = assetService;
         _employeeService = employeeService;
         _officeService = officeService;
         _departmentService = departmentService;
         _supplierService = supplierService;
         _masterDataService = masterDataService;
-        _masterDataLookupService = masterDataLookupService;
         _fileAttachmentService = fileAttachmentService;
         _storageService = storageService;
         _currentUserService = currentUserService;
@@ -687,7 +684,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     }
 
     // ============================================================
-    // COMPLETE TRANSACTIONS (NEW)
+    // COMPLETE TRANSACTIONS
     // ============================================================
 
     public async Task<ServiceResult<PaginatedResult<AssetTransactionListView>>> GetCompleteTransactionsAsync(AssetTransactionGridRequest request)
@@ -952,8 +949,13 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var assets = await _assetReps.GetDropdownListByTransactionTypeAsync(transactionTypeId);
-            var result = assets.Select(a => new AssetTransactionAssetDto
+            var assetsResult = await _assetService.GetDropdownListByTransactionTypeAsync(transactionTypeId);
+            if (!assetsResult.IsSuccess || assetsResult.Data == null)
+            {
+                return ServiceResult<IEnumerable<AssetTransactionAssetDto>>.Failure("Failed to get assets");
+            }
+
+            var result = assetsResult.Data.Select(a => new AssetTransactionAssetDto
             {
                 AssetId = a.AssetId,
                 AssetCode = a.AssetCode,
@@ -970,14 +972,14 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     private async Task<ServiceResult<AssetTransactionDetailView>?> ValidateTransactionAsync(
         AssetTransactionCreateViewModel model, AssetTransactionEntity? existing)
     {
-        var asset = await _assetReps.GetByIdRawAsync(model.AssetId);
-        if (asset == null)
+        var assetResult = await _assetService.GetByIdAsync(model.AssetId);
+        if (!assetResult.IsSuccess || assetResult.Data == null)
         {
             return ServiceResult<AssetTransactionDetailView>.NotFound($"Asset with id {model.AssetId} not found");
         }
 
-        var typeName = await _masterDataLookupService.GetTransactionTypeNameAsync(model.TransactionType);
-        if (typeName.Data == null)
+        var typeName = await _masterDataService.GetValueAsync("TransactionType", model.TransactionType);
+        if (!typeName.IsSuccess || typeName.Data == null)
         {
             return ServiceResult<AssetTransactionDetailView>.BadRequest($"Invalid TransactionType: {model.TransactionType}");
         }
@@ -1058,8 +1060,8 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
         if (model.Condition.HasValue)
         {
-            var condition = await _masterDataLookupService.GetAssetConditionNameAsync(model.Condition.Value);
-            if (condition.Data == null)
+            var condition = await _masterDataService.GetValueAsync("AssetCondition", model.Condition.Value);
+            if (!condition.IsSuccess || condition.Data == null)
             {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest($"Invalid Condition: {model.Condition}");
             }
@@ -1067,8 +1069,8 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
         if (model.MaintenanceType.HasValue)
         {
-            var maintType = await _masterDataLookupService.GetMaintenanceTypeNameAsync(model.MaintenanceType.Value);
-            if (maintType.Data == null)
+            var maintType = await _masterDataService.GetValueAsync("MaintenanceType", model.MaintenanceType.Value);
+            if (!maintType.IsSuccess || maintType.Data == null)
             {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest($"Invalid MaintenanceType: {model.MaintenanceType}");
             }
@@ -1120,7 +1122,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         };
 
         var datePart = DateTime.Now.ToString("yyMMdd");
-        var randomPart = new Random().Next(1000, 9999).ToString();
+        var randomPart = Random.Shared.Next(1000, 9999).ToString();
 
         return $"{prefix}-{datePart}-{randomPart}";
     }
@@ -1232,5 +1234,39 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             ".txt" => "text/plain",
             _ => "application/octet-stream"
         };
+    }
+
+    // ============================================================
+    // NEW: ATTACHMENTS (for standalone retrieval)
+    // ============================================================
+
+    public async Task<ServiceResult<IEnumerable<AssetTransactionAttachmentView>>> GetAttachmentsAsync(int transactionId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
+            if (transaction == null)
+            {
+                return ServiceResult<IEnumerable<AssetTransactionAttachmentView>>.NotFound($"Transaction with id {transactionId} not found");
+            }
+
+            var attachments = await _transactionReps.GetAttachmentsByTransactionIdAsync(transactionId);
+            return ServiceResult<IEnumerable<AssetTransactionAttachmentView>>.Success(attachments);
+        }, "get transaction attachments");
+    }
+
+    public async Task<ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>> GetApproveAttachmentsAsync(int transactionId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
+            if (transaction == null)
+            {
+                return ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>.NotFound($"Transaction with id {transactionId} not found");
+            }
+
+            var attachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(transactionId);
+            return ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>.Success(attachments);
+        }, "get transaction approve attachments");
     }
 }

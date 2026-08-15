@@ -22,7 +22,6 @@ public interface IAssetReps
     Task<AssetDetailView?> GetDetailByIdAsync(int assetId);
     Task<IEnumerable<AssetListView>> GetAllListViewAsync();
     Task<IEnumerable<AssetListView>> GetByCategoryListViewAsync(int categoryId);
-    Task<IEnumerable<AssetListView>> GetByHolderListViewAsync(int employeeId);
     Task<IEnumerable<AssetListView>> GetExpiredWarrantyListViewAsync();
     Task<IEnumerable<AssetListView>> GetByStatusListViewAsync(string status);
 
@@ -73,7 +72,7 @@ public interface IAssetReps
     Task<int> DeleteAttachmentsByAssetIdAsync(int assetId);
 
     // ============================================================
-    // ASSET PHOTO PROFILE (NEW)
+    // ASSET PHOTO PROFILE
     // ============================================================
 
     Task<int> InsertPhotoProfileAsync(AssetPhotoProfileAttachmentEntity entity);

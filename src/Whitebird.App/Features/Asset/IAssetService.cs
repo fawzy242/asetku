@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.Asset;
 using Whitebird.Domain.Features.Common;
@@ -43,14 +42,16 @@ public interface IAssetService
     Task<ServiceResult<IEnumerable<AssetDropdownView>>> GetDropdownListByTransactionTypeAsync(int transactionType);
 
     // ============================================================
-    // REMOVED METHODS (moved to internal/private):
-    // - AddPhotoProfileAsync
-    // - DeletePhotoProfileAsync
-    // - GetPhotoProfileAsync
-    // - AddAttachmentAsync
-    // - GetAttachmentsAsync
-    // - DeleteAttachmentAsync
-    // 
-    // These are now handled internally via UpdateAsync with base64 payload
+    // NEW: PHOTO & ATTACHMENTS (for AssetTracking and standalone use)
     // ============================================================
+
+    /// <summary>
+    /// Gets profile photo bytes for an asset
+    /// </summary>
+    Task<ServiceResult<byte[]>> GetPhotoAsync(int assetId);
+
+    /// <summary>
+    /// Gets attachment list for an asset
+    /// </summary>
+    Task<ServiceResult<IEnumerable<AssetAttachmentViewDto>>> GetAttachmentsAsync(int assetId);
 }

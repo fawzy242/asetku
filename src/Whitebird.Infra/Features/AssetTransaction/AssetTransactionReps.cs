@@ -111,11 +111,75 @@ public class AssetTransactionReps : IAssetTransactionReps
     }
 
     // ============================================================
+    // BATCH ATTACHMENT RETRIEVAL (Fixes N+1 Query)
+    // ============================================================
+
+    private async Task<Dictionary<int, List<AssetTransactionAttachmentView>>> GetAttachmentsForTransactionsAsync(IEnumerable<int> transactionIds)
+    {
+        var ids = transactionIds.ToList();
+        if (!ids.Any()) return new Dictionary<int, List<AssetTransactionAttachmentView>>();
+
+        const string sql = @"
+            SELECT 
+                ata.AssetTransactionId,
+                ata.AssetTransactionAttachmentId,
+                ata.FileAttachmentId,
+                ata.[Order],
+                ata.CreatedDate,
+                ata.CreatedBy,
+                fa.FileName,
+                fa.OriginalFileName,
+                fa.FileCategory,
+                fa.IsPrimary,
+                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl
+            FROM AssetTransactionAttachment ata
+            INNER JOIN FileAttachment fa ON ata.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
+            WHERE ata.AssetTransactionId IN @Ids AND ata.IsActive = 1
+            ORDER BY ata.[Order] ASC, fa.CreatedDate DESC";
+
+        var result = await _context.QueryAsync<AssetTransactionAttachmentView>(sql, new { Ids = ids });
+        return result.GroupBy(x => x.AssetTransactionId)
+                     .ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    private async Task<Dictionary<int, List<AssetTransactionApproveAttachmentView>>> GetApproveAttachmentsForTransactionsAsync(IEnumerable<int> transactionIds)
+    {
+        var ids = transactionIds.ToList();
+        if (!ids.Any()) return new Dictionary<int, List<AssetTransactionApproveAttachmentView>>();
+
+        const string sql = @"
+            SELECT 
+                ataa.AssetTransactionId,
+                ataa.AssetTransactionApproveAttachmentId,
+                ataa.FileAttachmentId,
+                ataa.[Order],
+                ataa.DocumentType,
+                ataa.NeedToChange,
+                ataa.Approved,
+                ataa.CreatedDate,
+                ataa.CreatedBy,
+                fa.FileName,
+                fa.OriginalFileName,
+                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl,
+                md.MasterDataName as DocumentTypeName,
+                CASE WHEN md.ReferenceCode IS NOT NULL THEN 1 ELSE 0 END as IsRequired
+            FROM AssetTransactionApproveAttachment ataa
+            INNER JOIN FileAttachment fa ON ataa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
+            LEFT JOIN MasterData md ON ataa.DocumentType = md.ReferenceCode AND md.ReferenceName = 'ApproveDocumentType' AND md.IsActive = 1
+            WHERE ataa.AssetTransactionId IN @Ids AND ataa.IsActive = 1
+            ORDER BY ataa.[Order] ASC, fa.CreatedDate DESC";
+
+        var result = await _context.QueryAsync<AssetTransactionApproveAttachmentView>(sql, new { Ids = ids });
+        return result.GroupBy(x => x.AssetTransactionId)
+                     .ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    // ============================================================
     // GRID - BASE
     // ============================================================
 
     private async Task<PaginatedResult<AssetTransactionListView>> GetGridBaseAsync(
-    AssetTransactionGridRequest request, int[] transactionTypes, bool isReturnGrid)
+        AssetTransactionGridRequest request, int[] transactionTypes, bool isReturnGrid)
     {
         var conditions = new List<string>();
         var parameters = new DynamicParameters();
@@ -133,19 +197,16 @@ public class AssetTransactionReps : IAssetTransactionReps
             {
                 case "approve":
                     conditions.Add("t.Approved = 1");
-                    conditions.Remove("t.IsActive = 1"); // Approve harus IsActive = 1, tapi kita sudah punya
                     break;
                 case "pending":
                     conditions.Add("t.Approved IS NULL");
-                    // IsActive = 1 sudah ada
                     break;
                 case "reject":
-                    conditions.Remove("t.IsActive = 1"); // Reject: IsActive = 0
+                    conditions.Remove("t.IsActive = 1");
                     conditions.Add("t.IsActive = 0");
                     conditions.Add("t.Approved = 0");
                     break;
                 default:
-                    // No filter
                     break;
             }
         }
@@ -221,7 +282,8 @@ public class AssetTransactionReps : IAssetTransactionReps
             md1.MasterDataName as TransactionTypeName,
             md2.MasterDataName as ConditionName,
             md3.MasterDataName as MaintenanceTypeName,
-            0 as CanEdit, 0 as CanDelete, 0 as CanReturn, 0 as CanPost";
+            0 as CanEdit, 0 as CanDelete, 0 as CanReturn, 0 as CanPost,
+            1 as CanView";
 
         var fromClause = @"
         FROM AssetTransaction t
@@ -240,43 +302,52 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var data = await _context.QueryAsync<AssetTransactionListView>(dataSql, parameters);
 
+        // NEW CODE (BATCH QUERY) - FIX N+1
         var result = data.ToList();
-        foreach (var item in result)
+        if (result.Any())
         {
-            var flags = await CalculateActionFlagsAsync(item, isReturnGrid);
-            item.CanEdit = flags.CanEdit;
-            item.CanDelete = flags.CanDelete;
-            item.CanReturn = flags.CanReturn;
-            item.CanPost = flags.CanPost;
+            var transactionIds = result.Select(x => x.AssetTransactionId).ToList();
+            var attachmentsDict = await GetAttachmentsForTransactionsAsync(transactionIds);
+            var approveAttachmentsDict = await GetApproveAttachmentsForTransactionsAsync(transactionIds);
 
-            // ============================================================
-            // NEW: Get Attachments for each transaction
-            // ============================================================
-            var attachments = await GetAttachmentsByTransactionIdAsync(item.AssetTransactionId);
-            item.Attachments = attachments.Select(a => new AssetTransactionAttachmentInfoDto
+            foreach (var item in result)
             {
-                AssetTransactionAttachmentId = a.AssetTransactionAttachmentId,
-                FileAttachmentId = a.FileAttachmentId,
-                FileName = a.FileName ?? string.Empty,
-                OriginalFileName = a.OriginalFileName ?? string.Empty,
-                FileUrl = a.FileUrl,
-                Order = a.Order
-            }).ToList();
+                if (attachmentsDict.TryGetValue(item.AssetTransactionId, out var attachments))
+                {
+                    item.Attachments = attachments.Select(a => new AssetTransactionAttachmentInfoDto
+                    {
+                        AssetTransactionAttachmentId = a.AssetTransactionAttachmentId,
+                        FileAttachmentId = a.FileAttachmentId,
+                        FileName = a.FileName ?? string.Empty,
+                        OriginalFileName = a.OriginalFileName ?? string.Empty,
+                        FileUrl = a.FileUrl,
+                        Order = a.Order
+                    }).ToList();
+                }
 
-            var approveAttachments = await GetApproveAttachmentsByTransactionIdAsync(item.AssetTransactionId);
-            item.ApproveAttachments = approveAttachments.Select(a => new AssetTransactionApproveAttachmentInfoDto
-            {
-                AssetTransactionApproveAttachmentId = a.AssetTransactionApproveAttachmentId,
-                FileAttachmentId = a.FileAttachmentId,
-                FileName = a.FileName ?? string.Empty,
-                OriginalFileName = a.OriginalFileName ?? string.Empty,
-                FileUrl = a.FileUrl,
-                DocumentType = a.DocumentType,
-                DocumentTypeName = a.DocumentTypeName,
-                NeedToChange = a.NeedToChange,
-                Approved = a.Approved,
-                Order = a.Order
-            }).ToList();
+                if (approveAttachmentsDict.TryGetValue(item.AssetTransactionId, out var approveAttachments))
+                {
+                    item.ApproveAttachments = approveAttachments.Select(a => new AssetTransactionApproveAttachmentInfoDto
+                    {
+                        AssetTransactionApproveAttachmentId = a.AssetTransactionApproveAttachmentId,
+                        FileAttachmentId = a.FileAttachmentId,
+                        FileName = a.FileName ?? string.Empty,
+                        OriginalFileName = a.OriginalFileName ?? string.Empty,
+                        FileUrl = a.FileUrl,
+                        DocumentType = a.DocumentType,
+                        DocumentTypeName = a.DocumentTypeName,
+                        NeedToChange = a.NeedToChange,
+                        Approved = a.Approved,
+                        Order = a.Order
+                    }).ToList();
+                }
+
+                var flags = await CalculateActionFlagsAsync(item, isReturnGrid);
+                item.CanEdit = flags.CanEdit;
+                item.CanDelete = flags.CanDelete;
+                item.CanReturn = flags.CanReturn;
+                item.CanPost = flags.CanPost;
+            }
         }
 
         return new PaginatedResult<AssetTransactionListView>
@@ -801,7 +872,7 @@ public class AssetTransactionReps : IAssetTransactionReps
     }
 
     // ============================================================
-    // SHORTCUT / PAIRING - FIXED
+    // SHORTCUT / PAIRING
     // ============================================================
 
     public async Task<AssetTransactionListView?> GetActiveTransactionByAssetIdAsync(int assetId)
@@ -1074,18 +1145,19 @@ public class AssetTransactionReps : IAssetTransactionReps
         var count = await _context.ExecuteScalarAsync<int>(sql, new { TransactionId = transactionId });
         return count == 0;
     }
+
     // ============================================================
-    // COMPLETE TRANSACTIONS (NEW) — Tambahkan di akhir class
+    // COMPLETE TRANSACTIONS (NEW)
     // ============================================================
 
     public async Task<PaginatedResult<AssetTransactionListView>> GetCompleteTransactionsAsync(AssetTransactionGridRequest request)
     {
         var conditions = new List<string>
-    {
-        "t.IsActive = 1",
-        "t.Approved = 1",
-        "t.Completed = 1"
-    };
+        {
+            "t.IsActive = 1",
+            "t.Approved = 1",
+            "t.Completed = 1"
+        };
         var parameters = new DynamicParameters();
 
         if (!string.IsNullOrWhiteSpace(request.Search))

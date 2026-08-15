@@ -45,40 +45,4 @@ public class ActivityLogReps : IActivityLogReps
 
         return await _context.QueryAsync<ActivityLogListViewModel>(sql, new { ReferenceTable = referenceTable, ReferenceId = referenceId });
     }
-
-    /// <inheritdoc />
-    public async Task<IEnumerable<ActivityLogListViewModel>> GetByActivityTypeAsync(string activityType, int limit = 100)
-    {
-        const string sql = @"
-            SELECT TOP (@Limit) LogId, ReferenceTable, ReferenceId, ActivityType, Description, CreatedDate, CreatedBy
-            FROM ActivityLogs
-            WHERE ActivityType = @ActivityType AND IsActive = 1
-            ORDER BY CreatedDate DESC";
-
-        return await _context.QueryAsync<ActivityLogListViewModel>(sql, new { ActivityType = activityType, Limit = limit });
-    }
-
-    /// <inheritdoc />
-    public async Task<IEnumerable<ActivityLogListViewModel>> GetRecentAsync(int limit = 50)
-    {
-        const string sql = @"
-            SELECT TOP (@Limit) LogId, ReferenceTable, ReferenceId, ActivityType, Description, CreatedDate, CreatedBy
-            FROM ActivityLogs
-            WHERE IsActive = 1
-            ORDER BY CreatedDate DESC";
-
-        return await _context.QueryAsync<ActivityLogListViewModel>(sql, new { Limit = limit });
-    }
-
-    /// <inheritdoc />
-    public async Task<IEnumerable<ActivityLogListViewModel>> GetByDateRangeAsync(DateTime startDate, DateTime endDate)
-    {
-        const string sql = @"
-            SELECT LogId, ReferenceTable, ReferenceId, ActivityType, Description, CreatedDate, CreatedBy
-            FROM ActivityLogs
-            WHERE CreatedDate BETWEEN @StartDate AND @EndDate AND IsActive = 1
-            ORDER BY CreatedDate DESC";
-
-        return await _context.QueryAsync<ActivityLogListViewModel>(sql, new { StartDate = startDate, EndDate = endDate });
-    }
 }

@@ -1,4 +1,5 @@
 using Whitebird.App.Features.Common;
+using Whitebird.Domain.Features.Employee;
 using Whitebird.Domain.Features.EmployeeSummary;
 using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Common;
@@ -63,4 +64,18 @@ public interface IEmployeeSummaryService
     // ============================================================
 
     Task<ServiceResult<EmployeeScheduleStatsDto>> GetScheduleStatsAsync(int employeeId);
+
+    // ============================================================
+    // NEW: PHOTO & ATTACHMENTS (delegated to EmployeeService)
+    // ============================================================
+
+    /// <summary>
+    /// Gets profile photo bytes for an employee (delegated to EmployeeService)
+    /// </summary>
+    Task<ServiceResult<byte[]>> GetPhotoAsync(int employeeId);
+
+    /// <summary>
+    /// Gets attachment list for an employee (delegated to EmployeeService)
+    /// </summary>
+    Task<ServiceResult<IEnumerable<EmployeeAttachmentViewDto>>> GetAttachmentsAsync(int employeeId);
 }

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Auth;
+using Whitebird.Infra.Features.User;
 
 namespace Whitebird.App.Features.Auth;
 
@@ -11,18 +12,21 @@ namespace Whitebird.App.Features.Auth;
 public class AuthService : BaseService, IAuthService
 {
     private readonly IAuthReps _authReps;
+    private readonly IUserReps _userReps;
     private readonly IEmailService _emailService;
     private readonly IActivityLogService _activityLogService;
     private readonly ICurrentUserService _currentUserService;
 
     public AuthService(
         IAuthReps authReps,
+        IUserReps userReps,
         IEmailService emailService,
         IActivityLogService activityLogService,
         ICurrentUserService currentUserService,
         ILogger<AuthService> logger) : base(logger)
     {
         _authReps = authReps;
+        _userReps = userReps;
         _emailService = emailService;
         _activityLogService = activityLogService;
         _currentUserService = currentUserService;
@@ -74,7 +78,7 @@ public class AuthService : BaseService, IAuthService
                     FullName = user.FullName,
                     RoleId = user.RoleId,
                     Username = user.Username,
-                    ProfilePhotoUrl = null // URL akan di-generate oleh UserController
+                    ProfilePhotoUrl = null
                 }
             };
 
@@ -90,10 +94,6 @@ public class AuthService : BaseService, IAuthService
             {
                 return ServiceResult.Success("Already logged out");
             }
-
-            var user = await _authReps.GetUserByUsernameAsync(sessionToken); // FIX: harusnya via session token
-            // Perbaiki dengan method GetUserBySessionTokenAsync yang dipindah ke UserReps
-            // Untuk sementara, kita clear session by token
 
             await _authReps.ClearSessionByTokenAsync(sessionToken);
             return ServiceResult.Success("Logged out successfully");
@@ -128,25 +128,32 @@ public class AuthService : BaseService, IAuthService
         }, "forgot password");
     }
 
+    // FIXED: Properly implement ResetPasswordAsync using userId from session
     public async Task<ServiceResult> ResetPasswordAsync(int userId, ResetPasswordRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var user = await _authReps.GetUserByUsernameAsync(request.CurrentPassword); // FIX: ini salah, harus cek user by id dulu
-            // Perbaiki dengan memanggil UserReps.GetUserByIdAsync
+            var user = await _userReps.GetUserByIdAsync(userId);
+            if (user == null || !user.IsActive)
+            {
+                return ServiceResult.Failure("User not found");
+            }
 
-            // Untuk sementara, asumsikan user ada
+            if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+            {
+                return ServiceResult.Failure("Current password is incorrect");
+            }
+
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
             var updated = await _authReps.UpdatePasswordAsync(userId, passwordHash);
 
             if (updated)
             {
-                await _activityLogService.LogAsync("User", userId, "PASSWORD_CHANGE", $"Password changed for user", _currentUserService.GetDisplayName());
+                await _activityLogService.LogAsync("User", userId, "PASSWORD_CHANGE", $"Password changed for user '{user.Username}'", user.Username);
+                return ServiceResult.Success("Password changed successfully");
             }
 
-            return !updated
-                ? ServiceResult.Failure("Failed to reset password")
-                : ServiceResult.Success("Password reset successfully");
+            return ServiceResult.Failure("Failed to change password");
         }, "reset password");
     }
 

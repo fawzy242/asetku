@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.Supplier;
@@ -9,6 +10,7 @@ namespace Whitebird.Features.Supplier;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize]
 public class SupplierController : ControllerBase
 {
     private readonly ISupplierService _supplierService;

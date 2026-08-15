@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Whitebird.App.Features.Auth;
 using Whitebird.Domain.Features.Common;
@@ -17,6 +19,7 @@ public class AuthController : ControllerBase
         _authService = authService;
     }
 
+    [AllowAnonymous]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
@@ -25,12 +28,14 @@ public class AuthController : ControllerBase
         return this.HandleResult(await _authService.LoginAsync(request));
     }
 
+    [Authorize]
     [HttpPost("logout")]
     public async Task<IActionResult> Logout([FromBody] LogoutRequest request)
     {
         return this.HandleResult(await _authService.LogoutAsync(request.SessionToken));
     }
 
+    [AllowAnonymous]
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
@@ -39,23 +44,21 @@ public class AuthController : ControllerBase
         return this.HandleResult(await _authService.ForgotPasswordAsync(request.Email));
     }
 
+    [Authorize]
     [HttpPost("reset-password")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
     {
         var validation = this.HandleModelState();
         if (validation != null) return validation;
 
-        var sessionToken = GetSessionToken();
-        if (string.IsNullOrEmpty(sessionToken)) return Unauthorized();
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId) || !int.TryParse(userId, out var id))
+            return Unauthorized();
 
-        // Get user via UserService
-        // Untuk sementara, kita perlu UserService di sini
-        // Atau menggunakan AuthService dengan parameter userId
-
-        // Sementara return Unauthorized
-        return Unauthorized();
+        return this.HandleResult(await _authService.ResetPasswordAsync(id, request));
     }
 
+    [AllowAnonymous]
     [HttpPost("reset-password-with-token")]
     public async Task<IActionResult> ResetPasswordWithToken([FromBody] ResetPasswordWithTokenRequest request)
     {
@@ -64,6 +67,7 @@ public class AuthController : ControllerBase
         return this.HandleResult(await _authService.ResetPasswordWithTokenAsync(request));
     }
 
+    [AllowAnonymous]
     [HttpGet("validate-session")]
     public async Task<IActionResult> ValidateSession()
     {

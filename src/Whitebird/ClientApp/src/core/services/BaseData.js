@@ -1,10 +1,10 @@
-// src/core/services/BaseData.js
-import { alertUtils } from '../../lib/sweetAlert';
-// HAPUS: import { handleSuccess } from './successHandler';
+import { downloadBlob } from '../utils/file.utils';
+import { isCanceledError } from '../utils/error.utils';
 
 /**
- * Base class untuk semua Data layer
- * Menggunakan apiClient yang terpusat.
+ * Base class for all Data layer services
+ * Pure data operations — NO UI logic (toast, alert, modal)
+ * UI feedback should be handled by components/hooks
  */
 class BaseData {
   constructor(api) {
@@ -22,33 +22,46 @@ class BaseData {
   }
 
   isCanceledError(error) {
-    return error?.name === 'CanceledError' || 
-           error?.message === 'canceled' || 
-           error?.isCanceled === true ||
-           error?.code === 'ERR_CANCELED';
+    return isCanceledError(error);
   }
+
+  // ============================================================
+  // GRID
+  // ============================================================
 
   async fetchGridData(params) {
     try {
       const result = await this.api.getGrid(params);
+      
       if (result.data?.isSuccess !== undefined) {
         if (result.data.isSuccess) {
-          return { success: true, data: result.data.data || { data: [], totalCount: 0 } };
+          return { 
+            success: true, 
+            data: result.data.data || { data: [], totalCount: 0 } 
+          };
         }
-        const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Failed to load data';
-        alertUtils.error('Error', errorMsg);
-        return { success: false, error: errorMsg };
+        return { 
+          success: false, 
+          error: result.data.errors?.join('\n') || result.data.message || 'Failed to load data',
+          errorType: result.data.errorType,
+        };
       }
+      
       return { success: true, data: result.data || { data: [], totalCount: 0 } };
     } catch (error) {
       if (this.isCanceledError(error)) {
         return { success: false, error: 'canceled', isCanceled: true };
       }
-      const errorMsg = error.userMessage || error.message || 'Failed to load data';
-      alertUtils.error('Error', errorMsg);
-      return { success: false, error: errorMsg };
+      return { 
+        success: false, 
+        error: error.userMessage || error.message || 'Failed to load data' 
+      };
     }
   }
+
+  // ============================================================
+  // CRUD
+  // ============================================================
 
   async fetchById(id) {
     try {
@@ -64,11 +77,12 @@ class BaseData {
       
       if (result?.data?.isSuccess === false) {
         const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Record not found';
-        if (result.data.errorType === 'NotFound' || result.data.status === 404) {
-          return { success: false, error: errorMsg, isNotFound: true };
-        }
-        alertUtils.error('Error', errorMsg);
-        return { success: false, error: errorMsg };
+        return { 
+          success: false, 
+          error: errorMsg, 
+          isNotFound: result.data.errorType === 'NotFound',
+          errorType: result.data.errorType,
+        };
       }
       
       return { success: false, error: 'Record not found', isNotFound: true };
@@ -77,11 +91,11 @@ class BaseData {
         return { success: false, error: 'canceled', isCanceled: true };
       }
       const errorMsg = error.userMessage || error.message || 'Failed to load record';
-      if (error.response?.status === 404) {
-        return { success: false, error: errorMsg, isNotFound: true };
-      }
-      alertUtils.error('Error', errorMsg);
-      return { success: false, error: errorMsg };
+      return { 
+        success: false, 
+        error: errorMsg, 
+        isNotFound: error.response?.status === 404 
+      };
     }
   }
 
@@ -91,11 +105,12 @@ class BaseData {
       
       if (result.data?.isSuccess !== undefined) {
         if (!result.data.isSuccess) {
-          const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Failed to create';
-          alertUtils.error('Error', errorMsg);
-          return { success: false, errors: result.data.errors };
+          return { 
+            success: false, 
+            errors: result.data.errors || [result.data.message || 'Failed to create'],
+            errorType: result.data.errorType,
+          };
         }
-        
         return { success: true, data: result.data.data };
       }
       
@@ -104,9 +119,10 @@ class BaseData {
       if (this.isCanceledError(error)) {
         return { success: false, error: 'canceled', isCanceled: true };
       }
-      const errorMsg = error.userMessage || error.message || 'Failed to create';
-      alertUtils.error('Error', errorMsg);
-      return { success: false, error: errorMsg };
+      return { 
+        success: false, 
+        error: error.userMessage || error.message || 'Failed to create' 
+      };
     }
   }
 
@@ -116,11 +132,12 @@ class BaseData {
       
       if (result.data?.isSuccess !== undefined) {
         if (!result.data.isSuccess) {
-          const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Failed to update';
-          alertUtils.error('Error', errorMsg);
-          return { success: false, errors: result.data.errors };
+          return { 
+            success: false, 
+            errors: result.data.errors || [result.data.message || 'Failed to update'],
+            errorType: result.data.errorType,
+          };
         }
-        
         return { success: true, data: result.data.data };
       }
       
@@ -129,9 +146,10 @@ class BaseData {
       if (this.isCanceledError(error)) {
         return { success: false, error: 'canceled', isCanceled: true };
       }
-      const errorMsg = error.userMessage || error.message || 'Failed to update';
-      alertUtils.error('Error', errorMsg);
-      return { success: false, error: errorMsg };
+      return { 
+        success: false, 
+        error: error.userMessage || error.message || 'Failed to update' 
+      };
     }
   }
 
@@ -141,11 +159,12 @@ class BaseData {
       
       if (result.data?.isSuccess !== undefined) {
         if (!result.data.isSuccess) {
-          const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Failed to delete';
-          alertUtils.error('Error', errorMsg);
-          return { success: false };
+          return { 
+            success: false, 
+            error: result.data.errors?.join('\n') || result.data.message || 'Failed to delete',
+            errorType: result.data.errorType,
+          };
         }
-        
         return { success: true };
       }
       
@@ -154,9 +173,10 @@ class BaseData {
       if (this.isCanceledError(error)) {
         return { success: false, error: 'canceled', isCanceled: true };
       }
-      const errorMsg = error.userMessage || error.message || 'Failed to delete';
-      alertUtils.error('Error', errorMsg);
-      return { success: false, error: errorMsg };
+      return { 
+        success: false, 
+        error: error.userMessage || error.message || 'Failed to delete' 
+      };
     }
   }
 
@@ -166,11 +186,12 @@ class BaseData {
       
       if (result.data?.isSuccess !== undefined) {
         if (!result.data.isSuccess) {
-          const errorMsg = result.data.errors?.join('\n') || result.data.message || 'Failed to soft delete';
-          alertUtils.error('Error', errorMsg);
-          return { success: false };
+          return { 
+            success: false, 
+            error: result.data.errors?.join('\n') || result.data.message || 'Failed to soft delete',
+            errorType: result.data.errorType,
+          };
         }
-        
         return { success: true };
       }
       
@@ -179,65 +200,96 @@ class BaseData {
       if (this.isCanceledError(error)) {
         return { success: false, error: 'canceled', isCanceled: true };
       }
-      const errorMsg = error.userMessage || error.message || 'Failed to soft delete';
-      alertUtils.error('Error', errorMsg);
-      return { success: false, error: errorMsg };
+      return { 
+        success: false, 
+        error: error.userMessage || error.message || 'Failed to soft delete' 
+      };
     }
   }
 
   // ============================================================
-  // DEFAULT DOWNLOAD TEMPLATE - OVERRIDE DI CHILD CLASS
+  // GENERIC BULK ACTIVATE
   // ============================================================
-  async downloadTemplate() {
+
+  async bulkActivate(ids, activate) {
+    const actionText = activate ? 'activate' : 'deactivate';
+    
     try {
-      // FIX: api.getImportTemplate() mengembalikan axios response
-      // Kita perlu mengambil response.data (Blob)
-      const response = await this.api.getImportTemplate();
+      const endpoint = activate ? this.api.activate : this.api.deactivate;
+      const result = await endpoint({ ids });
       
-      // FIX: Ambil data dari response (axios response wrapper)
+      if (result.data?.isSuccess !== undefined) {
+        if (!result.data.isSuccess) {
+          return { 
+            success: false, 
+            error: result.data.errors?.join('\n') || result.data.message || `Failed to ${actionText}`,
+            errorType: result.data.errorType,
+          };
+        }
+        
+        const count = result.data.data || ids.length;
+        return { 
+          success: true, 
+          data: count,
+          message: `${count} ${this._entityName}(s) ${actionText}d successfully`,
+        };
+      }
+      
+      return { 
+        success: true, 
+        data: ids.length,
+        message: `${ids.length} ${this._entityName}(s) ${actionText}d successfully`,
+      };
+    } catch (error) {
+      if (this.isCanceledError(error)) {
+        return { success: false, error: 'canceled', isCanceled: true };
+      }
+      return { 
+        success: false, 
+        error: error.userMessage || error.message || `Failed to ${actionText}` 
+      };
+    }
+  }
+
+  // ============================================================
+  // DOWNLOAD TEMPLATE
+  // ============================================================
+
+  async downloadTemplate(templateName) {
+    try {
+      const response = await this.api.getImportTemplate();
       const blob = response?.data;
       
       if (!blob || !(blob instanceof Blob) || blob.size === 0) {
-        console.warn('[BaseData.downloadTemplate] Empty or invalid blob:', blob);
-        alertUtils.error('Error', 'Template file is empty. Please try again.');
-        return { success: false };
+        return { success: false, error: 'Template file is empty' };
       }
       
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${this._entityName}_import_template.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const fileName = templateName || `${this._entityName}_import_template.xlsx`;
+      downloadBlob(blob, fileName);
       
-      alertUtils.success('Success', 'Template downloaded successfully');
       return { success: true };
     } catch (error) {
       if (this.isCanceledError(error)) {
         return { success: false, error: 'canceled', isCanceled: true };
       }
-      const errorMsg = error.userMessage || error.message || 'Failed to download template';
-      alertUtils.error('Error', errorMsg);
-      return { success: false, error: errorMsg };
+      
+      if (error.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const parsed = JSON.parse(text);
+          if (parsed.message) {
+            return { success: false, error: parsed.message };
+          }
+        } catch {
+          // Not JSON, continue
+        }
+      }
+      
+      return { 
+        success: false, 
+        error: error.userMessage || error.message || 'Failed to download template' 
+      };
     }
-  }
-
-  getCreateMessage() {
-    return `${this._entityName} created successfully`;
-  }
-  getUpdateMessage() {
-    return `${this._entityName} updated successfully`;
-  }
-  getDeleteMessage() {
-    return `${this._entityName} deleted successfully`;
-  }
-  getDeleteTitle() {
-    return `Delete ${this._entityName.charAt(0).toUpperCase() + this._entityName.slice(1)}`;
-  }
-  getDeleteText() {
-    return `Are you sure you want to delete this ${this._entityName}?`;
   }
 }
 

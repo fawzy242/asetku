@@ -17,7 +17,6 @@ public class OfficeService : BaseService, IOfficeService
     private readonly IGenericRepository<OfficeEntity> _repository;
     private readonly IOfficeReps _officeReps;
     private readonly IMasterDataService _masterDataService;
-    private readonly IMasterDataLookupService _masterDataLookupService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
 
@@ -25,7 +24,6 @@ public class OfficeService : BaseService, IOfficeService
         IGenericRepository<OfficeEntity> repository,
         IOfficeReps officeReps,
         IMasterDataService masterDataService,
-        IMasterDataLookupService masterDataLookupService,
         ICurrentUserService currentUserService,
         IActivityLogService activityLogService,
         ILogger<OfficeService> logger) : base(logger)
@@ -33,7 +31,6 @@ public class OfficeService : BaseService, IOfficeService
         _repository = repository;
         _officeReps = officeReps;
         _masterDataService = masterDataService;
-        _masterDataLookupService = masterDataLookupService;
         _currentUserService = currentUserService;
         _activityLogService = activityLogService;
     }
@@ -97,7 +94,7 @@ public class OfficeService : BaseService, IOfficeService
 
         if (model.OfficeType.HasValue)
         {
-            var typeExists = await _masterDataLookupService.GetOfficeTypeNameAsync(model.OfficeType.Value);
+            var typeExists = await _masterDataService.GetValueAsync("OfficeType", model.OfficeType.Value);
             if (!typeExists.IsSuccess || typeExists.Data == null)
             {
                 return ServiceResult<OfficeDetailView>.BadRequest($"Invalid office type: {model.OfficeType}");

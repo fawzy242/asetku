@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.Reports;
@@ -8,6 +9,7 @@ namespace Whitebird.Features.Reports;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize]
 public class ReportsController : ControllerBase
 {
     private readonly IReportsService _reportsService;

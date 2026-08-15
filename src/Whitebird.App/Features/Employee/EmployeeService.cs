@@ -437,7 +437,7 @@ public class EmployeeService : BaseService, IEmployeeService
         }, "bulk deactivate employees");
     }
 
-    public async Task<ServiceResult<byte[]>> GetPhotoProfileAsync(int employeeId)
+    public async Task<ServiceResult<byte[]>> GetPhotoAsync(int employeeId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
@@ -461,21 +461,29 @@ public class EmployeeService : BaseService, IEmployeeService
 
             var fileBytes = await _storageService.ReadFileAsync(fileResult.Data.FilePath);
             return ServiceResult<byte[]>.Success(fileBytes);
-        }, "get employee photo profile");
+        }, "get employee photo");
     }
 
-    public async Task<ServiceResult<IEnumerable<EmployeeAttachmentEntity>>> GetAttachmentsAsync(int employeeId)
+    public async Task<ServiceResult<IEnumerable<EmployeeAttachmentViewDto>>> GetAttachmentsAsync(int employeeId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
             var employee = await _employeeReps.GetByIdRawAsync(employeeId);
             if (employee == null)
             {
-                return ServiceResult<IEnumerable<EmployeeAttachmentEntity>>.NotFound($"Employee with id {employeeId} not found");
+                return ServiceResult<IEnumerable<EmployeeAttachmentViewDto>>.NotFound($"Employee with id {employeeId} not found");
             }
 
-            var attachments = await _employeeReps.GetAttachmentsByEmployeeIdAsync(employeeId);
-            return ServiceResult<IEnumerable<EmployeeAttachmentEntity>>.Success(attachments);
+            // Use the same query pattern as GetDetailByIdAsync for attachments
+            var detail = await _employeeReps.GetDetailByIdAsync(employeeId);
+            if (detail == null)
+            {
+                return ServiceResult<IEnumerable<EmployeeAttachmentViewDto>>.NotFound($"Employee with id {employeeId} not found");
+            }
+
+            var result = detail.Attachments?.ToList() ?? new List<EmployeeAttachmentViewDto>();
+
+            return ServiceResult<IEnumerable<EmployeeAttachmentViewDto>>.Success(result);
         }, "get employee attachments");
     }
 

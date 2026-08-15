@@ -68,6 +68,9 @@ public class EmployeeCreateViewModel
     public int? OfficeId { get; set; }
 
     public DateTime? JoinDate { get; set; }
+
+    // FIX: Added missing field from EmployeeEntity
+    public DateTime? ResignDate { get; set; }
 }
 
 public class EmployeeUpdateViewModel

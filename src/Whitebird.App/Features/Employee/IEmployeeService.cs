@@ -48,24 +48,16 @@ public interface IEmployeeService
     Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request);
 
     // ============================================================
-    // GET PHOTO PROFILE (PUBLIC - For display only)
+    // NEW: PHOTO & ATTACHMENTS (for EmployeeSummary and standalone use)
     // ============================================================
 
-    Task<ServiceResult<byte[]>> GetPhotoProfileAsync(int employeeId);
+    /// <summary>
+    /// Gets profile photo bytes for an employee
+    /// </summary>
+    Task<ServiceResult<byte[]>> GetPhotoAsync(int employeeId);
 
-    // ============================================================
-    // GET ATTACHMENTS (PUBLIC - For display only)
-    // ============================================================
-
-    Task<ServiceResult<IEnumerable<EmployeeAttachmentEntity>>> GetAttachmentsAsync(int employeeId);
-
-    // ============================================================
-    // REMOVED METHODS (moved to internal/private):
-    // - AddPhotoProfileAsync
-    // - DeletePhotoProfileAsync
-    // - AddAttachmentAsync
-    // - DeleteAttachmentAsync
-    // 
-    // These are now handled internally via UpdateAsync with base64 payload
-    // ============================================================
+    /// <summary>
+    /// Gets attachment list for an employee
+    /// </summary>
+    Task<ServiceResult<IEnumerable<EmployeeAttachmentViewDto>>> GetAttachmentsAsync(int employeeId);
 }

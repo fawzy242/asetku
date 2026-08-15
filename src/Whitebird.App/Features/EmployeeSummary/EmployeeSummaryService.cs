@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Common;
+using Whitebird.App.Features.Employee;
+using Whitebird.Domain.Features.Employee;
 using Whitebird.Domain.Features.EmployeeSummary;
 using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.EmployeeSummary;
@@ -13,12 +15,15 @@ namespace Whitebird.App.Features.EmployeeSummary;
 public class EmployeeSummaryService : BaseService, IEmployeeSummaryService
 {
     private readonly IEmployeeSummaryReps _employeeSummaryReps;
+    private readonly IEmployeeService _employeeService;
 
     public EmployeeSummaryService(
         IEmployeeSummaryReps employeeSummaryReps,
+        IEmployeeService employeeService,
         ILogger<EmployeeSummaryService> logger) : base(logger)
     {
         _employeeSummaryReps = employeeSummaryReps;
+        _employeeService = employeeService;
     }
 
     // ============================================================
@@ -144,5 +149,19 @@ public class EmployeeSummaryService : BaseService, IEmployeeSummaryService
             var result = await _employeeSummaryReps.GetScheduleStatsAsync(employeeId);
             return ServiceResult<EmployeeScheduleStatsDto>.Success(result);
         }, "get schedule stats");
+    }
+
+    // ============================================================
+    // NEW: PHOTO & ATTACHMENTS (delegated to EmployeeService)
+    // ============================================================
+
+    public async Task<ServiceResult<byte[]>> GetPhotoAsync(int employeeId)
+    {
+        return await _employeeService.GetPhotoAsync(employeeId);
+    }
+
+    public async Task<ServiceResult<IEnumerable<EmployeeAttachmentViewDto>>> GetAttachmentsAsync(int employeeId)
+    {
+        return await _employeeService.GetAttachmentsAsync(employeeId);
     }
 }

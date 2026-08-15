@@ -46,7 +46,12 @@ public class AssetTransactionListView
     public bool CanPost { get; set; }
 
     // ============================================================
-    // NEW: Attachments for grid (preview)
+    // NEW: CanView — always true
+    // ============================================================
+    public bool CanView { get; set; } = true;
+
+    // ============================================================
+    // Attachments for grid (preview)
     // ============================================================
     public List<AssetTransactionAttachmentInfoDto> Attachments { get; set; } = new();
     public List<AssetTransactionApproveAttachmentInfoDto> ApproveAttachments { get; set; } = new();

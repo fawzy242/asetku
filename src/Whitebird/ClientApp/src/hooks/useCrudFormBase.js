@@ -1,8 +1,4 @@
-// src/hooks/useCrudFormBase.js
-// Cari bagian handleSubmit - perbaiki agar handleSuccess hanya dipanggil sekali
-
 import { useState, useCallback } from 'react';
-import { handleSuccess } from '../core/services/successHandler';
 
 export const useCrudFormBase = (initialFormData, dataService, options = {}) => {
   const {
@@ -109,34 +105,36 @@ export const useCrudFormBase = (initialFormData, dataService, options = {}) => {
     setIsSubmitting(false);
 
     if (result.success) {
-      // FIX: Hanya panggil handleSuccess SEKALI di sini
       const operation = editingRecord ? 'update' : 'create';
       const entityName = dataService.getEntityName ? dataService.getEntityName() : 'record';
       
-      handleSuccess({
-        operation: operation,
-        entityName: entityName,
-        result: result,
-        onCloseModal: () => {
-          setShowModal(false);
-          setEditingRecord(null);
-          setFormData({ ...initialFormData });
-          setErrors({});
-        },
-        onRefreshData: () => {
-          if (onAfterSubmit) onAfterSubmit(result);
-          if (onSuccess) onSuccess(result);
-        },
-      });
-      
-      return true;
+      // Close modal and reset form
+      setShowModal(false);
+      setEditingRecord(null);
+      setFormData({ ...initialFormData });
+      setErrors({});
+
+      // Call callbacks - NO UI calls
+      if (onAfterSubmit) onAfterSubmit(result);
+      if (onSuccess) onSuccess(result);
+
+      return { 
+        success: true, 
+        message: `${entityName} ${operation}d successfully`,
+        data: result.data,
+      };
     } else if (!result.cancelled) {
       if (result.errors) {
         setErrors(result.errors);
       }
       if (onError) onError(result.error || 'Operation failed');
+      return { 
+        success: false, 
+        error: result.error || 'Operation failed',
+        errors: result.errors,
+      };
     }
-    return false;
+    return { success: false, error: 'Operation failed' };
   }, [isSubmitting, editingRecord, formData, dataService, getRecordId, transformFormData, onBeforeSubmit, onAfterSubmit, onSuccess, onError, initialFormData]);
 
   const resetForm = useCallback(() => {

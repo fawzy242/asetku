@@ -91,23 +91,6 @@ public class ScheduleHandoverReps : IScheduleHandoverReps
         return await _context.QueryAsync<ScheduleHandoverListView>(sql, new { EmployeeId = employeeId });
     }
 
-    public async Task<IEnumerable<ScheduleHandoverListView>> GetByDateRangeAsync(DateTime startDate, DateTime endDate)
-    {
-        const string sql = @"
-            SELECT 
-                sh.ScheduleHandoverId, sh.ScheduleDate, sh.AssetId, sh.EmployeeId,
-                sh.HandoverAssetTransactionId, sh.IsActive, sh.CreatedDate, sh.CreatedBy,
-                a.AssetCode, a.AssetName,
-                e.FullName as EmployeeName
-            FROM ScheduleHandover sh
-            LEFT JOIN Asset a ON sh.AssetId = a.AssetId
-            LEFT JOIN Employee e ON sh.EmployeeId = e.EmployeeId
-            WHERE sh.ScheduleDate BETWEEN @StartDate AND @EndDate AND sh.IsActive = 1
-            ORDER BY sh.ScheduleDate ASC";
-
-        return await _context.QueryAsync<ScheduleHandoverListView>(sql, new { StartDate = startDate, EndDate = endDate });
-    }
-
     public async Task<bool> IsScheduleExistsAsync(DateTime scheduleDate, int assetId, int? excludeId = null)
     {
         var sql = "SELECT COUNT(1) FROM ScheduleHandover WHERE ScheduleDate = @ScheduleDate AND AssetId = @AssetId AND IsActive = 1";
@@ -181,7 +164,7 @@ public class ScheduleHandoverReps : IScheduleHandoverReps
     }
 
     // ============================================================
-    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
+    // PAGINATION
     // ============================================================
 
     public async Task<PaginatedResult<ScheduleHandoverListView>> GetPagedListAsync(ScheduleGridRequest request)

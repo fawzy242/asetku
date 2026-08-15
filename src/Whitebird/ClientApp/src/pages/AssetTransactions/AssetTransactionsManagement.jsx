@@ -1,9 +1,9 @@
 // src/pages/AssetTransactions/AssetTransactionsManagement.jsx
 import React from 'react';
-import AssetTransactionsMenu from './AssetTransactions.menu';
+import AssetTransactions from './AssetTransactions';
 
 const AssetTransactionsManagement = () => {
-  return <AssetTransactionsMenu initialMainTab="management" />;
+  return <AssetTransactions initialMainTab="management" />;
 };
 
 export default AssetTransactionsManagement;

@@ -91,23 +91,6 @@ public class ScheduleReturnReps : IScheduleReturnReps
         return await _context.QueryAsync<ScheduleReturnListView>(sql, new { EmployeeId = employeeId });
     }
 
-    public async Task<IEnumerable<ScheduleReturnListView>> GetByDateRangeAsync(DateTime startDate, DateTime endDate)
-    {
-        const string sql = @"
-            SELECT 
-                sr.ScheduleReturnId, sr.ScheduleDate, sr.AssetId, sr.EmployeeId,
-                sr.ReturnAssetTransactionId, sr.IsActive, sr.CreatedDate, sr.CreatedBy,
-                a.AssetCode, a.AssetName,
-                e.FullName as EmployeeName
-            FROM ScheduleReturn sr
-            LEFT JOIN Asset a ON sr.AssetId = a.AssetId
-            LEFT JOIN Employee e ON sr.EmployeeId = e.EmployeeId
-            WHERE sr.ScheduleDate BETWEEN @StartDate AND @EndDate AND sr.IsActive = 1
-            ORDER BY sr.ScheduleDate ASC";
-
-        return await _context.QueryAsync<ScheduleReturnListView>(sql, new { StartDate = startDate, EndDate = endDate });
-    }
-
     public async Task<bool> IsScheduleExistsAsync(DateTime scheduleDate, int assetId, int? excludeId = null)
     {
         var sql = "SELECT COUNT(1) FROM ScheduleReturn WHERE ScheduleDate = @ScheduleDate AND AssetId = @AssetId AND IsActive = 1";
@@ -181,7 +164,7 @@ public class ScheduleReturnReps : IScheduleReturnReps
     }
 
     // ============================================================
-    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
+    // PAGINATION
     // ============================================================
 
     public async Task<PaginatedResult<ScheduleReturnListView>> GetPagedListAsync(ScheduleGridRequest request)
