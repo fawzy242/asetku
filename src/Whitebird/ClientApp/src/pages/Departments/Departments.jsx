@@ -1,3 +1,4 @@
+// src/pages/Departments/Departments.jsx
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Grid } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';

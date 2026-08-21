@@ -1,9 +1,13 @@
 // src/pages/Assets/Assets.jsx
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Grid, Box, Avatar, Typography, IconButton } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
-import { FiCamera, FiX, FiPaperclip, FiFile, FiUpload, FiCheckSquare } from 'react-icons/fi';
+import { FiCamera, FiX, FiUpload, FiCheckSquare } from 'react-icons/fi';
 import { AssetsData } from '../../core/services';
+import { assetSchema, getAssetDefaultValues } from '../../core/schemas/assetSchema';
+import { getFieldErrorProps } from '../../core/utils/validation.utils';
 import GridView from '../../components/organisms/GridView/GridView';
 import CrudModal from '../../components/molecules/CrudModal/CrudModal';
 import FormSection from '../../components/atoms/FormSection/FormSection';
@@ -23,34 +27,11 @@ import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
 import { useGridData } from '../../hooks/useGridData';
 import { useReferenceData } from '../../hooks/useReferenceData';
-import { useCrudFormBase } from '../../hooks/useCrudFormBase';
 import { useOptions } from '../../hooks/useOptions';
 import { getAssetColumns } from '../../core/constants/columns';
-import { alertUtils } from '../../lib/sweetAlert';
-import utilsHelper from '../../core/utils/utils.helper';
 import './Assets.scss';
 
 const assetsData = new AssetsData();
-
-const INITIAL_FORM_DATA = {
-  assetCode: '',
-  assetName: '',
-  categoryId: '',
-  brand: '',
-  model: '',
-  serialNumber: '',
-  imei: '',
-  macAddress: '',
-  hostname: '',
-  ipAddress: '',
-  purchaseDate: '',
-  purchasePrice: '',
-  invoiceNumber: '',
-  supplierId: '',
-  warrantyPeriod: '',
-  assetConditionPurchase: '',
-  notes: '',
-};
 
 const Assets = () => {
   const [activeTab, setActiveTab] = useState('all');
@@ -59,70 +40,61 @@ const Assets = () => {
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editingAsset, setEditingAsset] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [currentAssetId, setCurrentAssetId] = useState(null);
   
   const [filterCategoryId, setFilterCategoryId] = useState('');
   const [filterSupplierId, setFilterSupplierId] = useState('');
-  
-  const isMountedRef = useRef(true);
-  const queryClient = useQueryClient();
-  const { toast, confirm } = useSweetAlert();
   
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [attachmentFiles, setAttachmentFiles] = useState([]);
   const [existingAttachments, setExistingAttachments] = useState([]);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [currentAssetId, setCurrentAssetId] = useState(null);
+
+  const isMountedRef = useRef(true);
+  const queryClient = useQueryClient();
+  const { toast, confirm } = useSweetAlert();
 
   const { categories, suppliers, assetConditionPurchases } = useReferenceData();
 
+  // ============================================================
+  // REACT HOOK FORM WITH ZOD
+  // ============================================================
   const {
-    showModal,
-    editingRecord: editingAsset,
-    isSubmitting,
-    formData,
-    setFormField,
-    handleCreate,
-    handleEdit: handleEditBase,
-    handleClose,
-    handleSubmit: crudHandleSubmit,
-  } = useCrudFormBase(INITIAL_FORM_DATA, assetsData, {
-    idField: 'assetId',
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['assets'] });
-      queryClient.invalidateQueries({ queryKey: ['reference', 'assets'] });
-      setPhotoFile(null);
-      setPhotoPreview(null);
-      setAttachmentFiles([]);
-      setExistingAttachments([]);
-      setIsEditMode(false);
-      setCurrentAssetId(null);
-      // Show success toast
-      const operation = result?.data ? 'update' : 'create';
-      const message = operation === 'update' ? 'Asset updated successfully' : 'Asset created successfully';
-      toast.success(message);
-    },
-    onError: (error) => {
-      toast.error(error || 'Failed to save asset');
-    },
+    register,
+    handleSubmit: handleFormSubmit,
+    formState: { errors: formErrors, isSubmitting },
+    setValue,
+    reset,
+    watch,
+  } = useForm({
+    resolver: zodResolver(assetSchema),
+    defaultValues: getAssetDefaultValues(),
   });
 
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
-    useBulkSelection({ idField: 'assetId' });
+  const formData = watch();
 
-  const showCheckbox = useMemo(() => {
-    return activeTab === 'active' || activeTab === 'inactive';
-  }, [activeTab]);
-
-  const categoryFilterOptions = useOptions(categories, 'All Categories');
-  const supplierFilterOptions = useOptions(suppliers, 'All Suppliers');
-  const categoryFormOptions = useOptions(categories, 'Select Category');
-  const supplierFormOptions = useOptions(suppliers, 'Select Supplier');
-  const conditionPurchaseOptions = useOptions(assetConditionPurchases, 'Select Purchase Condition');
+  const setFormField = useCallback((field) => (value) => {
+    setValue(field, value, { shouldValidate: true });
+  }, [setValue]);
 
   // ============================================================
-  // EDIT - Load attachments
+  // CRUD OPERATIONS
   // ============================================================
+  const handleCreate = useCallback(() => {
+    reset(getAssetDefaultValues());
+    setIsEditMode(false);
+    setCurrentAssetId(null);
+    setAttachmentFiles([]);
+    setExistingAttachments([]);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setEditingAsset(null);
+    setShowModal(true);
+  }, [reset]);
+
   const handleEdit = useCallback(async (record) => {
     const recordId = record?.assetId;
     if (!recordId) return;
@@ -131,39 +103,116 @@ const Assets = () => {
     setCurrentAssetId(recordId);
     setPhotoFile(null);
     setPhotoPreview(null);
+    setEditingAsset(record);
     
     try {
       const result = await assetsData.fetchById(recordId);
       if (result.success && result.data) {
         const data = result.data;
+        const defaults = getAssetDefaultValues();
+        Object.keys(defaults).forEach(key => {
+          if (data[key] !== undefined && data[key] !== null) {
+            setValue(key, data[key]);
+          } else {
+            setValue(key, '');
+          }
+        });
+        
         if (data.attachments && Array.isArray(data.attachments)) {
           setExistingAttachments(data.attachments);
         } else {
           setExistingAttachments([]);
         }
+        setShowModal(true);
       } else {
         setExistingAttachments([]);
+        toast.error('Failed to load asset data');
       }
     } catch (error) {
-      console.warn('Failed to fetch attachments:', error);
+      console.warn('Failed to fetch asset:', error);
+      setExistingAttachments([]);
+      toast.error('Failed to load asset data');
+    }
+  }, [setValue, toast]);
+
+  const handleClose = useCallback(() => {
+    if (!isSubmitting) {
+      setShowModal(false);
+      setIsEditMode(false);
+      setCurrentAssetId(null);
+      setEditingAsset(null);
+      reset(getAssetDefaultValues());
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      setAttachmentFiles([]);
       setExistingAttachments([]);
     }
-    
-    handleEditBase(record);
-  }, [handleEditBase]);
+  }, [isSubmitting, reset]);
+
+  const onSubmit = useCallback(async (data) => {
+    if (isSubmitting) return;
+
+    const submitData = {
+      ...data,
+      photoFile: photoFile,
+      attachmentFiles: attachmentFiles,
+      attachmentIdsToKeep: isEditMode ? existingAttachments.map(a => a.fileAttachmentId) : [],
+      replaceAttachments: isEditMode ? true : false,
+    };
+
+    try {
+      const result = isEditMode && editingAsset
+        ? await assetsData.update(editingAsset.assetId, submitData)
+        : await assetsData.create(submitData);
+      
+      if (result.success) {
+        setPhotoFile(null);
+        setPhotoPreview(null);
+        setAttachmentFiles([]);
+        setExistingAttachments([]);
+        setIsEditMode(false);
+        setCurrentAssetId(null);
+        setEditingAsset(null);
+        setShowModal(false);
+        reset(getAssetDefaultValues());
+        
+        queryClient.invalidateQueries({ queryKey: ['assets'] });
+        queryClient.invalidateQueries({ queryKey: ['reference', 'assets'] });
+        reload();
+        clearSelection();
+        
+        const message = isEditMode && editingAsset 
+          ? 'Asset updated successfully' 
+          : 'Asset created successfully';
+        toast.success(message);
+      } else {
+        const errorMsg = result.error || result.errors?.join('\n') || 'Failed to save asset';
+        toast.error(errorMsg);
+      }
+    } catch (error) {
+      const errorMsg = error.userMessage || error.message || 'Failed to save asset';
+      toast.error(errorMsg);
+    }
+  }, [isSubmitting, isEditMode, editingAsset, photoFile, attachmentFiles, existingAttachments, queryClient, reload, clearSelection, toast, reset]);
 
   // ============================================================
-  // CREATE - Reset state
+  // BULK SELECTION
   // ============================================================
-  const handleCreateWithReset = useCallback(() => {
-    setIsEditMode(false);
-    setCurrentAssetId(null);
-    setAttachmentFiles([]);
-    setExistingAttachments([]);
-    setPhotoFile(null);
-    setPhotoPreview(null);
-    handleCreate();
-  }, [handleCreate]);
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
+    useBulkSelection({ idField: 'assetId' });
+
+  const showCheckbox = useMemo(() => {
+    return activeTab === 'active' || activeTab === 'inactive';
+  }, [activeTab]);
+
+  // ============================================================
+  // OPTIONS
+  // ============================================================
+  const categoryFilterOptions = useOptions(categories, 'All Categories');
+  const supplierFilterOptions = useOptions(suppliers, 'All Suppliers');
+  const categoryFormOptions = useOptions(categories, 'Select Category');
+  const supplierFormOptions = useOptions(suppliers, 'Select Supplier');
+  const conditionPurchaseOptions = useOptions(assetConditionPurchases, 'Select Purchase Condition');
 
   // ============================================================
   // PHOTO HANDLING
@@ -229,15 +278,9 @@ const Assets = () => {
         break;
     }
     
-    if (searchTerm) {
-      filters.search = searchTerm;
-    }
-    if (filterCategoryId) {
-      filters.categoryId = parseInt(filterCategoryId, 10);
-    }
-    if (filterSupplierId) {
-      filters.supplierId = parseInt(filterSupplierId, 10);
-    }
+    if (searchTerm) filters.search = searchTerm;
+    if (filterCategoryId) filters.categoryId = parseInt(filterCategoryId, 10);
+    if (filterSupplierId) filters.supplierId = parseInt(filterSupplierId, 10);
     
     return filters;
   }, [activeTab, searchTerm, filterCategoryId, filterSupplierId]);
@@ -416,43 +459,6 @@ const Assets = () => {
   }, [currentAssetId]);
 
   // ============================================================
-  // FORM SUBMIT - Using useCrudFormBase
-  // ============================================================
-  const handleFormSubmit = useCallback(async (event) => {
-    if (event && typeof event.preventDefault === 'function') {
-      event.preventDefault();
-    }
-    
-    if (isSubmitting) return;
-
-    // Build submit data with files
-    const submitData = {
-      ...formData,
-      photoFile: photoFile,
-      attachmentFiles: attachmentFiles,
-      attachmentIdsToKeep: isEditMode ? existingAttachments.map(a => a.fileAttachmentId) : [],
-      replaceAttachments: isEditMode ? true : false,
-    };
-
-    // Let useCrudFormBase handle the submit
-    const result = await crudHandleSubmit(submitData);
-    
-    if (result?.success) {
-      // Reset file state after successful submit
-      setPhotoFile(null);
-      setPhotoPreview(null);
-      setAttachmentFiles([]);
-      setExistingAttachments([]);
-      setIsEditMode(false);
-      setCurrentAssetId(null);
-      reload();
-      clearSelection();
-    }
-    
-    return result;
-  }, [formData, isEditMode, editingAsset, photoFile, attachmentFiles, existingAttachments, isSubmitting, crudHandleSubmit, reload, clearSelection]);
-
-  // ============================================================
   // GRID ACTIONS
   // ============================================================
   const handleGridAction = useCallback(
@@ -462,8 +468,6 @@ const Assets = () => {
         setExistingAttachments([]);
         setPhotoFile(null);
         setPhotoPreview(null);
-        setIsEditMode(true);
-        setCurrentAssetId(row.assetId);
         handleEdit(row);
       } else if (actionType === ACTION_TYPES.DELETE) {
         handleDelete(row);
@@ -534,7 +538,7 @@ const Assets = () => {
         tabs={ASSET_TABS}
         activeTab={activeTab}
         onTabChange={handleTabChange}
-        onCreate={handleCreateWithReset}
+        onCreate={handleCreate}
         columns={columns}
         data={assets}
         loading={loading}
@@ -590,7 +594,7 @@ const Assets = () => {
         isOpen={showModal}
         onClose={handleClose}
         title={editingAsset ? 'Edit Asset' : 'Add Asset'}
-        onSubmit={handleFormSubmit}
+        onSubmit={handleFormSubmit(onSubmit)}
         isSubmitting={isSubmitting}
         submitText={editingAsset ? 'Update' : 'Create'}
         size="xl"
@@ -670,34 +674,42 @@ const Assets = () => {
             <Grid item xs={12} sm={6}>
               <Input
                 label="Asset Code"
+                {...register('assetCode')}
                 value={formData.assetCode || ''}
                 onChange={(e) => setFormField('assetCode')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'assetCode')}
                 required
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <Input
                 label="Asset Name"
+                {...register('assetName')}
                 value={formData.assetName || ''}
                 onChange={(e) => setFormField('assetName')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'assetName')}
                 required
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <Select
                 label="Category"
+                {...register('categoryId')}
                 value={formData.categoryId || ''}
                 onChange={(e) => setFormField('categoryId')(e.target.value)}
                 options={categoryFormOptions}
+                {...getFieldErrorProps(formErrors, 'categoryId')}
                 required
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <Select
                 label="Supplier"
+                {...register('supplierId')}
                 value={formData.supplierId || ''}
                 onChange={(e) => setFormField('supplierId')(e.target.value)}
                 options={supplierFormOptions}
+                {...getFieldErrorProps(formErrors, 'supplierId')}
               />
             </Grid>
           </Grid>
@@ -708,57 +720,73 @@ const Assets = () => {
             <Grid item xs={12} sm={6}>
               <Input
                 label="Brand"
+                {...register('brand')}
                 value={formData.brand || ''}
                 onChange={(e) => setFormField('brand')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'brand')}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <Input
                 label="Model"
+                {...register('model')}
                 value={formData.model || ''}
                 onChange={(e) => setFormField('model')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'model')}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
               <Input
                 label="Serial Number"
+                {...register('serialNumber')}
                 value={formData.serialNumber || ''}
                 onChange={(e) => setFormField('serialNumber')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'serialNumber')}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
               <Input
                 label="IMEI"
+                {...register('imei')}
                 value={formData.imei || ''}
                 onChange={(e) => setFormField('imei')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'imei')}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
               <Input
                 label="MAC Address"
+                {...register('macAddress')}
                 value={formData.macAddress || ''}
                 onChange={(e) => setFormField('macAddress')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'macAddress')}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
               <Input
                 label="Hostname"
+                {...register('hostname')}
                 value={formData.hostname || ''}
                 onChange={(e) => setFormField('hostname')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'hostname')}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
               <Input
                 label="IP Address"
+                {...register('ipAddress')}
                 value={formData.ipAddress || ''}
                 onChange={(e) => setFormField('ipAddress')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'ipAddress')}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
               <Input
                 label="Invoice Number"
+                {...register('invoiceNumber')}
                 value={formData.invoiceNumber || ''}
                 onChange={(e) => setFormField('invoiceNumber')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'invoiceNumber')}
               />
             </Grid>
           </Grid>
@@ -769,36 +797,44 @@ const Assets = () => {
             <Grid item xs={12} sm={4}>
               <DatePickerInput
                 label="Purchase Date"
+                {...register('purchaseDate')}
                 value={formData.purchaseDate || ''}
                 onChange={(e) => setFormField('purchaseDate')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'purchaseDate')}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
               <NumberInput
                 label="Purchase Price"
+                {...register('purchasePrice')}
                 value={formData.purchasePrice}
                 onChange={(e) => setFormField('purchasePrice')(e.target.value)}
                 prefix="Rp "
                 thousandSeparator
                 decimalScale={0}
+                {...getFieldErrorProps(formErrors, 'purchasePrice')}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
               <NumberInput
                 label="Warranty (Months)"
+                {...register('warrantyPeriod')}
                 value={formData.warrantyPeriod}
                 onChange={(e) => setFormField('warrantyPeriod')(e.target.value)}
                 suffix=" months"
                 decimalScale={0}
                 min={0}
+                {...getFieldErrorProps(formErrors, 'warrantyPeriod')}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
               <Select
                 label="Purchase Condition"
+                {...register('assetConditionPurchase')}
                 value={formData.assetConditionPurchase || ''}
                 onChange={(e) => setFormField('assetConditionPurchase')(e.target.value)}
                 options={conditionPurchaseOptions}
+                {...getFieldErrorProps(formErrors, 'assetConditionPurchase')}
               />
             </Grid>
           </Grid>
@@ -809,10 +845,12 @@ const Assets = () => {
             <Grid item xs={12}>
               <Input
                 label="Notes"
+                {...register('notes')}
                 value={formData.notes || ''}
                 onChange={(e) => setFormField('notes')(e.target.value)}
                 multiline
                 rows={3}
+                {...getFieldErrorProps(formErrors, 'notes')}
               />
             </Grid>
             

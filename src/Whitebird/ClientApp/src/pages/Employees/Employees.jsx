@@ -1,9 +1,13 @@
 // src/pages/Employees/Employees.jsx
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Grid, Box, Avatar, Typography, IconButton } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
-import { FiCamera, FiX, FiPaperclip, FiFile, FiUpload, FiCheckSquare } from 'react-icons/fi';
+import { FiCamera, FiX, FiUpload, FiCheckSquare } from 'react-icons/fi';
 import { EmployeesData } from '../../core/services';
+import { employeeSchema, getEmployeeDefaultValues } from '../../core/schemas/employeeSchema';
+import { getFieldErrorProps } from '../../core/utils/validation.utils';
 import GridView from '../../components/organisms/GridView/GridView';
 import CrudModal from '../../components/molecules/CrudModal/CrudModal';
 import FormSection from '../../components/atoms/FormSection/FormSection';
@@ -22,27 +26,11 @@ import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
 import { useGridData } from '../../hooks/useGridData';
 import { useReferenceData } from '../../hooks/useReferenceData';
-import { useCrudFormBase } from '../../hooks/useCrudFormBase';
 import { useOptions } from '../../hooks/useOptions';
 import { getEmployeeColumns } from '../../core/constants/columns';
-import { alertUtils } from '../../lib/sweetAlert';
 import './Employees.scss';
 
 const employeesData = new EmployeesData();
-
-const INITIAL_FORM_DATA = {
-  employeeCode: '',
-  fullName: '',
-  address: '',
-  departmentId: '',
-  position: '',
-  employmentStatus: '',
-  phoneNumber: '',
-  email: '',
-  officeId: '',
-  joinDate: '',
-  resignDate: '',
-};
 
 const EMPLOYEE_TABS = [
   { id: 'all', label: 'All' },
@@ -57,58 +45,58 @@ const Employees = () => {
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [currentEmployeeId, setCurrentEmployeeId] = useState(null);
+  
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [attachmentFiles, setAttachmentFiles] = useState([]);
+  const [existingAttachments, setExistingAttachments] = useState([]);
+
   const isMountedRef = useRef(true);
   const queryClient = useQueryClient();
   const { toast, confirmDelete, confirm } = useSweetAlert();
 
   const { departments, offices, employeePositions, employeeStatuses } = useReferenceData();
 
-  const [photoFile, setPhotoFile] = useState(null);
-  const [photoPreview, setPhotoPreview] = useState(null);
-  const [attachmentFiles, setAttachmentFiles] = useState([]);
-  const [existingAttachments, setExistingAttachments] = useState([]);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [currentEmployeeId, setCurrentEmployeeId] = useState(null);
-
+  // ============================================================
+  // REACT HOOK FORM WITH ZOD
+  // ============================================================
   const {
-    showModal,
-    editingRecord: editingEmployee,
-    isSubmitting,
-    formData,
-    setFormField,
-    handleCreate,
-    handleEdit: handleEditBase,
-    handleClose,
-    handleSubmit: crudHandleSubmit,
-  } = useCrudFormBase(INITIAL_FORM_DATA, employeesData, {
-    idField: 'employeeId',
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
-      setPhotoFile(null);
-      setPhotoPreview(null);
-      setAttachmentFiles([]);
-      setExistingAttachments([]);
-      setIsEditMode(false);
-      setCurrentEmployeeId(null);
-      const operation = result?.data ? 'update' : 'create';
-      const message = operation === 'update' ? 'Employee updated successfully' : 'Employee created successfully';
-      toast.success(message);
-    },
-    onError: (error) => {
-      toast.error(error || 'Failed to save employee');
-    },
+    register,
+    handleSubmit: handleFormSubmit,
+    formState: { errors: formErrors, isSubmitting },
+    setValue,
+    reset,
+    watch,
+  } = useForm({
+    resolver: zodResolver(employeeSchema),
+    defaultValues: getEmployeeDefaultValues(),
   });
 
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
-    useBulkSelection({ idField: 'employeeId' });
+  const formData = watch();
 
-  const showCheckbox = useMemo(() => {
-    return activeTab === 'Active' || activeTab === 'Inactive';
-  }, [activeTab]);
+  const setFormField = useCallback((field) => (value) => {
+    setValue(field, value, { shouldValidate: true });
+  }, [setValue]);
 
   // ============================================================
-  // EDIT - Load attachments
+  // CRUD OPERATIONS
   // ============================================================
+  const handleCreate = useCallback(() => {
+    reset(getEmployeeDefaultValues());
+    setIsEditMode(false);
+    setCurrentEmployeeId(null);
+    setAttachmentFiles([]);
+    setExistingAttachments([]);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setEditingEmployee(null);
+    setShowModal(true);
+  }, [reset]);
+
   const handleEdit = useCallback(async (record) => {
     const recordId = record?.employeeId;
     if (!recordId) return;
@@ -117,39 +105,114 @@ const Employees = () => {
     setCurrentEmployeeId(recordId);
     setPhotoFile(null);
     setPhotoPreview(null);
+    setEditingEmployee(record);
     
     try {
       const result = await employeesData.fetchById(recordId);
       if (result.success && result.data) {
         const data = result.data;
+        const defaults = getEmployeeDefaultValues();
+        Object.keys(defaults).forEach(key => {
+          if (data[key] !== undefined && data[key] !== null) {
+            setValue(key, data[key]);
+          } else {
+            setValue(key, '');
+          }
+        });
+        
         if (data.attachments && Array.isArray(data.attachments)) {
           setExistingAttachments(data.attachments);
         } else {
           setExistingAttachments([]);
         }
+        setShowModal(true);
       } else {
         setExistingAttachments([]);
+        toast.error('Failed to load employee data');
       }
     } catch (error) {
-      console.warn('Failed to fetch attachments:', error);
+      console.warn('Failed to fetch employee:', error);
+      setExistingAttachments([]);
+      toast.error('Failed to load employee data');
+    }
+  }, [setValue, toast]);
+
+  const handleClose = useCallback(() => {
+    if (!isSubmitting) {
+      setShowModal(false);
+      setIsEditMode(false);
+      setCurrentEmployeeId(null);
+      setEditingEmployee(null);
+      reset(getEmployeeDefaultValues());
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      setAttachmentFiles([]);
       setExistingAttachments([]);
     }
-    
-    handleEditBase(record);
-  }, [handleEditBase]);
+  }, [isSubmitting, reset]);
+
+  const onSubmit = useCallback(async (data) => {
+    if (isSubmitting) return;
+
+    const submitData = {
+      ...data,
+      photoFile: photoFile,
+      attachmentFiles: attachmentFiles,
+      attachmentIdsToKeep: isEditMode ? existingAttachments.map(a => a.fileAttachmentId) : [],
+      replaceAttachments: isEditMode ? true : false,
+    };
+
+    try {
+      const result = isEditMode && editingEmployee
+        ? await employeesData.update(editingEmployee.employeeId, submitData)
+        : await employeesData.create(submitData);
+      
+      if (result.success) {
+        setPhotoFile(null);
+        setPhotoPreview(null);
+        setAttachmentFiles([]);
+        setExistingAttachments([]);
+        setIsEditMode(false);
+        setCurrentEmployeeId(null);
+        setEditingEmployee(null);
+        setShowModal(false);
+        reset(getEmployeeDefaultValues());
+        
+        queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
+        reload();
+        clearSelection();
+        
+        const message = isEditMode && editingEmployee 
+          ? 'Employee updated successfully' 
+          : 'Employee created successfully';
+        toast.success(message);
+      } else {
+        const errorMsg = result.error || result.errors?.join('\n') || 'Failed to save employee';
+        toast.error(errorMsg);
+      }
+    } catch (error) {
+      const errorMsg = error.userMessage || error.message || 'Failed to save employee';
+      toast.error(errorMsg);
+    }
+  }, [isSubmitting, isEditMode, editingEmployee, photoFile, attachmentFiles, existingAttachments, queryClient, reload, clearSelection, toast, reset]);
 
   // ============================================================
-  // CREATE - Reset state
+  // BULK SELECTION
   // ============================================================
-  const handleCreateWithReset = useCallback(() => {
-    setIsEditMode(false);
-    setCurrentEmployeeId(null);
-    setAttachmentFiles([]);
-    setExistingAttachments([]);
-    setPhotoFile(null);
-    setPhotoPreview(null);
-    handleCreate();
-  }, [handleCreate]);
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
+    useBulkSelection({ idField: 'employeeId' });
+
+  const showCheckbox = useMemo(() => {
+    return activeTab === 'Active' || activeTab === 'Inactive';
+  }, [activeTab]);
+
+  // ============================================================
+  // OPTIONS
+  // ============================================================
+  const departmentOptions = useOptions(departments, 'Select Department');
+  const positionOptions = useOptions(employeePositions, 'Select Position');
+  const statusOptions = useOptions(employeeStatuses, 'Select Status');
+  const officeOptions = useOptions(offices, 'Select Office');
 
   // ============================================================
   // PHOTO HANDLING
@@ -191,9 +254,7 @@ const Employees = () => {
     } else if (activeTab === 'Inactive') {
       filters.isActive = false;
     }
-    if (searchTerm) {
-      filters.search = searchTerm;
-    }
+    if (searchTerm) filters.search = searchTerm;
     return filters;
   }, [activeTab, searchTerm]);
 
@@ -357,40 +418,6 @@ const Employees = () => {
   }, [currentEmployeeId]);
 
   // ============================================================
-  // FORM SUBMIT - Using useCrudFormBase
-  // ============================================================
-  const handleFormSubmit = useCallback(async (event) => {
-    if (event && typeof event.preventDefault === 'function') {
-      event.preventDefault();
-    }
-    
-    if (isSubmitting) return;
-
-    const submitData = {
-      ...formData,
-      photoFile: photoFile,
-      attachmentFiles: attachmentFiles,
-      attachmentIdsToKeep: isEditMode ? existingAttachments.map(a => a.fileAttachmentId) : [],
-      replaceAttachments: isEditMode ? true : false,
-    };
-
-    const result = await crudHandleSubmit(submitData);
-    
-    if (result?.success) {
-      setPhotoFile(null);
-      setPhotoPreview(null);
-      setAttachmentFiles([]);
-      setExistingAttachments([]);
-      setIsEditMode(false);
-      setCurrentEmployeeId(null);
-      reload();
-      clearSelection();
-    }
-    
-    return result;
-  }, [formData, isEditMode, editingEmployee, photoFile, attachmentFiles, existingAttachments, isSubmitting, crudHandleSubmit, reload, clearSelection]);
-
-  // ============================================================
   // GRID ACTIONS
   // ============================================================
   const handleGridAction = useCallback(
@@ -400,8 +427,6 @@ const Employees = () => {
         setExistingAttachments([]);
         setPhotoFile(null);
         setPhotoPreview(null);
-        setIsEditMode(true);
-        setCurrentEmployeeId(row.employeeId);
         handleEdit(row);
       } else if (actionType === ACTION_TYPES.DELETE) {
         handleDelete(row);
@@ -423,14 +448,6 @@ const Employees = () => {
     getConditionalActions,
     rowIdField: 'employeeId',
   });
-
-  // ============================================================
-  // OPTIONS
-  // ============================================================
-  const departmentOptions = useOptions(departments, 'Select Department');
-  const positionOptions = useOptions(employeePositions, 'Select Position');
-  const statusOptions = useOptions(employeeStatuses, 'Select Status');
-  const officeOptions = useOptions(offices, 'Select Office');
 
   // ============================================================
   // COLUMNS
@@ -480,7 +497,7 @@ const Employees = () => {
         tabs={EMPLOYEE_TABS}
         activeTab={activeTab}
         onTabChange={handleTabChange}
-        onCreate={handleCreateWithReset}
+        onCreate={handleCreate}
         columns={columns}
         data={employees}
         loading={loading}
@@ -502,7 +519,7 @@ const Employees = () => {
         isOpen={showModal}
         onClose={handleClose}
         title={editingEmployee ? 'Edit Employee' : 'Add Employee'}
-        onSubmit={handleFormSubmit}
+        onSubmit={handleFormSubmit(onSubmit)}
         isSubmitting={isSubmitting}
         submitText={editingEmployee ? 'Update' : 'Create'}
         size="xl"
@@ -582,16 +599,20 @@ const Employees = () => {
             <Grid item xs={12} sm={6}>
               <Input
                 label="Employee Code"
+                {...register('employeeCode')}
                 value={formData.employeeCode || ''}
                 onChange={(e) => setFormField('employeeCode')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'employeeCode')}
                 required
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <Input
                 label="Full Name"
+                {...register('fullName')}
                 value={formData.fullName || ''}
                 onChange={(e) => setFormField('fullName')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'fullName')}
                 required
               />
             </Grid>
@@ -603,25 +624,31 @@ const Employees = () => {
             <Grid item xs={12}>
               <Input
                 label="Address"
+                {...register('address')}
                 value={formData.address || ''}
                 onChange={(e) => setFormField('address')(e.target.value)}
                 multiline
                 rows={2}
+                {...getFieldErrorProps(formErrors, 'address')}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <Input
                 label="Phone Number"
+                {...register('phoneNumber')}
                 value={formData.phoneNumber || ''}
                 onChange={(e) => setFormField('phoneNumber')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'phoneNumber')}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <Input
                 label="Email"
                 type="email"
+                {...register('email')}
                 value={formData.email || ''}
                 onChange={(e) => setFormField('email')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'email')}
               />
             </Grid>
           </Grid>
@@ -632,33 +659,41 @@ const Employees = () => {
             <Grid item xs={12} sm={6}>
               <Select
                 label="Department"
+                {...register('departmentId')}
                 value={formData.departmentId || ''}
                 onChange={(e) => setFormField('departmentId')(e.target.value)}
                 options={departmentOptions}
+                {...getFieldErrorProps(formErrors, 'departmentId')}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <Select
                 label="Position"
+                {...register('position')}
                 value={formData.position || ''}
                 onChange={(e) => setFormField('position')(e.target.value)}
                 options={positionOptions}
+                {...getFieldErrorProps(formErrors, 'position')}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <Select
                 label="Employment Status"
+                {...register('employmentStatus')}
                 value={formData.employmentStatus || ''}
                 onChange={(e) => setFormField('employmentStatus')(e.target.value)}
                 options={statusOptions}
+                {...getFieldErrorProps(formErrors, 'employmentStatus')}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <Select
                 label="Office"
+                {...register('officeId')}
                 value={formData.officeId || ''}
                 onChange={(e) => setFormField('officeId')(e.target.value)}
                 options={officeOptions}
+                {...getFieldErrorProps(formErrors, 'officeId')}
               />
             </Grid>
           </Grid>
@@ -669,15 +704,19 @@ const Employees = () => {
             <Grid item xs={12} sm={6}>
               <DatePickerInput
                 label="Join Date"
+                {...register('joinDate')}
                 value={formData.joinDate || ''}
                 onChange={(e) => setFormField('joinDate')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'joinDate')}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <DatePickerInput
                 label="Resign Date"
+                {...register('resignDate')}
                 value={formData.resignDate || ''}
                 onChange={(e) => setFormField('resignDate')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'resignDate')}
               />
             </Grid>
           </Grid>

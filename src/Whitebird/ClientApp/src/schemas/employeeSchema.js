@@ -44,4 +44,18 @@ export const employeeSchema = z.object({
 
 export type EmployeeFormData = z.infer<typeof employeeSchema>;
 
+export const getEmployeeDefaultValues = () => ({
+  employeeCode: '',
+  fullName: '',
+  address: '',
+  departmentId: '',
+  position: '',
+  employmentStatus: '',
+  phoneNumber: '',
+  email: '',
+  officeId: '',
+  joinDate: '',
+  resignDate: '',
+});
+
 export default employeeSchema;

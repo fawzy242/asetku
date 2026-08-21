@@ -1,4 +1,3 @@
-// src/core/schemas/transactionSchema.js
 import { z } from 'zod';
 import { TRANSACTION_TYPES } from '../constants/transactionTypes';
 
@@ -30,7 +29,7 @@ export const transactionSchema = z.object({
   // Required
   assetId: numberField(true),
   transactionType: numberField(true),
-  transactionDate: datetimeField(true), // DATETIME
+  transactionDate: datetimeField(true),
 
   // Single employee & office
   employeeId: numberField(),
@@ -100,4 +99,19 @@ export const transactionSchema = z.object({
 });
 
 export type TransactionFormData = z.infer<typeof transactionSchema>;
+
+export const getTransactionDefaultValues = () => ({
+  assetId: '',
+  transactionType: '',
+  employeeId: '',
+  officeId: '',
+  expectedLoanReturnDate: '',
+  notes: '',
+  condition: '',
+  maintenanceType: '',
+  maintenanceCost: '',
+  fromAssetTransactionId: '',
+  transactionDate: new Date().toISOString(),
+});
+
 export default transactionSchema;

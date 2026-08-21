@@ -29,8 +29,35 @@ export const hasError = (errors, fieldName) => {
   return !!errors?.[fieldName];
 };
 
+/**
+ * Get field error props for Input components
+ * @param {Object} errors - react-hook-form errors object
+ * @param {string} fieldName - Field name
+ * @returns {Object} { error: string, helperText: string }
+ */
+export const getFieldErrorProps = (errors, fieldName) => {
+  const message = getErrorMessage(errors, fieldName);
+  return {
+    error: message,
+    helperText: message,
+  };
+};
+
+/**
+ * Get register options with error handling
+ * @param {Object} register - react-hook-form register function
+ * @param {string} fieldName - Field name
+ * @param {Object} options - Additional register options
+ * @returns {Object} Register props with error handling
+ */
+export const getRegisterProps = (register, fieldName, options = {}) => {
+  return register(fieldName, options);
+};
+
 export default {
   createZodResolver,
   getErrorMessage,
   hasError,
+  getFieldErrorProps,
+  getRegisterProps,
 };
