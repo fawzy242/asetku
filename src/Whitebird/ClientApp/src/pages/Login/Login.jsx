@@ -6,7 +6,6 @@ import { useAuth } from "../../context/AuthContext";
 import Input from "../../components/atoms/Input/Input";
 import Button from "../../components/atoms/Button/Button";
 import { useSweetAlert } from "../../hooks/useSweetAlert";
-import "./Login.scss";
 
 const Login = () => {
   const navigate = useNavigate();

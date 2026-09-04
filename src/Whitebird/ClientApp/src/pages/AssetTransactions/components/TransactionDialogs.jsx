@@ -1,3 +1,4 @@
+// src/pages/AssetTransactions/components/TransactionDialogs.jsx
 import React from 'react';
 import CrudModal from '../../../components/molecules/CrudModal/CrudModal';
 import Modal from '../../../components/molecules/Modal/Modal';
@@ -20,6 +21,7 @@ const TransactionDialogs = ({
   setFormField,
   onSubmit,
   onClose,
+  isViewMode = false,
   // Return Modal
   showReturnModal,
   isReturnSubmitting,
@@ -56,17 +58,22 @@ const TransactionDialogs = ({
   handleUploadComplete,
   handleFileDeleted,
 }) => {
+  // Semua field disabled jika view mode
+  const disabled = isViewMode;
+
   return (
     <>
       {/* CRUD Modal */}
       <CrudModal
         isOpen={showModal}
         onClose={onClose}
-        title={editingTransaction ? 'Edit Transaction' : 'New Transaction'}
+        title={isViewMode ? 'View Transaction' : (editingTransaction ? 'Edit Transaction' : 'New Transaction')}
         onSubmit={onSubmit}
         isSubmitting={isSubmitting}
-        submitText={editingTransaction ? 'Update' : 'Create'}
+        submitText={isViewMode ? 'Close' : (editingTransaction ? 'Update' : 'Create')}
         size="xl"
+        disableSubmit={isViewMode}
+        showCancel={!isViewMode}
       >
         <FormSection title="Transaction Details" description="Type, asset, and parties">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -76,6 +83,7 @@ const TransactionDialogs = ({
               onChange={(e) => setFormField('transactionType')(e.target.value)}
               options={TRANSACTION_TYPE_OPTIONS}
               required
+              disabled={disabled}
             />
             <Select
               label="Asset"
@@ -83,6 +91,7 @@ const TransactionDialogs = ({
               onChange={(e) => setFormField('assetId')(e.target.value)}
               options={filteredAssetOptions}
               required
+              disabled={disabled}
             />
             {showEmployee && (
               <Select
@@ -91,6 +100,7 @@ const TransactionDialogs = ({
                 onChange={(e) => setFormField('employeeId')(e.target.value)}
                 options={employeeOptions}
                 required
+                disabled={disabled}
               />
             )}
             {showOffice && (
@@ -100,6 +110,7 @@ const TransactionDialogs = ({
                 onChange={(e) => setFormField('officeId')(e.target.value)}
                 options={officeOptions}
                 required
+                disabled={disabled}
               />
             )}
             {showPaired && (
@@ -109,7 +120,7 @@ const TransactionDialogs = ({
                 onChange={(e) => setFormField('fromAssetTransactionId')(e.target.value)}
                 options={[{ value: '', label: loadingPairedOptions ? 'Loading...' : 'Select Paired' }, ...pairedTransactionOptions]}
                 required
-                disabled={loadingPairedOptions}
+                disabled={disabled || loadingPairedOptions}
               />
             )}
             {showExpectedReturn && (
@@ -117,6 +128,7 @@ const TransactionDialogs = ({
                 label="Expected Loan Return Date"
                 value={formData.expectedLoanReturnDate || ''}
                 onChange={(e) => setFormField('expectedLoanReturnDate')(e.target.value)}
+                disabled={disabled}
               />
             )}
           </div>
@@ -129,6 +141,7 @@ const TransactionDialogs = ({
               value={formData.condition || ''}
               onChange={(e) => setFormField('condition')(e.target.value)}
               options={conditionOptions}
+              disabled={disabled}
             />
             {showMaintenance && (
               <>
@@ -137,6 +150,7 @@ const TransactionDialogs = ({
                   value={formData.maintenanceType || ''}
                   onChange={(e) => setFormField('maintenanceType')(e.target.value)}
                   options={maintenanceTypeOptions}
+                  disabled={disabled}
                 />
                 <NumberInput
                   label="Maintenance Cost"
@@ -145,6 +159,7 @@ const TransactionDialogs = ({
                   prefix="Rp "
                   thousandSeparator
                   decimalScale={0}
+                  disabled={disabled}
                 />
               </>
             )}
@@ -159,8 +174,9 @@ const TransactionDialogs = ({
               onChange={(e) => setFormField('notes')(e.target.value)}
               multiline
               rows={3}
+              disabled={disabled}
             />
-            {showFileUploads && (
+            {showFileUploads && !isViewMode && (
               <FileUploader
                 referenceType="AssetTransaction"
                 referenceId={currentTransactionId}
@@ -171,6 +187,18 @@ const TransactionDialogs = ({
                 onUploadComplete={handleUploadComplete}
                 onFileDeleted={handleFileDeleted}
               />
+            )}
+            {isViewMode && existingAttachments.length > 0 && (
+              <div>
+                <p style={{ fontWeight: 600, marginBottom: 8 }}>Attachments:</p>
+                {existingAttachments.map((att, idx) => (
+                  <div key={idx} style={{ padding: '4px 0' }}>
+                    <a href={att.fileUrl} target="_blank" rel="noopener noreferrer">
+                      {att.originalFileName || att.fileName || 'File'}
+                    </a>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </FormSection>

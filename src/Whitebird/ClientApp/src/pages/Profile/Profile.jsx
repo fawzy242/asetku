@@ -11,7 +11,6 @@ import Spinner from '../../components/atoms/Spinner/Spinner';
 import FormSection from '../../components/atoms/FormSection/FormSection';
 import InfoRow from '../../components/molecules/InfoRow/InfoRow';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
-import { alertUtils } from '../../lib/sweetAlert';
 import { formatDate } from '../../core/utils/date.utils';
 import { isValidEmail } from '../../core/utils/string.utils';
 import { getStorage, setStorage } from '../../core/utils/storage.utils';
@@ -36,16 +35,42 @@ const Profile = () => {
   const { toast, confirm } = useSweetAlert();
   
   const loadProfileIdRef = useRef(0);
+  const isMountedRef = useRef(true);
 
-  useEffect(() => { loadProfile(); }, []);
+  // ============================================================
+  // FUNCTIONS
+  // ============================================================
+  const loadProfilePhoto = useCallback(async () => {
+    if (!isMountedRef.current) return;
+    try {
+      const result = await userData.getPhoto();
+      if (isMountedRef.current && result.success && result.data) {
+        const url = URL.createObjectURL(result.data);
+        setProfilePhotoUrl(url);
+      } else if (isMountedRef.current) {
+        setProfilePhotoUrl(null);
+      }
+    } catch {
+      if (isMountedRef.current) {
+        setProfilePhotoUrl(null);
+      }
+    }
+  }, []);
 
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     const currentRequestId = ++loadProfileIdRef.current;
     
+    if (!isMountedRef.current) return;
     setLoading(true);
+    
     const r = await profileData.fetchProfile();
     
     if (currentRequestId !== loadProfileIdRef.current) {
+      return;
+    }
+    
+    if (!isMountedRef.current) {
+      setLoading(false);
       return;
     }
     
@@ -69,23 +94,26 @@ const Profile = () => {
         toast.error(r.error || 'Failed to load profile');
       }
     }
-    setLoading(false);
-  };
-
-  const loadProfilePhoto = async () => {
-    try {
-      const result = await userData.getPhoto();
-      if (result.success && result.data) {
-        const url = URL.createObjectURL(result.data);
-        setProfilePhotoUrl(url);
-      } else {
-        setProfilePhotoUrl(null);
-      }
-    } catch {
-      setProfilePhotoUrl(null);
+    if (isMountedRef.current) {
+      setLoading(false);
     }
-  };
+  }, [loadProfilePhoto, toast]);
 
+  // ============================================================
+  // EFFECT - HANYA DIJALANKAN SEKALI SAAT MOUNT
+  // ============================================================
+  useEffect(() => {
+    isMountedRef.current = true;
+    loadProfile();
+    return () => {
+      isMountedRef.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Hanya dijalankan sekali
+
+  // ============================================================
+  // HANDLERS
+  // ============================================================
   const handlePhotoUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;

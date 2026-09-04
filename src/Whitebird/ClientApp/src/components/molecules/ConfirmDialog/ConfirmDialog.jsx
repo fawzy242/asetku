@@ -2,9 +2,6 @@
 import React, { useCallback, createContext, useContext } from 'react';
 import { alertUtils, toastr } from '../../../lib/sweetAlert';
 
-// ============================================================
-// CONFIRM CONTEXT - Using SweetAlert2
-// ============================================================
 const ConfirmContext = createContext(null);
 
 export const useConfirm = () => {
@@ -31,9 +28,6 @@ export const ConfirmDialogProvider = ({ children }) => {
   );
 };
 
-// ============================================================
-// STATIC API
-// ============================================================
 class ConfirmDialog {
   static show(options = {}) {
     return alertUtils.confirm(options);
@@ -55,9 +49,6 @@ class ConfirmDialog {
   static showError = (title, text) =>
     alertUtils.error(title, text);
 
-  // ============================================================
-  // File Upload/Delete Confirmation
-  // ============================================================
   static confirmFileUpload = (fileNames, count) => {
     const names = Array.isArray(fileNames) ? fileNames.join(', ') : fileNames;
     return ConfirmDialog.show({
@@ -108,7 +99,7 @@ class ConfirmDialog {
     },
   };
 
-  static close = () => {};
+  // REMOVED: close() - empty function, not needed
 }
 
 export default ConfirmDialog;

@@ -43,6 +43,17 @@ const Suppliers = () => {
   const queryClient = useQueryClient();
   const { toast, confirmDelete, confirm } = useSweetAlert();
 
+  // ============================================================
+  // BULK SELECTION - HARUS DI ATAS useEffect
+  // ============================================================
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
+    useBulkSelection({ idField: 'supplierId' });
+
+  const showCheckbox = activeTab === 'active' || activeTab === 'inactive';
+
+  // ============================================================
+  // CRUD FORM
+  // ============================================================
   const {
     showModal,
     editingRecord: editingSupplier,
@@ -66,11 +77,9 @@ const Suppliers = () => {
     },
   });
 
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
-    useBulkSelection({ idField: 'supplierId' });
-
-  const showCheckbox = activeTab === 'active' || activeTab === 'inactive';
-
+  // ============================================================
+  // BUILD FILTERS
+  // ============================================================
   const buildFilters = useCallback(() => {
     const filters = {};
     if (activeTab === 'active') filters.isActive = true;
@@ -79,6 +88,9 @@ const Suppliers = () => {
     return filters;
   }, [activeTab, searchTerm]);
 
+  // ============================================================
+  // FETCH GRID DATA
+  // ============================================================
   const fetchGridData = useCallback(
     async (params) => {
       const filters = buildFilters();
@@ -94,11 +106,20 @@ const Suppliers = () => {
     [buildFilters]
   );
 
-  const { data, totalCount, loading, page, setPage, pageSize, setPageSize, reload } = useGridData(
-    ['suppliers', activeTab, searchTerm],
-    fetchGridData
-  );
+  const {
+    data,
+    totalCount,
+    loading,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    reload,
+  } = useGridData(['suppliers', activeTab, searchTerm], fetchGridData);
 
+  // ============================================================
+  // EFFECTS
+  // ============================================================
   useEffect(() => {
     isMountedRef.current = true;
     reload();
@@ -108,6 +129,9 @@ const Suppliers = () => {
     };
   }, [activeTab, reload, clearSelection]);
 
+  // ============================================================
+  // HANDLERS
+  // ============================================================
   const handleSearch = useCallback(
     (search) => {
       setSearchTerm(search);

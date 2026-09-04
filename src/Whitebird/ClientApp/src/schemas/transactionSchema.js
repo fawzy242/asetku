@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TRANSACTION_TYPES } from '../constants/transactionTypes';
+import { TRANSACTION_TYPES } from '../core/constants/transactionTypes';
 
 const stringField = (max = 500, required = false) => {
   let schema = z.string().max(max, `Maximum ${max} characters`);
@@ -26,21 +26,13 @@ const datetimeField = (required = true) => {
 };
 
 export const transactionSchema = z.object({
-  // Required
   assetId: numberField(true),
   transactionType: numberField(true),
   transactionDate: datetimeField(true),
-
-  // Single employee & office
   employeeId: numberField(),
   officeId: numberField(),
-
-  // Renamed from expectedReturnDate
   expectedLoanReturnDate: dateField(),
-
-  // Single condition (replaces conditionBefore / conditionAfter)
   condition: numberField(),
-
   notes: stringField(),
   maintenanceType: numberField(),
   maintenanceCost: numberField(),
@@ -48,7 +40,6 @@ export const transactionSchema = z.object({
 }).superRefine((data, ctx) => {
   const type = data.transactionType;
 
-  // LOAN requires expectedLoanReturnDate
   if (type === TRANSACTION_TYPES.LOAN && !data.expectedLoanReturnDate) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -57,7 +48,6 @@ export const transactionSchema = z.object({
     });
   }
 
-  // HANDOVER / TRANSFER / LOAN require employeeId
   if ([TRANSACTION_TYPES.HANDOVER, TRANSACTION_TYPES.TRANSFER, TRANSACTION_TYPES.LOAN].includes(type) && !data.employeeId) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -66,7 +56,6 @@ export const transactionSchema = z.object({
     });
   }
 
-  // OPERATIONAL_OFFICE requires officeId
   if (type === TRANSACTION_TYPES.OPERATIONAL_OFFICE && !data.officeId) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -75,7 +64,6 @@ export const transactionSchema = z.object({
     });
   }
 
-  // LOAN_RETURN / POST_MAINTENANCE require fromAssetTransactionId
   if ([TRANSACTION_TYPES.LOAN_RETURN, TRANSACTION_TYPES.POST_MAINTENANCE].includes(type) && !data.fromAssetTransactionId) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -84,7 +72,6 @@ export const transactionSchema = z.object({
     });
   }
 
-  // Expected return date must be after transaction date
   if (data.expectedLoanReturnDate && data.transactionDate) {
     const expected = new Date(data.expectedLoanReturnDate);
     const trans = new Date(data.transactionDate);
@@ -98,7 +85,7 @@ export const transactionSchema = z.object({
   }
 });
 
-export type TransactionFormData = z.infer<typeof transactionSchema>;
+// REMOVED: export type TransactionFormData = z.infer<typeof transactionSchema>;
 
 export const getTransactionDefaultValues = () => ({
   assetId: '',

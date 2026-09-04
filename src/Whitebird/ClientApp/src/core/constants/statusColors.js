@@ -1,12 +1,3 @@
-/**
- * CENTRALIZED STATUS COLOR CONSTANTS
- * Single source of truth untuk semua status colors di seluruh aplikasi.
- * 
- * Usage:
- *   import { STATUS_COLORS, getStatusChipStyles } from '../../core/constants/statusColors';
- *   <Chip label={status} size="small" sx={getStatusChipStyles(status)} />
- */
-
 export const STATUS_COLORS = {
   // Asset Status
   'Available':       { bg: 'rgba(16, 185, 129, 0.1)', color: '#10b981', label: 'success' },
@@ -35,11 +26,6 @@ export const STATUS_COLORS = {
   'default':         { bg: 'rgba(107, 114, 128, 0.1)', color: '#6b7280', label: 'secondary' },
 };
 
-/**
- * Get status chip styles for MUI Chip component
- * @param {string} status - Status text
- * @returns {Object} MUI sx styles for Chip
- */
 export const getStatusChipStyles = (status) => {
   const colors = STATUS_COLORS[status] || STATUS_COLORS.default;
   return {

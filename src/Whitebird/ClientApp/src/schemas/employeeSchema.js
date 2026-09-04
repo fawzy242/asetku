@@ -22,27 +22,20 @@ const emailField = () => {
 };
 
 export const employeeSchema = z.object({
-  // Required fields
   employeeCode: stringField(50, true),
   fullName: stringField(100, true),
-  
-  // Optional fields
   address: stringField(300),
   phoneNumber: stringField(20),
   email: emailField(),
-  
-  // ID fields (FK)
   departmentId: numberField(),
   position: numberField(),
   employmentStatus: numberField(),
   officeId: numberField(),
-  
-  // Date fields
   joinDate: dateField(),
   resignDate: dateField(),
 });
 
-export type EmployeeFormData = z.infer<typeof employeeSchema>;
+// REMOVED: export type EmployeeFormData = z.infer<typeof employeeSchema>;
 
 export const getEmployeeDefaultValues = () => ({
   employeeCode: '',

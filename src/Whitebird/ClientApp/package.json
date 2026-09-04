@@ -15,6 +15,7 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
+    "@hookform/resolvers": "^5.9.1",
     "@mui/material": "^5.16.0",
     "@mui/x-data-grid": "^7.23.0",
     "@mui/x-date-pickers": "^7.23.0",
@@ -33,6 +34,7 @@
     "react-router-dom": "^6.28.0",
     "sweetalert2": "^11.14.5",
     "xlsx": "^0.18.5",
+    "zod": "^4.5.4",
     "zustand": "^4.5.7"
   },
   "devDependencies": {

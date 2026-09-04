@@ -1,9 +1,9 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 const stringField = (max = 100, required = false) => {
   let schema = z.string().max(max, `Maximum ${max} characters`);
-  if (!required) schema = schema.optional().or(z.literal("")).or(z.null());
-  else schema = schema.min(1, "This field is required");
+  if (!required) schema = schema.optional().or(z.literal('')).or(z.null());
+  else schema = schema.min(1, 'This field is required');
   return schema;
 };
 
@@ -16,17 +16,14 @@ const numberField = (required = false, min = 0, max = undefined) => {
 
 const dateField = (required = false) => {
   let schema = z.string().or(z.null()).optional();
-  if (required) schema = z.string().min(1, "Date is required");
+  if (required) schema = z.string().min(1, 'Date is required');
   return schema;
 };
 
 export const assetSchema = z.object({
-  // Required
   assetCode: stringField(50, true),
   assetName: stringField(100, true),
   categoryId: numberField(true, 1),
-
-  // Optional
   brand: stringField(50),
   model: stringField(50),
   serialNumber: stringField(50),
@@ -43,26 +40,26 @@ export const assetSchema = z.object({
   purchaseDate: dateField(),
 });
 
-export type AssetFormData = z.infer<typeof assetSchema>;
+// REMOVED: export type AssetFormData = z.infer<typeof assetSchema>;
 
 export const getAssetDefaultValues = () => ({
-  assetCode: "",
-  assetName: "",
-  categoryId: "",
-  brand: "",
-  model: "",
-  serialNumber: "",
-  imei: "",
-  macAddress: "",
-  hostname: "",
-  ipAddress: "",
-  purchaseDate: "",
-  purchasePrice: "",
-  invoiceNumber: "",
-  supplierId: "",
-  warrantyPeriod: "",
-  assetConditionPurchase: "",
-  notes: "",
+  assetCode: '',
+  assetName: '',
+  categoryId: '',
+  brand: '',
+  model: '',
+  serialNumber: '',
+  imei: '',
+  macAddress: '',
+  hostname: '',
+  ipAddress: '',
+  purchaseDate: '',
+  purchasePrice: '',
+  invoiceNumber: '',
+  supplierId: '',
+  warrantyPeriod: '',
+  assetConditionPurchase: '',
+  notes: '',
 });
 
 export default assetSchema;

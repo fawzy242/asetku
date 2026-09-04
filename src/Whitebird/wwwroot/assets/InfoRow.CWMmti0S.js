@@ -1,1 +1,0 @@
-import{j as s}from"./utils-vendor.Dg7wmKRZ.js";const r=({icon:o,label:a,value:n,className:e=""})=>s.jsxs("div",{className:`info-row ${e}`,children:[o&&s.jsx(o,{size:16,className:"info-row__icon"}),s.jsxs("span",{className:"info-row__label",children:[a,":"]}),s.jsx("span",{className:"info-row__value",children:n||"-"})]});export{r as I};

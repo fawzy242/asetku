@@ -6,7 +6,7 @@ import { Grid, Box, Avatar, Typography, IconButton } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import { FiCamera, FiX, FiUpload, FiCheckSquare } from 'react-icons/fi';
 import { EmployeesData } from '../../core/services';
-import { employeeSchema, getEmployeeDefaultValues } from '../../core/schemas/employeeSchema';
+import { employeeSchema, getEmployeeDefaultValues } from '../../schemas/employeeSchema';
 import { getFieldErrorProps } from '../../core/utils/validation.utils';
 import GridView from '../../components/organisms/GridView/GridView';
 import CrudModal from '../../components/molecules/CrudModal/CrudModal';
@@ -62,6 +62,16 @@ const Employees = () => {
   const { departments, offices, employeePositions, employeeStatuses } = useReferenceData();
 
   // ============================================================
+  // BULK SELECTION - HARUS DI ATAS useEffect
+  // ============================================================
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
+    useBulkSelection({ idField: 'employeeId' });
+
+  const showCheckbox = useMemo(() => {
+    return activeTab === 'Active' || activeTab === 'Inactive';
+  }, [activeTab]);
+
+  // ============================================================
   // REACT HOOK FORM WITH ZOD
   // ============================================================
   const {
@@ -81,6 +91,100 @@ const Employees = () => {
   const setFormField = useCallback((field) => (value) => {
     setValue(field, value, { shouldValidate: true });
   }, [setValue]);
+
+  // ============================================================
+  // BUILD FILTERS
+  // ============================================================
+  const buildFilters = useCallback(() => {
+    const filters = {};
+    if (activeTab === 'Active') {
+      filters.isActive = true;
+    } else if (activeTab === 'Inactive') {
+      filters.isActive = false;
+    }
+    if (searchTerm) filters.search = searchTerm;
+    return filters;
+  }, [activeTab, searchTerm]);
+
+  // ============================================================
+  // FETCH GRID DATA
+  // ============================================================
+  const fetchGridData = useCallback(
+    async (params) => {
+      const filters = buildFilters();
+      const requestParams = {
+        page: params.page || 1,
+        pageSize: params.pageSize || 10,
+        ...filters,
+        ...params,
+      };
+      const result = await employeesData.fetchGridData(requestParams);
+      return result;
+    },
+    [buildFilters]
+  );
+
+  const {
+    data: employees,
+    totalCount,
+    loading,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    reload,
+  } = useGridData(['employees', activeTab, searchTerm], fetchGridData);
+
+  // ============================================================
+  // EFFECTS
+  // ============================================================
+  useEffect(() => {
+    isMountedRef.current = true;
+    setPage(1);
+    clearSelection();
+    reload();
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [activeTab, reload, setPage, clearSelection]);
+
+  // ============================================================
+  // OPTIONS
+  // ============================================================
+  const departmentOptions = useOptions(departments, 'Select Department');
+  const positionOptions = useOptions(employeePositions, 'Select Position');
+  const statusOptions = useOptions(employeeStatuses, 'Select Status');
+  const officeOptions = useOptions(offices, 'Select Office');
+
+  // ============================================================
+  // PHOTO HANDLING
+  // ============================================================
+  const handlePhotoChange = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+    
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setPhotoPreview(event.target.result);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }, [toast]);
+
+  const handleRemovePhoto = useCallback(() => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+  }, []);
 
   // ============================================================
   // CRUD OPERATIONS
@@ -151,6 +255,9 @@ const Employees = () => {
     }
   }, [isSubmitting, reset]);
 
+  // ============================================================
+  // FORM SUBMIT
+  // ============================================================
   const onSubmit = useCallback(async (data) => {
     if (isSubmitting) return;
 
@@ -163,9 +270,12 @@ const Employees = () => {
     };
 
     try {
-      const result = isEditMode && editingEmployee
-        ? await employeesData.update(editingEmployee.employeeId, submitData)
-        : await employeesData.create(submitData);
+      let result;
+      if (isEditMode && editingEmployee) {
+        result = await employeesData.update(editingEmployee.employeeId, submitData);
+      } else {
+        result = await employeesData.create(submitData);
+      }
       
       if (result.success) {
         setPhotoFile(null);
@@ -195,110 +305,6 @@ const Employees = () => {
       toast.error(errorMsg);
     }
   }, [isSubmitting, isEditMode, editingEmployee, photoFile, attachmentFiles, existingAttachments, queryClient, reload, clearSelection, toast, reset]);
-
-  // ============================================================
-  // BULK SELECTION
-  // ============================================================
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
-    useBulkSelection({ idField: 'employeeId' });
-
-  const showCheckbox = useMemo(() => {
-    return activeTab === 'Active' || activeTab === 'Inactive';
-  }, [activeTab]);
-
-  // ============================================================
-  // OPTIONS
-  // ============================================================
-  const departmentOptions = useOptions(departments, 'Select Department');
-  const positionOptions = useOptions(employeePositions, 'Select Position');
-  const statusOptions = useOptions(employeeStatuses, 'Select Status');
-  const officeOptions = useOptions(offices, 'Select Office');
-
-  // ============================================================
-  // PHOTO HANDLING
-  // ============================================================
-  const handlePhotoChange = useCallback((e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB');
-      return;
-    }
-    
-    setPhotoFile(file);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setPhotoPreview(event.target.result);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  }, [toast]);
-
-  const handleRemovePhoto = useCallback(() => {
-    setPhotoFile(null);
-    setPhotoPreview(null);
-  }, []);
-
-  // ============================================================
-  // BUILD FILTERS
-  // ============================================================
-  const buildFilters = useCallback(() => {
-    const filters = {};
-    if (activeTab === 'Active') {
-      filters.isActive = true;
-    } else if (activeTab === 'Inactive') {
-      filters.isActive = false;
-    }
-    if (searchTerm) filters.search = searchTerm;
-    return filters;
-  }, [activeTab, searchTerm]);
-
-  // ============================================================
-  // FETCH GRID DATA
-  // ============================================================
-  const fetchGridData = useCallback(
-    async (params) => {
-      const filters = buildFilters();
-      const requestParams = {
-        page: params.page || 1,
-        pageSize: params.pageSize || 10,
-        ...filters,
-        ...params,
-      };
-      const result = await employeesData.fetchGridData(requestParams);
-      return result;
-    },
-    [buildFilters]
-  );
-
-  const {
-    data: employees,
-    totalCount,
-    loading,
-    page,
-    setPage,
-    pageSize,
-    setPageSize,
-    reload,
-  } = useGridData(['employees', activeTab, searchTerm], fetchGridData);
-
-  // ============================================================
-  // EFFECTS
-  // ============================================================
-  useEffect(() => {
-    isMountedRef.current = true;
-    setPage(1);
-    clearSelection();
-    reload();
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, [activeTab, reload, setPage, clearSelection]);
 
   // ============================================================
   // HANDLERS

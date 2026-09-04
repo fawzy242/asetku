@@ -157,13 +157,10 @@ const AssetTracking = () => {
   const location = useLocation();
   const { toast } = useSweetAlert();
 
-  useEffect(() => {
-    isMountedRef.current = true;
-    loadAssets();
-    return () => { isMountedRef.current = false; };
-  }, []);
-
-  const loadAssets = async () => {
+  // ============================================================
+  // FUNCTIONS - DIDEKLARASIKAN SEBELUM useEffect
+  // ============================================================
+  const loadAssets = useCallback(async () => {
     setLoading(true);
     const assetsRes = await trackingData.fetchAssets();
     if (isMountedRef.current && assetsRes.success) {
@@ -179,7 +176,7 @@ const AssetTracking = () => {
       }
     }
     if (isMountedRef.current) setLoading(false);
-  };
+  }, [location.search]);
 
   const handleAssetSelect = useCallback(async (assetId) => {
     if (!assetId) {
@@ -311,6 +308,18 @@ const AssetTracking = () => {
     toast.success('Data refreshed');
   }, [selectedAssetId, handleAssetSelect, toast]);
 
+  // ============================================================
+  // EFFECT - DIPINDAHKAN KE BAWAH
+  // ============================================================
+  useEffect(() => {
+    isMountedRef.current = true;
+    loadAssets();
+    return () => { isMountedRef.current = false; };
+  }, [loadAssets]);
+
+  // ============================================================
+  // MEMOS
+  // ============================================================
   const filteredTimeline = useMemo(() => {
     if (historyFilter === 'all') return timelineData;
     const filterMap = {
@@ -328,16 +337,6 @@ const AssetTracking = () => {
     });
   }, [timelineData, historyFilter]);
 
-  const historyFilterTabs = [
-    { id: 'all', label: 'All History' },
-    { id: 'handover', label: 'Handover' },
-    { id: 'transfer', label: 'Transfer' },
-    { id: 'loan', label: 'Loan' },
-    { id: 'movement', label: 'Movement' },
-    { id: 'maintenance', label: 'Maintenance' },
-    { id: 'disposal', label: 'Disposal' },
-  ];
-
   const stats = useMemo(() => {
     const result = { totalMovements: 0, totalLoans: 0, totalMaintenance: 0, totalDisposals: 0, totalHandovers: 0, totalTransfers: 0 };
     timelineData.forEach(t => {
@@ -352,16 +351,6 @@ const AssetTracking = () => {
     return result;
   }, [timelineData]);
 
-  const statCards = [
-    { icon: FiBox, label: 'Total Transactions', value: trackingData_?.totalTransactions || 0, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
-    { icon: FiMove, label: 'Movements', value: stats.totalMovements, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
-    { icon: FiMove, label: 'Handovers', value: stats.totalHandovers, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
-    { icon: FiMove, label: 'Transfers', value: stats.totalTransfers, color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)' },
-    { icon: FiClock, label: 'Loans', value: stats.totalLoans, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
-    { icon: FiTool, label: 'Maintenance', value: stats.totalMaintenance, color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)' },
-    { icon: FiActivity, label: 'Disposals', value: stats.totalDisposals, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
-  ];
-
   const transactionTypeChartData = useMemo(() => {
     if (!transactionTypeStats?.data) return [];
     return transactionTypeStats.data.map(item => ({
@@ -371,6 +360,26 @@ const AssetTracking = () => {
       color: transactionTypeColors[item.transactionType] || '#6b7280',
     }));
   }, [transactionTypeStats]);
+
+  const historyFilterTabs = [
+    { id: 'all', label: 'All History' },
+    { id: 'handover', label: 'Handover' },
+    { id: 'transfer', label: 'Transfer' },
+    { id: 'loan', label: 'Loan' },
+    { id: 'movement', label: 'Movement' },
+    { id: 'maintenance', label: 'Maintenance' },
+    { id: 'disposal', label: 'Disposal' },
+  ];
+
+  const statCards = [
+    { icon: FiBox, label: 'Total Transactions', value: trackingData_?.totalTransactions || 0, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
+    { icon: FiMove, label: 'Movements', value: stats.totalMovements, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
+    { icon: FiMove, label: 'Handovers', value: stats.totalHandovers, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
+    { icon: FiMove, label: 'Transfers', value: stats.totalTransfers, color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)' },
+    { icon: FiClock, label: 'Loans', value: stats.totalLoans, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+    { icon: FiTool, label: 'Maintenance', value: stats.totalMaintenance, color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)' },
+    { icon: FiActivity, label: 'Disposals', value: stats.totalDisposals, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
+  ];
 
   const getStatusChip = (status) => <StatusChip status={status || 'Available'} />;
 

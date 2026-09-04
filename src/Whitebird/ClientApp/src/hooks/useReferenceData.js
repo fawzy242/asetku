@@ -1,6 +1,15 @@
 // src/hooks/useReferenceData.js
 import { useQueries, useQueryClient } from '@tanstack/react-query';
-import apiClient from '../core/api/apiClient';
+// FIX: Path yang benar - API modules sudah di-split
+import { 
+  categoryApi, 
+  supplierApi, 
+  employeeApi, 
+  departmentApi, 
+  officeApi, 
+  assetApi, 
+  transactionApi 
+} from '../core/api';
 
 const CACHE_KEYS = {
   CATEGORIES: ['reference', 'categories'],
@@ -25,7 +34,7 @@ const MASTER_DATA_STALE_TIME = 24 * 60 * 60 * 1000;
 // FETCHERS
 // ============================================================
 const fetchCategories = async () => {
-  const res = await apiClient.category.dropdown();
+  const res = await categoryApi.dropdown();
   return (res.data?.data || []).map((c) => ({
     value: c.categoryId,
     label: c.categoryName,
@@ -33,7 +42,7 @@ const fetchCategories = async () => {
 };
 
 const fetchSuppliers = async () => {
-  const res = await apiClient.supplier.dropdown();
+  const res = await supplierApi.dropdown();
   return (res.data?.data || []).map((s) => ({
     value: s.supplierId,
     label: s.supplierName,
@@ -41,7 +50,7 @@ const fetchSuppliers = async () => {
 };
 
 const fetchEmployees = async () => {
-  const res = await apiClient.employee.dropdown();
+  const res = await employeeApi.dropdown();
   return (res.data?.data || []).map((e) => ({
     value: e.employeeId,
     label: `${e.employeeCode} - ${e.fullName}`,
@@ -51,7 +60,7 @@ const fetchEmployees = async () => {
 };
 
 const fetchDepartments = async () => {
-  const res = await apiClient.department.dropdown();
+  const res = await departmentApi.dropdown();
   return (res.data?.data || []).map((d) => ({
     value: d.departmentId,
     label: d.departmentName,
@@ -59,7 +68,7 @@ const fetchDepartments = async () => {
 };
 
 const fetchOffices = async () => {
-  const res = await apiClient.office.dropdown();
+  const res = await officeApi.dropdown();
   return (res.data?.data || []).map((o) => ({
     value: o.officeId,
     label: o.officeName,
@@ -67,9 +76,8 @@ const fetchOffices = async () => {
 };
 
 const fetchAssets = async () => {
-  // FIX: Gunakan getGrid untuk dropdown asset standar
   try {
-    const res = await apiClient.asset.getGrid({ page: 1, pageSize: 1000 });
+    const res = await assetApi.getGrid({ page: 1, pageSize: 1000 });
     const data = res.data?.data?.data || res.data?.data || res.data || [];
     return Array.isArray(data) ? data.map((a) => ({
       value: a.assetId,
@@ -84,7 +92,7 @@ const fetchAssets = async () => {
 };
 
 const fetchTransactionTypes = async () => {
-  const res = await apiClient.transaction.listTransactionTypeAdd();
+  const res = await transactionApi.listTransactionTypeAdd();
   return (res.data?.data || []).map((m) => ({
     code: m.code,
     name: m.name,
@@ -94,7 +102,7 @@ const fetchTransactionTypes = async () => {
 };
 
 const fetchConditions = async () => {
-  const res = await apiClient.transaction.listCondition();
+  const res = await transactionApi.listCondition();
   return (res.data?.data || []).map((m) => ({
     code: m.code,
     name: m.name,
@@ -104,7 +112,7 @@ const fetchConditions = async () => {
 };
 
 const fetchEmployeePositions = async () => {
-  const res = await apiClient.employee.masterDataList('Position');
+  const res = await employeeApi.masterDataList('Position');
   return (res.data?.data || []).map((m) => ({
     code: m.code,
     name: m.name,
@@ -114,7 +122,7 @@ const fetchEmployeePositions = async () => {
 };
 
 const fetchEmployeeStatuses = async () => {
-  const res = await apiClient.employee.masterDataList('EmployeeStatus');
+  const res = await employeeApi.masterDataList('EmployeeStatus');
   return (res.data?.data || []).map((m) => ({
     code: m.code,
     name: m.name,
@@ -123,7 +131,6 @@ const fetchEmployeeStatuses = async () => {
   }));
 };
 
-// FIX: Gunakan hardcoded values untuk OfficeType
 const fetchOfficeTypes = async () => {
   return [
     { code: 1, name: 'Head Office', value: 1, label: 'Head Office' },
@@ -132,7 +139,7 @@ const fetchOfficeTypes = async () => {
 };
 
 const fetchMaintenanceTypes = async () => {
-  const res = await apiClient.transaction.listMaintenanceType();
+  const res = await transactionApi.listMaintenanceType();
   return (res.data?.data || []).map((m) => ({
     code: m.code,
     name: m.name,
@@ -141,7 +148,6 @@ const fetchMaintenanceTypes = async () => {
   }));
 };
 
-// FIX: Gunakan hardcoded values untuk AssetConditionPurchase
 const fetchAssetConditionPurchases = async () => {
   return [
     { code: 1, name: 'New', value: 1, label: 'New' },

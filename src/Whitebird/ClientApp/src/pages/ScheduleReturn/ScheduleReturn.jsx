@@ -1,8 +1,12 @@
 // src/pages/ScheduleReturn/ScheduleReturn.jsx
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Grid } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
 import { ScheduleReturnData } from '../../core/services';
+import { getFieldErrorProps } from '../../core/utils/validation.utils';
 import GridView from '../../components/organisms/GridView/GridView';
 import CrudModal from '../../components/molecules/CrudModal/CrudModal';
 import FormSection from '../../components/atoms/FormSection/FormSection';
@@ -20,19 +24,24 @@ import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
 import { useGridData } from '../../hooks/useGridData';
 import { useReferenceData } from '../../hooks/useReferenceData';
-import { useCrudFormBase } from '../../hooks/useCrudFormBase';
 import { useOptions } from '../../hooks/useOptions';
 import { getScheduleColumns } from '../../core/constants/columns';
-import utilsHelper from '../../core/utils/utils.helper';
 import './ScheduleReturn.scss';
 
 const scheduleData = new ScheduleReturnData();
 
-const INITIAL_FORM_DATA = {
+// Zod Schema
+const scheduleReturnSchema = z.object({
+  scheduleDate: z.string().min(1, 'Schedule date is required'),
+  assetId: z.coerce.number().min(1, 'Asset is required'),
+  employeeId: z.coerce.number().min(1, 'Employee is required'),
+});
+
+const getDefaultValues = () => ({
   scheduleDate: '',
   assetId: '',
   employeeId: '',
-};
+});
 
 const TABS = [
   { id: 'all', label: 'All' },
@@ -45,6 +54,8 @@ const ScheduleReturn = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [editingRecord, setEditingRecord] = useState(null);
   const [generateData, setGenerateData] = useState({
     dateFrom: '',
     dateTo: '',
@@ -58,40 +69,38 @@ const ScheduleReturn = () => {
 
   const { assets, employees } = useReferenceData();
 
-  const {
-    showModal,
-    editingRecord,
-    isSubmitting,
-    formData,
-    setFormField,
-    handleCreate,
-    handleEdit,
-    handleClose,
-    handleSubmit: crudHandleSubmit,
-  } = useCrudFormBase(INITIAL_FORM_DATA, scheduleData, {
-    idField: 'scheduleReturnId',
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['schedule-return'] });
-      toast.success(editingRecord ? 'Schedule updated' : 'Schedule created');
-      reload();
-      clearSelection();
-    },
-    onError: (error) => {
-      toast.error(error || 'Failed to save schedule');
-    },
-  });
-
-  const {
-    selectedRowIds,
-    selectionCount,
-    hasSelection,
-    handleSelectionChange,
-    clearSelection,
-    getSelectedIds,
-  } = useBulkSelection({ idField: 'scheduleReturnId' });
+  // ============================================================
+  // BULK SELECTION - HARUS DI ATAS useEffect
+  // ============================================================
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
+    useBulkSelection({ idField: 'scheduleReturnId' });
 
   const showCheckbox = activeTab === 'active' || activeTab === 'inactive';
 
+  // ============================================================
+  // REACT HOOK FORM WITH ZOD
+  // ============================================================
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    formState: { errors: formErrors, isSubmitting },
+    setValue,
+    reset,
+    watch,
+  } = useForm({
+    resolver: zodResolver(scheduleReturnSchema),
+    defaultValues: getDefaultValues(),
+  });
+
+  const formData = watch();
+
+  const setFormField = useCallback((field) => (value) => {
+    setValue(field, value, { shouldValidate: true });
+  }, [setValue]);
+
+  // ============================================================
+  // BUILD FILTERS
+  // ============================================================
   const buildFilters = useCallback(() => {
     const filters = {};
     if (activeTab === 'active') filters.isActive = true;
@@ -100,6 +109,9 @@ const ScheduleReturn = () => {
     return filters;
   }, [activeTab, searchTerm]);
 
+  // ============================================================
+  // FETCH GRID DATA
+  // ============================================================
   const fetchGridData = useCallback(
     async (params) => {
       const filters = buildFilters();
@@ -115,11 +127,20 @@ const ScheduleReturn = () => {
     [buildFilters]
   );
 
-  const { data, totalCount, loading, page, setPage, pageSize, setPageSize, reload } = useGridData(
-    ['schedule-return', activeTab, searchTerm],
-    fetchGridData
-  );
+  const {
+    data,
+    totalCount,
+    loading,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    reload,
+  } = useGridData(['schedule-return', activeTab, searchTerm], fetchGridData);
 
+  // ============================================================
+  // EFFECTS
+  // ============================================================
   useEffect(() => {
     isMountedRef.current = true;
     reload();
@@ -129,6 +150,89 @@ const ScheduleReturn = () => {
     };
   }, [activeTab, reload, clearSelection]);
 
+  // ============================================================
+  // OPTIONS
+  // ============================================================
+  const assetOptions = useOptions(assets, 'Select Asset');
+  const employeeOptions = useOptions(employees, 'Select Employee');
+
+  // ============================================================
+  // CRUD OPERATIONS
+  // ============================================================
+  const handleCreate = useCallback(() => {
+    reset(getDefaultValues());
+    setEditingRecord(null);
+    setShowModal(true);
+  }, [reset]);
+
+  const handleEdit = useCallback(async (record) => {
+    const recordId = record?.scheduleReturnId;
+    if (!recordId) return;
+    
+    setEditingRecord(record);
+    
+    try {
+      const result = await scheduleData.fetchById(recordId);
+      if (result.success && result.data) {
+        const data = result.data;
+        const defaults = getDefaultValues();
+        Object.keys(defaults).forEach(key => {
+          if (data[key] !== undefined && data[key] !== null) {
+            setValue(key, data[key]);
+          } else {
+            setValue(key, '');
+          }
+        });
+        setShowModal(true);
+      } else {
+        toast.error('Failed to load schedule data');
+      }
+    } catch (error) {
+      console.warn('Failed to fetch schedule:', error);
+      toast.error('Failed to load schedule data');
+    }
+  }, [setValue, toast]);
+
+  const handleClose = useCallback(() => {
+    if (!isSubmitting) {
+      setShowModal(false);
+      setEditingRecord(null);
+      reset(getDefaultValues());
+    }
+  }, [isSubmitting, reset]);
+
+  const onSubmit = useCallback(async (data) => {
+    if (isSubmitting) return;
+
+    try {
+      const result = editingRecord
+        ? await scheduleData.update(editingRecord.scheduleReturnId, { ...data, isActive: editingRecord.isActive })
+        : await scheduleData.create(data);
+      
+      if (result.success) {
+        setShowModal(false);
+        setEditingRecord(null);
+        reset(getDefaultValues());
+        
+        queryClient.invalidateQueries({ queryKey: ['schedule-return'] });
+        reload();
+        clearSelection();
+        
+        const message = editingRecord ? 'Schedule updated successfully' : 'Schedule created successfully';
+        toast.success(message);
+      } else {
+        const errorMsg = result.error || result.errors?.join('\n') || 'Failed to save schedule';
+        toast.error(errorMsg);
+      }
+    } catch (error) {
+      const errorMsg = error.userMessage || error.message || 'Failed to save schedule';
+      toast.error(errorMsg);
+    }
+  }, [isSubmitting, editingRecord, queryClient, reload, clearSelection, toast, reset]);
+
+  // ============================================================
+  // HANDLERS
+  // ============================================================
   const handleSearch = useCallback(
     (search) => {
       setSearchTerm(search);
@@ -199,6 +303,8 @@ const ScheduleReturn = () => {
       reload();
       clearSelection();
       toast.success('Schedules generated successfully');
+    } else {
+      toast.error(r.error || 'Failed to generate schedules');
     }
   }, [generateData, reload, queryClient, toast, clearSelection]);
 
@@ -223,9 +329,6 @@ const ScheduleReturn = () => {
     getConditionalActions,
     rowIdField: 'scheduleReturnId',
   });
-
-  const assetOptions = useOptions(assets, 'Select Asset');
-  const employeeOptions = useOptions(employees, 'Select Employee');
 
   const columns = useMemo(() => {
     return getScheduleColumns(actionColumn, 'return');
@@ -279,7 +382,7 @@ const ScheduleReturn = () => {
         isOpen={showModal}
         onClose={handleClose}
         title={editingRecord ? 'Edit Schedule' : 'Add Schedule'}
-        onSubmit={crudHandleSubmit}
+        onSubmit={handleFormSubmit(onSubmit)}
         isSubmitting={isSubmitting}
         submitText={editingRecord ? 'Update' : 'Create'}
         size="md"
@@ -289,26 +392,32 @@ const ScheduleReturn = () => {
             <Grid item xs={12}>
               <DatePickerInput
                 label="Schedule Date"
+                {...register('scheduleDate')}
                 value={formData.scheduleDate || ''}
                 onChange={(e) => setFormField('scheduleDate')(e.target.value)}
+                {...getFieldErrorProps(formErrors, 'scheduleDate')}
                 required
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <Select
                 label="Asset"
+                {...register('assetId')}
                 value={formData.assetId || ''}
                 onChange={(e) => setFormField('assetId')(e.target.value)}
                 options={assetOptions}
+                {...getFieldErrorProps(formErrors, 'assetId')}
                 required
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <Select
                 label="Employee"
+                {...register('employeeId')}
                 value={formData.employeeId || ''}
                 onChange={(e) => setFormField('employeeId')(e.target.value)}
                 options={employeeOptions}
+                {...getFieldErrorProps(formErrors, 'employeeId')}
                 required
               />
             </Grid>

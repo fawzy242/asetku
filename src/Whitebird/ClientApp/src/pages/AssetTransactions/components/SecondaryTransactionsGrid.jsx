@@ -1,7 +1,7 @@
+// src/pages/AssetTransactions/components/SecondaryTransactionsGrid.jsx
 import React from 'react';
 import Card from '../../../components/atoms/Card/Card';
 import DataTable from '../../../components/molecules/DataTable/DataTable';
-import { getManagementReturnColumns } from '../../../core/constants/columns';
 
 const SecondaryTransactionsGrid = ({
   data,
@@ -15,12 +15,16 @@ const SecondaryTransactionsGrid = ({
   checkboxSelection,
   onSelectionChange,
   getRowId,
+  bulkActions = null,
+  title = "Secondary Transactions",
+  subtitle = "Return, Loan Return, Post Maintenance"
 }) => {
   return (
     <Card
       className="transactions-menu__grid-card"
-      title="Secondary Transactions"
-      subtitle="Return, Loan Return, Post Maintenance"
+      title={title}
+      subtitle={subtitle}
+      actions={bulkActions}
     >
       <DataTable
         rows={data}

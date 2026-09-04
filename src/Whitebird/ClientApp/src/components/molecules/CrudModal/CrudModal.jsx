@@ -20,8 +20,6 @@ const CrudModal = ({
 }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
-    // FIX: onSubmit sudah menangani handleSuccess di useCrudFormBase
-    // Jangan panggil handleSuccess lagi di sini
     if (onSubmit) onSubmit(e);
   };
 

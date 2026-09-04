@@ -6,7 +6,7 @@ import { Grid, Box, Avatar, Typography, IconButton } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import { FiCamera, FiX, FiUpload, FiCheckSquare } from 'react-icons/fi';
 import { AssetsData } from '../../core/services';
-import { assetSchema, getAssetDefaultValues } from '../../core/schemas/assetSchema';
+import { assetSchema, getAssetDefaultValues } from '../../schemas/assetSchema';
 import { getFieldErrorProps } from '../../core/utils/validation.utils';
 import GridView from '../../components/organisms/GridView/GridView';
 import CrudModal from '../../components/molecules/CrudModal/CrudModal';
@@ -60,6 +60,16 @@ const Assets = () => {
   const { categories, suppliers, assetConditionPurchases } = useReferenceData();
 
   // ============================================================
+  // BULK SELECTION - HARUS DI ATAS useEffect
+  // ============================================================
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
+    useBulkSelection({ idField: 'assetId' });
+
+  const showCheckbox = useMemo(() => {
+    return activeTab === 'active' || activeTab === 'inactive';
+  }, [activeTab]);
+
+  // ============================================================
   // REACT HOOK FORM WITH ZOD
   // ============================================================
   const {
@@ -79,170 +89,6 @@ const Assets = () => {
   const setFormField = useCallback((field) => (value) => {
     setValue(field, value, { shouldValidate: true });
   }, [setValue]);
-
-  // ============================================================
-  // CRUD OPERATIONS
-  // ============================================================
-  const handleCreate = useCallback(() => {
-    reset(getAssetDefaultValues());
-    setIsEditMode(false);
-    setCurrentAssetId(null);
-    setAttachmentFiles([]);
-    setExistingAttachments([]);
-    setPhotoFile(null);
-    setPhotoPreview(null);
-    setEditingAsset(null);
-    setShowModal(true);
-  }, [reset]);
-
-  const handleEdit = useCallback(async (record) => {
-    const recordId = record?.assetId;
-    if (!recordId) return;
-    
-    setIsEditMode(true);
-    setCurrentAssetId(recordId);
-    setPhotoFile(null);
-    setPhotoPreview(null);
-    setEditingAsset(record);
-    
-    try {
-      const result = await assetsData.fetchById(recordId);
-      if (result.success && result.data) {
-        const data = result.data;
-        const defaults = getAssetDefaultValues();
-        Object.keys(defaults).forEach(key => {
-          if (data[key] !== undefined && data[key] !== null) {
-            setValue(key, data[key]);
-          } else {
-            setValue(key, '');
-          }
-        });
-        
-        if (data.attachments && Array.isArray(data.attachments)) {
-          setExistingAttachments(data.attachments);
-        } else {
-          setExistingAttachments([]);
-        }
-        setShowModal(true);
-      } else {
-        setExistingAttachments([]);
-        toast.error('Failed to load asset data');
-      }
-    } catch (error) {
-      console.warn('Failed to fetch asset:', error);
-      setExistingAttachments([]);
-      toast.error('Failed to load asset data');
-    }
-  }, [setValue, toast]);
-
-  const handleClose = useCallback(() => {
-    if (!isSubmitting) {
-      setShowModal(false);
-      setIsEditMode(false);
-      setCurrentAssetId(null);
-      setEditingAsset(null);
-      reset(getAssetDefaultValues());
-      setPhotoFile(null);
-      setPhotoPreview(null);
-      setAttachmentFiles([]);
-      setExistingAttachments([]);
-    }
-  }, [isSubmitting, reset]);
-
-  const onSubmit = useCallback(async (data) => {
-    if (isSubmitting) return;
-
-    const submitData = {
-      ...data,
-      photoFile: photoFile,
-      attachmentFiles: attachmentFiles,
-      attachmentIdsToKeep: isEditMode ? existingAttachments.map(a => a.fileAttachmentId) : [],
-      replaceAttachments: isEditMode ? true : false,
-    };
-
-    try {
-      const result = isEditMode && editingAsset
-        ? await assetsData.update(editingAsset.assetId, submitData)
-        : await assetsData.create(submitData);
-      
-      if (result.success) {
-        setPhotoFile(null);
-        setPhotoPreview(null);
-        setAttachmentFiles([]);
-        setExistingAttachments([]);
-        setIsEditMode(false);
-        setCurrentAssetId(null);
-        setEditingAsset(null);
-        setShowModal(false);
-        reset(getAssetDefaultValues());
-        
-        queryClient.invalidateQueries({ queryKey: ['assets'] });
-        queryClient.invalidateQueries({ queryKey: ['reference', 'assets'] });
-        reload();
-        clearSelection();
-        
-        const message = isEditMode && editingAsset 
-          ? 'Asset updated successfully' 
-          : 'Asset created successfully';
-        toast.success(message);
-      } else {
-        const errorMsg = result.error || result.errors?.join('\n') || 'Failed to save asset';
-        toast.error(errorMsg);
-      }
-    } catch (error) {
-      const errorMsg = error.userMessage || error.message || 'Failed to save asset';
-      toast.error(errorMsg);
-    }
-  }, [isSubmitting, isEditMode, editingAsset, photoFile, attachmentFiles, existingAttachments, queryClient, reload, clearSelection, toast, reset]);
-
-  // ============================================================
-  // BULK SELECTION
-  // ============================================================
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
-    useBulkSelection({ idField: 'assetId' });
-
-  const showCheckbox = useMemo(() => {
-    return activeTab === 'active' || activeTab === 'inactive';
-  }, [activeTab]);
-
-  // ============================================================
-  // OPTIONS
-  // ============================================================
-  const categoryFilterOptions = useOptions(categories, 'All Categories');
-  const supplierFilterOptions = useOptions(suppliers, 'All Suppliers');
-  const categoryFormOptions = useOptions(categories, 'Select Category');
-  const supplierFormOptions = useOptions(suppliers, 'Select Supplier');
-  const conditionPurchaseOptions = useOptions(assetConditionPurchases, 'Select Purchase Condition');
-
-  // ============================================================
-  // PHOTO HANDLING
-  // ============================================================
-  const handlePhotoChange = useCallback((e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB');
-      return;
-    }
-    
-    setPhotoFile(file);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setPhotoPreview(event.target.result);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  }, [toast]);
-
-  const handleRemovePhoto = useCallback(() => {
-    setPhotoFile(null);
-    setPhotoPreview(null);
-  }, []);
 
   // ============================================================
   // BUILD FILTERS
@@ -337,6 +183,166 @@ const Assets = () => {
       displayStatus: asset.currentStatus || asset.status || 'Available',
     }));
   }, [rawAssets]);
+
+  // ============================================================
+  // OPTIONS
+  // ============================================================
+  const categoryFilterOptions = useOptions(categories, 'All Categories');
+  const supplierFilterOptions = useOptions(suppliers, 'All Suppliers');
+  const categoryFormOptions = useOptions(categories, 'Select Category');
+  const supplierFormOptions = useOptions(suppliers, 'Select Supplier');
+  const conditionPurchaseOptions = useOptions(assetConditionPurchases, 'Select Purchase Condition');
+
+  // ============================================================
+  // PHOTO HANDLING
+  // ============================================================
+  const handlePhotoChange = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+    
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setPhotoPreview(event.target.result);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }, [toast]);
+
+  const handleRemovePhoto = useCallback(() => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+  }, []);
+
+  // ============================================================
+  // CRUD OPERATIONS
+  // ============================================================
+  const handleCreate = useCallback(() => {
+    reset(getAssetDefaultValues());
+    setIsEditMode(false);
+    setCurrentAssetId(null);
+    setAttachmentFiles([]);
+    setExistingAttachments([]);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setEditingAsset(null);
+    setShowModal(true);
+  }, [reset]);
+
+  const handleEdit = useCallback(async (record) => {
+    const recordId = record?.assetId;
+    if (!recordId) return;
+    
+    setIsEditMode(true);
+    setCurrentAssetId(recordId);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setEditingAsset(record);
+    
+    try {
+      const result = await assetsData.fetchById(recordId);
+      if (result.success && result.data) {
+        const data = result.data;
+        const defaults = getAssetDefaultValues();
+        Object.keys(defaults).forEach(key => {
+          if (data[key] !== undefined && data[key] !== null) {
+            setValue(key, data[key]);
+          } else {
+            setValue(key, '');
+          }
+        });
+        
+        if (data.attachments && Array.isArray(data.attachments)) {
+          setExistingAttachments(data.attachments);
+        } else {
+          setExistingAttachments([]);
+        }
+        setShowModal(true);
+      } else {
+        setExistingAttachments([]);
+        toast.error('Failed to load asset data');
+      }
+    } catch (error) {
+      console.warn('Failed to fetch asset:', error);
+      setExistingAttachments([]);
+      toast.error('Failed to load asset data');
+    }
+  }, [setValue, toast]);
+
+  const handleClose = useCallback(() => {
+    if (!isSubmitting) {
+      setShowModal(false);
+      setIsEditMode(false);
+      setCurrentAssetId(null);
+      setEditingAsset(null);
+      reset(getAssetDefaultValues());
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      setAttachmentFiles([]);
+      setExistingAttachments([]);
+    }
+  }, [isSubmitting, reset]);
+
+  // ============================================================
+  // FORM SUBMIT
+  // ============================================================
+  const onSubmit = useCallback(async (data) => {
+    if (isSubmitting) return;
+
+    const submitData = {
+      ...data,
+      photoFile: photoFile,
+      attachmentFiles: attachmentFiles,
+      attachmentIdsToKeep: isEditMode ? existingAttachments.map(a => a.fileAttachmentId) : [],
+      replaceAttachments: isEditMode ? true : false,
+    };
+
+    try {
+      let result;
+      if (isEditMode && editingAsset) {
+        result = await assetsData.update(editingAsset.assetId, submitData);
+      } else {
+        result = await assetsData.create(submitData);
+      }
+      
+      if (result.success) {
+        setPhotoFile(null);
+        setPhotoPreview(null);
+        setAttachmentFiles([]);
+        setExistingAttachments([]);
+        setIsEditMode(false);
+        setCurrentAssetId(null);
+        setEditingAsset(null);
+        setShowModal(false);
+        reset(getAssetDefaultValues());
+        
+        queryClient.invalidateQueries({ queryKey: ['assets'] });
+        queryClient.invalidateQueries({ queryKey: ['reference', 'assets'] });
+        reload();
+        clearSelection();
+        
+        const message = isEditMode && editingAsset 
+          ? 'Asset updated successfully' 
+          : 'Asset created successfully';
+        toast.success(message);
+      } else {
+        const errorMsg = result.error || result.errors?.join('\n') || 'Failed to save asset';
+        toast.error(errorMsg);
+      }
+    } catch (error) {
+      const errorMsg = error.userMessage || error.message || 'Failed to save asset';
+      toast.error(errorMsg);
+    }
+  }, [isSubmitting, isEditMode, editingAsset, photoFile, attachmentFiles, existingAttachments, queryClient, reload, clearSelection, toast, reset]);
 
   // ============================================================
   // HANDLERS

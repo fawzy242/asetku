@@ -41,6 +41,17 @@ const Departments = () => {
   const queryClient = useQueryClient();
   const { toast, confirmDelete, confirm } = useSweetAlert();
 
+  // ============================================================
+  // BULK SELECTION - HARUS DI ATAS useEffect
+  // ============================================================
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
+    useBulkSelection({ idField: 'departmentId' });
+
+  const showCheckbox = activeTab === 'active' || activeTab === 'inactive';
+
+  // ============================================================
+  // CRUD FORM
+  // ============================================================
   const {
     showModal,
     editingRecord: editingDepartment,
@@ -64,11 +75,9 @@ const Departments = () => {
     },
   });
 
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
-    useBulkSelection({ idField: 'departmentId' });
-
-  const showCheckbox = activeTab === 'active' || activeTab === 'inactive';
-
+  // ============================================================
+  // BUILD FILTERS
+  // ============================================================
   const buildFilters = useCallback(() => {
     const filters = {};
     if (activeTab === 'active') filters.isActive = true;
@@ -77,6 +86,9 @@ const Departments = () => {
     return filters;
   }, [activeTab, searchTerm]);
 
+  // ============================================================
+  // FETCH GRID DATA
+  // ============================================================
   const fetchGridData = useCallback(
     async (params) => {
       const filters = buildFilters();
@@ -92,11 +104,20 @@ const Departments = () => {
     [buildFilters]
   );
 
-  const { data, totalCount, loading, page, setPage, pageSize, setPageSize, reload } = useGridData(
-    ['departments', activeTab, searchTerm],
-    fetchGridData
-  );
+  const {
+    data,
+    totalCount,
+    loading,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    reload,
+  } = useGridData(['departments', activeTab, searchTerm], fetchGridData);
 
+  // ============================================================
+  // EFFECTS
+  // ============================================================
   useEffect(() => {
     isMountedRef.current = true;
     reload();
@@ -106,6 +127,9 @@ const Departments = () => {
     };
   }, [activeTab, reload, clearSelection]);
 
+  // ============================================================
+  // HANDLERS
+  // ============================================================
   const handleSearch = useCallback(
     (search) => {
       setSearchTerm(search);

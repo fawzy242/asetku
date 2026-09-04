@@ -49,6 +49,17 @@ const Offices = () => {
   const { toast, confirmDelete, confirm } = useSweetAlert();
   const { offices: parentOffices, officeTypes } = useReferenceData();
 
+  // ============================================================
+  // BULK SELECTION - HARUS DI ATAS useEffect
+  // ============================================================
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
+    useBulkSelection({ idField: 'officeId' });
+
+  const showCheckbox = activeTab === 'active' || activeTab === 'inactive';
+
+  // ============================================================
+  // CRUD FORM
+  // ============================================================
   const {
     showModal,
     editingRecord: editingOffice,
@@ -72,11 +83,9 @@ const Offices = () => {
     },
   });
 
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
-    useBulkSelection({ idField: 'officeId' });
-
-  const showCheckbox = activeTab === 'active' || activeTab === 'inactive';
-
+  // ============================================================
+  // BUILD FILTERS
+  // ============================================================
   const buildFilters = useCallback(() => {
     const filters = {};
     if (activeTab === 'active') filters.isActive = true;
@@ -85,6 +94,9 @@ const Offices = () => {
     return filters;
   }, [activeTab, searchTerm]);
 
+  // ============================================================
+  // FETCH GRID DATA
+  // ============================================================
   const fetchGridData = useCallback(
     async (params) => {
       const filters = buildFilters();
@@ -100,11 +112,20 @@ const Offices = () => {
     [buildFilters]
   );
 
-  const { data, totalCount, loading, page, setPage, pageSize, setPageSize, reload } = useGridData(
-    ['offices', activeTab, searchTerm],
-    fetchGridData
-  );
+  const {
+    data,
+    totalCount,
+    loading,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    reload,
+  } = useGridData(['offices', activeTab, searchTerm], fetchGridData);
 
+  // ============================================================
+  // EFFECTS
+  // ============================================================
   useEffect(() => {
     isMountedRef.current = true;
     reload();
@@ -114,6 +135,19 @@ const Offices = () => {
     };
   }, [activeTab, reload, clearSelection]);
 
+  // ============================================================
+  // OPTIONS
+  // ============================================================
+  const parentOfficeOptions = useOptions(
+    parentOffices.filter((o) => !editingOffice || o.value !== editingOffice.officeId),
+    'None (Top Level)'
+  );
+
+  const officeTypeOptions = useOptions(officeTypes, 'Select Type');
+
+  // ============================================================
+  // HANDLERS
+  // ============================================================
   const handleSearch = useCallback(
     (search) => {
       setSearchTerm(search);
@@ -193,13 +227,6 @@ const Offices = () => {
     getConditionalActions,
     rowIdField: 'officeId',
   });
-
-  const parentOfficeOptions = useOptions(
-    parentOffices.filter((o) => !editingOffice || o.value !== editingOffice.officeId),
-    'None (Top Level)'
-  );
-
-  const officeTypeOptions = useOptions(officeTypes, 'Select Type');
 
   const columns = useMemo(
     () => [

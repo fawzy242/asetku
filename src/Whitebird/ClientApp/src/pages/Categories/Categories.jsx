@@ -45,6 +45,17 @@ const Categories = () => {
   const { toast, confirmDelete, confirm } = useSweetAlert();
   const { categories: parentCategories } = useReferenceData();
 
+  // ============================================================
+  // BULK SELECTION - HARUS DI ATAS useEffect
+  // ============================================================
+  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
+    useBulkSelection({ idField: 'categoryId' });
+
+  const showCheckbox = activeTab === 'active' || activeTab === 'inactive';
+
+  // ============================================================
+  // CRUD FORM
+  // ============================================================
   const {
     showModal,
     editingRecord: editingCategory,
@@ -68,11 +79,9 @@ const Categories = () => {
     },
   });
 
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
-    useBulkSelection({ idField: 'categoryId' });
-
-  const showCheckbox = activeTab === 'active' || activeTab === 'inactive';
-
+  // ============================================================
+  // BUILD FILTERS
+  // ============================================================
   const buildFilters = useCallback(() => {
     const filters = {};
     if (activeTab === 'active') filters.isActive = true;
@@ -81,6 +90,9 @@ const Categories = () => {
     return filters;
   }, [activeTab, searchTerm]);
 
+  // ============================================================
+  // FETCH GRID DATA
+  // ============================================================
   const fetchGridData = useCallback(
     async (params) => {
       const filters = buildFilters();
@@ -96,11 +108,20 @@ const Categories = () => {
     [buildFilters]
   );
 
-  const { data, totalCount, loading, page, setPage, pageSize, setPageSize, reload } = useGridData(
-    ['categories', activeTab, searchTerm],
-    fetchGridData
-  );
+  const {
+    data,
+    totalCount,
+    loading,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    reload,
+  } = useGridData(['categories', activeTab, searchTerm], fetchGridData);
 
+  // ============================================================
+  // EFFECTS
+  // ============================================================
   useEffect(() => {
     isMountedRef.current = true;
     reload();
@@ -110,6 +131,17 @@ const Categories = () => {
     };
   }, [activeTab, reload, clearSelection]);
 
+  // ============================================================
+  // OPTIONS
+  // ============================================================
+  const parentCategoryOptions = useOptions(
+    parentCategories.filter((c) => !editingCategory || c.value !== editingCategory.categoryId),
+    'None (Top Level)'
+  );
+
+  // ============================================================
+  // HANDLERS
+  // ============================================================
   const handleSearch = useCallback(
     (search) => {
       setSearchTerm(search);
@@ -186,11 +218,6 @@ const Categories = () => {
     getConditionalActions,
     rowIdField: 'categoryId',
   });
-
-  const parentCategoryOptions = useOptions(
-    parentCategories.filter((c) => !editingCategory || c.value !== editingCategory.categoryId),
-    'None (Top Level)'
-  );
 
   const columns = useMemo(
     () => [

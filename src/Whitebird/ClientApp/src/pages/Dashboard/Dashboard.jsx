@@ -16,7 +16,6 @@ import Tabs from '../../components/molecules/Tabs/Tabs';
 import DrilldownModal from '../../components/molecules/DrilldownModal/DrilldownModal';
 import StatCard from '../../components/molecules/StatCard/StatCard';
 import StatusChip from '../../components/atoms/StatusChip/StatusChip';
-import { ASSET_STATUS_CHART_COLORS } from '../../core/constants/assetStatuses';
 import { useUIStore } from '../../stores/uiStore';
 import { formatDate, formatDateTime } from '../../core/utils/date.utils';
 import { formatCurrency } from '../../core/utils/number.utils';
@@ -25,6 +24,19 @@ import './Dashboard.scss';
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler);
 
 const dashboardData = new DashboardData();
+
+// ============================================================
+// CHART COLORS - Defined locally (replacing removed constant)
+// ============================================================
+const ASSET_STATUS_CHART_COLORS = {
+  'Available': '#10b981',
+  'Assigned': '#3b82f6',
+  'On Loan': '#8b5cf6',
+  'In Maintenance': '#f59e0b',
+  'Damaged': '#ef4444',
+  'Retired': '#6b7280',
+  'Disposed': '#4b5563',
+};
 
 const DASHBOARD_TABS = [
   { id: 'summary', label: 'Summary', icon: <FiGrid size={16} /> },

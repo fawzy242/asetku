@@ -149,13 +149,10 @@ const EmployeeSummary = () => {
   const location = useLocation();
   const { toast } = useSweetAlert();
 
-  useEffect(() => {
-    isMountedRef.current = true;
-    loadEmployees();
-    return () => { isMountedRef.current = false; };
-  }, []);
-
-  const loadEmployees = async () => {
+  // ============================================================
+  // FUNCTIONS - DIDEKLARASIKAN SEBELUM useEffect
+  // ============================================================
+  const loadEmployees = useCallback(async () => {
     setLoading(true);
     const r = await summaryData.fetchEmployees();
     if (isMountedRef.current && r.success) {
@@ -175,7 +172,7 @@ const EmployeeSummary = () => {
     if (isMountedRef.current) {
       setLoading(false);
     }
-  };
+  }, [location.search]);
 
   const handleEmployeeSelect = useCallback(
     async (employeeId) => {
@@ -260,6 +257,15 @@ const EmployeeSummary = () => {
     }
   }, [selectedEmployeeId, toast]);
 
+  // ============================================================
+  // EFFECTS - DIPINDAHKAN KE BAWAH
+  // ============================================================
+  useEffect(() => {
+    isMountedRef.current = true;
+    loadEmployees();
+    return () => { isMountedRef.current = false; };
+  }, [loadEmployees]);
+
   useEffect(() => {
     if (employees.length > 0) {
       const params = new URLSearchParams(location.search);
@@ -274,6 +280,9 @@ const EmployeeSummary = () => {
     }
   }, [location.search, employees, selectedEmployeeId, handleEmployeeSelect]);
 
+  // ============================================================
+  // MEMOS
+  // ============================================================
   const totalAssetValue = (assetSummary?.currentAssets || []).reduce(
     (sum, a) => sum + (a.purchasePrice || 0),
     0
