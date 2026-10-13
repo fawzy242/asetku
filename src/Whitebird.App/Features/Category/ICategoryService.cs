@@ -39,4 +39,5 @@ public interface ICategoryService
 
     Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request);
     Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request);
+    Task<ServiceResult<int>> BulkDeleteAsync(BulkDeleteRequest request);
 }

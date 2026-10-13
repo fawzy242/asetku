@@ -137,10 +137,10 @@ public class AssetTrackingService : BaseService, IAssetTrackingService
     }
 
     // ============================================================
-    // NEW: PHOTO & ATTACHMENTS (delegated to AssetService)
+    // PHOTO & ATTACHMENTS (delegated to AssetService)
     // ============================================================
 
-    public async Task<ServiceResult<byte[]>> GetPhotoAsync(int assetId)
+    public async Task<ServiceResult<FileContentDto>> GetPhotoAsync(int assetId)
     {
         return await _assetService.GetPhotoAsync(assetId);
     }

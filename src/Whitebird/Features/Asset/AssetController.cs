@@ -118,6 +118,14 @@ public class AssetController : ControllerBase
         return this.HandleResult(await _assetService.BulkDeactivateAsync(request));
     }
 
+    [HttpPost("bulk-delete")]
+    public async Task<IActionResult> BulkDelete([FromBody] BulkDeleteRequest request)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _assetService.BulkDeleteAsync(request));
+    }
+
     // ============================================================
     // DROPDOWN
     // ============================================================
@@ -127,19 +135,73 @@ public class AssetController : ControllerBase
         => this.HandleResult(await _assetService.GetDropdownListByTransactionTypeAsync(transactionType));
 
     // ============================================================
-    // NEW: PHOTO & ATTACHMENTS
+    // PHOTO PROFILE
     // ============================================================
 
+    /// <summary>
+    /// Get asset profile photo. Returns the image bytes with the correct Content-Type.
+    /// </summary>
     [HttpGet("{id:int}/photo")]
     public async Task<IActionResult> GetPhoto(int id)
     {
         var result = await _assetService.GetPhotoAsync(id);
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
-        return File(result.Data, "image/jpeg");
+
+        return File(result.Data.Bytes, result.Data.ContentType);
     }
 
+    /// <summary>
+    /// Upload (or replace) the asset profile photo.
+    /// </summary>
+    [HttpPost("{id:int}/photo")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UploadPhoto(int id, IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(ServiceResult.Failure("No file provided"));
+
+        return this.HandleResult(await _assetService.UploadPhotoAsync(id, file));
+    }
+
+    /// <summary>
+    /// Delete the asset profile photo (soft-delete).
+    /// </summary>
+    [HttpDelete("{id:int}/photo")]
+    public async Task<IActionResult> DeletePhoto(int id)
+        => this.HandleResult(await _assetService.DeletePhotoAsync(id));
+
+    // ============================================================
+    // ATTACHMENTS
+    // ============================================================
+
+    /// <summary>
+    /// Get asset attachment list.
+    /// </summary>
     [HttpGet("{id:int}/attachments")]
     public async Task<IActionResult> GetAttachments(int id)
         => this.HandleResult(await _assetService.GetAttachmentsAsync(id));
+
+    /// <summary>
+    /// Upload a standalone attachment (does not require sending the whole asset).
+    /// </summary>
+    [HttpPost("{id:int}/attachments")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UploadAttachment(int id, [FromForm] AttachmentUploadDto model)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+
+        if (model.File == null || model.File.Length == 0)
+            return BadRequest(ServiceResult.Failure("No file provided"));
+
+        return this.HandleResult(await _assetService.UploadAttachmentAsync(id, model));
+    }
+
+    /// <summary>
+    /// Delete a single attachment (soft-delete).
+    /// </summary>
+    [HttpDelete("{id:int}/attachments/{fileAttachmentId:int}")]
+    public async Task<IActionResult> DeleteAttachment(int id, int fileAttachmentId)
+        => this.HandleResult(await _assetService.DeleteAttachmentAsync(id, fileAttachmentId));
 }

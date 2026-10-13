@@ -59,7 +59,7 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
         foreach (var prop in properties)
         {
             var propType = prop.PropertyType;
-            
+
             // Skip complex navigation properties (only value types, string, DateTime)
             if (!propType.IsValueType && propType != typeof(string) && propType != typeof(DateTime) && propType != typeof(DateTime?))
                 continue;
@@ -337,16 +337,6 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
         return count;
     }
 
-    public async Task<IEnumerable<T>> ExecuteStoredProcedureAsync(string procedureName, object? parameters = null)
-    {
-        return await _context.QueryAsync<T>(procedureName, parameters, CommandType.StoredProcedure);
-    }
-
-    public async Task<int> ExecuteStoredProcedureNonQueryAsync(string procedureName, object? parameters = null)
-    {
-        return await _context.ExecuteAsync(procedureName, parameters, CommandType.StoredProcedure);
-    }
-
     // ============================================================
     // OPTIMIZED BULK INSERT USING SQLBULKCOPY
     // ============================================================
@@ -358,7 +348,7 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
 
         var insertableProps = GetInsertableProperties();
         var dataTable = new DataTable();
-        
+
         foreach (var prop in insertableProps)
         {
             var columnType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
@@ -385,7 +375,7 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
                 bulkCopy.DestinationTableName = _tableName;
                 bulkCopy.BatchSize = 1000;
                 bulkCopy.BulkCopyTimeout = 300;
-                
+
                 await bulkCopy.WriteToServerAsync(dataTable);
                 return entityList.Count;
             }

@@ -10,8 +10,6 @@ public interface IAssetTransactionReps
     // ============================================================
 
     Task<AssetTransactionEntity?> GetByIdRawAsync(int id);
-    Task<int> GetTransactionCountByAssetAsync(int assetId);
-    Task<bool> HasOpenPairedTransactionAsync(int assetId, int transactionType);
 
     // ============================================================
     // DETAIL VIEW
@@ -28,7 +26,7 @@ public interface IAssetTransactionReps
     Task<PaginatedResult<AssetTransactionPendingApprovalView>> GetGridPendingApprovalAsync(AssetTransactionGridRequest request);
 
     // ============================================================
-    // COMPLETE TRANSACTIONS (NEW)
+    // COMPLETE TRANSACTIONS
     // ============================================================
 
     Task<PaginatedResult<AssetTransactionListView>> GetCompleteTransactionsAsync(AssetTransactionGridRequest request);

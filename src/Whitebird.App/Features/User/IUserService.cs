@@ -35,9 +35,9 @@ public interface IUserService
     Task<ServiceResult<string>> UploadProfilePhotoAsync(int userId, IFormFile file);
 
     /// <summary>
-    /// Gets profile photo bytes
+    /// Gets profile photo bytes with the correct Content-Type.
     /// </summary>
-    Task<ServiceResult<byte[]>> GetProfilePhotoAsync(int userId);
+    Task<ServiceResult<FileContentDto>> GetProfilePhotoAsync(int userId);
 
     /// <summary>
     /// Deletes profile photo

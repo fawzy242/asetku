@@ -210,16 +210,8 @@ public class UserService : BaseService, IUserService
             var existingPhoto = await _userReps.GetPhotoProfileByUserIdAsync(userId);
             if (existingPhoto != null)
             {
-                // Soft delete from UsersPhotoProfileAttachment
                 await _userReps.DeletePhotoProfileByUserIdAsync(userId);
-                // Soft delete from FileAttachment
                 await _fileAttachmentReps.DeleteAsync(existingPhoto.FileAttachmentId);
-                // Delete physical file
-                var fileEntity = await _fileAttachmentReps.GetByIdAsync(existingPhoto.FileAttachmentId);
-                if (fileEntity != null)
-                {
-                    await _storageService.DeleteFileAsync(fileEntity.FilePath);
-                }
             }
 
             // 2. Save physical file
@@ -277,33 +269,39 @@ public class UserService : BaseService, IUserService
         }, "upload profile photo");
     }
 
-    public async Task<ServiceResult<byte[]>> GetProfilePhotoAsync(int userId)
+    public async Task<ServiceResult<FileContentDto>> GetProfilePhotoAsync(int userId)
     {
         return await ExecuteSafelyAsync(async () =>
         {
             var user = await _userReps.GetUserByIdAsync(userId);
             if (user == null)
             {
-                return ServiceResult<byte[]>.NotFound("User not found");
+                return ServiceResult<FileContentDto>.NotFound("User not found");
             }
 
             // 1. Get photo profile from UsersPhotoProfileAttachment
             var photoProfile = await _userReps.GetPhotoProfileByUserIdAsync(userId);
             if (photoProfile == null)
             {
-                return ServiceResult<byte[]>.NotFound("Profile photo not found");
+                return ServiceResult<FileContentDto>.NotFound("Profile photo not found");
             }
 
             // 2. Get file attachment
             var fileEntity = await _fileAttachmentReps.GetByIdAsync(photoProfile.FileAttachmentId);
             if (fileEntity == null)
             {
-                return ServiceResult<byte[]>.NotFound("Profile photo not found");
+                return ServiceResult<FileContentDto>.NotFound("Profile photo not found");
             }
 
             // 3. Read physical file
             var fileBytes = await _storageService.ReadFileAsync(fileEntity.FilePath);
-            return ServiceResult<byte[]>.Success(fileBytes);
+
+            return ServiceResult<FileContentDto>.Success(new FileContentDto
+            {
+                Bytes = fileBytes,
+                ContentType = _storageService.GetMimeType(fileEntity.OriginalFileName),
+                FileName = fileEntity.OriginalFileName
+            });
         }, "get profile photo");
     }
 
@@ -317,29 +315,15 @@ public class UserService : BaseService, IUserService
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            // 1. Get photo profile
             var photoProfile = await _userReps.GetPhotoProfileByUserIdAsync(userId);
             if (photoProfile == null)
             {
                 return ServiceResult.Success("No profile photo to delete");
             }
 
-            // 2. Get file attachment
-            var fileEntity = await _fileAttachmentReps.GetByIdAsync(photoProfile.FileAttachmentId);
-
-            // 3. Soft delete from UsersPhotoProfileAttachment
             await _userReps.DeletePhotoProfileByUserIdAsync(userId);
-
-            // 4. Soft delete from FileAttachment
             await _fileAttachmentReps.DeleteAsync(photoProfile.FileAttachmentId);
 
-            // 5. Delete physical file
-            if (fileEntity != null)
-            {
-                await _storageService.DeleteFileAsync(fileEntity.FilePath);
-            }
-
-            // 6. Update user ModifiedDate
             user.ModifiedDate = DateTime.Now;
             user.ModifiedBy = _currentUserService.GetDisplayName();
             await _userReps.UpdateUserAsync(user);

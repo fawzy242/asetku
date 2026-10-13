@@ -31,12 +31,14 @@ public interface IAssetTransactionService
     // ============================================================
 
     /// <summary>
-    /// Update transaction with attachments (base64) - for standard grid data
+    /// Update transaction with attachments (base64) - for standard grid data.
+    /// After the update, the backend re-evaluates the transaction Completed state.
     /// </summary>
     Task<ServiceResult<AssetTransactionDetailView>> UpdateWithAttachmentsAsync(int id, AssetTransactionUpdateFormDto model);
 
     /// <summary>
-    /// Update transaction approval with attachments (base64) - for pending approval grid data
+    /// Update transaction approval with attachments (base64) - for pending approval grid data.
+    /// After the update, the backend re-evaluates the transaction Completed state.
     /// </summary>
     Task<ServiceResult<AssetTransactionDetailView>> UpdateApprovalWithAttachmentsAsync(int id, AssetTransactionUpdateApprovalFormDto model);
 
@@ -64,7 +66,7 @@ public interface IAssetTransactionService
     Task<ServiceResult<PaginatedResult<AssetTransactionPendingApprovalView>>> GetGridPendingApprovalAsync(AssetTransactionGridRequest request);
 
     // ============================================================
-    // COMPLETE TRANSACTIONS (NEW)
+    // COMPLETE TRANSACTIONS
     // ============================================================
 
     Task<ServiceResult<PaginatedResult<AssetTransactionListView>>> GetCompleteTransactionsAsync(AssetTransactionGridRequest request);
@@ -97,16 +99,27 @@ public interface IAssetTransactionService
     Task<ServiceResult<IEnumerable<AssetTransactionAssetDto>>> GetAssetListAsync(int transactionTypeId);
 
     // ============================================================
-    // NEW: ATTACHMENTS (for standalone retrieval)
+    // ATTACHMENTS (standalone retrieval)
+    // ============================================================
+
+    Task<ServiceResult<IEnumerable<AssetTransactionAttachmentView>>> GetAttachmentsAsync(int transactionId);
+    Task<ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>> GetApproveAttachmentsAsync(int transactionId);
+
+    // ============================================================
+    // APPROVAL DOCUMENT WORKFLOW
     // ============================================================
 
     /// <summary>
-    /// Gets general attachments for a transaction
+    /// Returns the required approval-document checklist for the transaction,
+    /// derived from MasterData.ReferenceName = 'ApproveDocumentType' joined
+    /// with the transaction's current approval attachments.
     /// </summary>
-    Task<ServiceResult<IEnumerable<AssetTransactionAttachmentView>>> GetAttachmentsAsync(int transactionId);
+    Task<ServiceResult<IEnumerable<RequiredDocumentTypeDto>>> GetRequiredDocumentsAsync(int transactionId);
 
     /// <summary>
-    /// Gets approve attachments for a transaction
+    /// Applies an action (approve / revision) to a single approval document.
+    /// After the change, the transaction Completed flag is auto re-evaluated.
     /// </summary>
-    Task<ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>> GetApproveAttachmentsAsync(int transactionId);
+    Task<ServiceResult<AssetTransactionDetailView>> SetApproveAttachmentActionAsync(
+        int transactionId, int attachmentId, ApproveAttachmentActionDto dto);
 }

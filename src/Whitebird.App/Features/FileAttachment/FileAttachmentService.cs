@@ -50,16 +50,6 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
     }
 
     /// <inheritdoc />
-    public async Task<ServiceResult<IEnumerable<FileAttachmentListViewModel>>> GetByReferenceAsync(string referenceTable, int referenceId)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var attachments = await _fileAttachmentReps.GetByReferenceAsync(referenceTable, referenceId);
-            return ServiceResult<IEnumerable<FileAttachmentListViewModel>>.Success(attachments.Adapt<IEnumerable<FileAttachmentListViewModel>>());
-        }, "get file attachments by reference");
-    }
-
-    /// <inheritdoc />
     public async Task<ServiceResult<FileAttachmentResponseDto>> UploadAsync(string referenceTable, int referenceId, FileAttachmentUploadDto model)
     {
         if (model.File == null || model.File.Length == 0)
@@ -84,52 +74,71 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
             var savedPath = await _storageService.SaveFileAsync(model.File, subDirectory);
             var fileHash = _storageService.ComputeFileHash(model.File);
 
-            var entity = new FileAttachmentEntity
-            {
-                FileCategory = model.FileCategory,
-                FileName = Path.GetFileName(savedPath),
-                OriginalFileName = model.File.FileName,
-                FileExtension = extension,
-                FileMimeType = _storageService.GetMimeType(model.File.FileName),
-                FilePath = savedPath,
-                FileSize = model.File.Length,
-                FileHash = fileHash,
-                Description = model.Description,
-                VersionNumber = 1,
-                IsPrimary = model.IsPrimary,
-                IsActive = true,
-                CreatedDate = DateTime.Now,
-                CreatedBy = _currentUserService.GetDisplayName()
-            };
-
-            var id = await _fileAttachmentReps.InsertAsync(entity);
-
-            var request = _httpContextAccessor.HttpContext?.Request;
-            var fileUrl = request != null ? $"{request.Scheme}://{request.Host}/api/FileAttachment/download/{id}" : null;
-            var previewUrl = _storageService.IsImageFile(model.File.FileName) && request != null
-                ? $"{request.Scheme}://{request.Host}/api/FileAttachment/preview/{id}"
-                : null;
-
-            var response = new FileAttachmentResponseDto
-            {
-                FileAttachmentId = id,
-                FileName = entity.FileName,
-                OriginalFileName = entity.OriginalFileName,
-                FileUrl = fileUrl,
-                PreviewUrl = previewUrl,
-                FileSize = entity.FileSize,
-                FileCategory = entity.FileCategory,
-                IsPrimary = entity.IsPrimary
-            };
-
-            await _activityLogService.LogCreateAsync(
+            return await PersistAsync(
                 referenceTable,
                 referenceId,
-                $"File uploaded: '{model.File.FileName}'",
-                _currentUserService.GetDisplayName());
-
-            return ServiceResult<FileAttachmentResponseDto>.Success(response, "File uploaded successfully");
+                originalFileName: model.File.FileName,
+                extension: extension,
+                savedPath: savedPath,
+                fileSize: model.File.Length,
+                fileHash: fileHash,
+                fileCategory: model.FileCategory,
+                description: model.Description,
+                isPrimary: model.IsPrimary);
         }, "upload file");
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResult<FileAttachmentResponseDto>> UploadBytesAsync(
+        string referenceTable,
+        int referenceId,
+        string originalFileName,
+        byte[] bytes,
+        string? fileCategory = null,
+        string? description = null,
+        bool isPrimary = false)
+    {
+        if (bytes == null || bytes.Length == 0)
+        {
+            return ServiceResult<FileAttachmentResponseDto>.BadRequest("No file content provided");
+        }
+
+        if (string.IsNullOrWhiteSpace(originalFileName))
+        {
+            return ServiceResult<FileAttachmentResponseDto>.BadRequest("Original file name is required");
+        }
+
+        var extension = Path.GetExtension(originalFileName).ToLowerInvariant();
+        if (!FileSizeConstants.IsAllowedAssetExtension(extension))
+        {
+            return ServiceResult<FileAttachmentResponseDto>.BadRequest(
+                $"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedAssetExtensions)}");
+        }
+
+        if (bytes.Length > FileSizeConstants.MaxAssetAttachmentBytes)
+        {
+            return ServiceResult<FileAttachmentResponseDto>.BadRequest(
+                $"File size exceeds {FileSizeConstants.MaxAssetAttachmentMB}MB limit");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var subDirectory = Path.Combine(referenceTable, referenceId.ToString());
+            var savedPath = await _storageService.SaveBytesAsync(bytes, originalFileName, subDirectory);
+            var fileHash = _storageService.ComputeHash(bytes);
+
+            return await PersistAsync(
+                referenceTable,
+                referenceId,
+                originalFileName: originalFileName,
+                extension: extension,
+                savedPath: savedPath,
+                fileSize: bytes.Length,
+                fileHash: fileHash,
+                fileCategory: fileCategory,
+                description: description,
+                isPrimary: isPrimary);
+        }, "upload file bytes");
     }
 
     /// <inheritdoc />
@@ -184,7 +193,6 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
                 return ServiceResult<FileAttachmentResponseDto>.NotFound($"Attachment with id {id} not found");
             }
 
-            var oldDescription = existing.Description;
             var oldIsPrimary = existing.IsPrimary;
 
             existing.Description = model.Description;
@@ -234,7 +242,6 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
                 return ServiceResult.NotFound($"Attachment with id {id} not found");
             }
 
-            await _storageService.DeleteFileAsync(existing.FilePath);
             var result = await _fileAttachmentReps.DeleteAsync(id);
 
             if (result > 0)
@@ -299,5 +306,73 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
             var isImage = _storageService.IsImageFile(attachment.OriginalFileName);
             return ServiceResult<bool>.Success(isImage);
         }, "check if file is image");
+    }
+
+    // ============================================================
+    // PRIVATE HELPERS
+    // ============================================================
+
+    /// <summary>
+    /// Persists a FileAttachment row and builds the response DTO.
+    /// Shared by <see cref="UploadAsync"/> and <see cref="UploadBytesAsync"/>
+    /// to keep the DB-insert + response-construction logic in one place.
+    /// </summary>
+    private async Task<ServiceResult<FileAttachmentResponseDto>> PersistAsync(
+        string referenceTable,
+        int referenceId,
+        string originalFileName,
+        string extension,
+        string savedPath,
+        long fileSize,
+        string fileHash,
+        string? fileCategory,
+        string? description,
+        bool isPrimary)
+    {
+        var entity = new FileAttachmentEntity
+        {
+            FileCategory = fileCategory,
+            FileName = Path.GetFileName(savedPath),
+            OriginalFileName = originalFileName,
+            FileExtension = extension,
+            FileMimeType = _storageService.GetMimeType(originalFileName),
+            FilePath = savedPath,
+            FileSize = fileSize,
+            FileHash = fileHash,
+            Description = description,
+            VersionNumber = 1,
+            IsPrimary = isPrimary,
+            IsActive = true,
+            CreatedDate = DateTime.Now,
+            CreatedBy = _currentUserService.GetDisplayName()
+        };
+
+        var id = await _fileAttachmentReps.InsertAsync(entity);
+
+        var request = _httpContextAccessor.HttpContext?.Request;
+        var fileUrl = request != null ? $"{request.Scheme}://{request.Host}/api/FileAttachment/download/{id}" : null;
+        var previewUrl = _storageService.IsImageFile(originalFileName) && request != null
+            ? $"{request.Scheme}://{request.Host}/api/FileAttachment/preview/{id}"
+            : null;
+
+        var response = new FileAttachmentResponseDto
+        {
+            FileAttachmentId = id,
+            FileName = entity.FileName,
+            OriginalFileName = entity.OriginalFileName,
+            FileUrl = fileUrl,
+            PreviewUrl = previewUrl,
+            FileSize = entity.FileSize,
+            FileCategory = entity.FileCategory,
+            IsPrimary = entity.IsPrimary
+        };
+
+        await _activityLogService.LogCreateAsync(
+            referenceTable,
+            referenceId,
+            $"File uploaded: '{originalFileName}'",
+            _currentUserService.GetDisplayName());
+
+        return ServiceResult<FileAttachmentResponseDto>.Success(response, "File uploaded successfully");
     }
 }

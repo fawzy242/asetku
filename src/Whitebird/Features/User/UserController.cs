@@ -120,7 +120,7 @@ public class UserController : ControllerBase
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
 
-        return File(result.Data, "image/jpeg");
+        return File(result.Data.Bytes, result.Data.ContentType);
     }
 
     /// <summary>

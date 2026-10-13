@@ -91,4 +91,12 @@ public class SupplierController : ControllerBase
         if (validation != null) return validation;
         return this.HandleResult(await _supplierService.BulkDeactivateAsync(request));
     }
+
+    [HttpPost("bulk-delete")]
+    public async Task<IActionResult> BulkDelete([FromBody] BulkDeleteRequest request)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _supplierService.BulkDeleteAsync(request));
+    }
 }

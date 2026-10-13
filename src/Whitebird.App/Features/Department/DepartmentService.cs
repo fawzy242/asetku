@@ -129,12 +129,19 @@ public class DepartmentService : BaseService, IDepartmentService
                 return ServiceResult<DepartmentDetailView>.NotFound($"Department with id {id} not found");
             }
 
+            var wasActive = existing.IsActive;
             var oldName = existing.DepartmentName;
             var oldCode = existing.DepartmentCode;
 
             model.Adapt(existing);
             existing.ModifiedDate = DateTime.Now;
             existing.ModifiedBy = _currentUserService.GetDisplayName();
+
+            // BR-01: if record was Active on entry, force Inactive after update.
+            if (wasActive)
+            {
+                existing.IsActive = false;
+            }
 
             var result = await _repository.UpdateAsync(existing);
             if (result <= 0)
@@ -325,5 +332,52 @@ public class DepartmentService : BaseService, IDepartmentService
 
             return ServiceResult<int>.Success(deactivatedCount, message);
         }, "bulk deactivate departments");
+    }
+
+    public async Task<ServiceResult<int>> BulkDeleteAsync(BulkDeleteRequest request)
+    {
+        if (request.Ids == null || !request.Ids.Any())
+        {
+            return ServiceResult<int>.BadRequest("No department IDs provided");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var deletedCount = 0;
+
+            foreach (var id in request.Ids)
+            {
+                var department = await _departmentReps.GetByIdRawAsync(id);
+                if (department == null)
+                {
+                    continue;
+                }
+
+                // Reuse per-row business rule: refuse if it has employees assigned.
+                var employeeCount = await _departmentReps.GetEmployeeCountAsync(id);
+                if (employeeCount > 0)
+                {
+                    continue;
+                }
+
+                var result = await _repository.DeleteAsync(id);
+                if (result > 0)
+                {
+                    deletedCount++;
+
+                    await _activityLogService.LogDeleteAsync(
+                        TableNames.Department,
+                        id,
+                        $"Department '{department.DepartmentName}' deleted via bulk operation",
+                        _currentUserService.GetDisplayName());
+                }
+            }
+
+            var message = deletedCount > 0
+                ? $"{deletedCount} department(s) deleted successfully"
+                : "No departments were deleted. Departments with employees cannot be deleted.";
+
+            return ServiceResult<int>.Success(deletedCount, message);
+        }, "bulk delete departments");
     }
 }

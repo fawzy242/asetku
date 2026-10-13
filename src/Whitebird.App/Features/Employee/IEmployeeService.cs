@@ -46,18 +46,40 @@ public interface IEmployeeService
 
     Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request);
     Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request);
+    Task<ServiceResult<int>> BulkDeleteAsync(BulkDeleteRequest request);
 
     // ============================================================
-    // NEW: PHOTO & ATTACHMENTS (for EmployeeSummary and standalone use)
+    // PHOTO & ATTACHMENTS
     // ============================================================
 
     /// <summary>
-    /// Gets profile photo bytes for an employee
+    /// Gets profile photo bytes with the correct Content-Type.
     /// </summary>
-    Task<ServiceResult<byte[]>> GetPhotoAsync(int employeeId);
+    Task<ServiceResult<FileContentDto>> GetPhotoAsync(int employeeId);
 
     /// <summary>
-    /// Gets attachment list for an employee
+    /// Uploads (or replaces) the profile photo from multipart form data.
+    /// Returns the photo URL on success.
+    /// </summary>
+    Task<ServiceResult<string>> UploadPhotoAsync(int employeeId, IFormFile file);
+
+    /// <summary>
+    /// Soft-deletes the current profile photo (physical file is retained).
+    /// </summary>
+    Task<ServiceResult> DeletePhotoAsync(int employeeId);
+
+    /// <summary>
+    /// Gets attachment list for an employee.
     /// </summary>
     Task<ServiceResult<IEnumerable<EmployeeAttachmentViewDto>>> GetAttachmentsAsync(int employeeId);
+
+    /// <summary>
+    /// Uploads a standalone attachment.
+    /// </summary>
+    Task<ServiceResult<EmployeeAttachmentViewDto>> UploadAttachmentAsync(int employeeId, AttachmentUploadDto model);
+
+    /// <summary>
+    /// Soft-deletes a single attachment (physical file is retained).
+    /// </summary>
+    Task<ServiceResult> DeleteAttachmentAsync(int employeeId, int fileAttachmentId);
 }

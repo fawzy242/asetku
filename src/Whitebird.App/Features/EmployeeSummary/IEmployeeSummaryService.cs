@@ -66,16 +66,16 @@ public interface IEmployeeSummaryService
     Task<ServiceResult<EmployeeScheduleStatsDto>> GetScheduleStatsAsync(int employeeId);
 
     // ============================================================
-    // NEW: PHOTO & ATTACHMENTS (delegated to EmployeeService)
+    // PHOTO & ATTACHMENTS (delegated to EmployeeService)
     // ============================================================
 
     /// <summary>
-    /// Gets profile photo bytes for an employee (delegated to EmployeeService)
+    /// Gets profile photo bytes with the correct Content-Type (delegated to EmployeeService).
     /// </summary>
-    Task<ServiceResult<byte[]>> GetPhotoAsync(int employeeId);
+    Task<ServiceResult<FileContentDto>> GetPhotoAsync(int employeeId);
 
     /// <summary>
-    /// Gets attachment list for an employee (delegated to EmployeeService)
+    /// Gets attachment list for an employee (delegated to EmployeeService).
     /// </summary>
     Task<ServiceResult<IEnumerable<EmployeeAttachmentViewDto>>> GetAttachmentsAsync(int employeeId);
 }

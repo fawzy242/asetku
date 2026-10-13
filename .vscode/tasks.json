@@ -6,19 +6,46 @@
       "type": "shell",
       "command": "dotnet",
       "args": ["restore", "${workspaceFolder}/src/Whitebird/Whitebird.csproj"],
-      "presentation": {
-        "reveal": "silent"
-      }
+      "presentation": { "reveal": "silent" }
     },
     {
       "label": "build-backend",
       "type": "shell",
       "command": "dotnet",
       "args": ["build", "${workspaceFolder}/src/Whitebird/Whitebird.csproj", "--no-restore"],
-      "presentation": {
-        "reveal": "silent"
-      },
+      "presentation": { "reveal": "silent" },
       "dependsOn": ["restore-backend"]
+    },
+    {
+      "label": "npm-install",
+      "type": "shell",
+      "command": "npm",
+      "args": ["install"],
+      "options": { "cwd": "${workspaceFolder}/src/Whitebird/ClientApp" },
+      "presentation": { "reveal": "silent" }
+    },
+    {
+      "label": "build-frontend",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "build"],
+      "options": { "cwd": "${workspaceFolder}/src/Whitebird/ClientApp" },
+      "presentation": { "reveal": "always" }
+    },
+    {
+      "label": "publish-fullstack",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "publish",
+        "${workspaceFolder}/src/Whitebird/Whitebird.csproj",
+        "-c",
+        "Release",
+        "-o",
+        "${workspaceFolder}/publish"
+      ],
+      "presentation": { "reveal": "always" },
+      "dependsOn": ["build-frontend"]
     },
     {
       "label": "start-backend",
@@ -34,9 +61,7 @@
       ],
       "isBackground": true,
       "problemMatcher": {
-        "pattern": {
-          "regexp": "^$"
-        },
+        "pattern": { "regexp": "^$" },
         "background": {
           "activeOnStart": true,
           "beginsPattern": "Now listening on:",
@@ -50,30 +75,14 @@
       }
     },
     {
-      "label": "npm-install",
-      "type": "shell",
-      "command": "npm",
-      "args": ["install"],
-      "options": {
-        "cwd": "${workspaceFolder}/src/Whitebird/ClientApp"
-      },
-      "presentation": {
-        "reveal": "silent"
-      }
-    },
-    {
       "label": "start-frontend",
       "type": "shell",
       "command": "npm",
       "args": ["run", "dev", "--", "--host"],
-      "options": {
-        "cwd": "${workspaceFolder}/src/Whitebird/ClientApp"
-      },
+      "options": { "cwd": "${workspaceFolder}/src/Whitebird/ClientApp" },
       "isBackground": true,
       "problemMatcher": {
-        "pattern": {
-          "regexp": "^$"
-        },
+        "pattern": { "regexp": "^$" },
         "background": {
           "activeOnStart": true,
           "beginsPattern": "VITE.*ready in",
@@ -93,45 +102,13 @@
       "problemMatcher": []
     },
     {
-      "label": "build-frontend",
-      "type": "shell",
-      "command": "npm",
-      "args": ["run", "build"],
-      "options": {
-        "cwd": "${workspaceFolder}/src/Whitebird/ClientApp"
-      },
-      "presentation": {
-        "reveal": "always"
-      }
-    },
-    {
       "label": "preview-frontend",
       "type": "shell",
       "command": "npm",
       "args": ["run", "preview"],
-      "options": {
-        "cwd": "${workspaceFolder}/src/Whitebird/ClientApp"
-      },
+      "options": { "cwd": "${workspaceFolder}/src/Whitebird/ClientApp" },
       "isBackground": true,
-      "presentation": {
-        "reveal": "always"
-      }
-    },
-    {
-      "label": "publish-backend",
-      "type": "shell",
-      "command": "dotnet",
-      "args": [
-        "publish",
-        "${workspaceFolder}/src/Whitebird/Whitebird.csproj",
-        "-c",
-        "Release",
-        "-o",
-        "${workspaceFolder}/publish"
-      ],
-      "presentation": {
-        "reveal": "always"
-      }
+      "presentation": { "reveal": "always" }
     }
   ]
 }

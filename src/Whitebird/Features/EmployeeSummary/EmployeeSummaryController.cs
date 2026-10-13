@@ -93,7 +93,7 @@ public class EmployeeSummaryController : ControllerBase
         => this.HandleResult(await _employeeSummaryService.GetScheduleStatsAsync(employeeId));
 
     // ============================================================
-    // NEW: PHOTO & ATTACHMENTS (delegated to EmployeeService)
+    // PHOTO & ATTACHMENTS (delegated to EmployeeService)
     // ============================================================
 
     [HttpGet("{employeeId:int}/photo")]
@@ -102,7 +102,8 @@ public class EmployeeSummaryController : ControllerBase
         var result = await _employeeSummaryService.GetPhotoAsync(employeeId);
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
-        return File(result.Data, "image/jpeg");
+
+        return File(result.Data.Bytes, result.Data.ContentType);
     }
 
     [HttpGet("{employeeId:int}/attachments")]

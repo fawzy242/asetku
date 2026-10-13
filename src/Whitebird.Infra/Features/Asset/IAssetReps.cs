@@ -22,21 +22,6 @@ public interface IAssetReps
     Task<AssetDetailView?> GetDetailByIdAsync(int assetId);
     Task<IEnumerable<AssetListView>> GetAllListViewAsync();
     Task<IEnumerable<AssetListView>> GetByCategoryListViewAsync(int categoryId);
-    Task<IEnumerable<AssetListView>> GetExpiredWarrantyListViewAsync();
-    Task<IEnumerable<AssetListView>> GetByStatusListViewAsync(string status);
-
-    // ============================================================
-    // COUNT METHODS
-    // ============================================================
-
-    Task<int> GetTotalAssetsCountAsync();
-    Task<int> GetAvailableAssetsCountAsync();
-    Task<int> GetAssignedAssetsCountAsync();
-    Task<int> GetAssetsOnLoanCountAsync();
-    Task<int> GetAssetsInMaintenanceCountAsync();
-    Task<int> GetDamagedAssetsCountAsync();
-    Task<int> GetExpiredWarrantyCountAsync();
-    Task<decimal> GetTotalAssetValueAsync();
 
     // ============================================================
     // PAGINATION

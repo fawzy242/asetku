@@ -62,18 +62,6 @@ public class MasterDataService : BaseService, IMasterDataService
         }, $"get master data value: {referenceName}/{code}");
     }
 
-    public async Task<ServiceResult<int?>> GetCodeAsync(string referenceName, string value)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var allData = await _masterDataReps.GetByReferenceNameAsync(referenceName);
-            var match = allData.FirstOrDefault(x =>
-                x.MasterDataName.Equals(value, StringComparison.OrdinalIgnoreCase));
-
-            return ServiceResult<int?>.Success(match?.ReferenceCode);
-        }, $"get master data code: {referenceName}/{value}");
-    }
-
     public async Task<ServiceResult<IEnumerable<MasterDataDto>>> GetTransactionTypesAsync()
         => await GetByReferenceNameAsync("TransactionType");
 

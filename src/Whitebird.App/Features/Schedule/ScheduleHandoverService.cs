@@ -156,9 +156,17 @@ public class ScheduleHandoverService : BaseService, IScheduleHandoverService
 
         return await ExecuteWithTransactionAsync(async () =>
         {
+            var wasActive = existing.IsActive;
+
             dto.Adapt(existing);
             existing.ModifiedDate = DateTime.Now;
             existing.ModifiedBy = _currentUserService.GetDisplayName();
+
+            // BR-01: if record was Active on entry, force Inactive after update.
+            if (wasActive)
+            {
+                existing.IsActive = false;
+            }
 
             await _scheduleReps.UpdateAsync(existing);
             var updated = await _scheduleReps.GetDetailByIdAsync(id);
@@ -292,6 +300,39 @@ public class ScheduleHandoverService : BaseService, IScheduleHandoverService
 
             return ServiceResult<int>.Success(deactivatedCount, $"{deactivatedCount} schedule(s) deactivated successfully");
         }, "bulk deactivate schedule handover");
+    }
+
+    public async Task<ServiceResult<int>> BulkDeleteAsync(BulkDeleteRequest request)
+    {
+        if (request.Ids == null || !request.Ids.Any())
+        {
+            return ServiceResult<int>.BadRequest("No schedule IDs provided");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var deletedCount = 0;
+
+            foreach (var id in request.Ids)
+            {
+                var schedule = await _scheduleReps.GetByIdRawAsync(id);
+                if (schedule == null)
+                {
+                    continue;
+                }
+
+                await _scheduleReps.DeleteAsync(id);
+                deletedCount++;
+            }
+
+            await _activityLogService.LogDeleteAsync(
+                TableNames.ScheduleHandover,
+                0,
+                $"{deletedCount} schedule(s) deleted via bulk operation",
+                _currentUserService.GetDisplayName());
+
+            return ServiceResult<int>.Success(deletedCount, $"{deletedCount} schedule(s) deleted successfully");
+        }, "bulk delete schedule handover");
     }
 
     public async Task<ServiceResult<ScheduleGenerateResultDto>> GenerateAsync(ScheduleHandoverGenerateDto dto)

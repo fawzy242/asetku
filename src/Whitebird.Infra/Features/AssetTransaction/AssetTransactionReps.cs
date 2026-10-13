@@ -28,24 +28,6 @@ public class AssetTransactionReps : IAssetTransactionReps
         return await _context.QueryFirstOrDefaultAsync<AssetTransactionEntity>(sql, new { Id = id });
     }
 
-    public async Task<int> GetTransactionCountByAssetAsync(int assetId)
-    {
-        const string sql = "SELECT COUNT(*) FROM AssetTransaction WHERE AssetId = @AssetId AND IsActive = 1";
-        return await _context.ExecuteScalarAsync<int>(sql, new { AssetId = assetId });
-    }
-
-    public async Task<bool> HasOpenPairedTransactionAsync(int assetId, int transactionType)
-    {
-        const string sql = @"
-            SELECT COUNT(1) FROM AssetTransaction
-            WHERE AssetId = @AssetId
-              AND TransactionType = @TransactionType
-              AND Approved = 1
-              AND FromAssetTransactionId IS NULL
-              AND IsActive = 1";
-        return await _context.ExecuteScalarAsync<int>(sql, new { AssetId = assetId, TransactionType = transactionType }) > 0;
-    }
-
     // ============================================================
     // DETAIL VIEW
     // ============================================================
@@ -189,7 +171,8 @@ public class AssetTransactionReps : IAssetTransactionReps
         conditions.Add("t.IsActive = 1");
 
         // ============================================================
-        // NEW: Status Filter
+        // Status Filter
+        // AT-09: Pending widened to include both NULL and 0 (Approved = 0).
         // ============================================================
         if (!string.IsNullOrWhiteSpace(request.Status))
         {
@@ -199,7 +182,7 @@ public class AssetTransactionReps : IAssetTransactionReps
                     conditions.Add("t.Approved = 1");
                     break;
                 case "pending":
-                    conditions.Add("t.Approved IS NULL");
+                    conditions.Add("(t.Approved IS NULL OR t.Approved = 0)");
                     break;
                 case "reject":
                     conditions.Remove("t.IsActive = 1");
@@ -302,7 +285,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var data = await _context.QueryAsync<AssetTransactionListView>(dataSql, parameters);
 
-        // NEW CODE (BATCH QUERY) - FIX N+1
         var result = data.ToList();
         if (result.Any())
         {
@@ -425,7 +407,7 @@ public class AssetTransactionReps : IAssetTransactionReps
     }
 
     // ============================================================
-    // GRID - PENDING APPROVAL
+    // GRID - PENDING APPROVAL (Uncompleted)
     // ============================================================
 
     public async Task<PaginatedResult<AssetTransactionPendingApprovalView>> GetGridPendingApprovalAsync(AssetTransactionGridRequest request)
@@ -434,8 +416,32 @@ public class AssetTransactionReps : IAssetTransactionReps
         var parameters = new DynamicParameters();
 
         conditions.Add("t.Approved = 1");
-        conditions.Add("t.Completed IS NULL");
+        conditions.Add("(t.Completed IS NULL OR t.Completed = 0)");
         conditions.Add("t.IsActive = 1");
+
+        // ============================================================
+        // AT-04 — Defense-in-depth:
+        // Exclude transactions that already have every required approval-document
+        // type attached. Those satisfy the "Uncompleted" definition only when
+        // all docs are attached; further exclusion is intentional here to keep
+        // the query aligned with the business definition and to prevent the
+        // Pending Approval query from returning transactions whose document
+        // state is already complete-eligible.
+        // ============================================================
+        conditions.Add(@"
+            NOT EXISTS (
+                SELECT 1
+                FROM MasterData md
+                WHERE md.ReferenceName = 'ApproveDocumentType'
+                  AND md.IsActive = 1
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM AssetTransactionApproveAttachment ataa
+                      WHERE ataa.AssetTransactionId = t.AssetTransactionId
+                        AND ataa.DocumentType = md.ReferenceCode
+                        AND ataa.IsActive = 1
+                  )
+            )");
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
@@ -1147,7 +1153,7 @@ public class AssetTransactionReps : IAssetTransactionReps
     }
 
     // ============================================================
-    // COMPLETE TRANSACTIONS (NEW)
+    // COMPLETE TRANSACTIONS
     // ============================================================
 
     public async Task<PaginatedResult<AssetTransactionListView>> GetCompleteTransactionsAsync(AssetTransactionGridRequest request)

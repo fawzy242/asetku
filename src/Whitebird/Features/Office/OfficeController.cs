@@ -91,4 +91,12 @@ public class OfficeController : ControllerBase
         if (validation != null) return validation;
         return this.HandleResult(await _officeService.BulkDeactivateAsync(request));
     }
+
+    [HttpPost("bulk-delete")]
+    public async Task<IActionResult> BulkDelete([FromBody] BulkDeleteRequest request)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _officeService.BulkDeleteAsync(request));
+    }
 }

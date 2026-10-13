@@ -128,11 +128,19 @@ public class BulkApprovalRequest
     public List<int> Ids { get; set; } = new();
 }
 
+/// <summary>
+/// Request body for the single approval-document action endpoint.
+/// The target attachmentId is supplied via the route
+/// (POST /api/AssetTransaction/{id}/approve-attachments/{attachmentId}/action),
+/// so it is intentionally not part of this DTO.
+/// </summary>
 public class ApproveAttachmentActionDto
 {
-    [Required(ErrorMessage = "AttachmentId is required")]
-    public int AttachmentId { get; set; }
-
+    /// <summary>
+    /// Supported values: "approve" or "revision" (case-insensitive).
+    /// - approve  → sets Approved = 1, NeedToChange = 0
+    /// - revision → sets Approved = 0, NeedToChange = 1
+    /// </summary>
     [Required(ErrorMessage = "Action is required")]
     public string Action { get; set; } = string.Empty;
 

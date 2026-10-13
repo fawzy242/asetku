@@ -77,7 +77,7 @@ public class AssetTrackingController : ControllerBase
         => this.HandleResult(await _assetTrackingService.GetEmployeeHistoryAsync(request));
 
     // ============================================================
-    // NEW: PHOTO & ATTACHMENTS (delegated to AssetService)
+    // PHOTO & ATTACHMENTS (delegated to AssetService)
     // ============================================================
 
     [HttpGet("{assetId:int}/photo")]
@@ -86,7 +86,8 @@ public class AssetTrackingController : ControllerBase
         var result = await _assetTrackingService.GetPhotoAsync(assetId);
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
-        return File(result.Data, "image/jpeg");
+
+        return File(result.Data.Bytes, result.Data.ContentType);
     }
 
     [HttpGet("{assetId:int}/attachments")]

@@ -111,12 +111,19 @@ public class SupplierService : BaseService, ISupplierService
                 return ServiceResult<SupplierDetailView>.NotFound($"Supplier with id {id} not found");
             }
 
+            var wasActive = existing.IsActive;
             var oldName = existing.SupplierName;
             var oldContact = existing.ContactPerson;
 
             model.Adapt(existing);
             existing.ModifiedDate = DateTime.Now;
             existing.ModifiedBy = _currentUserService.GetDisplayName();
+
+            // BR-01: if record was Active on entry, force Inactive after update.
+            if (wasActive)
+            {
+                existing.IsActive = false;
+            }
 
             var result = await _repository.UpdateAsync(existing);
             if (result <= 0)
@@ -307,5 +314,52 @@ public class SupplierService : BaseService, ISupplierService
 
             return ServiceResult<int>.Success(deactivatedCount, message);
         }, "bulk deactivate suppliers");
+    }
+
+    public async Task<ServiceResult<int>> BulkDeleteAsync(BulkDeleteRequest request)
+    {
+        if (request.Ids == null || !request.Ids.Any())
+        {
+            return ServiceResult<int>.BadRequest("No supplier IDs provided");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var deletedCount = 0;
+
+            foreach (var id in request.Ids)
+            {
+                var supplier = await _supplierReps.GetByIdRawAsync(id);
+                if (supplier == null)
+                {
+                    continue;
+                }
+
+                // Reuse per-row business rule: refuse if it has associated assets.
+                var assetCount = await _supplierReps.GetAssetCountAsync(id);
+                if (assetCount > 0)
+                {
+                    continue;
+                }
+
+                var result = await _repository.DeleteAsync(id);
+                if (result > 0)
+                {
+                    deletedCount++;
+
+                    await _activityLogService.LogDeleteAsync(
+                        TableNames.Supplier,
+                        id,
+                        $"Supplier '{supplier.SupplierName}' deleted via bulk operation",
+                        _currentUserService.GetDisplayName());
+                }
+            }
+
+            var message = deletedCount > 0
+                ? $"{deletedCount} supplier(s) deleted successfully"
+                : "No suppliers were deleted. Suppliers with associated assets cannot be deleted.";
+
+            return ServiceResult<int>.Success(deletedCount, message);
+        }, "bulk delete suppliers");
     }
 }

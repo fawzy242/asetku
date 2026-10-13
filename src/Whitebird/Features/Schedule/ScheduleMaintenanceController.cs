@@ -92,6 +92,14 @@ public class ScheduleMaintenanceController : ControllerBase
         return this.HandleResult(await _service.BulkDeactivateAsync(request));
     }
 
+    [HttpPost("bulk-delete")]
+    public async Task<IActionResult> BulkDelete([FromBody] BulkDeleteRequest request)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _service.BulkDeleteAsync(request));
+    }
+
     // ============================================================
     // GENERATE
     // ============================================================

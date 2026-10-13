@@ -54,16 +54,16 @@ public interface IAssetTrackingService
     Task<ServiceResult<PaginatedResult<AssetTrackingEmployeeHistoryDto>>> GetEmployeeHistoryAsync(AssetTrackingGridRequest request);
 
     // ============================================================
-    // NEW: PHOTO & ATTACHMENTS (delegated to AssetService)
+    // PHOTO & ATTACHMENTS (delegated to AssetService)
     // ============================================================
 
     /// <summary>
-    /// Gets profile photo bytes for an asset (delegated to AssetService)
+    /// Gets profile photo bytes with the correct Content-Type (delegated to AssetService).
     /// </summary>
-    Task<ServiceResult<byte[]>> GetPhotoAsync(int assetId);
+    Task<ServiceResult<FileContentDto>> GetPhotoAsync(int assetId);
 
     /// <summary>
-    /// Gets attachment list for an asset (delegated to AssetService)
+    /// Gets attachment list for an asset (delegated to AssetService).
     /// </summary>
     Task<ServiceResult<IEnumerable<AssetAttachmentViewDto>>> GetAttachmentsAsync(int assetId);
 }

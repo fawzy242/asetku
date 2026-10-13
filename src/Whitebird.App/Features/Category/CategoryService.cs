@@ -152,12 +152,19 @@ public class CategoryService : BaseService, ICategoryService
                 return ServiceResult<CategoryDetailView>.NotFound($"Category with id {id} not found");
             }
 
+            var wasActive = existing.IsActive;
             var oldName = existing.CategoryName;
             var oldParentId = existing.ParentCategoryId;
 
             model.Adapt(existing);
             existing.ModifiedDate = DateTime.Now;
             existing.ModifiedBy = _currentUserService.GetDisplayName();
+
+            // BR-01: if record was Active on entry, force Inactive after update.
+            if (wasActive)
+            {
+                existing.IsActive = false;
+            }
 
             var result = await _repository.UpdateAsync(existing);
             if (result <= 0)
@@ -348,5 +355,52 @@ public class CategoryService : BaseService, ICategoryService
 
             return ServiceResult<int>.Success(deactivatedCount, message);
         }, "bulk deactivate categories");
+    }
+
+    public async Task<ServiceResult<int>> BulkDeleteAsync(BulkDeleteRequest request)
+    {
+        if (request.Ids == null || !request.Ids.Any())
+        {
+            return ServiceResult<int>.BadRequest("No category IDs provided");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var deletedCount = 0;
+
+            foreach (var id in request.Ids)
+            {
+                var category = await _categoryReps.GetByIdRawAsync(id);
+                if (category == null)
+                {
+                    continue;
+                }
+
+                // Reuse per-row business rule: refuse if it has subcategories.
+                var childCount = await _categoryReps.GetChildCountAsync(id);
+                if (childCount > 0)
+                {
+                    continue;
+                }
+
+                var result = await _repository.DeleteAsync(id);
+                if (result > 0)
+                {
+                    deletedCount++;
+
+                    await _activityLogService.LogDeleteAsync(
+                        TableNames.Category,
+                        id,
+                        $"Category '{category.CategoryName}' deleted via bulk operation",
+                        _currentUserService.GetDisplayName());
+                }
+            }
+
+            var message = deletedCount > 0
+                ? $"{deletedCount} category(s) deleted successfully"
+                : "No categories were deleted. Categories with subcategories cannot be deleted.";
+
+            return ServiceResult<int>.Success(deletedCount, message);
+        }, "bulk delete categories");
     }
 }

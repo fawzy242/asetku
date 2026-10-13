@@ -40,6 +40,26 @@ public class StorageService : IStorageService
         return Path.Combine(subDirectory, fileName).Replace('\\', '/');
     }
 
+    public async Task<string> SaveBytesAsync(byte[] bytes, string originalFileName, string subDirectory)
+    {
+        if (bytes == null || bytes.Length == 0)
+            throw new ArgumentException("Bytes content is empty", nameof(bytes));
+
+        var directoryPath = Path.Combine(_basePath, subDirectory);
+        if (!Directory.Exists(directoryPath))
+        {
+            Directory.CreateDirectory(directoryPath);
+        }
+
+        var extension = Path.GetExtension(originalFileName);
+        var fileName = $"{Guid.NewGuid():N}{extension}";
+        var filePath = Path.Combine(directoryPath, fileName);
+
+        await File.WriteAllBytesAsync(filePath, bytes);
+
+        return Path.Combine(subDirectory, fileName).Replace('\\', '/');
+    }
+
     public Task DeleteFileAsync(string filePath)
     {
         var fullPath = Path.Combine(_basePath, filePath);
@@ -60,17 +80,18 @@ public class StorageService : IStorageService
         return await File.ReadAllBytesAsync(fullPath);
     }
 
-    public string GetFileUrl(string filePath, HttpRequest request)
-    {
-        var baseUrl = $"{request.Scheme}://{request.Host}";
-        return $"{baseUrl}/api/FileAttachment/download/{Path.GetFileNameWithoutExtension(filePath)}";
-    }
-
     public string ComputeFileHash(IFormFile file)
     {
         using var sha256 = SHA256.Create();
         using var stream = file.OpenReadStream();
         var hash = sha256.ComputeHash(stream);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    public string ComputeHash(byte[] bytes)
+    {
+        using var sha256 = SHA256.Create();
+        var hash = sha256.ComputeHash(bytes);
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 

@@ -405,7 +405,7 @@ public class AssetTransactionController : ControllerBase
     }
 
     // ============================================================
-    // NEW: ATTACHMENTS (standalone retrieval)
+    // ATTACHMENTS (standalone retrieval)
     // ============================================================
 
     [HttpGet("{id:int}/attachments")]
@@ -415,4 +415,30 @@ public class AssetTransactionController : ControllerBase
     [HttpGet("{id:int}/approve-attachments")]
     public async Task<IActionResult> GetApproveAttachments(int id)
         => this.HandleResult(await _transactionService.GetApproveAttachmentsAsync(id));
+
+    // ============================================================
+    // APPROVAL DOCUMENT WORKFLOW
+    // ============================================================
+
+    /// <summary>
+    /// Returns the required approval-document checklist for the transaction.
+    /// Derived from MasterData.ReferenceName = 'ApproveDocumentType' joined with
+    /// the transaction's current approval attachments.
+    /// </summary>
+    [HttpGet("{id:int}/required-documents")]
+    public async Task<IActionResult> GetRequiredDocuments(int id)
+        => this.HandleResult(await _transactionService.GetRequiredDocumentsAsync(id));
+
+    /// <summary>
+    /// Apply an action (approve / revision) to a single approval document.
+    /// The transaction's Completed flag is automatically re-evaluated afterward.
+    /// </summary>
+    [HttpPost("{id:int}/approve-attachments/{attachmentId:int}/action")]
+    public async Task<IActionResult> SetApproveAttachmentAction(
+        int id, int attachmentId, [FromBody] ApproveAttachmentActionDto dto)
+    {
+        var validation = this.HandleModelState();
+        if (validation != null) return validation;
+        return this.HandleResult(await _transactionService.SetApproveAttachmentActionAsync(id, attachmentId, dto));
+    }
 }

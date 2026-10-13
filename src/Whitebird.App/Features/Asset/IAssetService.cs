@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.Asset;
 using Whitebird.Domain.Features.Common;
@@ -34,6 +35,7 @@ public interface IAssetService
 
     Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request);
     Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request);
+    Task<ServiceResult<int>> BulkDeleteAsync(BulkDeleteRequest request);
 
     // ============================================================
     // DROPDOWN
@@ -42,16 +44,37 @@ public interface IAssetService
     Task<ServiceResult<IEnumerable<AssetDropdownView>>> GetDropdownListByTransactionTypeAsync(int transactionType);
 
     // ============================================================
-    // NEW: PHOTO & ATTACHMENTS (for AssetTracking and standalone use)
+    // PHOTO & ATTACHMENTS
     // ============================================================
 
     /// <summary>
-    /// Gets profile photo bytes for an asset
+    /// Gets profile photo bytes with the correct Content-Type.
     /// </summary>
-    Task<ServiceResult<byte[]>> GetPhotoAsync(int assetId);
+    Task<ServiceResult<FileContentDto>> GetPhotoAsync(int assetId);
 
     /// <summary>
-    /// Gets attachment list for an asset
+    /// Uploads (or replaces) the profile photo from multipart form data.
+    /// Returns the photo URL on success.
+    /// </summary>
+    Task<ServiceResult<string>> UploadPhotoAsync(int assetId, IFormFile file);
+
+    /// <summary>
+    /// Soft-deletes the current profile photo (physical file is retained).
+    /// </summary>
+    Task<ServiceResult> DeletePhotoAsync(int assetId);
+
+    /// <summary>
+    /// Gets attachment list for an asset.
     /// </summary>
     Task<ServiceResult<IEnumerable<AssetAttachmentViewDto>>> GetAttachmentsAsync(int assetId);
+
+    /// <summary>
+    /// Uploads a standalone attachment.
+    /// </summary>
+    Task<ServiceResult<AssetAttachmentViewDto>> UploadAttachmentAsync(int assetId, AttachmentUploadDto model);
+
+    /// <summary>
+    /// Soft-deletes a single attachment (physical file is retained).
+    /// </summary>
+    Task<ServiceResult> DeleteAttachmentAsync(int assetId, int fileAttachmentId);
 }

@@ -171,6 +171,7 @@ public class OfficeService : BaseService, IOfficeService
                 }
             }
 
+            var wasActive = existing.IsActive;
             var oldName = existing.OfficeName;
             var oldCode = existing.OfficeCode;
             var oldParentId = existing.ParentOfficeId;
@@ -179,6 +180,12 @@ public class OfficeService : BaseService, IOfficeService
             model.Adapt(existing);
             existing.ModifiedDate = DateTime.Now;
             existing.ModifiedBy = _currentUserService.GetDisplayName();
+
+            // BR-01: if record was Active on entry, force Inactive after update.
+            if (wasActive)
+            {
+                existing.IsActive = false;
+            }
 
             var result = await _repository.UpdateAsync(existing);
             if (result <= 0)
@@ -369,5 +376,52 @@ public class OfficeService : BaseService, IOfficeService
 
             return ServiceResult<int>.Success(deactivatedCount, message);
         }, "bulk deactivate offices");
+    }
+
+    public async Task<ServiceResult<int>> BulkDeleteAsync(BulkDeleteRequest request)
+    {
+        if (request.Ids == null || !request.Ids.Any())
+        {
+            return ServiceResult<int>.BadRequest("No office IDs provided");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var deletedCount = 0;
+
+            foreach (var id in request.Ids)
+            {
+                var office = await _officeReps.GetByIdRawAsync(id);
+                if (office == null)
+                {
+                    continue;
+                }
+
+                // Reuse per-row business rule: refuse if it has child offices.
+                var childCount = await _officeReps.GetChildCountAsync(id);
+                if (childCount > 0)
+                {
+                    continue;
+                }
+
+                var result = await _repository.DeleteAsync(id);
+                if (result > 0)
+                {
+                    deletedCount++;
+
+                    await _activityLogService.LogDeleteAsync(
+                        TableNames.Office,
+                        id,
+                        $"Office '{office.OfficeName}' deleted via bulk operation",
+                        _currentUserService.GetDisplayName());
+                }
+            }
+
+            var message = deletedCount > 0
+                ? $"{deletedCount} office(s) deleted successfully"
+                : "No offices were deleted. Offices with child offices cannot be deleted.";
+
+            return ServiceResult<int>.Success(deletedCount, message);
+        }, "bulk delete offices");
     }
 }

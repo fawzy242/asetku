@@ -17,6 +17,7 @@
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.SpaProxy" Version="8.0.0" />
     
     <PackageVersion Include="FluentMigrator" Version="6.2.0" />
     <PackageVersion Include="FluentMigrator.Runner" Version="6.2.0" />
@@ -27,8 +28,8 @@
     <PackageVersion Include="Mapster" Version="7.4.0" />
     <PackageVersion Include="Mapster.DependencyInjection" Version="1.0.1" />
     <PackageVersion Include="BCrypt.Net-Next" Version="4.0.3" />
-<PackageVersion Include="MailKit" Version="4.12.0" />
-<PackageVersion Include="MimeKit" Version="4.12.0" />
+    <PackageVersion Include="MailKit" Version="4.12.0" />
+    <PackageVersion Include="MimeKit" Version="4.12.0" />
     <PackageVersion Include="EPPlus" Version="7.1.2" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.5.0" />
     <PackageVersion Include="Polly" Version="8.4.1" />

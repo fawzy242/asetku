@@ -1,23 +1,15 @@
 using Mapster;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Asset;
 using Whitebird.App.Features.Common;
-using Whitebird.App.Features.Department;
 using Whitebird.App.Features.Employee;
 using Whitebird.App.Features.FileAttachment;
 using Whitebird.App.Features.MasterData;
 using Whitebird.App.Features.Office;
-using Whitebird.App.Features.Supplier;
-using Whitebird.Domain.Features.Asset;
 using Whitebird.Domain.Features.AssetTransaction;
 using Whitebird.Domain.Features.Common;
-using Whitebird.Domain.Features.Department;
 using Whitebird.Domain.Features.Employee;
-using Whitebird.Domain.Features.FileAttachment;
 using Whitebird.Domain.Features.MasterData;
-using Whitebird.Domain.Features.Office;
-using Whitebird.Domain.Features.Supplier;
 using Whitebird.Infra.Features.AssetTransaction;
 using Whitebird.Infra.Features.Common;
 
@@ -28,49 +20,34 @@ namespace Whitebird.App.Features.AssetTransaction;
 /// </summary>
 public class AssetTransactionService : BaseService, IAssetTransactionService
 {
-    private readonly IGenericRepository<AssetTransactionEntity> _repository;
     private readonly IAssetTransactionReps _transactionReps;
     private readonly IAssetService _assetService;
     private readonly IEmployeeService _employeeService;
     private readonly IOfficeService _officeService;
-    private readonly IDepartmentService _departmentService;
-    private readonly ISupplierService _supplierService;
     private readonly IMasterDataService _masterDataService;
     private readonly IFileAttachmentService _fileAttachmentService;
-    private readonly IStorageService _storageService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
-    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public AssetTransactionService(
-        IGenericRepository<AssetTransactionEntity> repository,
         IAssetTransactionReps transactionReps,
         IAssetService assetService,
         IEmployeeService employeeService,
         IOfficeService officeService,
-        IDepartmentService departmentService,
-        ISupplierService supplierService,
         IMasterDataService masterDataService,
         IFileAttachmentService fileAttachmentService,
-        IStorageService storageService,
         ICurrentUserService currentUserService,
         IActivityLogService activityLogService,
-        IHttpContextAccessor httpContextAccessor,
         ILogger<AssetTransactionService> logger) : base(logger)
     {
-        _repository = repository;
         _transactionReps = transactionReps;
         _assetService = assetService;
         _employeeService = employeeService;
         _officeService = officeService;
-        _departmentService = departmentService;
-        _supplierService = supplierService;
         _masterDataService = masterDataService;
         _fileAttachmentService = fileAttachmentService;
-        _storageService = storageService;
         _currentUserService = currentUserService;
         _activityLogService = activityLogService;
-        _httpContextAccessor = httpContextAccessor;
     }
 
     // ============================================================
@@ -366,6 +343,9 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 }
             }
 
+            // AT-01/AT-02: auto-re-evaluate Completed based on the current document state.
+            await ReevaluateCompletedAsync(id);
+
             var updated = await _transactionReps.GetDetailByIdAsync(id);
 
             await _activityLogService.LogUpdateAsync(
@@ -449,6 +429,9 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 }
             }
 
+            // AT-01/AT-02: auto-re-evaluate Completed based on the current document state.
+            await ReevaluateCompletedAsync(id);
+
             var updated = await _transactionReps.GetDetailByIdAsync(id);
 
             await _activityLogService.LogUpdateAsync(
@@ -486,6 +469,9 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                     transaction.ModifiedBy = _currentUserService.GetDisplayName();
                     await _transactionReps.UpdateAsync(transaction);
                     count++;
+
+                    // AT-02: auto-re-evaluate Completed for each affected transaction.
+                    await ReevaluateCompletedAsync(id);
                 }
             }
 
@@ -520,6 +506,9 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                     transaction.ModifiedBy = _currentUserService.GetDisplayName();
                     await _transactionReps.UpdateAsync(transaction);
                     count++;
+
+                    // AT-02: auto-re-evaluate Completed for each affected transaction.
+                    await ReevaluateCompletedAsync(id);
                 }
             }
 
@@ -548,8 +537,12 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 var transaction = await _transactionReps.GetByIdRawAsync(id);
                 if (transaction != null && transaction.Approved != false && transaction.IsActive == true)
                 {
+                    // AT-08: rejected definition = IsActive = 0, Approved = 0, Completed = 0
                     transaction.Approved = false;
                     transaction.ApprovedBy = _currentUserService.GetDisplayName();
+                    transaction.IsActive = false;
+                    transaction.Completed = false;
+                    transaction.CompletedBy = null;
                     transaction.ModifiedDate = DateTime.Now;
                     transaction.ModifiedBy = _currentUserService.GetDisplayName();
                     await _transactionReps.UpdateAsync(transaction);
@@ -591,8 +584,14 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult.BadRequest("Transaction already completed");
             }
 
-            var allUploaded = await _transactionReps.IsAllRequiredDocumentsUploadedAsync(id);
-            if (!allUploaded)
+            // Pre-check documents so we can return precise error messages.
+            var requiredDocs = (await _transactionReps.GetRequiredDocumentTypesAsync(id)).ToList();
+            if (requiredDocs.Count == 0)
+            {
+                return ServiceResult.BadRequest("Cannot complete: no approval document types configured in MasterData");
+            }
+
+            if (!requiredDocs.All(d => d.IsUploaded))
             {
                 return ServiceResult.BadRequest("All required documents must be uploaded before complete");
             }
@@ -603,12 +602,14 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult.BadRequest("All uploaded documents must be approved before complete");
             }
 
-            transaction.Completed = true;
-            transaction.CompletedBy = _currentUserService.GetDisplayName();
-            transaction.ModifiedDate = DateTime.Now;
-            transaction.ModifiedBy = _currentUserService.GetDisplayName();
+            // Backend source of truth: re-evaluate the flag from document state.
+            await ReevaluateCompletedAsync(id);
 
-            await _transactionReps.UpdateAsync(transaction);
+            var reloaded = await _transactionReps.GetByIdRawAsync(id);
+            if (reloaded?.Completed != true)
+            {
+                return ServiceResult.Failure("Failed to complete transaction: document state re-check did not yield Completed = true");
+            }
 
             await _activityLogService.LogUpdateAsync(
                 TableNames.AssetTransaction,
@@ -635,18 +636,23 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult.BadRequest("Transaction is not completed");
             }
 
-            transaction.Completed = null;
-            transaction.CompletedBy = null;
-            transaction.ModifiedDate = DateTime.Now;
-            transaction.ModifiedBy = _currentUserService.GetDisplayName();
+            // AT-03: re-evaluate from document state rather than blindly flipping the flag.
+            await ReevaluateCompletedAsync(id);
 
-            await _transactionReps.UpdateAsync(transaction);
+            var reloaded = await _transactionReps.GetByIdRawAsync(id);
 
             await _activityLogService.LogUpdateAsync(
                 TableNames.AssetTransaction,
                 id,
-                $"Transaction uncompleted (reverted to approved)",
+                $"Transaction uncomplete requested; re-evaluated Completed = {reloaded?.Completed}",
                 _currentUserService.GetDisplayName());
+
+            if (reloaded?.Completed == true)
+            {
+                return ServiceResult.BadRequest(
+                    "Cannot uncomplete: all required approval documents are still approved. " +
+                    "Mark a document for revision or delete a required approval attachment to revert the transaction to Uncompleted.");
+            }
 
             return ServiceResult.Success("Transaction uncompleted successfully");
         }, "uncomplete transaction");
@@ -966,8 +972,187 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     }
 
     // ============================================================
+    // ATTACHMENTS (standalone retrieval)
+    // ============================================================
+
+    public async Task<ServiceResult<IEnumerable<AssetTransactionAttachmentView>>> GetAttachmentsAsync(int transactionId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
+            if (transaction == null)
+            {
+                return ServiceResult<IEnumerable<AssetTransactionAttachmentView>>.NotFound($"Transaction with id {transactionId} not found");
+            }
+
+            var attachments = await _transactionReps.GetAttachmentsByTransactionIdAsync(transactionId);
+            return ServiceResult<IEnumerable<AssetTransactionAttachmentView>>.Success(attachments);
+        }, "get transaction attachments");
+    }
+
+    public async Task<ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>> GetApproveAttachmentsAsync(int transactionId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
+            if (transaction == null)
+            {
+                return ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>.NotFound($"Transaction with id {transactionId} not found");
+            }
+
+            var attachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(transactionId);
+            return ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>.Success(attachments);
+        }, "get transaction approve attachments");
+    }
+
+    // ============================================================
+    // APPROVAL DOCUMENT WORKFLOW
+    // ============================================================
+
+    public async Task<ServiceResult<IEnumerable<RequiredDocumentTypeDto>>> GetRequiredDocumentsAsync(int transactionId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
+            if (transaction == null)
+            {
+                return ServiceResult<IEnumerable<RequiredDocumentTypeDto>>.NotFound($"Transaction with id {transactionId} not found");
+            }
+
+            var required = await _transactionReps.GetRequiredDocumentTypesAsync(transactionId);
+            return ServiceResult<IEnumerable<RequiredDocumentTypeDto>>.Success(required);
+        }, "get required documents");
+    }
+
+    public async Task<ServiceResult<AssetTransactionDetailView>> SetApproveAttachmentActionAsync(
+        int transactionId, int attachmentId, ApproveAttachmentActionDto dto)
+    {
+        if (dto == null || string.IsNullOrWhiteSpace(dto.Action))
+        {
+            return ServiceResult<AssetTransactionDetailView>.BadRequest("Action is required");
+        }
+
+        var action = dto.Action.Trim().ToLowerInvariant();
+        if (action != "approve" && action != "revision")
+        {
+            return ServiceResult<AssetTransactionDetailView>.BadRequest(
+                $"Invalid action '{dto.Action}'. Supported: approve, revision");
+        }
+
+        return await ExecuteWithTransactionAsync(async () =>
+        {
+            var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
+            if (transaction == null)
+            {
+                return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {transactionId} not found");
+            }
+
+            var attachment = await _transactionReps.GetApproveAttachmentByIdAsync(attachmentId);
+            if (attachment == null)
+            {
+                return ServiceResult<AssetTransactionDetailView>.NotFound($"Approve attachment with id {attachmentId} not found");
+            }
+
+            if (attachment.AssetTransactionId != transactionId)
+            {
+                return ServiceResult<AssetTransactionDetailView>.BadRequest(
+                    $"Approve attachment {attachmentId} does not belong to transaction {transactionId}");
+            }
+
+            if (action == "approve")
+            {
+                if (attachment.Approved)
+                {
+                    return ServiceResult<AssetTransactionDetailView>.BadRequest("Document is already approved");
+                }
+                if (attachment.NeedToChange)
+                {
+                    return ServiceResult<AssetTransactionDetailView>.BadRequest(
+                        "Document is marked for revision. Upload the revised document before approving.");
+                }
+                attachment.Approved = true;
+                attachment.NeedToChange = false;
+            }
+            else // revision
+            {
+                if (attachment.Approved)
+                {
+                    // AT-10: prevent silently invalidating a completed transaction.
+                    return ServiceResult<AssetTransactionDetailView>.BadRequest(
+                        "Cannot mark an approved document for revision. Re-upload the document to replace it.");
+                }
+                attachment.Approved = false;
+                attachment.NeedToChange = true;
+            }
+
+            attachment.ModifiedDate = DateTime.Now;
+            attachment.ModifiedBy = _currentUserService.GetDisplayName();
+            await _transactionReps.UpdateApproveAttachmentAsync(attachment);
+
+            await _activityLogService.LogUpdateAsync(
+                TableNames.AssetTransaction,
+                transactionId,
+                $"Approval document {attachmentId} (Type {attachment.DocumentType}) action: {action}",
+                _currentUserService.GetDisplayName());
+
+            // AT-01/AT-02: re-evaluate Completed after document action.
+            await ReevaluateCompletedAsync(transactionId);
+
+            var updated = await _transactionReps.GetDetailByIdAsync(transactionId);
+            return ServiceResult<AssetTransactionDetailView>.Success(updated!, $"Document action '{action}' applied successfully");
+        }, "set approve attachment action");
+    }
+
+    // ============================================================
     // PRIVATE HELPERS
     // ============================================================
+
+    /// <summary>
+    /// AT-01 / AT-02: Backend source of truth for Completed.
+    /// Sets Completed = 1 iff (IsActive = 1) AND (Approved = 1) AND
+    /// (all required approval document types have been uploaded) AND
+    /// (all of them are approved and none is flagged for revision).
+    /// Otherwise sets Completed = 0.
+    /// No-op when the transaction does not exist.
+    /// </summary>
+    private async Task ReevaluateCompletedAsync(int transactionId)
+    {
+        var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
+        if (transaction == null) return;
+
+        bool shouldBeCompleted = false;
+
+        if (transaction.IsActive == true && transaction.Approved == true)
+        {
+            var requiredDocs = (await _transactionReps.GetRequiredDocumentTypesAsync(transactionId)).ToList();
+
+            if (requiredDocs.Count == 0)
+            {
+                // AT-11: avoid silently completing when MasterData is misconfigured.
+                _logger.LogWarning(
+                    "Transaction {TransactionId}: no ApproveDocumentType entries configured in MasterData; Completed will not be set.",
+                    transactionId);
+            }
+            else
+            {
+                var allUploaded = requiredDocs.All(d => d.IsUploaded);
+                if (allUploaded)
+                {
+                    var allApproved = await _transactionReps.IsAllRequiredDocumentsApprovedAsync(transactionId);
+                    shouldBeCompleted = allApproved;
+                }
+            }
+        }
+
+        if (transaction.Completed != shouldBeCompleted)
+        {
+            transaction.Completed = shouldBeCompleted;
+            transaction.CompletedBy = shouldBeCompleted ? _currentUserService.GetDisplayName() : null;
+            transaction.ModifiedDate = DateTime.Now;
+            transaction.ModifiedBy = _currentUserService.GetDisplayName();
+            await _transactionReps.UpdateAsync(transaction);
+        }
+    }
 
     private async Task<ServiceResult<AssetTransactionDetailView>?> ValidateTransactionAsync(
         AssetTransactionCreateViewModel model, AssetTransactionEntity? existing)
@@ -1132,22 +1317,16 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         try
         {
             var bytes = Convert.FromBase64String(base64String);
-            using var stream = new MemoryStream(bytes);
-            var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
-            {
-                Headers = new HeaderDictionary(),
-                ContentType = GetContentType(fileName)
-            };
 
-            var uploadModel = new FileAttachmentUploadDto
-            {
-                File = file,
-                FileCategory = "AssetTransaction",
-                Description = $"Attachment: {fileName}",
-                IsPrimary = false
-            };
+            var fileResult = await _fileAttachmentService.UploadBytesAsync(
+                referenceTable: "AssetTransaction",
+                referenceId: transactionId,
+                originalFileName: fileName,
+                bytes: bytes,
+                fileCategory: "AssetTransaction",
+                description: $"Attachment: {fileName}",
+                isPrimary: false);
 
-            var fileResult = await _fileAttachmentService.UploadAsync("AssetTransaction", transactionId, uploadModel);
             if (!fileResult.IsSuccess || fileResult.Data == null)
             {
                 throw new Exception($"Upload attachment failed: {string.Join(", ", fileResult.Errors)}");
@@ -1176,25 +1355,28 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         try
         {
             var bytes = Convert.FromBase64String(base64String);
-            using var stream = new MemoryStream(bytes);
-            var file = new FormFile(stream, 0, bytes.Length, "file", fileName)
-            {
-                Headers = new HeaderDictionary(),
-                ContentType = GetContentType(fileName)
-            };
 
-            var uploadModel = new FileAttachmentUploadDto
-            {
-                File = file,
-                FileCategory = "ApproveDocument",
-                Description = $"Approve document: {fileName}",
-                IsPrimary = false
-            };
+            var fileResult = await _fileAttachmentService.UploadBytesAsync(
+                referenceTable: "AssetTransactionApprove",
+                referenceId: transactionId,
+                originalFileName: fileName,
+                bytes: bytes,
+                fileCategory: "ApproveDocument",
+                description: $"Approve document: {fileName}",
+                isPrimary: false);
 
-            var fileResult = await _fileAttachmentService.UploadAsync("AssetTransactionApprove", transactionId, uploadModel);
             if (!fileResult.IsSuccess || fileResult.Data == null)
             {
                 throw new Exception($"Upload approve attachment failed: {string.Join(", ", fileResult.Errors)}");
+            }
+
+            // AT-16: enforce one active approval attachment per (TransactionId, DocumentType).
+            // Any previously active attachment of the same type is soft-deleted before the new one is inserted.
+            var existingApproveAttachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(transactionId);
+            foreach (var att in existingApproveAttachments.Where(a => a.DocumentType == documentType))
+            {
+                await _transactionReps.DeleteApproveAttachmentAsync(att.AssetTransactionApproveAttachmentId);
+                await _fileAttachmentService.DeleteAsync(att.FileAttachmentId);
             }
 
             var attachmentEntity = new AssetTransactionApproveAttachmentEntity
@@ -1216,57 +1398,5 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             _logger.LogError(ex, "Error adding approve attachment for Transaction {TransactionId}", transactionId);
             throw;
         }
-    }
-
-    private string GetContentType(string fileName)
-    {
-        var ext = Path.GetExtension(fileName).ToLowerInvariant();
-        return ext switch
-        {
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".png" => "image/png",
-            ".gif" => "image/gif",
-            ".pdf" => "application/pdf",
-            ".doc" => "application/msword",
-            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ".xls" => "application/vnd.ms-excel",
-            ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            ".txt" => "text/plain",
-            _ => "application/octet-stream"
-        };
-    }
-
-    // ============================================================
-    // NEW: ATTACHMENTS (for standalone retrieval)
-    // ============================================================
-
-    public async Task<ServiceResult<IEnumerable<AssetTransactionAttachmentView>>> GetAttachmentsAsync(int transactionId)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
-            if (transaction == null)
-            {
-                return ServiceResult<IEnumerable<AssetTransactionAttachmentView>>.NotFound($"Transaction with id {transactionId} not found");
-            }
-
-            var attachments = await _transactionReps.GetAttachmentsByTransactionIdAsync(transactionId);
-            return ServiceResult<IEnumerable<AssetTransactionAttachmentView>>.Success(attachments);
-        }, "get transaction attachments");
-    }
-
-    public async Task<ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>> GetApproveAttachmentsAsync(int transactionId)
-    {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
-            if (transaction == null)
-            {
-                return ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>.NotFound($"Transaction with id {transactionId} not found");
-            }
-
-            var attachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(transactionId);
-            return ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>.Success(attachments);
-        }, "get transaction approve attachments");
     }
 }

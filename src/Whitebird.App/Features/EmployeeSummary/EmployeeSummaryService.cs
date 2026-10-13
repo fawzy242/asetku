@@ -152,10 +152,10 @@ public class EmployeeSummaryService : BaseService, IEmployeeSummaryService
     }
 
     // ============================================================
-    // NEW: PHOTO & ATTACHMENTS (delegated to EmployeeService)
+    // PHOTO & ATTACHMENTS (delegated to EmployeeService)
     // ============================================================
 
-    public async Task<ServiceResult<byte[]>> GetPhotoAsync(int employeeId)
+    public async Task<ServiceResult<FileContentDto>> GetPhotoAsync(int employeeId)
     {
         return await _employeeService.GetPhotoAsync(employeeId);
     }
