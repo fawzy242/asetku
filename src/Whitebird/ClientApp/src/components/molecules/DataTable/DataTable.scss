@@ -10,6 +10,13 @@
     flex-direction: column;
     position: relative;
 
+    // Row click affordance
+    &--clickable {
+        .MuiDataGrid-row {
+            cursor: pointer;
+        }
+    }
+
     .MuiDataGrid-root {
         border: none;
         background-color: transparent;
@@ -24,11 +31,11 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        
+
         .icon-btn {
             color: var(--text-secondary);
             transition: all 0.2s ease;
-            
+
             &:hover {
                 color: var(--primary);
                 background-color: rgba(220, 38, 38, 0.1);
@@ -39,7 +46,7 @@
     .MuiDataGrid-virtualScroller {
         overflow-y: auto !important;
         overflow-x: hidden !important;
-        
+
         &::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -65,14 +72,16 @@
         position: sticky;
         top: 0;
         z-index: 2;
-        
+
         &::-webkit-scrollbar {
             display: none;
         }
     }
 
     .MuiDataGrid-cell {
-        &:focus, &:focus-within {
+
+        &:focus,
+        &:focus-within {
             outline: none !important;
         }
     }
@@ -85,11 +94,11 @@
     .MuiDataGrid-iconSeparator {
         cursor: col-resize !important;
     }
-    
+
     .MuiDataGrid-menuIcon {
         opacity: 0.5;
         transition: opacity 0.2s;
-        
+
         &:hover {
             opacity: 1;
         }

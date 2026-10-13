@@ -11,13 +11,16 @@ const SecondaryTransactionsGrid = ({
   pageSize,
   onPageChange,
   onPageSizeChange,
+  sortModel = [],
+  onSortModelChange = null,
   columns,
   checkboxSelection,
   onSelectionChange,
   getRowId,
+  onRowClick = null,
   bulkActions = null,
-  title = "Secondary Transactions",
-  subtitle = "Return, Loan Return, Post Maintenance"
+  title = 'Secondary Transactions',
+  subtitle = 'Return, Loan Return, Post Maintenance',
 }) => {
   return (
     <Card
@@ -38,6 +41,10 @@ const SecondaryTransactionsGrid = ({
         getRowId={getRowId}
         checkboxSelection={checkboxSelection}
         onRowSelectionModelChange={onSelectionChange}
+        onRowClick={onRowClick}
+        sortModel={sortModel}
+        onSortModelChange={onSortModelChange}
+        sortingMode="server"
         ariaLabel="Secondary transactions"
         paginationMode="server"
       />

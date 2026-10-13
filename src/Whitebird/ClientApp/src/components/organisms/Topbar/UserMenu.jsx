@@ -36,8 +36,8 @@ const UserMenu = ({ user }) => {
         setShowUserMenu(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -46,22 +46,33 @@ const UserMenu = ({ user }) => {
     }
   }, [user?.userId, loadProfilePhoto]);
 
+  // Refresh when Profile page dispatches 'profile-photo-updated'
+  useEffect(() => {
+    const handler = () => {
+      loadProfilePhoto();
+    };
+    window.addEventListener('profile-photo-updated', handler);
+    return () => {
+      window.removeEventListener('profile-photo-updated', handler);
+    };
+  }, [loadProfilePhoto]);
+
   const handleLogout = async () => {
     const confirmed = await ConfirmDialog.show({
-      title: "Logout",
-      text: "Are you sure you want to logout?",
-      icon: "question",
-      confirmButtonText: "Logout",
-      confirmButtonColor: "#dc2626",
+      title: 'Logout',
+      text: 'Are you sure you want to logout?',
+      icon: 'question',
+      confirmButtonText: 'Logout',
+      confirmButtonColor: '#dc2626',
     });
     if (confirmed) {
       setShowUserMenu(false);
       await logout();
-      navigate("/login");
+      navigate('/login');
     }
   };
 
-  const userInitial = user?.fullName?.charAt(0)?.toUpperCase() || "U";
+  const userInitial = user?.fullName?.charAt(0)?.toUpperCase() || 'U';
 
   return (
     <div className="topbar__user" ref={userMenuRef}>
@@ -72,23 +83,23 @@ const UserMenu = ({ user }) => {
         aria-expanded={showUserMenu}
       >
         {profilePhotoUrl ? (
-          <Avatar 
-            src={profilePhotoUrl} 
+          <Avatar
+            src={profilePhotoUrl}
             sx={{ width: 36, height: 36 }}
             onError={() => setProfilePhotoUrl(null)}
           />
         ) : (
           <span className="topbar__user-avatar">{userInitial}</span>
         )}
-        <span className="topbar__user-name">{user?.fullName || "User"}</span>
+        <span className="topbar__user-name">{user?.fullName || 'User'}</span>
         <FiChevronDown size={16} />
       </button>
       {showUserMenu && (
         <div className="topbar__user-dropdown">
           <div className="topbar__user-header">
             {profilePhotoUrl ? (
-              <Avatar 
-                src={profilePhotoUrl} 
+              <Avatar
+                src={profilePhotoUrl}
                 sx={{ width: 48, height: 48 }}
                 onError={() => setProfilePhotoUrl(null)}
               />
@@ -102,7 +113,12 @@ const UserMenu = ({ user }) => {
           </div>
           <ul className="topbar__user-menu">
             <li>
-              <button onClick={() => { setShowUserMenu(false); navigate("/profile"); }}>
+              <button
+                onClick={() => {
+                  setShowUserMenu(false);
+                  navigate('/profile');
+                }}
+              >
                 <FiUser size={18} /> Profile
               </button>
             </li>

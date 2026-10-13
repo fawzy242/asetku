@@ -13,7 +13,6 @@ import PostMaintenanceModalContent from '../../../components/molecules/PostMaint
 import { TRANSACTION_TYPE_OPTIONS } from '../../../core/constants/transactionTypes';
 
 const TransactionDialogs = ({
-  // CRUD Modal
   showModal,
   editingTransaction,
   isSubmitting,
@@ -22,7 +21,6 @@ const TransactionDialogs = ({
   onSubmit,
   onClose,
   isViewMode = false,
-  // Return Modal
   showReturnModal,
   isReturnSubmitting,
   returnData,
@@ -30,14 +28,12 @@ const TransactionDialogs = ({
   selectedTransaction,
   onReturnSubmit,
   onReturnCancel,
-  // Post Maintenance Modal
   showPostMaintenanceModal,
   isPostMaintenanceSubmitting,
   postMaintenanceData,
   setPostMaintenanceData,
   onPostMaintenanceSubmit,
   onPostMaintenanceCancel,
-  // Common
   employeeOptions,
   officeOptions,
   conditionOptions,
@@ -58,19 +54,29 @@ const TransactionDialogs = ({
   handleUploadComplete,
   handleFileDeleted,
 }) => {
-  // Semua field disabled jika view mode
   const disabled = isViewMode;
+
+  // In view mode, the form must not submit (Enter key safety).
+  const formSubmitHandler = isViewMode ? (e) => { e.preventDefault(); } : onSubmit;
 
   return (
     <>
-      {/* CRUD Modal */}
       <CrudModal
         isOpen={showModal}
         onClose={onClose}
-        title={isViewMode ? 'View Transaction' : (editingTransaction ? 'Edit Transaction' : 'New Transaction')}
-        onSubmit={onSubmit}
+        title={
+          isViewMode
+            ? 'View Transaction'
+            : editingTransaction
+              ? 'Edit Transaction'
+              : 'New Transaction'
+        }
+        onSubmit={formSubmitHandler}
         isSubmitting={isSubmitting}
-        submitText={isViewMode ? 'Close' : (editingTransaction ? 'Update' : 'Create')}
+        submitText={
+          isViewMode ? 'Close' : editingTransaction ? 'Update' : 'Create'
+        }
+        cancelText={isViewMode ? 'Close' : 'Cancel'}
         size="xl"
         disableSubmit={isViewMode}
         showCancel={!isViewMode}
@@ -117,8 +123,18 @@ const TransactionDialogs = ({
               <Select
                 label="Paired Transaction"
                 value={formData.fromAssetTransactionId || ''}
-                onChange={(e) => setFormField('fromAssetTransactionId')(e.target.value)}
-                options={[{ value: '', label: loadingPairedOptions ? 'Loading...' : 'Select Paired' }, ...pairedTransactionOptions]}
+                onChange={(e) =>
+                  setFormField('fromAssetTransactionId')(e.target.value)
+                }
+                options={[
+                  {
+                    value: '',
+                    label: loadingPairedOptions
+                      ? 'Loading...'
+                      : 'Select Paired',
+                  },
+                  ...pairedTransactionOptions,
+                ]}
                 required
                 disabled={disabled || loadingPairedOptions}
               />
@@ -127,7 +143,9 @@ const TransactionDialogs = ({
               <DatePickerInput
                 label="Expected Loan Return Date"
                 value={formData.expectedLoanReturnDate || ''}
-                onChange={(e) => setFormField('expectedLoanReturnDate')(e.target.value)}
+                onChange={(e) =>
+                  setFormField('expectedLoanReturnDate')(e.target.value)
+                }
                 disabled={disabled}
               />
             )}
@@ -148,14 +166,18 @@ const TransactionDialogs = ({
                 <Select
                   label="Maintenance Type"
                   value={formData.maintenanceType || ''}
-                  onChange={(e) => setFormField('maintenanceType')(e.target.value)}
+                  onChange={(e) =>
+                    setFormField('maintenanceType')(e.target.value)
+                  }
                   options={maintenanceTypeOptions}
                   disabled={disabled}
                 />
                 <NumberInput
                   label="Maintenance Cost"
                   value={formData.maintenanceCost}
-                  onChange={(e) => setFormField('maintenanceCost')(e.target.value)}
+                  onChange={(e) =>
+                    setFormField('maintenanceCost')(e.target.value)
+                  }
                   prefix="Rp "
                   thousandSeparator
                   decimalScale={0}
@@ -193,7 +215,11 @@ const TransactionDialogs = ({
                 <p style={{ fontWeight: 600, marginBottom: 8 }}>Attachments:</p>
                 {existingAttachments.map((att, idx) => (
                   <div key={idx} style={{ padding: '4px 0' }}>
-                    <a href={att.fileUrl} target="_blank" rel="noopener noreferrer">
+                    <a
+                      href={att.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       {att.originalFileName || att.fileName || 'File'}
                     </a>
                   </div>
@@ -204,7 +230,6 @@ const TransactionDialogs = ({
         </FormSection>
       </CrudModal>
 
-      {/* Return Modal */}
       <Modal
         isOpen={showReturnModal}
         onClose={onReturnCancel}
@@ -222,7 +247,6 @@ const TransactionDialogs = ({
         />
       </Modal>
 
-      {/* Post Maintenance Modal */}
       <Modal
         isOpen={showPostMaintenanceModal}
         onClose={onPostMaintenanceCancel}

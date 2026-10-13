@@ -1,18 +1,24 @@
 // src/pages/Categories/Categories.jsx
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Grid } from '@mui/material';
+import { Grid, Box } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
+import { FiCheckSquare, FiPlus, FiTrash2 } from 'react-icons/fi';
 import { CategoriesData } from '../../core/services';
-import GridView from '../../components/organisms/GridView/GridView';
+import PageHeader from '../../components/atoms/PageHeader';
+import BulkActionBar from '../../components/atoms/BulkActionBar';
+import RefreshButton from '../../components/atoms/RefreshButton';
+import Button from '../../components/atoms/Button/Button';
+import StatusChip from '../../components/atoms/StatusChip/StatusChip';
+import Spinner from '../../components/atoms/Spinner/Spinner';
+import Tabs from '../../components/molecules/Tabs/Tabs';
+import SearchToolbar from '../../components/molecules/SearchToolbar/SearchToolbar';
+import DataTable from '../../components/molecules/DataTable/DataTable';
 import CrudModal from '../../components/molecules/CrudModal/CrudModal';
+import BulkActivateModal from '../../components/molecules/BulkActivateModal/BulkActivateModal';
+import ActionMenu from '../../components/molecules/ActionMenu';
 import FormSection from '../../components/atoms/FormSection/FormSection';
 import Input from '../../components/atoms/Input/Input';
 import Select from '../../components/atoms/Select/Select';
-import Spinner from '../../components/atoms/Spinner/Spinner';
-import BulkActivateModal from '../../components/molecules/BulkActivateModal/BulkActivateModal';
-import Button from '../../components/atoms/Button/Button';
-import StatusChip from '../../components/atoms/StatusChip/StatusChip';
-import { FiCheckSquare } from 'react-icons/fi';
 import { ACTION_TYPES, useGridActions } from '../../hooks/useGridActions';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
@@ -40,37 +46,44 @@ const Categories = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
+  const [isViewMode, setIsViewMode] = useState(false);
   const isMountedRef = useRef(true);
   const queryClient = useQueryClient();
   const { toast, confirmDelete, confirm } = useSweetAlert();
   const { categories: parentCategories } = useReferenceData();
 
-  // ============================================================
-  // BULK SELECTION - HARUS DI ATAS useEffect
-  // ============================================================
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
-    useBulkSelection({ idField: 'categoryId' });
+  const {
+    selectedRowIds,
+    selectionCount,
+    hasSelection,
+    handleSelectionChange,
+    clearSelection,
+    getSelectedIds,
+  } = useBulkSelection({ idField: 'categoryId' });
 
-  const showCheckbox = activeTab === 'active' || activeTab === 'inactive';
+  const showCheckbox = true;
+  const showActivateToggle =
+    activeTab === 'active' || activeTab === 'inactive';
 
-  // ============================================================
-  // CRUD FORM
-  // ============================================================
   const {
     showModal,
     editingRecord: editingCategory,
     isSubmitting,
     formData,
     setFormField,
-    handleCreate,
+    handleCreate: baseHandleCreate,
     handleEdit,
-    handleClose,
+    handleClose: baseHandleClose,
     handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, categoriesData, {
     idField: 'categoryId',
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reference', 'categories'] });
-      toast.success(editingCategory ? 'Category updated successfully' : 'Category created successfully');
+      toast.success(
+        editingCategory
+          ? 'Category updated successfully'
+          : 'Category created successfully'
+      );
       reload();
       clearSelection();
     },
@@ -79,9 +92,16 @@ const Categories = () => {
     },
   });
 
-  // ============================================================
-  // BUILD FILTERS
-  // ============================================================
+  const handleCreate = useCallback(() => {
+    setIsViewMode(false);
+    baseHandleCreate();
+  }, [baseHandleCreate]);
+
+  const handleClose = useCallback(() => {
+    setIsViewMode(false);
+    baseHandleClose();
+  }, [baseHandleClose]);
+
   const buildFilters = useCallback(() => {
     const filters = {};
     if (activeTab === 'active') filters.isActive = true;
@@ -90,9 +110,6 @@ const Categories = () => {
     return filters;
   }, [activeTab, searchTerm]);
 
-  // ============================================================
-  // FETCH GRID DATA
-  // ============================================================
   const fetchGridData = useCallback(
     async (params) => {
       const filters = buildFilters();
@@ -102,8 +119,7 @@ const Categories = () => {
         ...filters,
         ...params,
       };
-      const result = await categoriesData.fetchGridData(requestParams);
-      return result;
+      return await categoriesData.fetchGridData(requestParams);
     },
     [buildFilters]
   );
@@ -116,12 +132,11 @@ const Categories = () => {
     setPage,
     pageSize,
     setPageSize,
+    sortModel,
+    setSortModel,
     reload,
   } = useGridData(['categories', activeTab, searchTerm], fetchGridData);
 
-  // ============================================================
-  // EFFECTS
-  // ============================================================
   useEffect(() => {
     isMountedRef.current = true;
     reload();
@@ -131,17 +146,13 @@ const Categories = () => {
     };
   }, [activeTab, reload, clearSelection]);
 
-  // ============================================================
-  // OPTIONS
-  // ============================================================
   const parentCategoryOptions = useOptions(
-    parentCategories.filter((c) => !editingCategory || c.value !== editingCategory.categoryId),
+    parentCategories.filter(
+      (c) => !editingCategory || c.value !== editingCategory.categoryId
+    ),
     'None (Top Level)'
   );
 
-  // ============================================================
-  // HANDLERS
-  // ============================================================
   const handleSearch = useCallback(
     (search) => {
       setSearchTerm(search);
@@ -151,9 +162,17 @@ const Categories = () => {
     [setPage, clearSelection]
   );
 
+  const handleRefresh = useCallback(() => {
+    reload();
+    clearSelection();
+  }, [reload, clearSelection]);
+
   const handleDelete = useCallback(
     async (cat) => {
-      const confirmed = await confirmDelete('Delete Category', `Are you sure you want to delete "${cat.categoryName}"?`);
+      const confirmed = await confirmDelete(
+        'Delete Category',
+        `Are you sure you want to delete "${cat.categoryName}"?`
+      );
       if (!confirmed) return;
       const r = await categoriesData.delete(cat.categoryId);
       if (r.success && isMountedRef.current) {
@@ -164,6 +183,38 @@ const Categories = () => {
       }
     },
     [reload, queryClient, toast, confirmDelete, clearSelection]
+  );
+
+  const handleBulkDelete = useCallback(
+    async (ids) => {
+      if (!ids || ids.length === 0) return;
+      const confirmed = await confirm({
+        title: 'Delete Categories',
+        text: `Are you sure you want to delete ${ids.length} categor(y/ies)? This action cannot be undone.`,
+        icon: 'warning',
+        confirmButtonText: 'Yes, Delete',
+        confirmButtonColor: '#ef4444',
+      });
+      if (!confirmed) return;
+
+      const r = await categoriesData.bulkDelete(ids);
+      if (!isMountedRef.current) return;
+
+      if (r.success) {
+        toast.success(`${r.data.successCount} categor(y/ies) deleted`);
+      } else if (r.partial) {
+        toast.warning(
+          `${r.data.successCount} deleted, ${r.data.failCount} failed`
+        );
+      } else {
+        toast.error(r.error || 'Failed to delete categories');
+      }
+
+      clearSelection();
+      queryClient.invalidateQueries({ queryKey: ['reference', 'categories'] });
+      reload();
+    },
+    [reload, queryClient, toast, confirm, clearSelection]
   );
 
   const handleBulkActivate = useCallback(
@@ -199,10 +250,25 @@ const Categories = () => {
 
   const handleGridAction = useCallback(
     (actionType, row) => {
-      if (actionType === ACTION_TYPES.EDIT) handleEdit(row);
-      else if (actionType === ACTION_TYPES.DELETE) handleDelete(row);
+      if (actionType === ACTION_TYPES.VIEW) {
+        setIsViewMode(true);
+        handleEdit(row);
+      } else if (actionType === ACTION_TYPES.EDIT) {
+        setIsViewMode(false);
+        handleEdit(row);
+      } else if (actionType === ACTION_TYPES.DELETE) {
+        handleDelete(row);
+      }
     },
     [handleEdit, handleDelete]
+  );
+
+  const handleRowClick = useCallback(
+    (row) => {
+      setIsViewMode(true);
+      handleEdit(row);
+    },
+    [handleEdit]
   );
 
   const getConditionalActions = useCallback((row) => {
@@ -212,7 +278,15 @@ const Categories = () => {
     return actions;
   }, []);
 
-  const { actionColumn } = useGridActions({
+  const {
+    actionColumn,
+    menuAnchorEl,
+    menuOpen,
+    menuActions,
+    selectedRow,
+    handleMenuClose,
+    handleActionClick,
+  } = useGridActions({
     actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
     onAction: handleGridAction,
     getConditionalActions,
@@ -224,11 +298,17 @@ const Categories = () => {
       { field: 'categoryName', headerName: 'Name', flex: 1, minWidth: 200 },
       { field: 'description', headerName: 'Description', flex: 1, minWidth: 200 },
       { field: 'parentCategoryName', headerName: 'Parent', width: 180 },
-      { field: 'childCount', headerName: 'Subcategories', width: 130 },
+      {
+        field: 'childCount',
+        headerName: 'Subcategories',
+        width: 130,
+        sortable: false,
+      },
       {
         field: 'isActive',
         headerName: 'Status',
         width: 110,
+        sortable: false,
         renderCell: (p) => {
           const status = p.value ? 'Active' : 'Inactive';
           return <StatusChip status={status} />;
@@ -239,68 +319,133 @@ const Categories = () => {
     [actionColumn]
   );
 
-  const extraActions = (
-    <>
-      {hasSelection && showCheckbox && (
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setShowBulkActivateModal(true)}
-          className="u-inline-flex u-btn-gap"
-        >
-          <FiCheckSquare size={16} /> {activeTab === 'active' ? 'Deactivate' : 'Activate'} ({selectionCount})
-        </Button>
-      )}
-    </>
-  );
-
-  if (loading && !data.length) return <div className="page-loading"><Spinner size="lg" /></div>;
-
   const bulkActivateValue = activeTab === 'active' ? false : true;
-  const bulkTitle = bulkActivateValue ? 'Activate Categories' : 'Deactivate Categories';
+
+  const bulkActions = hasSelection
+    ? [
+        ...(showActivateToggle
+          ? [
+              {
+                key: 'bulk-toggle',
+                label: `${bulkActivateValue ? 'Activate' : 'Deactivate'} (${selectionCount})`,
+                variant: 'primary',
+                icon: <FiCheckSquare size={16} />,
+                onClick: () => setShowBulkActivateModal(true),
+              },
+            ]
+          : []),
+        {
+          key: 'bulk-delete',
+          label: `Delete (${selectionCount})`,
+          variant: 'danger',
+          icon: <FiTrash2 size={16} />,
+          onClick: () => handleBulkDelete(getSelectedIds(data)),
+        },
+      ]
+    : [];
+
+  const bulkTitle = bulkActivateValue
+    ? 'Activate Categories'
+    : 'Deactivate Categories';
   const bulkDescription = `This action will ${bulkActivateValue ? 'activate' : 'deactivate'} the selected categories.`;
+
+  if (loading && !data.length) {
+    return (
+      <div className="page-loading">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="categories-menu">
-      <GridView
+      <PageHeader
         title="Category Management"
-        tabs={TABS}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        onCreate={handleCreate}
-        columns={columns}
-        data={data}
-        loading={loading}
-        totalCount={totalCount}
-        page={page}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-        onSearch={handleSearch}
-        showCheckbox={showCheckbox}
-        selectedRows={selectedRowIds}
-        onSelectionChange={handleSelectionChange}
-        createButtonText="Add Category"
-        ariaLabel="Categories data table"
-        extraActions={extraActions}
+        description="Manage asset categories and subcategories"
+        actions={
+          <>
+            <RefreshButton onClick={handleRefresh} loading={loading} />
+            <BulkActionBar visible={bulkActions.length > 0} actions={bulkActions} />
+            <Button variant="primary" onClick={handleCreate} startIcon={<FiPlus />}>
+              Add Category
+            </Button>
+          </>
+        }
+      />
+
+      <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+
+      <SearchToolbar onSearch={handleSearch} placeholder="Search categories..." />
+
+      <Box
+        sx={{
+          backgroundColor: 'var(--card-bg)',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          mb: 2,
+          border: '1px solid var(--border)',
+          width: '100%',
+          minWidth: 0,
+        }}
+      >
+        <DataTable
+          rows={data}
+          columns={columns}
+          loading={loading}
+          pageSize={pageSize}
+          page={page}
+          totalRowCount={totalCount}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          getRowId={(row) => row?.categoryId || `row-${Math.random()}`}
+          checkboxSelection={showCheckbox}
+          onRowSelectionModelChange={handleSelectionChange}
+          onRowClick={handleRowClick}
+          sortModel={sortModel}
+          onSortModelChange={setSortModel}
+          paginationMode="server"
+          sortingMode="server"
+          ariaLabel="Categories data table"
+        />
+      </Box>
+
+      <ActionMenu
+        anchorEl={menuAnchorEl}
+        open={menuOpen}
+        onClose={handleMenuClose}
+        actions={menuActions}
+        row={selectedRow}
+        onAction={handleActionClick}
       />
 
       <CrudModal
         isOpen={showModal}
         onClose={handleClose}
-        title={editingCategory ? 'Edit Category' : 'Add Category'}
-        onSubmit={crudHandleSubmit}
+        title={
+          isViewMode
+            ? 'View Category'
+            : editingCategory
+              ? 'Edit Category'
+              : 'Add Category'
+        }
+        onSubmit={isViewMode ? () => {} : crudHandleSubmit}
         isSubmitting={isSubmitting}
-        submitText={editingCategory ? 'Update' : 'Create'}
+        submitText={isViewMode ? 'Close' : editingCategory ? 'Update' : 'Create'}
+        cancelText={isViewMode ? 'Close' : 'Cancel'}
+        disableSubmit={isViewMode}
         size="md"
       >
-        <FormSection title="Basic Information" description="Category name and description">
+        <FormSection
+          title="Basic Information"
+          description="Category name and description"
+        >
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <Input
                 label="Category Name"
                 value={formData.categoryName || ''}
                 onChange={(e) => setFormField('categoryName')(e.target.value)}
+                disabled={isViewMode}
                 required
               />
             </Grid>
@@ -309,6 +454,7 @@ const Categories = () => {
                 label="Description"
                 value={formData.description || ''}
                 onChange={(e) => setFormField('description')(e.target.value)}
+                disabled={isViewMode}
                 multiline
                 rows={2}
               />
@@ -317,8 +463,11 @@ const Categories = () => {
               <Select
                 label="Parent Category"
                 value={formData.parentCategoryId || ''}
-                onChange={(e) => setFormField('parentCategoryId')(e.target.value || null)}
+                onChange={(e) =>
+                  setFormField('parentCategoryId')(e.target.value || null)
+                }
                 options={parentCategoryOptions}
+                disabled={isViewMode}
               />
             </Grid>
           </Grid>

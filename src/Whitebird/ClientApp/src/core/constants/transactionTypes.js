@@ -12,7 +12,6 @@ export const TRANSACTION_TYPES = {
   OPERATIONAL_OFFICE: 9,
 };
 
-// ADD types (bisa dibuat manual via form)
 export const TRANSACTION_TYPE_ADD = [
   TRANSACTION_TYPES.HANDOVER,
   TRANSACTION_TYPES.TRANSFER,
@@ -22,7 +21,6 @@ export const TRANSACTION_TYPE_ADD = [
   TRANSACTION_TYPES.OPERATIONAL_OFFICE,
 ];
 
-// RETURN types (hanya via shortcut)
 export const TRANSACTION_TYPE_RETURN = [
   TRANSACTION_TYPES.RETURN,
   TRANSACTION_TYPES.LOAN_RETURN,
@@ -37,11 +35,6 @@ export const TRANSACTION_TYPE_OPTIONS = [
   { value: TRANSACTION_TYPES.MAINTENANCE, label: 'MAINTENANCE' },
   { value: TRANSACTION_TYPES.DISPOSAL, label: 'DISPOSAL' },
   { value: TRANSACTION_TYPES.OPERATIONAL_OFFICE, label: 'OPERATIONAL OFFICE' },
-];
-
-export const TRANSACTION_TYPE_FILTER_OPTIONS = [
-  { value: '', label: 'All Types' },
-  ...TRANSACTION_TYPE_OPTIONS.filter(o => o.value !== ''),
 ];
 
 export const TRANSACTION_TYPES_REQUIRING_EMPLOYEE = [
@@ -70,11 +63,7 @@ export const getTransactionTypeName = (code) => {
 };
 
 export const isPrimaryTransactionType = (code) => TRANSACTION_TYPE_ADD.includes(code);
-export const isSecondaryTransactionType = (code) => TRANSACTION_TYPE_RETURN.includes(code);
 
-// ============================================================
-// TRANSACTION TYPE COLORS (untuk Chip di grid)
-// ============================================================
 export const TRANSACTION_TYPE_COLORS = {
   HANDOVER: { bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', label: 'Handover' },
   TRANSFER: { bg: 'rgba(139, 92, 246, 0.15)', color: '#8b5cf6', label: 'Transfer' },
@@ -88,8 +77,15 @@ export const TRANSACTION_TYPE_COLORS = {
 };
 
 export const getTransactionTypeColor = (typeName) => {
-  if (!typeName) return { bg: 'rgba(107,114,128,0.1)', color: '#6b7280', label: 'Unknown' };
-  return TRANSACTION_TYPE_COLORS[typeName] || { bg: 'rgba(107,114,128,0.1)', color: '#6b7280', label: typeName };
+  if (!typeName)
+    return { bg: 'rgba(107,114,128,0.1)', color: '#6b7280', label: 'Unknown' };
+  return (
+    TRANSACTION_TYPE_COLORS[typeName] || {
+      bg: 'rgba(107,114,128,0.1)',
+      color: '#6b7280',
+      label: typeName,
+    }
+  );
 };
 
 export default TRANSACTION_TYPES;

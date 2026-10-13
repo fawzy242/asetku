@@ -1,73 +1,19 @@
 @use '../../styles/variables' as *;
 @use '../../styles/mixins' as *;
-@use '../../styles/shared';
 
 .reports-menu {
     color: var(--text-primary);
 
-    &__report-types {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-        gap: $spacing-md;
-    }
-
-    &__report-card {
+    &__selector {
         display: flex;
-        align-items: center;
-        gap: $spacing-md;
-        padding: $spacing-lg;
-        background-color: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: $radius-lg;
-        cursor: pointer;
-        transition: all $transition-fast;
-        text-align: left;
-        width: 100%;
-
-        &:hover {
-            border-color: var(--primary);
-            background-color: rgba(220, 38, 38, 0.02);
-        }
-
-        &--active {
-            border-color: var(--primary);
-            background-color: rgba(220, 38, 38, 0.05);
-        }
+        flex-direction: column;
+        gap: $spacing-sm;
+        max-width: 560px;
     }
 
-    &__report-icon {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 48px;
-        height: 48px;
-        background: rgba(220, 38, 38, 0.1);
-        border-radius: $radius-md;
-        color: var(--primary);
-        font-size: 24px;
-        flex-shrink: 0;
-
-        svg {
-            width: 24px;
-            height: 24px;
-        }
-    }
-
-    &__report-info {
-        flex: 1;
-    }
-
-    &__report-label {
-        font-size: $font-size-base;
-        font-weight: 600;
-        margin: 0 0 $spacing-xs 0;
-        color: var(--text-primary);
-    }
-
-    &__report-description {
+    &__selector-hint {
+        padding-left: $spacing-xs;
         font-size: $font-size-sm;
-        color: var(--text-secondary);
-        margin: 0;
     }
 
     &__filters {
@@ -85,7 +31,9 @@
     }
 
     &__export-card {
-        background: linear-gradient(135deg, rgba(220, 38, 38, 0.05) 0%, rgba(220, 38, 38, 0.02) 100%);
+        background: linear-gradient(135deg,
+                rgba(220, 38, 38, 0.05) 0%,
+                rgba(220, 38, 38, 0.02) 100%);
     }
 
     &__export-content {
@@ -112,10 +60,6 @@
     }
 
     @include respond-to('md') {
-        &__report-types {
-            grid-template-columns: 1fr;
-        }
-
         &__export-content {
             flex-direction: column;
             text-align: center;

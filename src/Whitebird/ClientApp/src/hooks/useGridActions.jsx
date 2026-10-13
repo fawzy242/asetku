@@ -1,7 +1,15 @@
-// src/hooks/useGridActions.jsx
 import React, { useState, useCallback, useMemo } from 'react';
-import { IconButton, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
-import { FiMoreVertical, FiEye, FiEdit2, FiTrash2, FiCheck, FiX, FiRotateCcw, FiTool } from 'react-icons/fi';
+import { IconButton } from '@mui/material';
+import {
+  FiMoreVertical,
+  FiEye,
+  FiEdit2,
+  FiTrash2,
+  FiCheck,
+  FiX,
+  FiRotateCcw,
+  FiTool,
+} from 'react-icons/fi';
 
 export const ACTION_TYPES = {
   VIEW: 'view',
@@ -31,157 +39,123 @@ export const getActionConfig = (type) => {
 };
 
 /**
- * Hook untuk standardisasi action column dengan kebab menu
- * 
- * @param {Object} options
- * @param {Array} options.actions - List of action types to show (fallback jika tidak ada row data)
- * @param {Function} options.onAction - Callback when action is clicked (actionType, row)
- * @param {Function} options.getConditionalActions - Optional function to filter actions per row
- * @param {string} options.rowIdField - Field name for row ID (default: 'id')
- * @param {Array} options.defaultActions - Default actions jika row tidak memiliki flag
+ * Standardizes the row action column with a single Menu per grid.
+ * Renders only the kebab button in the column; the Menu element is
+ * the caller's responsibility (see `menuAnchorEl` / `menuActions`).
  */
 export const useGridActions = ({
   actions = [],
   onAction,
   getConditionalActions = null,
   rowIdField = 'id',
-  defaultActions = [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE]
+  defaultActions = [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleMenuOpen = useCallback((event, row) => {
     event.stopPropagation();
     setAnchorEl(event.currentTarget);
     setSelectedRow(row);
-    setMenuOpen(true);
   }, []);
 
   const handleMenuClose = useCallback(() => {
     setAnchorEl(null);
     setSelectedRow(null);
-    setMenuOpen(false);
   }, []);
 
-  const handleActionClick = useCallback((actionType, row) => {
-    handleMenuClose();
-    if (onAction) {
-      onAction(actionType, row);
-    }
-  }, [onAction, handleMenuClose]);
+  const handleActionClick = useCallback(
+    (actionType, row) => {
+      const targetRow = row || selectedRow;
+      handleMenuClose();
+      if (onAction) {
+        onAction(actionType, targetRow);
+      }
+    },
+    [onAction, selectedRow, handleMenuClose]
+  );
 
-  const actionColumn = useMemo(() => {
-    return {
+  const actionColumn = useMemo(
+    () => ({
       field: 'actions',
       headerName: 'Actions',
       width: 80,
       sortable: false,
-      renderCell: (params) => {
-        const row = params.row;
-        let visibleActions = [];
+      filterable: false,
+      disableColumnMenu: true,
+      disableReorder: true,
+      renderCell: (params) => (
+        <div className="table-actions">
+          <IconButton
+            size="small"
+            onClick={(e) => handleMenuOpen(e, params.row)}
+            className="icon-btn"
+            aria-label="Row actions"
+          >
+            <FiMoreVertical size={18} />
+          </IconButton>
+        </div>
+      ),
+    }),
+    [handleMenuOpen]
+  );
 
-        // ============================================================
-        // PRIORITAS: Gunakan row data dari backend terlebih dahulu
-        // Backend mengembalikan CanEdit, CanDelete, CanReturn, CanPost
-        // ============================================================
-        if (row.canEdit !== undefined || row.canDelete !== undefined ||
-            row.canReturn !== undefined || row.canPost !== undefined) {
+  // Resolve the action list for the currently selected row.
+  const menuActions = useMemo(() => {
+    if (!selectedRow) return [];
 
-          // Gunakan flag dari row data
-          if (row.canEdit) visibleActions.push(ACTION_TYPES.EDIT);
-          if (row.canDelete) visibleActions.push(ACTION_TYPES.DELETE);
-          if (row.canReturn) visibleActions.push(ACTION_TYPES.RETURN);
-          if (row.canPost) visibleActions.push(ACTION_TYPES.POST_MAINTENANCE);
+    let visibleActions = [];
 
-          // FIX: Jika tidak ada action yang tersedia, tampilkan View saja sebagai fallback
-          if (visibleActions.length === 0) {
-            visibleActions.push(ACTION_TYPES.VIEW);
-          }
-        }
-        // ============================================================
-        // FALLBACK: Gunakan getConditionalActions jika disediakan
-        // ============================================================
-        else if (getConditionalActions) {
-          visibleActions = getConditionalActions(row);
-          // FIX: Pastikan VIEW selalu ada jika tidak ada action lain
-          if (visibleActions.length === 0) {
-            visibleActions.push(ACTION_TYPES.VIEW);
-          }
-        }
-        // ============================================================
-        // FALLBACK TERAKHIR: Gunakan actions default
-        // ============================================================
-        else {
-          visibleActions = actions.length > 0 ? actions : defaultActions;
-          // FIX: Pastikan VIEW selalu ada
-          if (!visibleActions.includes(ACTION_TYPES.VIEW)) {
-            visibleActions = [ACTION_TYPES.VIEW, ...visibleActions];
-          }
-        }
+    if (
+      selectedRow.canEdit !== undefined ||
+      selectedRow.canDelete !== undefined ||
+      selectedRow.canReturn !== undefined ||
+      selectedRow.canPost !== undefined
+    ) {
+      if (selectedRow.canEdit) visibleActions.push(ACTION_TYPES.EDIT);
+      if (selectedRow.canDelete) visibleActions.push(ACTION_TYPES.DELETE);
+      if (selectedRow.canReturn) visibleActions.push(ACTION_TYPES.RETURN);
+      if (selectedRow.canPost) visibleActions.push(ACTION_TYPES.POST_MAINTENANCE);
 
-        // Remove duplicates
-        visibleActions = [...new Set(visibleActions)];
+      if (visibleActions.length === 0) {
+        visibleActions.push(ACTION_TYPES.VIEW);
+      }
+    } else if (getConditionalActions) {
+      visibleActions = getConditionalActions(selectedRow);
+      if (visibleActions.length === 0) {
+        visibleActions.push(ACTION_TYPES.VIEW);
+      }
+    } else {
+      visibleActions =
+        actions.length > 0 ? actions : defaultActions;
+      if (!visibleActions.includes(ACTION_TYPES.VIEW)) {
+        visibleActions = [ACTION_TYPES.VIEW, ...visibleActions];
+      }
+    }
 
-        if (!visibleActions || visibleActions.length === 0) {
-          return null;
-        }
+    visibleActions = [...new Set(visibleActions)];
 
-        const rowId = row[rowIdField] || row.id || row.assetId || row.employeeId || row.assetTransactionId;
-        const isMenuOpen = menuOpen && selectedRow?.[rowIdField] === rowId;
+    return visibleActions.map((type) => {
+      const config = getActionConfig(type);
+      return {
+        type,
+        label: config.label,
+        icon: config.icon,
+        color: config.color,
+      };
+    });
+  }, [selectedRow, actions, defaultActions, getConditionalActions]);
 
-        return (
-          <div className="table-actions">
-            <IconButton
-              size="small"
-              onClick={(e) => handleMenuOpen(e, row)}
-              className="icon-btn"
-              aria-label="Actions"
-            >
-              <FiMoreVertical size={18} />
-            </IconButton>
-            <Menu
-              anchorEl={anchorEl}
-              open={isMenuOpen}
-              onClose={handleMenuClose}
-              PaperProps={{
-                sx: {
-                  minWidth: 160,
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  backgroundColor: 'var(--card-bg)',
-                }
-              }}
-            >
-              {visibleActions.map((actionType) => {
-                const config = getActionConfig(actionType);
-                const Icon = config.icon;
-                return (
-                  <MenuItem
-                    key={actionType}
-                    onClick={() => handleActionClick(actionType, row)}
-                    sx={{
-                      color: config.color === 'error' ? 'var(--error)' :
-                             config.color === 'success' ? 'var(--success)' :
-                             config.color === 'warning' ? 'var(--warning)' :
-                             'var(--text-primary)',
-                    }}
-                  >
-                    <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}>
-                      <Icon size={18} />
-                    </ListItemIcon>
-                    <ListItemText>{config.label}</ListItemText>
-                  </MenuItem>
-                );
-              })}
-            </Menu>
-          </div>
-        );
-      },
-    };
-  }, [actions, defaultActions, getConditionalActions, rowIdField, anchorEl, menuOpen, selectedRow, handleMenuOpen, handleMenuClose, handleActionClick]);
-
-  return { actionColumn };
+  return {
+    actionColumn,
+    menuAnchorEl: anchorEl,
+    menuOpen: Boolean(anchorEl),
+    menuActions,
+    selectedRow,
+    handleMenuClose,
+    handleActionClick,
+    rowIdField,
+  };
 };
 
 export default useGridActions;

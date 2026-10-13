@@ -1,18 +1,24 @@
 // src/pages/Offices/Offices.jsx
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Grid } from '@mui/material';
+import { Grid, Box } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
+import { FiCheckSquare, FiPlus, FiTrash2 } from 'react-icons/fi';
 import { OfficesData } from '../../core/services';
-import GridView from '../../components/organisms/GridView/GridView';
+import PageHeader from '../../components/atoms/PageHeader';
+import BulkActionBar from '../../components/atoms/BulkActionBar';
+import RefreshButton from '../../components/atoms/RefreshButton';
+import Button from '../../components/atoms/Button/Button';
+import StatusChip from '../../components/atoms/StatusChip/StatusChip';
+import Spinner from '../../components/atoms/Spinner/Spinner';
+import Tabs from '../../components/molecules/Tabs/Tabs';
+import SearchToolbar from '../../components/molecules/SearchToolbar/SearchToolbar';
+import DataTable from '../../components/molecules/DataTable/DataTable';
 import CrudModal from '../../components/molecules/CrudModal/CrudModal';
+import BulkActivateModal from '../../components/molecules/BulkActivateModal/BulkActivateModal';
+import ActionMenu from '../../components/molecules/ActionMenu';
 import FormSection from '../../components/atoms/FormSection/FormSection';
 import Input from '../../components/atoms/Input/Input';
 import Select from '../../components/atoms/Select/Select';
-import Spinner from '../../components/atoms/Spinner/Spinner';
-import BulkActivateModal from '../../components/molecules/BulkActivateModal/BulkActivateModal';
-import Button from '../../components/atoms/Button/Button';
-import StatusChip from '../../components/atoms/StatusChip/StatusChip';
-import { FiCheckSquare } from 'react-icons/fi';
 import { ACTION_TYPES, useGridActions } from '../../hooks/useGridActions';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
@@ -44,37 +50,44 @@ const Offices = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
+  const [isViewMode, setIsViewMode] = useState(false);
   const isMountedRef = useRef(true);
   const queryClient = useQueryClient();
   const { toast, confirmDelete, confirm } = useSweetAlert();
   const { offices: parentOffices, officeTypes } = useReferenceData();
 
-  // ============================================================
-  // BULK SELECTION - HARUS DI ATAS useEffect
-  // ============================================================
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
-    useBulkSelection({ idField: 'officeId' });
+  const {
+    selectedRowIds,
+    selectionCount,
+    hasSelection,
+    handleSelectionChange,
+    clearSelection,
+    getSelectedIds,
+  } = useBulkSelection({ idField: 'officeId' });
 
-  const showCheckbox = activeTab === 'active' || activeTab === 'inactive';
+  const showCheckbox = true;
+  const showActivateToggle =
+    activeTab === 'active' || activeTab === 'inactive';
 
-  // ============================================================
-  // CRUD FORM
-  // ============================================================
   const {
     showModal,
     editingRecord: editingOffice,
     isSubmitting,
     formData,
     setFormField,
-    handleCreate,
+    handleCreate: baseHandleCreate,
     handleEdit,
-    handleClose,
+    handleClose: baseHandleClose,
     handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, officesData, {
     idField: 'officeId',
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reference', 'offices'] });
-      toast.success(editingOffice ? 'Office updated successfully' : 'Office created successfully');
+      toast.success(
+        editingOffice
+          ? 'Office updated successfully'
+          : 'Office created successfully'
+      );
       reload();
       clearSelection();
     },
@@ -83,9 +96,16 @@ const Offices = () => {
     },
   });
 
-  // ============================================================
-  // BUILD FILTERS
-  // ============================================================
+  const handleCreate = useCallback(() => {
+    setIsViewMode(false);
+    baseHandleCreate();
+  }, [baseHandleCreate]);
+
+  const handleClose = useCallback(() => {
+    setIsViewMode(false);
+    baseHandleClose();
+  }, [baseHandleClose]);
+
   const buildFilters = useCallback(() => {
     const filters = {};
     if (activeTab === 'active') filters.isActive = true;
@@ -94,9 +114,6 @@ const Offices = () => {
     return filters;
   }, [activeTab, searchTerm]);
 
-  // ============================================================
-  // FETCH GRID DATA
-  // ============================================================
   const fetchGridData = useCallback(
     async (params) => {
       const filters = buildFilters();
@@ -106,8 +123,7 @@ const Offices = () => {
         ...filters,
         ...params,
       };
-      const result = await officesData.fetchGridData(requestParams);
-      return result;
+      return await officesData.fetchGridData(requestParams);
     },
     [buildFilters]
   );
@@ -120,12 +136,11 @@ const Offices = () => {
     setPage,
     pageSize,
     setPageSize,
+    sortModel,
+    setSortModel,
     reload,
   } = useGridData(['offices', activeTab, searchTerm], fetchGridData);
 
-  // ============================================================
-  // EFFECTS
-  // ============================================================
   useEffect(() => {
     isMountedRef.current = true;
     reload();
@@ -135,19 +150,14 @@ const Offices = () => {
     };
   }, [activeTab, reload, clearSelection]);
 
-  // ============================================================
-  // OPTIONS
-  // ============================================================
   const parentOfficeOptions = useOptions(
-    parentOffices.filter((o) => !editingOffice || o.value !== editingOffice.officeId),
+    parentOffices.filter(
+      (o) => !editingOffice || o.value !== editingOffice.officeId
+    ),
     'None (Top Level)'
   );
-
   const officeTypeOptions = useOptions(officeTypes, 'Select Type');
 
-  // ============================================================
-  // HANDLERS
-  // ============================================================
   const handleSearch = useCallback(
     (search) => {
       setSearchTerm(search);
@@ -156,6 +166,11 @@ const Offices = () => {
     },
     [setPage, clearSelection]
   );
+
+  const handleRefresh = useCallback(() => {
+    reload();
+    clearSelection();
+  }, [reload, clearSelection]);
 
   const handleDelete = useCallback(
     async (office) => {
@@ -173,6 +188,38 @@ const Offices = () => {
       }
     },
     [reload, queryClient, toast, confirmDelete, clearSelection]
+  );
+
+  const handleBulkDelete = useCallback(
+    async (ids) => {
+      if (!ids || ids.length === 0) return;
+      const confirmed = await confirm({
+        title: 'Delete Offices',
+        text: `Are you sure you want to delete ${ids.length} office(s)? This action cannot be undone.`,
+        icon: 'warning',
+        confirmButtonText: 'Yes, Delete',
+        confirmButtonColor: '#ef4444',
+      });
+      if (!confirmed) return;
+
+      const r = await officesData.bulkDelete(ids);
+      if (!isMountedRef.current) return;
+
+      if (r.success) {
+        toast.success(`${r.data.successCount} office(s) deleted`);
+      } else if (r.partial) {
+        toast.warning(
+          `${r.data.successCount} deleted, ${r.data.failCount} failed`
+        );
+      } else {
+        toast.error(r.error || 'Failed to delete offices');
+      }
+
+      clearSelection();
+      queryClient.invalidateQueries({ queryKey: ['reference', 'offices'] });
+      reload();
+    },
+    [reload, queryClient, toast, confirm, clearSelection]
   );
 
   const handleBulkActivate = useCallback(
@@ -208,10 +255,25 @@ const Offices = () => {
 
   const handleGridAction = useCallback(
     (actionType, row) => {
-      if (actionType === ACTION_TYPES.EDIT) handleEdit(row);
-      else if (actionType === ACTION_TYPES.DELETE) handleDelete(row);
+      if (actionType === ACTION_TYPES.VIEW) {
+        setIsViewMode(true);
+        handleEdit(row);
+      } else if (actionType === ACTION_TYPES.EDIT) {
+        setIsViewMode(false);
+        handleEdit(row);
+      } else if (actionType === ACTION_TYPES.DELETE) {
+        handleDelete(row);
+      }
     },
     [handleEdit, handleDelete]
+  );
+
+  const handleRowClick = useCallback(
+    (row) => {
+      setIsViewMode(true);
+      handleEdit(row);
+    },
+    [handleEdit]
   );
 
   const getConditionalActions = useCallback((row) => {
@@ -221,7 +283,15 @@ const Offices = () => {
     return actions;
   }, []);
 
-  const { actionColumn } = useGridActions({
+  const {
+    actionColumn,
+    menuAnchorEl,
+    menuOpen,
+    menuActions,
+    selectedRow,
+    handleMenuClose,
+    handleActionClick,
+  } = useGridActions({
     actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
     onAction: handleGridAction,
     getConditionalActions,
@@ -235,11 +305,17 @@ const Offices = () => {
       { field: 'officeTypeName', headerName: 'Type', width: 130 },
       { field: 'city', headerName: 'City', width: 140 },
       { field: 'parentOfficeName', headerName: 'Parent', width: 170 },
-      { field: 'childCount', headerName: 'Sub-offices', width: 130 },
+      {
+        field: 'childCount',
+        headerName: 'Sub-offices',
+        width: 130,
+        sortable: false,
+      },
       {
         field: 'isActive',
         headerName: 'Status',
         width: 110,
+        sortable: false,
         renderCell: (p) => {
           const status = p.value ? 'Active' : 'Inactive';
           return <StatusChip status={status} />;
@@ -250,68 +326,127 @@ const Offices = () => {
     [actionColumn]
   );
 
-  const extraActions = (
-    <>
-      {hasSelection && showCheckbox && (
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setShowBulkActivateModal(true)}
-          className="u-inline-flex u-btn-gap"
-        >
-          <FiCheckSquare size={16} /> {activeTab === 'active' ? 'Deactivate' : 'Activate'} ({selectionCount})
-        </Button>
-      )}
-    </>
-  );
-
-  if (loading && !data.length) return <div className="page-loading"><Spinner size="lg" /></div>;
-
   const bulkActivateValue = activeTab === 'active' ? false : true;
+
+  const bulkActions = hasSelection
+    ? [
+        ...(showActivateToggle
+          ? [
+              {
+                key: 'bulk-toggle',
+                label: `${bulkActivateValue ? 'Activate' : 'Deactivate'} (${selectionCount})`,
+                variant: 'primary',
+                icon: <FiCheckSquare size={16} />,
+                onClick: () => setShowBulkActivateModal(true),
+              },
+            ]
+          : []),
+        {
+          key: 'bulk-delete',
+          label: `Delete (${selectionCount})`,
+          variant: 'danger',
+          icon: <FiTrash2 size={16} />,
+          onClick: () => handleBulkDelete(getSelectedIds(data)),
+        },
+      ]
+    : [];
+
   const bulkTitle = bulkActivateValue ? 'Activate Offices' : 'Deactivate Offices';
   const bulkDescription = `This action will ${bulkActivateValue ? 'activate' : 'deactivate'} the selected offices.`;
 
+  if (loading && !data.length) {
+    return (
+      <div className="page-loading">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
   return (
     <div className="offices-menu">
-      <GridView
+      <PageHeader
         title="Office Management"
-        tabs={TABS}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        onCreate={handleCreate}
-        columns={columns}
-        data={data}
-        loading={loading}
-        totalCount={totalCount}
-        page={page}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-        onSearch={handleSearch}
-        showCheckbox={showCheckbox}
-        selectedRows={selectedRowIds}
-        onSelectionChange={handleSelectionChange}
-        createButtonText="Add Office"
-        ariaLabel="Offices data table"
-        extraActions={extraActions}
+        description="Manage office locations and hierarchy"
+        actions={
+          <>
+            <RefreshButton onClick={handleRefresh} loading={loading} />
+            <BulkActionBar visible={bulkActions.length > 0} actions={bulkActions} />
+            <Button variant="primary" onClick={handleCreate} startIcon={<FiPlus />}>
+              Add Office
+            </Button>
+          </>
+        }
+      />
+
+      <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+
+      <SearchToolbar onSearch={handleSearch} placeholder="Search offices..." />
+
+      <Box
+        sx={{
+          backgroundColor: 'var(--card-bg)',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          mb: 2,
+          border: '1px solid var(--border)',
+          width: '100%',
+          minWidth: 0,
+        }}
+      >
+        <DataTable
+          rows={data}
+          columns={columns}
+          loading={loading}
+          pageSize={pageSize}
+          page={page}
+          totalRowCount={totalCount}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          getRowId={(row) => row?.officeId || `row-${Math.random()}`}
+          checkboxSelection={showCheckbox}
+          onRowSelectionModelChange={handleSelectionChange}
+          onRowClick={handleRowClick}
+          sortModel={sortModel}
+          onSortModelChange={setSortModel}
+          paginationMode="server"
+          sortingMode="server"
+          ariaLabel="Offices data table"
+        />
+      </Box>
+
+      <ActionMenu
+        anchorEl={menuAnchorEl}
+        open={menuOpen}
+        onClose={handleMenuClose}
+        actions={menuActions}
+        row={selectedRow}
+        onAction={handleActionClick}
       />
 
       <CrudModal
         isOpen={showModal}
         onClose={handleClose}
-        title={editingOffice ? 'Edit Office' : 'Add Office'}
-        onSubmit={crudHandleSubmit}
+        title={
+          isViewMode ? 'View Office' : editingOffice ? 'Edit Office' : 'Add Office'
+        }
+        onSubmit={isViewMode ? () => {} : crudHandleSubmit}
         isSubmitting={isSubmitting}
-        submitText={editingOffice ? 'Update' : 'Create'}
+        submitText={isViewMode ? 'Close' : editingOffice ? 'Update' : 'Create'}
+        cancelText={isViewMode ? 'Close' : 'Cancel'}
+        disableSubmit={isViewMode}
         size="lg"
       >
-        <FormSection title="Basic Information" description="Office name, code, and type">
+        <FormSection
+          title="Basic Information"
+          description="Office name, code, and type"
+        >
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <Input
                 label="Office Name"
                 value={formData.officeName || ''}
                 onChange={(e) => setFormField('officeName')(e.target.value)}
+                disabled={isViewMode}
                 required
               />
             </Grid>
@@ -320,6 +455,7 @@ const Offices = () => {
                 label="Office Code"
                 value={formData.officeCode || ''}
                 onChange={(e) => setFormField('officeCode')(e.target.value)}
+                disabled={isViewMode}
                 placeholder="Optional"
               />
             </Grid>
@@ -329,14 +465,18 @@ const Offices = () => {
                 value={formData.officeType || ''}
                 onChange={(e) => setFormField('officeType')(e.target.value)}
                 options={officeTypeOptions}
+                disabled={isViewMode}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <Select
                 label="Parent Office"
                 value={formData.parentOfficeId || ''}
-                onChange={(e) => setFormField('parentOfficeId')(e.target.value || null)}
+                onChange={(e) =>
+                  setFormField('parentOfficeId')(e.target.value || null)
+                }
                 options={parentOfficeOptions}
+                disabled={isViewMode}
               />
             </Grid>
           </Grid>
@@ -349,6 +489,7 @@ const Offices = () => {
                 label="City"
                 value={formData.city || ''}
                 onChange={(e) => setFormField('city')(e.target.value)}
+                disabled={isViewMode}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -356,6 +497,7 @@ const Offices = () => {
                 label="Phone"
                 value={formData.phone || ''}
                 onChange={(e) => setFormField('phone')(e.target.value)}
+                disabled={isViewMode}
               />
             </Grid>
             <Grid item xs={12}>
@@ -363,6 +505,7 @@ const Offices = () => {
                 label="Address"
                 value={formData.address || ''}
                 onChange={(e) => setFormField('address')(e.target.value)}
+                disabled={isViewMode}
                 multiline
                 rows={2}
               />

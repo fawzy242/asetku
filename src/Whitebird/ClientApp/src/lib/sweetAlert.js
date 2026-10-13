@@ -1,8 +1,8 @@
 // src/lib/sweetAlert.js
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
+import toast from 'react-hot-toast';
 
-// SweetAlert2 default configuration untuk confirm (dengan reverseButtons)
 export const swal = Swal.mixin({
   customClass: {
     confirmButton: 'swal-confirm-btn',
@@ -22,29 +22,27 @@ export const swal = Swal.mixin({
   allowEscapeKey: true,
 });
 
-// Toast tetap tersedia (untuk keperluan lain jika ada)
+// Thin toast wrappers over react-hot-toast
 export const toastr = {
-  success: (message, options = {}) => {
+  success: (message) => {
     if (!message) return;
-    alertUtils.success('Success!', message);
+    toast.success(message);
   },
-  error: (message, options = {}) => {
+  error: (message) => {
     if (!message) return;
-    alertUtils.error('Error', message);
+    toast.error(message);
   },
-  info: (message, options = {}) => {
+  info: (message) => {
     if (!message) return;
-    alertUtils.info('Info', message);
+    toast(message, { icon: 'ℹ️' });
   },
-  warning: (message, options = {}) => {
+  warning: (message) => {
     if (!message) return;
-    alertUtils.info('Warning', message);
+    toast(message, { icon: '⚠️' });
   },
 };
 
-// Alert utilities
 export const alertUtils = {
-  // Confirm - tetap menggunakan swal.mixin dengan reverseButtons
   confirm: async (options) => {
     const result = await swal.fire({
       title: options.title || 'Are you sure?',
@@ -68,8 +66,6 @@ export const alertUtils = {
     });
   },
 
-  // FIX: Success - Pakai Swal.fire langsung (BUKAN swal.mixin)
-  // TAPI tetap pakai customClass yang sama agar styling konsisten
   success: async (title, text) => {
     await Swal.fire({
       title: title || 'Success!',
@@ -93,7 +89,6 @@ export const alertUtils = {
     });
   },
 
-  // FIX: Error - Pakai Swal.fire langsung (BUKAN swal.mixin)
   error: async (title, text) => {
     await Swal.fire({
       title: title || 'Error!',

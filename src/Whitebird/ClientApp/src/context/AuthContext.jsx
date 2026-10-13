@@ -1,13 +1,25 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
-import { LoginData, UserData } from "../core/services";
-import { STORAGE_KEYS } from "../core/constants/storageKeys";
-import { getStorage, setStorage, removeStorage } from "../core/utils/storage.utils";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from 'react';
+import { LoginData, UserData } from '../core/services';
+import { STORAGE_KEYS } from '../core/constants/storageKeys';
+import {
+  getStorage,
+  setStorage,
+  removeStorage,
+} from '../core/utils/storage.utils';
+import { getProfilePhotoUrl } from '../core/utils/photoUrl.utils';
 
 const AuthContext = createContext(null);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 };
 
@@ -23,8 +35,10 @@ export const AuthProvider = ({ children }) => {
 
   const performLogout = useCallback(async () => {
     const token = localStorage.getItem(STORAGE_KEYS.SESSION_TOKEN);
-    if (token) { 
-      try { await loginData.logout(token); } catch {} 
+    if (token) {
+      try {
+        await loginData.logout(token);
+      } catch {}
     }
     localStorage.removeItem(STORAGE_KEYS.SESSION_TOKEN);
     removeStorage(STORAGE_KEYS.USER);
@@ -37,19 +51,16 @@ export const AuthProvider = ({ children }) => {
   const refreshUser = useCallback(async () => {
     const token = localStorage.getItem(STORAGE_KEYS.SESSION_TOKEN);
     if (!token) return false;
-    
+
     try {
       const result = await userData.getMe();
       if (result.success && result.data) {
         const userDataResult = result.data;
-        
-        const request = { scheme: window.location.protocol.replace(':', ''), host: window.location.host };
-        const profilePhotoUrl = userDataResult.userId 
-          ? `${request.scheme}://${request.host}/api/User/profile-photo`
-          : null;
-        
-        const updatedUser = { ...userDataResult, profilePhotoUrl };
-        
+        const updatedUser = {
+          ...userDataResult,
+          profilePhotoUrl: getProfilePhotoUrl(userDataResult.userId),
+        };
+
         setStorage(STORAGE_KEYS.USER, updatedUser);
         if (mountedRef.current) {
           setUser(updatedUser);
@@ -58,7 +69,7 @@ export const AuthProvider = ({ children }) => {
       }
       return false;
     } catch (error) {
-      console.error("Failed to refresh user:", error);
+      console.error('Failed to refresh user:', error);
       return false;
     }
   }, []);
@@ -69,25 +80,25 @@ export const AuthProvider = ({ children }) => {
 
     const token = localStorage.getItem(STORAGE_KEYS.SESSION_TOKEN);
     const savedUser = getStorage(STORAGE_KEYS.USER);
-    
+
     if (token && savedUser) {
       try {
         const result = await loginData.validateSession();
-        const isValid = result.success && result.data?.isValid;
+        const isValid = result.success && result.data?.isValid === true;
         if (!mountedRef.current) return;
-        if (isValid) { 
-          setUser(savedUser); 
-          setIsAuthenticated(true); 
-        } else { 
-          await performLogout(); 
+        if (isValid) {
+          setUser(savedUser);
+          setIsAuthenticated(true);
+        } else {
+          await performLogout();
         }
-      } catch { 
+      } catch {
         if (mountedRef.current) {
-          await performLogout(); 
+          await performLogout();
         }
       }
     }
-    
+
     if (mountedRef.current) {
       setLoading(false);
     }
@@ -107,14 +118,12 @@ export const AuthProvider = ({ children }) => {
       const result = await loginData.handleLogin(username, password);
       if (result.success) {
         const { sessionToken, user: userDataResult } = result.data;
-        
-        const request = { scheme: window.location.protocol.replace(':', ''), host: window.location.host };
-        const profilePhotoUrl = userDataResult.userId 
-          ? `${request.scheme}://${request.host}/api/User/profile-photo`
-          : null;
-        
-        const userWithPhoto = { ...userDataResult, profilePhotoUrl };
-        
+
+        const userWithPhoto = {
+          ...userDataResult,
+          profilePhotoUrl: getProfilePhotoUrl(userDataResult.userId),
+        };
+
         localStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, sessionToken);
         setStorage(STORAGE_KEYS.USER, userWithPhoto);
         if (mountedRef.current) {
@@ -123,9 +132,10 @@ export const AuthProvider = ({ children }) => {
         }
         return { success: true };
       }
-      return { success: false, error: result.error || "Login failed" };
+      return { success: false, error: result.error || 'Login failed' };
     } catch (error) {
-      const message = error.response?.data?.message || "Invalid username or password";
+      const message =
+        error.response?.data?.message || 'Invalid username or password';
       return { success: false, error: message };
     }
   }, []);
@@ -134,15 +144,15 @@ export const AuthProvider = ({ children }) => {
     await performLogout();
   }, [performLogout]);
 
-  const value = { 
-    user, 
-    loading, 
-    isAuthenticated, 
-    login, 
-    logout, 
+  const value = {
+    user,
+    loading,
+    isAuthenticated,
+    login,
+    logout,
     checkAuth,
-    refreshUser
+    refreshUser,
   };
-  
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

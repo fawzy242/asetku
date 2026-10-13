@@ -24,8 +24,7 @@
     --sidebar-text: #{$sidebar-text-light};
     --sidebar-text-active: #{$sidebar-text-active-light};
     --sidebar-hover: #{$sidebar-hover-light};
-    
-    // Additional colors
+
     --table-header-bg: #f9fafb;
     --table-row-hover: #f3f4f6;
     --disabled-bg: #f3f4f6;
@@ -57,11 +56,137 @@
     --sidebar-text: #{$sidebar-text-dark};
     --sidebar-text-active: #{$sidebar-text-active-dark};
     --sidebar-hover: #{$sidebar-hover-dark};
-    
-    // Additional colors for dark mode
+
     --table-header-bg: #374151;
     --table-row-hover: #2d3748;
     --disabled-bg: #374151;
     --disabled-text: #6b7280;
     --placeholder: #6b7280;
+}
+
+// ============================================================
+// CONSOLIDATED FORM-CONTROL OVERRIDES (dark mode)
+// Previously duplicated in Button.scss, Input.scss, Select.scss.
+// ============================================================
+[data-theme='dark'] {
+    .btn--outline {
+        color: #f9fafb;
+        border-color: #4b5563;
+
+        &:hover {
+            color: var(--primary);
+        }
+    }
+
+    .btn--text {
+        color: #f9fafb;
+    }
+
+    .MuiInputLabel-root {
+        color: #9ca3af !important;
+
+        &.Mui-focused {
+            color: var(--primary) !important;
+        }
+
+        &.Mui-error {
+            color: #ef4444 !important;
+        }
+    }
+
+    .MuiOutlinedInput-root {
+        color: #f9fafb !important;
+
+        fieldset {
+            border-color: #4b5563 !important;
+        }
+
+        &:hover fieldset {
+            border-color: var(--primary) !important;
+        }
+
+        &.Mui-focused fieldset {
+            border-color: var(--primary) !important;
+        }
+
+        &.Mui-error fieldset {
+            border-color: #ef4444 !important;
+        }
+
+        input {
+            color: #f9fafb !important;
+
+            &::placeholder {
+                color: #6b7280 !important;
+            }
+        }
+
+        textarea {
+            color: #f9fafb !important;
+
+            &::placeholder {
+                color: #6b7280 !important;
+            }
+        }
+    }
+
+    .MuiFormHelperText-root {
+        color: #9ca3af !important;
+
+        &.Mui-error {
+            color: #ef4444 !important;
+        }
+    }
+
+    .MuiInputAdornment-root {
+        color: #9ca3af !important;
+
+        button {
+            color: #9ca3af !important;
+
+            &:hover {
+                color: var(--primary) !important;
+            }
+        }
+    }
+
+    // Autocomplete (Select)
+    .MuiAutocomplete-paper {
+        background-color: #1f2937 !important;
+        color: #f9fafb !important;
+        border: 1px solid #4b5563 !important;
+    }
+
+    .MuiAutocomplete-option {
+        color: #f9fafb !important;
+
+        &:hover {
+            background-color: #374151 !important;
+        }
+
+        &[aria-selected='true'] {
+            background-color: rgba(220, 38, 38, 0.25) !important;
+        }
+    }
+
+    .MuiAutocomplete-loading,
+    .MuiAutocomplete-noOptions {
+        color: #9ca3af !important;
+    }
+}
+
+[data-theme='light'] {
+    .MuiOutlinedInput-root {
+        input {
+            color: #111827 !important;
+        }
+
+        textarea {
+            color: #111827 !important;
+        }
+    }
+
+    .MuiAutocomplete-option[aria-selected='true'] {
+        background-color: rgba(220, 38, 38, 0.1) !important;
+    }
 }

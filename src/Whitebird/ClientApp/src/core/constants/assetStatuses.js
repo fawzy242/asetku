@@ -19,11 +19,6 @@ export const ASSET_STATUS_OPTIONS = [
   { value: ASSET_STATUSES.DISPOSED, label: 'Disposed' },
 ];
 
-export const ASSET_STATUS_FILTER_OPTIONS = [
-  { value: '', label: 'All Statuses' },
-  ...ASSET_STATUS_OPTIONS,
-];
-
 export const ASSET_TABS = [
   { id: 'all', label: 'All' },
   { id: 'active', label: 'Active' },
@@ -34,42 +29,5 @@ export const ASSET_TABS = [
   { id: 'damaged', label: 'Damaged' },
   { id: 'inactive', label: 'Inactive' },
 ];
-
-export const ASSET_GRID_TABS = ASSET_TABS;
-export const ASSET_STATUS_TABS = ASSET_TABS;
-
-// NOTE: Colors moved to statusColors.js - import from there
-// ASSET_STATUS_CHART_COLORS removed - use getStatusChipStyles from statusColors.js
-
-export const ASSET_CONDITION_OPTIONS = [
-  { value: '', label: 'Select Condition' },
-  { value: '1', label: 'Good' },
-  { value: '2', label: 'Normal' },
-  { value: '3', label: 'Damaged' },
-];
-
-export const ASSET_CONDITION_PURCHASE_OPTIONS = [
-  { value: '', label: 'Select' },
-  { value: '1', label: 'New' },
-  { value: '2', label: 'Second Hand' },
-];
-
-export const CONDITION_OPTIONS = ASSET_CONDITION_OPTIONS;
-
-export const getAssetStatusFromTransactionType = (transactionType) => {
-  switch (transactionType) {
-    case 1:
-    case 2:
-      return ASSET_STATUSES.ASSIGNED;
-    case 3:
-      return ASSET_STATUSES.ON_LOAN;
-    case 6:
-      return ASSET_STATUSES.IN_MAINTENANCE;
-    case 8:
-      return ASSET_STATUSES.DISPOSED;
-    default:
-      return ASSET_STATUSES.AVAILABLE;
-  }
-};
 
 export default ASSET_STATUSES;

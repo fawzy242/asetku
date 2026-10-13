@@ -1,15 +1,6 @@
 @use '../../styles/variables' as *;
 @use '../../styles/mixins' as *;
-@use '../../styles/shared';
 
 .departments-menu {
     color: var(--text-primary);
-
-    &__table {
-        background-color: var(--card-bg);
-        border-radius: $radius-lg;
-        overflow: hidden;
-        margin-bottom: $spacing-lg;
-        border: 1px solid var(--border);
-    }
 }

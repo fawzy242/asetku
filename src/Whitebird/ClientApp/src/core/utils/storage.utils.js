@@ -24,20 +24,3 @@ export const removeStorage = (key) => {
     return false;
   }
 };
-
-export const clearStorage = () => {
-  try {
-    localStorage.clear();
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-export const hasStorage = (key) => {
-  try {
-    return localStorage.getItem(key) !== null;
-  } catch {
-    return false;
-  }
-};

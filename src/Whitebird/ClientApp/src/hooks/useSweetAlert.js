@@ -1,17 +1,21 @@
 import { useCallback } from 'react';
-import { alertUtils, toastr } from '../lib/sweetAlert';
+import toast from 'react-hot-toast';
+import { alertUtils } from '../lib/sweetAlert';
 
 /**
- * Hook for SweetAlert2 and toast utilities
+ * Hook for SweetAlert2 confirmations and react-hot-toast notifications.
  */
 export const useSweetAlert = () => {
   const confirm = useCallback(async (options) => {
     return alertUtils.confirm(options);
   }, []);
 
-  const confirmDelete = useCallback(async (title = 'Delete Record', text = 'This action cannot be undone.') => {
-    return alertUtils.delete(title, text);
-  }, []);
+  const confirmDelete = useCallback(
+    async (title = 'Delete Record', text = 'This action cannot be undone.') => {
+      return alertUtils.delete(title, text);
+    },
+    []
+  );
 
   const showSuccess = useCallback((title, text) => {
     alertUtils.success(title, text);
@@ -25,11 +29,19 @@ export const useSweetAlert = () => {
     alertUtils.info(title, text);
   }, []);
 
-  const toast = {
-    success: useCallback((message) => toastr.success(message), []),
-    error: useCallback((message) => toastr.error(message), []),
-    info: useCallback((message) => toastr.info(message), []),
-    warning: useCallback((message) => toastr.warning(message), []),
+  const toastApi = {
+    success: useCallback((message) => {
+      if (message) toast.success(message);
+    }, []),
+    error: useCallback((message) => {
+      if (message) toast.error(message);
+    }, []),
+    info: useCallback((message) => {
+      if (message) toast(message, { icon: 'ℹ️' });
+    }, []),
+    warning: useCallback((message) => {
+      if (message) toast(message, { icon: '⚠️' });
+    }, []),
   };
 
   return {
@@ -38,7 +50,7 @@ export const useSweetAlert = () => {
     showSuccess,
     showError,
     showInfo,
-    toast,
+    toast: toastApi,
   };
 };
 

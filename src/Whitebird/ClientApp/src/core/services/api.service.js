@@ -9,10 +9,10 @@ class ApiService {
     this.instance = axios.create({
       baseURL: API_CONFIG.BASE_URL,
       timeout: API_CONFIG.TIMEOUT,
-      headers: { 
-        'Content-Type': 'application/json', 
-        'Accept': 'application/json' 
-      }
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
     });
     this.setupInterceptors();
   }
@@ -41,20 +41,16 @@ class ApiService {
         }
 
         if (error.config?.responseType === 'blob') {
-          if (error.response?.status === 200) {
-            return Promise.resolve({
-              data: null,
-              status: 200,
-            });
-          }
           return Promise.reject({
             ...error,
             __skipToast: true,
           });
         }
 
-        if (error.response?.status === 404 && 
-            error.config?.url?.includes('/User/profile-photo')) {
+        if (
+          error.response?.status === 404 &&
+          error.config?.url?.includes('/User/profile-photo')
+        ) {
           return Promise.resolve({
             data: null,
             isNotFound: true,
@@ -63,7 +59,7 @@ class ApiService {
         }
 
         const handledError = handleApiError(error, {
-          showToast: false, // UI handled by page
+          showToast: false,
         });
 
         return Promise.reject({
@@ -101,82 +97,77 @@ class ApiService {
   get(url, config = {}) {
     const controller = new AbortController();
     const requestKey = `GET:${url}:${JSON.stringify(config.params || {})}`;
-    
+
     this.cancelPendingRequest(requestKey);
     this.pendingRequests.set(requestKey, controller);
 
-    return this.instance.get(url, { 
-      ...config, 
-      signal: controller.signal 
-    }).finally(() => {
-      if (this.pendingRequests.get(requestKey) === controller) {
-        this.pendingRequests.delete(requestKey);
-      }
-    });
+    return this.instance
+      .get(url, { ...config, signal: controller.signal })
+      .finally(() => {
+        if (this.pendingRequests.get(requestKey) === controller) {
+          this.pendingRequests.delete(requestKey);
+        }
+      });
   }
 
   post(url, data = {}, config = {}) {
     const controller = new AbortController();
     const requestKey = `POST:${url}`;
-    
+
     this.pendingRequests.set(requestKey, controller);
 
-    return this.instance.post(url, data, { 
-      ...config, 
-      signal: controller.signal 
-    }).finally(() => {
-      if (this.pendingRequests.get(requestKey) === controller) {
-        this.pendingRequests.delete(requestKey);
-      }
-    });
+    return this.instance
+      .post(url, data, { ...config, signal: controller.signal })
+      .finally(() => {
+        if (this.pendingRequests.get(requestKey) === controller) {
+          this.pendingRequests.delete(requestKey);
+        }
+      });
   }
 
   put(url, data = {}, config = {}) {
     const controller = new AbortController();
     const requestKey = `PUT:${url}`;
-    
+
     this.pendingRequests.set(requestKey, controller);
 
-    return this.instance.put(url, data, { 
-      ...config, 
-      signal: controller.signal 
-    }).finally(() => {
-      if (this.pendingRequests.get(requestKey) === controller) {
-        this.pendingRequests.delete(requestKey);
-      }
-    });
+    return this.instance
+      .put(url, data, { ...config, signal: controller.signal })
+      .finally(() => {
+        if (this.pendingRequests.get(requestKey) === controller) {
+          this.pendingRequests.delete(requestKey);
+        }
+      });
   }
 
   delete(url, config = {}) {
     const controller = new AbortController();
     const requestKey = `DELETE:${url}`;
-    
+
     this.pendingRequests.set(requestKey, controller);
 
-    return this.instance.delete(url, { 
-      ...config, 
-      signal: controller.signal 
-    }).finally(() => {
-      if (this.pendingRequests.get(requestKey) === controller) {
-        this.pendingRequests.delete(requestKey);
-      }
-    });
+    return this.instance
+      .delete(url, { ...config, signal: controller.signal })
+      .finally(() => {
+        if (this.pendingRequests.get(requestKey) === controller) {
+          this.pendingRequests.delete(requestKey);
+        }
+      });
   }
 
   patch(url, data = {}, config = {}) {
     const controller = new AbortController();
     const requestKey = `PATCH:${url}`;
-    
+
     this.pendingRequests.set(requestKey, controller);
 
-    return this.instance.patch(url, data, { 
-      ...config, 
-      signal: controller.signal 
-    }).finally(() => {
-      if (this.pendingRequests.get(requestKey) === controller) {
-        this.pendingRequests.delete(requestKey);
-      }
-    });
+    return this.instance
+      .patch(url, data, { ...config, signal: controller.signal })
+      .finally(() => {
+        if (this.pendingRequests.get(requestKey) === controller) {
+          this.pendingRequests.delete(requestKey);
+        }
+      });
   }
 }
 

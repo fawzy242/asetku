@@ -1,0 +1,11 @@
+@use '../../../styles/variables' as *;
+
+.action-menu {
+    &__paper {
+        min-width: 160px;
+        border-radius: $radius-md;
+        box-shadow: $shadow-lg;
+        background-color: var(--card-bg);
+        border: 1px solid var(--border);
+    }
+}

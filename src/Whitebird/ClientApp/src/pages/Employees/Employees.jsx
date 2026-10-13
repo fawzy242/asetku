@@ -4,22 +4,36 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Grid, Box, Avatar, Typography, IconButton } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
-import { FiCamera, FiX, FiUpload, FiCheckSquare } from 'react-icons/fi';
+import {
+  FiCamera,
+  FiX,
+  FiUpload,
+  FiCheckSquare,
+  FiPlus,
+  FiTrash2,
+} from 'react-icons/fi';
 import { EmployeesData } from '../../core/services';
-import { employeeSchema, getEmployeeDefaultValues } from '../../schemas/employeeSchema';
+import {
+  employeeSchema,
+  getEmployeeDefaultValues,
+} from '../../schemas/employeeSchema';
 import { getFieldErrorProps } from '../../core/utils/validation.utils';
-import GridView from '../../components/organisms/GridView/GridView';
-import CrudModal from '../../components/molecules/CrudModal/CrudModal';
+import PageHeader from '../../components/atoms/PageHeader';
+import BulkActionBar from '../../components/atoms/BulkActionBar';
+import RefreshButton from '../../components/atoms/RefreshButton';
+import Button from '../../components/atoms/Button/Button';
+import Spinner from '../../components/atoms/Spinner/Spinner';
 import FormSection from '../../components/atoms/FormSection/FormSection';
 import Input from '../../components/atoms/Input/Input';
 import Select from '../../components/atoms/Select/Select';
 import DatePickerInput from '../../components/atoms/Input/DatePickerInput';
-import Spinner from '../../components/atoms/Spinner/Spinner';
+import Tabs from '../../components/molecules/Tabs/Tabs';
+import SearchToolbar from '../../components/molecules/SearchToolbar/SearchToolbar';
+import DataTable from '../../components/molecules/DataTable/DataTable';
+import CrudModal from '../../components/molecules/CrudModal/CrudModal';
 import ImportModal from '../../components/molecules/ImportModal/ImportModal';
 import BulkActivateModal from '../../components/molecules/BulkActivateModal/BulkActivateModal';
-import Button from '../../components/atoms/Button/Button';
-import StatusChip from '../../components/atoms/StatusChip/StatusChip';
-import EmploymentStatusChip from '../../components/atoms/EmploymentStatusChip/EmploymentStatusChip';
+import ActionMenu from '../../components/molecules/ActionMenu';
 import FileUploader from '../../components/molecules/FileUploader/FileUploader';
 import { ACTION_TYPES, useGridActions } from '../../hooks/useGridActions';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
@@ -48,8 +62,9 @@ const Employees = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isViewMode, setIsViewMode] = useState(false);
   const [currentEmployeeId, setCurrentEmployeeId] = useState(null);
-  
+
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [attachmentFiles, setAttachmentFiles] = useState([]);
@@ -59,21 +74,24 @@ const Employees = () => {
   const queryClient = useQueryClient();
   const { toast, confirmDelete, confirm } = useSweetAlert();
 
-  const { departments, offices, employeePositions, employeeStatuses } = useReferenceData();
+  const { departments, offices, employeePositions, employeeStatuses } =
+    useReferenceData();
 
-  // ============================================================
-  // BULK SELECTION - HARUS DI ATAS useEffect
-  // ============================================================
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
-    useBulkSelection({ idField: 'employeeId' });
+  const {
+    selectedRowIds,
+    selectionCount,
+    hasSelection,
+    handleSelectionChange,
+    clearSelection,
+    getSelectedIds,
+  } = useBulkSelection({ idField: 'employeeId' });
 
-  const showCheckbox = useMemo(() => {
-    return activeTab === 'Active' || activeTab === 'Inactive';
-  }, [activeTab]);
+  const showCheckbox = true;
+  const showActivateToggle = useMemo(
+    () => activeTab === 'Active' || activeTab === 'Inactive',
+    [activeTab]
+  );
 
-  // ============================================================
-  // REACT HOOK FORM WITH ZOD
-  // ============================================================
   const {
     register,
     handleSubmit: handleFormSubmit,
@@ -88,27 +106,21 @@ const Employees = () => {
 
   const formData = watch();
 
-  const setFormField = useCallback((field) => (value) => {
-    setValue(field, value, { shouldValidate: true });
-  }, [setValue]);
+  const setFormField = useCallback(
+    (field) => (value) => {
+      setValue(field, value, { shouldValidate: true });
+    },
+    [setValue]
+  );
 
-  // ============================================================
-  // BUILD FILTERS
-  // ============================================================
   const buildFilters = useCallback(() => {
     const filters = {};
-    if (activeTab === 'Active') {
-      filters.isActive = true;
-    } else if (activeTab === 'Inactive') {
-      filters.isActive = false;
-    }
+    if (activeTab === 'Active') filters.isActive = true;
+    else if (activeTab === 'Inactive') filters.isActive = false;
     if (searchTerm) filters.search = searchTerm;
     return filters;
   }, [activeTab, searchTerm]);
 
-  // ============================================================
-  // FETCH GRID DATA
-  // ============================================================
   const fetchGridData = useCallback(
     async (params) => {
       const filters = buildFilters();
@@ -118,8 +130,7 @@ const Employees = () => {
         ...filters,
         ...params,
       };
-      const result = await employeesData.fetchGridData(requestParams);
-      return result;
+      return await employeesData.fetchGridData(requestParams);
     },
     [buildFilters]
   );
@@ -132,12 +143,11 @@ const Employees = () => {
     setPage,
     pageSize,
     setPageSize,
+    sortModel,
+    setSortModel,
     reload,
   } = useGridData(['employees', activeTab, searchTerm], fetchGridData);
 
-  // ============================================================
-  // EFFECTS
-  // ============================================================
   useEffect(() => {
     isMountedRef.current = true;
     setPage(1);
@@ -148,50 +158,45 @@ const Employees = () => {
     };
   }, [activeTab, reload, setPage, clearSelection]);
 
-  // ============================================================
-  // OPTIONS
-  // ============================================================
   const departmentOptions = useOptions(departments, 'Select Department');
   const positionOptions = useOptions(employeePositions, 'Select Position');
   const statusOptions = useOptions(employeeStatuses, 'Select Status');
   const officeOptions = useOptions(offices, 'Select Office');
 
-  // ============================================================
-  // PHOTO HANDLING
-  // ============================================================
-  const handlePhotoChange = useCallback((e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB');
-      return;
-    }
-    
-    setPhotoFile(file);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setPhotoPreview(event.target.result);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  }, [toast]);
+  const handlePhotoChange = useCallback(
+    (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Image size must be less than 5MB');
+        return;
+      }
+
+      setPhotoFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setPhotoPreview(event.target.result);
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    },
+    [toast]
+  );
 
   const handleRemovePhoto = useCallback(() => {
     setPhotoFile(null);
     setPhotoPreview(null);
   }, []);
 
-  // ============================================================
-  // CRUD OPERATIONS
-  // ============================================================
   const handleCreate = useCallback(() => {
     reset(getEmployeeDefaultValues());
     setIsEditMode(false);
+    setIsViewMode(false);
     setCurrentEmployeeId(null);
     setAttachmentFiles([]);
     setExistingAttachments([]);
@@ -201,50 +206,54 @@ const Employees = () => {
     setShowModal(true);
   }, [reset]);
 
-  const handleEdit = useCallback(async (record) => {
-    const recordId = record?.employeeId;
-    if (!recordId) return;
-    
-    setIsEditMode(true);
-    setCurrentEmployeeId(recordId);
-    setPhotoFile(null);
-    setPhotoPreview(null);
-    setEditingEmployee(record);
-    
-    try {
-      const result = await employeesData.fetchById(recordId);
-      if (result.success && result.data) {
-        const data = result.data;
-        const defaults = getEmployeeDefaultValues();
-        Object.keys(defaults).forEach(key => {
-          if (data[key] !== undefined && data[key] !== null) {
-            setValue(key, data[key]);
+  const handleEdit = useCallback(
+    async (record) => {
+      const recordId = record?.employeeId;
+      if (!recordId) return;
+
+      setIsEditMode(true);
+      setCurrentEmployeeId(recordId);
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      setEditingEmployee(record);
+
+      try {
+        const result = await employeesData.fetchById(recordId);
+        if (result.success && result.data) {
+          const data = result.data;
+          const defaults = getEmployeeDefaultValues();
+          Object.keys(defaults).forEach((key) => {
+            if (data[key] !== undefined && data[key] !== null) {
+              setValue(key, data[key]);
+            } else {
+              setValue(key, '');
+            }
+          });
+
+          if (data.attachments && Array.isArray(data.attachments)) {
+            setExistingAttachments(data.attachments);
           } else {
-            setValue(key, '');
+            setExistingAttachments([]);
           }
-        });
-        
-        if (data.attachments && Array.isArray(data.attachments)) {
-          setExistingAttachments(data.attachments);
+          setShowModal(true);
         } else {
           setExistingAttachments([]);
+          toast.error('Failed to load employee data');
         }
-        setShowModal(true);
-      } else {
+      } catch (error) {
+        console.warn('Failed to fetch employee:', error);
         setExistingAttachments([]);
         toast.error('Failed to load employee data');
       }
-    } catch (error) {
-      console.warn('Failed to fetch employee:', error);
-      setExistingAttachments([]);
-      toast.error('Failed to load employee data');
-    }
-  }, [setValue, toast]);
+    },
+    [setValue, toast]
+  );
 
   const handleClose = useCallback(() => {
     if (!isSubmitting) {
       setShowModal(false);
       setIsEditMode(false);
+      setIsViewMode(false);
       setCurrentEmployeeId(null);
       setEditingEmployee(null);
       reset(getEmployeeDefaultValues());
@@ -255,60 +264,78 @@ const Employees = () => {
     }
   }, [isSubmitting, reset]);
 
-  // ============================================================
-  // FORM SUBMIT
-  // ============================================================
-  const onSubmit = useCallback(async (data) => {
-    if (isSubmitting) return;
+  const onSubmit = useCallback(
+    async (data) => {
+      if (isSubmitting || isViewMode) return;
 
-    const submitData = {
-      ...data,
-      photoFile: photoFile,
-      attachmentFiles: attachmentFiles,
-      attachmentIdsToKeep: isEditMode ? existingAttachments.map(a => a.fileAttachmentId) : [],
-      replaceAttachments: isEditMode ? true : false,
-    };
+      const submitData = {
+        ...data,
+        photoFile,
+        attachmentFiles,
+        attachmentIdsToKeep: isEditMode
+          ? existingAttachments.map((a) => a.fileAttachmentId)
+          : [],
+        replaceAttachments: isEditMode ? true : false,
+      };
 
-    try {
-      let result;
-      if (isEditMode && editingEmployee) {
-        result = await employeesData.update(editingEmployee.employeeId, submitData);
-      } else {
-        result = await employeesData.create(submitData);
-      }
-      
-      if (result.success) {
-        setPhotoFile(null);
-        setPhotoPreview(null);
-        setAttachmentFiles([]);
-        setExistingAttachments([]);
-        setIsEditMode(false);
-        setCurrentEmployeeId(null);
-        setEditingEmployee(null);
-        setShowModal(false);
-        reset(getEmployeeDefaultValues());
-        
-        queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
-        reload();
-        clearSelection();
-        
-        const message = isEditMode && editingEmployee 
-          ? 'Employee updated successfully' 
-          : 'Employee created successfully';
-        toast.success(message);
-      } else {
-        const errorMsg = result.error || result.errors?.join('\n') || 'Failed to save employee';
+      try {
+        let result;
+        if (isEditMode && editingEmployee) {
+          result = await employeesData.update(editingEmployee.employeeId, submitData);
+        } else {
+          result = await employeesData.create(submitData);
+        }
+
+        if (result.success) {
+          setPhotoFile(null);
+          setPhotoPreview(null);
+          setAttachmentFiles([]);
+          setExistingAttachments([]);
+          setIsEditMode(false);
+          setIsViewMode(false);
+          setCurrentEmployeeId(null);
+          setEditingEmployee(null);
+          setShowModal(false);
+          reset(getEmployeeDefaultValues());
+
+          queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
+          reload();
+          clearSelection();
+
+          const message =
+            isEditMode && editingEmployee
+              ? 'Employee updated successfully'
+              : 'Employee created successfully';
+          toast.success(message);
+        } else {
+          const errorMsg =
+            result.error ||
+            result.errors?.join('\n') ||
+            'Failed to save employee';
+          toast.error(errorMsg);
+        }
+      } catch (error) {
+        const errorMsg =
+          error.userMessage || error.message || 'Failed to save employee';
         toast.error(errorMsg);
       }
-    } catch (error) {
-      const errorMsg = error.userMessage || error.message || 'Failed to save employee';
-      toast.error(errorMsg);
-    }
-  }, [isSubmitting, isEditMode, editingEmployee, photoFile, attachmentFiles, existingAttachments, queryClient, reload, clearSelection, toast, reset]);
+    },
+    [
+      isSubmitting,
+      isViewMode,
+      isEditMode,
+      editingEmployee,
+      photoFile,
+      attachmentFiles,
+      existingAttachments,
+      queryClient,
+      reload,
+      clearSelection,
+      toast,
+      reset,
+    ]
+  );
 
-  // ============================================================
-  // HANDLERS
-  // ============================================================
   const handleSearch = useCallback(
     (search) => {
       setSearchTerm(search);
@@ -317,6 +344,11 @@ const Employees = () => {
     },
     [setPage, clearSelection]
   );
+
+  const handleRefresh = useCallback(() => {
+    reload();
+    clearSelection();
+  }, [reload, clearSelection]);
 
   const handleDelete = useCallback(
     async (emp) => {
@@ -334,6 +366,38 @@ const Employees = () => {
       }
     },
     [reload, queryClient, toast, confirmDelete, clearSelection]
+  );
+
+  const handleBulkDelete = useCallback(
+    async (ids) => {
+      if (!ids || ids.length === 0) return;
+      const confirmed = await confirm({
+        title: 'Delete Employees',
+        text: `Are you sure you want to delete ${ids.length} employee(s)? This action cannot be undone.`,
+        icon: 'warning',
+        confirmButtonText: 'Yes, Delete',
+        confirmButtonColor: '#ef4444',
+      });
+      if (!confirmed) return;
+
+      const r = await employeesData.bulkDelete(ids);
+      if (!isMountedRef.current) return;
+
+      if (r.success) {
+        toast.success(`${r.data.successCount} employee(s) deleted`);
+      } else if (r.partial) {
+        toast.warning(
+          `${r.data.successCount} deleted, ${r.data.failCount} failed`
+        );
+      } else {
+        toast.error(r.error || 'Failed to delete employees');
+      }
+
+      clearSelection();
+      queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
+      reload();
+    },
+    [reload, queryClient, toast, confirm, clearSelection]
   );
 
   const handleTabChange = useCallback(
@@ -375,9 +439,13 @@ const Employees = () => {
       if (r.success && isMountedRef.current) {
         setImportResult(r.data);
         if (r.data?.errorCount > 0) {
-          toast.info(`Import completed: ${r.data.successCount} success, ${r.data.errorCount} errors`);
+          toast.info(
+            `Import completed: ${r.data.successCount} success, ${r.data.errorCount} errors`
+          );
         } else {
-          toast.success(`Import completed: ${r.data?.successCount || 0} employees imported`);
+          toast.success(
+            `Import completed: ${r.data?.successCount || 0} employees imported`
+          );
         }
         queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
         reload();
@@ -395,8 +463,8 @@ const Employees = () => {
   }, [toast]);
 
   const handleFilesChange = useCallback((files) => {
-    setAttachmentFiles(files.filter(f => f.isNew));
-    const existing = files.filter(f => !f.isNew);
+    setAttachmentFiles(files.filter((f) => f.isNew));
+    const existing = files.filter((f) => !f.isNew);
     if (existing.length > 0) {
       setExistingAttachments(existing);
     }
@@ -423,12 +491,13 @@ const Employees = () => {
     fetchAttachments();
   }, [currentEmployeeId]);
 
-  // ============================================================
-  // GRID ACTIONS
-  // ============================================================
   const handleGridAction = useCallback(
     (actionType, row) => {
-      if (actionType === ACTION_TYPES.EDIT) {
+      if (actionType === ACTION_TYPES.VIEW) {
+        setIsViewMode(true);
+        handleEdit(row);
+      } else if (actionType === ACTION_TYPES.EDIT) {
+        setIsViewMode(false);
         setAttachmentFiles([]);
         setExistingAttachments([]);
         setPhotoFile(null);
@@ -441,6 +510,14 @@ const Employees = () => {
     [handleEdit, handleDelete]
   );
 
+  const handleRowClick = useCallback(
+    (row) => {
+      setIsViewMode(true);
+      handleEdit(row);
+    },
+    [handleEdit]
+  );
+
   const getConditionalActions = useCallback((row) => {
     const actions = [];
     if (row.canEdit !== false) actions.push(ACTION_TYPES.EDIT);
@@ -448,93 +525,176 @@ const Employees = () => {
     return actions;
   }, []);
 
-  const { actionColumn } = useGridActions({
+  const {
+    actionColumn,
+    menuAnchorEl,
+    menuOpen,
+    menuActions,
+    selectedRow,
+    handleMenuClose,
+    handleActionClick,
+  } = useGridActions({
     actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
     onAction: handleGridAction,
     getConditionalActions,
     rowIdField: 'employeeId',
   });
 
-  // ============================================================
-  // COLUMNS
-  // ============================================================
-  const columns = useMemo(() => {
-    return getEmployeeColumns(actionColumn);
-  }, [actionColumn]);
-
-  // ============================================================
-  // RENDER HELPERS
-  // ============================================================
-  const extraActions = (
-    <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setShowImportModal(true)}
-        className="u-inline-flex u-btn-gap"
-      >
-        <FiUpload size={16} /> Import
-      </Button>
-      {hasSelection && showCheckbox && (
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setShowBulkActivateModal(true)}
-          className="u-inline-flex u-btn-gap"
-        >
-          <FiCheckSquare size={16} /> {activeTab === 'Active' ? 'Deactivate' : 'Activate'} ({selectionCount})
-        </Button>
-      )}
-    </>
-  );
-
-  if (loading && !employees.length) return <div className="page-loading"><Spinner size="lg" /></div>;
+  const columns = useMemo(() => getEmployeeColumns(actionColumn), [actionColumn]);
 
   const bulkActivateValue = activeTab === 'Active' ? false : true;
-  const bulkTitle = bulkActivateValue ? 'Activate Employees' : 'Deactivate Employees';
+
+  const bulkActions = hasSelection
+    ? [
+        ...(showActivateToggle
+          ? [
+              {
+                key: 'bulk-toggle',
+                label: `${bulkActivateValue ? 'Activate' : 'Deactivate'} (${selectionCount})`,
+                variant: 'primary',
+                icon: <FiCheckSquare size={16} />,
+                onClick: () => setShowBulkActivateModal(true),
+              },
+            ]
+          : []),
+        {
+          key: 'bulk-delete',
+          label: `Delete (${selectionCount})`,
+          variant: 'danger',
+          icon: <FiTrash2 size={16} />,
+          onClick: () => handleBulkDelete(getSelectedIds(employees)),
+        },
+      ]
+    : [];
+
+  const bulkTitle = bulkActivateValue
+    ? 'Activate Employees'
+    : 'Deactivate Employees';
   const bulkDescription = `This action will ${bulkActivateValue ? 'activate' : 'deactivate'} the selected employees.`;
 
-  const showFileUploads = isEditMode && currentEmployeeId;
+  if (loading && !employees.length) {
+    return (
+      <div className="page-loading">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  const showFileUploads = isEditMode && currentEmployeeId && !isViewMode;
+  const showPhotoSection = isEditMode && currentEmployeeId;
 
   return (
     <div className="employees-menu">
-      <GridView
+      <PageHeader
         title="Employee Management"
+        description="Manage employees, their assets, and assignments"
+        actions={
+          <>
+            <RefreshButton onClick={handleRefresh} loading={loading} />
+            <Button
+              variant="outline"
+              onClick={() => setShowImportModal(true)}
+              startIcon={<FiUpload />}
+            >
+              Import
+            </Button>
+            <BulkActionBar
+              visible={bulkActions.length > 0}
+              actions={bulkActions}
+            />
+            <Button variant="primary" onClick={handleCreate} startIcon={<FiPlus />}>
+              Add Employee
+            </Button>
+          </>
+        }
+      />
+
+      <Tabs
         tabs={EMPLOYEE_TABS}
         activeTab={activeTab}
         onTabChange={handleTabChange}
-        onCreate={handleCreate}
-        columns={columns}
-        data={employees}
-        loading={loading}
-        totalCount={totalCount}
-        page={page}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-        onSearch={handleSearch}
-        showCheckbox={showCheckbox}
-        selectedRows={selectedRowIds}
-        onSelectionChange={handleSelectionChange}
-        createButtonText="Add Employee"
-        ariaLabel="Employees data table"
-        extraActions={extraActions}
+      />
+
+      <SearchToolbar onSearch={handleSearch} placeholder="Search employees..." />
+
+      <Box
+        sx={{
+          backgroundColor: 'var(--card-bg)',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          mb: 2,
+          border: '1px solid var(--border)',
+          width: '100%',
+          minWidth: 0,
+        }}
+      >
+        <DataTable
+          rows={employees}
+          columns={columns}
+          loading={loading}
+          pageSize={pageSize}
+          page={page}
+          totalRowCount={totalCount}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          getRowId={(row) => row?.employeeId || `row-${Math.random()}`}
+          checkboxSelection={showCheckbox}
+          onRowSelectionModelChange={handleSelectionChange}
+          onRowClick={handleRowClick}
+          sortModel={sortModel}
+          onSortModelChange={setSortModel}
+          paginationMode="server"
+          sortingMode="server"
+          ariaLabel="Employees data table"
+        />
+      </Box>
+
+      <ActionMenu
+        anchorEl={menuAnchorEl}
+        open={menuOpen}
+        onClose={handleMenuClose}
+        actions={menuActions}
+        row={selectedRow}
+        onAction={handleActionClick}
       />
 
       <CrudModal
         isOpen={showModal}
         onClose={handleClose}
-        title={editingEmployee ? 'Edit Employee' : 'Add Employee'}
-        onSubmit={handleFormSubmit(onSubmit)}
+        title={
+          isViewMode
+            ? 'View Employee'
+            : editingEmployee
+              ? 'Edit Employee'
+              : 'Add Employee'
+        }
+        onSubmit={isViewMode ? () => {} : handleFormSubmit(onSubmit)}
         isSubmitting={isSubmitting}
-        submitText={editingEmployee ? 'Update' : 'Create'}
+        submitText={
+          isViewMode ? 'Close' : editingEmployee ? 'Update' : 'Create'
+        }
+        cancelText={isViewMode ? 'Close' : 'Cancel'}
+        disableSubmit={isViewMode}
         size="xl"
       >
-        {showFileUploads && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 3, pb: 3, borderBottom: '1px solid var(--border)' }}>
+        {showPhotoSection && (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+              mb: 3,
+              pb: 3,
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
             <Box sx={{ position: 'relative' }}>
               <Avatar
-                src={photoPreview || (editingEmployee?.photoProfileUrl) || undefined}
+                src={
+                  photoPreview ||
+                  editingEmployee?.photoProfileUrl ||
+                  undefined
+                }
                 sx={{
                   width: 100,
                   height: 100,
@@ -544,63 +704,75 @@ const Employees = () => {
                   border: '3px solid var(--border)',
                 }}
               >
-                {!photoPreview && !editingEmployee?.photoProfileUrl && (formData.fullName?.charAt(0) || 'E')}
+                {!photoPreview &&
+                  !editingEmployee?.photoProfileUrl &&
+                  (formData.fullName?.charAt(0) || 'E')}
               </Avatar>
-              <Box sx={{ position: 'absolute', bottom: -4, right: -4 }}>
-                <label htmlFor="employee-photo-upload" style={{ cursor: 'pointer' }}>
-                  <IconButton
-                    component="span"
-                    size="small"
-                    sx={{
-                      bgcolor: 'var(--primary)',
-                      color: 'white',
-                      '&:hover': { bgcolor: 'var(--primary-hover)' },
-                      width: 32,
-                      height: 32,
-                    }}
+              {!isViewMode && (
+                <Box sx={{ position: 'absolute', bottom: -4, right: -4 }}>
+                  <label
+                    htmlFor="employee-photo-upload"
+                    style={{ cursor: 'pointer' }}
                   >
-                    <FiCamera size={16} />
-                  </IconButton>
-                  <input
-                    id="employee-photo-upload"
-                    type="file"
-                    accept="image/jpeg,image/png,image/gif,image/webp"
-                    style={{ display: 'none' }}
-                    onChange={handlePhotoChange}
-                  />
-                </label>
-                {photoPreview && (
-                  <IconButton
-                    size="small"
-                    onClick={handleRemovePhoto}
-                    sx={{
-                      position: 'absolute',
-                      top: -8,
-                      right: -8,
-                      bgcolor: 'var(--error)',
-                      color: 'white',
-                      '&:hover': { bgcolor: 'var(--error-dark)' },
-                      width: 24,
-                      height: 24,
-                    }}
-                  >
-                    <FiX size={14} />
-                  </IconButton>
-                )}
-              </Box>
+                    <IconButton
+                      component="span"
+                      size="small"
+                      sx={{
+                        bgcolor: 'var(--primary)',
+                        color: 'white',
+                        '&:hover': { bgcolor: 'var(--primary-hover)' },
+                        width: 32,
+                        height: 32,
+                      }}
+                    >
+                      <FiCamera size={16} />
+                    </IconButton>
+                    <input
+                      id="employee-photo-upload"
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      style={{ display: 'none' }}
+                      onChange={handlePhotoChange}
+                    />
+                  </label>
+                  {photoPreview && (
+                    <IconButton
+                      size="small"
+                      onClick={handleRemovePhoto}
+                      sx={{
+                        position: 'absolute',
+                        top: -8,
+                        right: -8,
+                        bgcolor: 'var(--error)',
+                        color: 'white',
+                        '&:hover': { bgcolor: 'var(--error-dark)' },
+                        width: 24,
+                        height: 24,
+                      }}
+                    >
+                      <FiX size={14} />
+                    </IconButton>
+                  )}
+                </Box>
+              )}
             </Box>
             <Box>
               <Typography variant="subtitle1" fontWeight={600}>
-                Update Photo
+                {isViewMode ? 'Photo' : 'Update Photo'}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Click the camera icon to upload or change photo. Max 5MB.
-              </Typography>
+              {!isViewMode && (
+                <Typography variant="caption" color="text.secondary">
+                  Click the camera icon to upload or change photo. Max 5MB.
+                </Typography>
+              )}
             </Box>
           </Box>
         )}
 
-        <FormSection title="Basic Information" description="Employee code and full name">
+        <FormSection
+          title="Basic Information"
+          description="Employee code and full name"
+        >
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <Input
@@ -609,6 +781,7 @@ const Employees = () => {
                 value={formData.employeeCode || ''}
                 onChange={(e) => setFormField('employeeCode')(e.target.value)}
                 {...getFieldErrorProps(formErrors, 'employeeCode')}
+                disabled={isViewMode}
                 required
               />
             </Grid>
@@ -619,13 +792,17 @@ const Employees = () => {
                 value={formData.fullName || ''}
                 onChange={(e) => setFormField('fullName')(e.target.value)}
                 {...getFieldErrorProps(formErrors, 'fullName')}
+                disabled={isViewMode}
                 required
               />
             </Grid>
           </Grid>
         </FormSection>
 
-        <FormSection title="Contact Information" description="Address, phone, and email">
+        <FormSection
+          title="Contact Information"
+          description="Address, phone, and email"
+        >
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <Input
@@ -636,6 +813,7 @@ const Employees = () => {
                 multiline
                 rows={2}
                 {...getFieldErrorProps(formErrors, 'address')}
+                disabled={isViewMode}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -645,6 +823,7 @@ const Employees = () => {
                 value={formData.phoneNumber || ''}
                 onChange={(e) => setFormField('phoneNumber')(e.target.value)}
                 {...getFieldErrorProps(formErrors, 'phoneNumber')}
+                disabled={isViewMode}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -655,12 +834,16 @@ const Employees = () => {
                 value={formData.email || ''}
                 onChange={(e) => setFormField('email')(e.target.value)}
                 {...getFieldErrorProps(formErrors, 'email')}
+                disabled={isViewMode}
               />
             </Grid>
           </Grid>
         </FormSection>
 
-        <FormSection title="Employment Details" description="Department, position, status, and office">
+        <FormSection
+          title="Employment Details"
+          description="Department, position, status, and office"
+        >
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <Select
@@ -670,6 +853,7 @@ const Employees = () => {
                 onChange={(e) => setFormField('departmentId')(e.target.value)}
                 options={departmentOptions}
                 {...getFieldErrorProps(formErrors, 'departmentId')}
+                disabled={isViewMode}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -680,6 +864,7 @@ const Employees = () => {
                 onChange={(e) => setFormField('position')(e.target.value)}
                 options={positionOptions}
                 {...getFieldErrorProps(formErrors, 'position')}
+                disabled={isViewMode}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -687,9 +872,12 @@ const Employees = () => {
                 label="Employment Status"
                 {...register('employmentStatus')}
                 value={formData.employmentStatus || ''}
-                onChange={(e) => setFormField('employmentStatus')(e.target.value)}
+                onChange={(e) =>
+                  setFormField('employmentStatus')(e.target.value)
+                }
                 options={statusOptions}
                 {...getFieldErrorProps(formErrors, 'employmentStatus')}
+                disabled={isViewMode}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -700,6 +888,7 @@ const Employees = () => {
                 onChange={(e) => setFormField('officeId')(e.target.value)}
                 options={officeOptions}
                 {...getFieldErrorProps(formErrors, 'officeId')}
+                disabled={isViewMode}
               />
             </Grid>
           </Grid>
@@ -714,6 +903,7 @@ const Employees = () => {
                 value={formData.joinDate || ''}
                 onChange={(e) => setFormField('joinDate')(e.target.value)}
                 {...getFieldErrorProps(formErrors, 'joinDate')}
+                disabled={isViewMode}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -723,6 +913,7 @@ const Employees = () => {
                 value={formData.resignDate || ''}
                 onChange={(e) => setFormField('resignDate')(e.target.value)}
                 {...getFieldErrorProps(formErrors, 'resignDate')}
+                disabled={isViewMode}
               />
             </Grid>
           </Grid>
@@ -742,6 +933,25 @@ const Employees = () => {
                   onUploadComplete={handleUploadComplete}
                   onFileDeleted={handleFileDeleted}
                 />
+              </Grid>
+            )}
+
+            {isViewMode && existingAttachments.length > 0 && (
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Attachments ({existingAttachments.length})
+                </Typography>
+                {existingAttachments.map((att, idx) => (
+                  <div key={att.fileAttachmentId || idx} style={{ padding: '4px 0' }}>
+                    <a
+                      href={att.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {att.originalFileName || att.fileName || 'File'}
+                    </a>
+                  </div>
+                ))}
               </Grid>
             )}
           </Grid>

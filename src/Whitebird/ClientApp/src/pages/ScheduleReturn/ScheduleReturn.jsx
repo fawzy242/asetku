@@ -2,23 +2,27 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Grid } from '@mui/material';
+import { Grid, Box } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
+import { FiCalendar, FiCheckSquare, FiPlus, FiTrash2 } from 'react-icons/fi';
 import { ScheduleReturnData } from '../../core/services';
 import { getFieldErrorProps } from '../../core/utils/validation.utils';
-import GridView from '../../components/organisms/GridView/GridView';
-import CrudModal from '../../components/molecules/CrudModal/CrudModal';
+import PageHeader from '../../components/atoms/PageHeader';
+import BulkActionBar from '../../components/atoms/BulkActionBar';
+import RefreshButton from '../../components/atoms/RefreshButton';
+import Button from '../../components/atoms/Button/Button';
+import Spinner from '../../components/atoms/Spinner/Spinner';
 import FormSection from '../../components/atoms/FormSection/FormSection';
-import Input from '../../components/atoms/Input/Input';
 import Select from '../../components/atoms/Select/Select';
 import DatePickerInput from '../../components/atoms/Input/DatePickerInput';
-import Spinner from '../../components/atoms/Spinner/Spinner';
-import Button from '../../components/atoms/Button/Button';
+import Tabs from '../../components/molecules/Tabs/Tabs';
+import SearchToolbar from '../../components/molecules/SearchToolbar/SearchToolbar';
+import DataTable from '../../components/molecules/DataTable/DataTable';
+import CrudModal from '../../components/molecules/CrudModal/CrudModal';
 import Modal from '../../components/molecules/Modal/Modal';
 import BulkActivateModal from '../../components/molecules/BulkActivateModal/BulkActivateModal';
-import StatusChip from '../../components/atoms/StatusChip/StatusChip';
-import { FiCalendar, FiCheckSquare } from 'react-icons/fi';
+import ActionMenu from '../../components/molecules/ActionMenu';
 import { ACTION_TYPES, useGridActions } from '../../hooks/useGridActions';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
@@ -30,7 +34,6 @@ import './ScheduleReturn.scss';
 
 const scheduleData = new ScheduleReturnData();
 
-// Zod Schema
 const scheduleReturnSchema = z.object({
   scheduleDate: z.string().min(1, 'Schedule date is required'),
   assetId: z.coerce.number().min(1, 'Asset is required'),
@@ -56,6 +59,7 @@ const ScheduleReturn = () => {
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
+  const [isViewMode, setIsViewMode] = useState(false);
   const [generateData, setGenerateData] = useState({
     dateFrom: '',
     dateTo: '',
@@ -69,17 +73,19 @@ const ScheduleReturn = () => {
 
   const { assets, employees } = useReferenceData();
 
-  // ============================================================
-  // BULK SELECTION - HARUS DI ATAS useEffect
-  // ============================================================
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
-    useBulkSelection({ idField: 'scheduleReturnId' });
+  const {
+    selectedRowIds,
+    selectionCount,
+    hasSelection,
+    handleSelectionChange,
+    clearSelection,
+    getSelectedIds,
+  } = useBulkSelection({ idField: 'scheduleReturnId' });
 
-  const showCheckbox = activeTab === 'active' || activeTab === 'inactive';
+  const showCheckbox = true;
+  const showActivateToggle =
+    activeTab === 'active' || activeTab === 'inactive';
 
-  // ============================================================
-  // REACT HOOK FORM WITH ZOD
-  // ============================================================
   const {
     register,
     handleSubmit: handleFormSubmit,
@@ -94,13 +100,13 @@ const ScheduleReturn = () => {
 
   const formData = watch();
 
-  const setFormField = useCallback((field) => (value) => {
-    setValue(field, value, { shouldValidate: true });
-  }, [setValue]);
+  const setFormField = useCallback(
+    (field) => (value) => {
+      setValue(field, value, { shouldValidate: true });
+    },
+    [setValue]
+  );
 
-  // ============================================================
-  // BUILD FILTERS
-  // ============================================================
   const buildFilters = useCallback(() => {
     const filters = {};
     if (activeTab === 'active') filters.isActive = true;
@@ -109,9 +115,6 @@ const ScheduleReturn = () => {
     return filters;
   }, [activeTab, searchTerm]);
 
-  // ============================================================
-  // FETCH GRID DATA
-  // ============================================================
   const fetchGridData = useCallback(
     async (params) => {
       const filters = buildFilters();
@@ -121,8 +124,7 @@ const ScheduleReturn = () => {
         ...filters,
         ...params,
       };
-      const result = await scheduleData.fetchGridData(requestParams);
-      return result;
+      return await scheduleData.fetchGridData(requestParams);
     },
     [buildFilters]
   );
@@ -135,12 +137,11 @@ const ScheduleReturn = () => {
     setPage,
     pageSize,
     setPageSize,
+    sortModel,
+    setSortModel,
     reload,
   } = useGridData(['schedule-return', activeTab, searchTerm], fetchGridData);
 
-  // ============================================================
-  // EFFECTS
-  // ============================================================
   useEffect(() => {
     isMountedRef.current = true;
     reload();
@@ -150,89 +151,98 @@ const ScheduleReturn = () => {
     };
   }, [activeTab, reload, clearSelection]);
 
-  // ============================================================
-  // OPTIONS
-  // ============================================================
   const assetOptions = useOptions(assets, 'Select Asset');
   const employeeOptions = useOptions(employees, 'Select Employee');
 
-  // ============================================================
-  // CRUD OPERATIONS
-  // ============================================================
   const handleCreate = useCallback(() => {
     reset(getDefaultValues());
     setEditingRecord(null);
+    setIsViewMode(false);
     setShowModal(true);
   }, [reset]);
 
-  const handleEdit = useCallback(async (record) => {
-    const recordId = record?.scheduleReturnId;
-    if (!recordId) return;
-    
-    setEditingRecord(record);
-    
-    try {
-      const result = await scheduleData.fetchById(recordId);
-      if (result.success && result.data) {
-        const data = result.data;
-        const defaults = getDefaultValues();
-        Object.keys(defaults).forEach(key => {
-          if (data[key] !== undefined && data[key] !== null) {
-            setValue(key, data[key]);
-          } else {
-            setValue(key, '');
-          }
-        });
-        setShowModal(true);
-      } else {
+  const handleEdit = useCallback(
+    async (record) => {
+      const recordId = record?.scheduleReturnId;
+      if (!recordId) return;
+
+      setEditingRecord(record);
+
+      try {
+        const result = await scheduleData.fetchById(recordId);
+        if (result.success && result.data) {
+          const data = result.data;
+          const defaults = getDefaultValues();
+          Object.keys(defaults).forEach((key) => {
+            if (data[key] !== undefined && data[key] !== null) {
+              setValue(key, data[key]);
+            } else {
+              setValue(key, '');
+            }
+          });
+          setShowModal(true);
+        } else {
+          toast.error('Failed to load schedule data');
+        }
+      } catch (error) {
+        console.warn('Failed to fetch schedule:', error);
         toast.error('Failed to load schedule data');
       }
-    } catch (error) {
-      console.warn('Failed to fetch schedule:', error);
-      toast.error('Failed to load schedule data');
-    }
-  }, [setValue, toast]);
+    },
+    [setValue, toast]
+  );
 
   const handleClose = useCallback(() => {
     if (!isSubmitting) {
       setShowModal(false);
       setEditingRecord(null);
+      setIsViewMode(false);
       reset(getDefaultValues());
     }
   }, [isSubmitting, reset]);
 
-  const onSubmit = useCallback(async (data) => {
-    if (isSubmitting) return;
+  const onSubmit = useCallback(
+    async (formValues) => {
+      if (isSubmitting || isViewMode) return;
 
-    try {
-      const result = editingRecord
-        ? await scheduleData.update(editingRecord.scheduleReturnId, { ...data, isActive: editingRecord.isActive })
-        : await scheduleData.create(data);
-      
-      if (result.success) {
-        setShowModal(false);
-        setEditingRecord(null);
-        reset(getDefaultValues());
-        
-        queryClient.invalidateQueries({ queryKey: ['schedule-return'] });
-        reload();
-        clearSelection();
-        
-        const message = editingRecord ? 'Schedule updated successfully' : 'Schedule created successfully';
-        toast.success(message);
-      } else {
-        const errorMsg = result.error || result.errors?.join('\n') || 'Failed to save schedule';
+      try {
+        const result = editingRecord
+          ? await scheduleData.update(editingRecord.scheduleReturnId, {
+              ...formValues,
+              isActive: editingRecord.isActive,
+            })
+          : await scheduleData.create(formValues);
+
+        if (result.success) {
+          setShowModal(false);
+          setEditingRecord(null);
+          setIsViewMode(false);
+          reset(getDefaultValues());
+
+          queryClient.invalidateQueries({ queryKey: ['schedule-return'] });
+          reload();
+          clearSelection();
+
+          const message = editingRecord
+            ? 'Schedule updated successfully'
+            : 'Schedule created successfully';
+          toast.success(message);
+        } else {
+          const errorMsg =
+            result.error ||
+            result.errors?.join('\n') ||
+            'Failed to save schedule';
+          toast.error(errorMsg);
+        }
+      } catch (error) {
+        const errorMsg =
+          error.userMessage || error.message || 'Failed to save schedule';
         toast.error(errorMsg);
       }
-    } catch (error) {
-      const errorMsg = error.userMessage || error.message || 'Failed to save schedule';
-      toast.error(errorMsg);
-    }
-  }, [isSubmitting, editingRecord, queryClient, reload, clearSelection, toast, reset]);
+    },
+    [isSubmitting, isViewMode, editingRecord, queryClient, reload, clearSelection, toast, reset]
+  );
 
-  // ============================================================
-  // HANDLERS
-  // ============================================================
   const handleSearch = useCallback(
     (search) => {
       setSearchTerm(search);
@@ -242,9 +252,17 @@ const ScheduleReturn = () => {
     [setPage, clearSelection]
   );
 
+  const handleRefresh = useCallback(() => {
+    reload();
+    clearSelection();
+  }, [reload, clearSelection]);
+
   const handleDelete = useCallback(
     async (record) => {
-      const confirmed = await confirmDelete('Delete Schedule', `Are you sure you want to delete this schedule?`);
+      const confirmed = await confirmDelete(
+        'Delete Schedule',
+        `Are you sure you want to delete this schedule?`
+      );
       if (!confirmed) return;
       const r = await scheduleData.delete(record.scheduleReturnId);
       if (r.success && isMountedRef.current) {
@@ -255,6 +273,38 @@ const ScheduleReturn = () => {
       }
     },
     [reload, queryClient, toast, confirmDelete, clearSelection]
+  );
+
+  const handleBulkDelete = useCallback(
+    async (ids) => {
+      if (!ids || ids.length === 0) return;
+      const confirmed = await confirm({
+        title: 'Delete Schedules',
+        text: `Are you sure you want to delete ${ids.length} schedule(s)? This action cannot be undone.`,
+        icon: 'warning',
+        confirmButtonText: 'Yes, Delete',
+        confirmButtonColor: '#ef4444',
+      });
+      if (!confirmed) return;
+
+      const r = await scheduleData.bulkDelete(ids);
+      if (!isMountedRef.current) return;
+
+      if (r.success) {
+        toast.success(`${r.data.successCount} schedule(s) deleted`);
+      } else if (r.partial) {
+        toast.warning(
+          `${r.data.successCount} deleted, ${r.data.failCount} failed`
+        );
+      } else {
+        toast.error(r.error || 'Failed to delete schedules');
+      }
+
+      clearSelection();
+      queryClient.invalidateQueries({ queryKey: ['schedule-return'] });
+      reload();
+    },
+    [reload, queryClient, toast, confirm, clearSelection]
   );
 
   const handleBulkActivate = useCallback(
@@ -289,7 +339,12 @@ const ScheduleReturn = () => {
   );
 
   const handleGenerate = useCallback(async () => {
-    if (!generateData.dateFrom || !generateData.dateTo || !generateData.assetId || !generateData.employeeId) {
+    if (
+      !generateData.dateFrom ||
+      !generateData.dateTo ||
+      !generateData.assetId ||
+      !generateData.employeeId
+    ) {
       toast.error('All fields are required');
       return;
     }
@@ -310,10 +365,25 @@ const ScheduleReturn = () => {
 
   const handleGridAction = useCallback(
     (actionType, row) => {
-      if (actionType === ACTION_TYPES.EDIT) handleEdit(row);
-      else if (actionType === ACTION_TYPES.DELETE) handleDelete(row);
+      if (actionType === ACTION_TYPES.VIEW) {
+        setIsViewMode(true);
+        handleEdit(row);
+      } else if (actionType === ACTION_TYPES.EDIT) {
+        setIsViewMode(false);
+        handleEdit(row);
+      } else if (actionType === ACTION_TYPES.DELETE) {
+        handleDelete(row);
+      }
     },
     [handleEdit, handleDelete]
+  );
+
+  const handleRowClick = useCallback(
+    (row) => {
+      setIsViewMode(true);
+      handleEdit(row);
+    },
+    [handleEdit]
   );
 
   const getConditionalActions = useCallback((row) => {
@@ -323,68 +393,150 @@ const ScheduleReturn = () => {
     return actions;
   }, []);
 
-  const { actionColumn } = useGridActions({
+  const {
+    actionColumn,
+    menuAnchorEl,
+    menuOpen,
+    menuActions,
+    selectedRow,
+    handleMenuClose,
+    handleActionClick,
+  } = useGridActions({
     actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
     onAction: handleGridAction,
     getConditionalActions,
     rowIdField: 'scheduleReturnId',
   });
 
-  const columns = useMemo(() => {
-    return getScheduleColumns(actionColumn, 'return');
-  }, [actionColumn]);
-
-  const extraActions = (
-    <>
-      <Button variant="outline" size="sm" onClick={() => setShowGenerateModal(true)} className="u-inline-flex u-btn-gap">
-        <FiCalendar size={16} /> Generate
-      </Button>
-      {hasSelection && showCheckbox && (
-        <Button variant="primary" size="sm" onClick={() => setShowBulkActivateModal(true)} className="u-inline-flex u-btn-gap">
-          <FiCheckSquare size={16} /> {activeTab === 'active' ? 'Deactivate' : 'Activate'} ({selectionCount})
-        </Button>
-      )}
-    </>
+  const columns = useMemo(
+    () => getScheduleColumns(actionColumn, 'return'),
+    [actionColumn]
   );
 
-  if (loading && !data.length) return <div className="page-loading"><Spinner size="lg" /></div>;
-
   const bulkActivateValue = activeTab === 'active' ? false : true;
-  const bulkTitle = bulkActivateValue ? 'Activate Schedules' : 'Deactivate Schedules';
+
+  const bulkActions = hasSelection
+    ? [
+        ...(showActivateToggle
+          ? [
+              {
+                key: 'bulk-toggle',
+                label: `${bulkActivateValue ? 'Activate' : 'Deactivate'} (${selectionCount})`,
+                variant: 'primary',
+                icon: <FiCheckSquare size={16} />,
+                onClick: () => setShowBulkActivateModal(true),
+              },
+            ]
+          : []),
+        {
+          key: 'bulk-delete',
+          label: `Delete (${selectionCount})`,
+          variant: 'danger',
+          icon: <FiTrash2 size={16} />,
+          onClick: () => handleBulkDelete(getSelectedIds(data)),
+        },
+      ]
+    : [];
+
+  const bulkTitle = bulkActivateValue
+    ? 'Activate Schedules'
+    : 'Deactivate Schedules';
   const bulkDescription = `This action will ${bulkActivateValue ? 'activate' : 'deactivate'} the selected schedules.`;
+
+  if (loading && !data.length) {
+    return (
+      <div className="page-loading">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="schedule-return">
-      <GridView
+      <PageHeader
         title="Schedule Return"
-        tabs={TABS}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        onCreate={handleCreate}
-        columns={columns}
-        data={data}
-        loading={loading}
-        totalCount={totalCount}
-        page={page}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-        onSearch={handleSearch}
-        showCheckbox={showCheckbox}
-        selectedRows={selectedRowIds}
-        onSelectionChange={handleSelectionChange}
-        createButtonText="Add Schedule"
-        ariaLabel="Schedule Return"
-        extraActions={extraActions}
+        description="Plan and track scheduled asset returns"
+        actions={
+          <>
+            <RefreshButton onClick={handleRefresh} loading={loading} />
+            <Button
+              variant="outline"
+              onClick={() => setShowGenerateModal(true)}
+              startIcon={<FiCalendar />}
+            >
+              Generate
+            </Button>
+            <BulkActionBar
+              visible={bulkActions.length > 0}
+              actions={bulkActions}
+            />
+            <Button variant="primary" onClick={handleCreate} startIcon={<FiPlus />}>
+              Add Schedule
+            </Button>
+          </>
+        }
+      />
+
+      <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+
+      <SearchToolbar onSearch={handleSearch} placeholder="Search schedules..." />
+
+      <Box
+        sx={{
+          backgroundColor: 'var(--card-bg)',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          mb: 2,
+          border: '1px solid var(--border)',
+          width: '100%',
+          minWidth: 0,
+        }}
+      >
+        <DataTable
+          rows={data}
+          columns={columns}
+          loading={loading}
+          pageSize={pageSize}
+          page={page}
+          totalRowCount={totalCount}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          getRowId={(row) => row?.scheduleReturnId || `row-${Math.random()}`}
+          checkboxSelection={showCheckbox}
+          onRowSelectionModelChange={handleSelectionChange}
+          onRowClick={handleRowClick}
+          sortModel={sortModel}
+          onSortModelChange={setSortModel}
+          paginationMode="server"
+          sortingMode="server"
+          ariaLabel="Schedule Return"
+        />
+      </Box>
+
+      <ActionMenu
+        anchorEl={menuAnchorEl}
+        open={menuOpen}
+        onClose={handleMenuClose}
+        actions={menuActions}
+        row={selectedRow}
+        onAction={handleActionClick}
       />
 
       <CrudModal
         isOpen={showModal}
         onClose={handleClose}
-        title={editingRecord ? 'Edit Schedule' : 'Add Schedule'}
-        onSubmit={handleFormSubmit(onSubmit)}
+        title={
+          isViewMode
+            ? 'View Schedule'
+            : editingRecord
+              ? 'Edit Schedule'
+              : 'Add Schedule'
+        }
+        onSubmit={isViewMode ? () => {} : handleFormSubmit(onSubmit)}
         isSubmitting={isSubmitting}
-        submitText={editingRecord ? 'Update' : 'Create'}
+        submitText={isViewMode ? 'Close' : editingRecord ? 'Update' : 'Create'}
+        cancelText={isViewMode ? 'Close' : 'Cancel'}
+        disableSubmit={isViewMode}
         size="md"
       >
         <FormSection title="Schedule Details">
@@ -396,6 +548,7 @@ const ScheduleReturn = () => {
                 value={formData.scheduleDate || ''}
                 onChange={(e) => setFormField('scheduleDate')(e.target.value)}
                 {...getFieldErrorProps(formErrors, 'scheduleDate')}
+                disabled={isViewMode}
                 required
               />
             </Grid>
@@ -407,6 +560,7 @@ const ScheduleReturn = () => {
                 onChange={(e) => setFormField('assetId')(e.target.value)}
                 options={assetOptions}
                 {...getFieldErrorProps(formErrors, 'assetId')}
+                disabled={isViewMode}
                 required
               />
             </Grid>
@@ -418,6 +572,7 @@ const ScheduleReturn = () => {
                 onChange={(e) => setFormField('employeeId')(e.target.value)}
                 options={employeeOptions}
                 {...getFieldErrorProps(formErrors, 'employeeId')}
+                disabled={isViewMode}
                 required
               />
             </Grid>
@@ -437,7 +592,9 @@ const ScheduleReturn = () => {
               <DatePickerInput
                 label="Date From"
                 value={generateData.dateFrom || ''}
-                onChange={(e) => setGenerateData({ ...generateData, dateFrom: e.target.value })}
+                onChange={(e) =>
+                  setGenerateData({ ...generateData, dateFrom: e.target.value })
+                }
                 required
               />
             </Grid>
@@ -445,7 +602,9 @@ const ScheduleReturn = () => {
               <DatePickerInput
                 label="Date To"
                 value={generateData.dateTo || ''}
-                onChange={(e) => setGenerateData({ ...generateData, dateTo: e.target.value })}
+                onChange={(e) =>
+                  setGenerateData({ ...generateData, dateTo: e.target.value })
+                }
                 required
               />
             </Grid>
@@ -453,7 +612,9 @@ const ScheduleReturn = () => {
               <Select
                 label="Asset"
                 value={generateData.assetId || ''}
-                onChange={(e) => setGenerateData({ ...generateData, assetId: e.target.value })}
+                onChange={(e) =>
+                  setGenerateData({ ...generateData, assetId: e.target.value })
+                }
                 options={assetOptions}
                 required
               />
@@ -462,17 +623,36 @@ const ScheduleReturn = () => {
               <Select
                 label="Employee"
                 value={generateData.employeeId || ''}
-                onChange={(e) => setGenerateData({ ...generateData, employeeId: e.target.value })}
+                onChange={(e) =>
+                  setGenerateData({
+                    ...generateData,
+                    employeeId: e.target.value,
+                  })
+                }
                 options={employeeOptions}
                 required
               />
             </Grid>
             <Grid item xs={12}>
-              <div style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end', marginTop: '16px' }}>
-                <Button variant="outline" onClick={() => setShowGenerateModal(false)}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '16px',
+                  justifyContent: 'flex-end',
+                  marginTop: '16px',
+                }}
+              >
+                <Button
+                  variant="outline"
+                  onClick={() => setShowGenerateModal(false)}
+                >
                   Cancel
                 </Button>
-                <Button variant="primary" onClick={handleGenerate} loading={isGenerating}>
+                <Button
+                  variant="primary"
+                  onClick={handleGenerate}
+                  loading={isGenerating}
+                >
                   Generate
                 </Button>
               </div>

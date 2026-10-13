@@ -1,17 +1,6 @@
 @use 'variables' as *;
 @use 'mixins' as *;
 
-// ============================================================
-// SHARED COMPONENT STYLES
-// SINGLE SOURCE OF TRUTH — JANGAN DUPLIKAT DI FILE LAIN
-// ============================================================
-
-// ============================================================
-// NOTE: Status badge styles are now handled by:
-// - statusColors.js (getStatusChipStyles) for MUI Chip
-// - Do NOT use .status-badge class anymore
-// ============================================================
-
 // Badge (generic)
 .badge {
     display: inline-flex;
@@ -106,10 +95,6 @@
     }
 }
 
-// ============================================================
-// KEBAB MENU / ACTION MENU STYLES
-// ============================================================
-
 .table-actions {
     display: flex;
     align-items: center;
@@ -122,13 +107,13 @@
     &__btn {
         color: var(--text-secondary);
         transition: all 0.2s ease;
-        
+
         &:hover {
             color: var(--primary);
             background-color: rgba(220, 38, 38, 0.1);
         }
     }
-    
+
     &__paper {
         min-width: 160px;
         border-radius: $radius-md;
@@ -136,36 +121,36 @@
         background-color: var(--card-bg);
         border: 1px solid var(--border);
     }
-    
+
     &__item {
         font-size: $font-size-sm;
         padding: $spacing-sm $spacing-md;
         gap: $spacing-sm;
         transition: all $transition-fast;
-        
+
         &:hover {
             background-color: var(--surface);
         }
-        
+
         &--danger {
             color: var(--error);
-            
+
             &:hover {
                 background-color: rgba(239, 68, 68, 0.1);
             }
         }
-        
+
         &--success {
             color: var(--success);
-            
+
             &:hover {
                 background-color: rgba(16, 185, 129, 0.1);
             }
         }
-        
+
         &--warning {
             color: var(--warning);
-            
+
             &:hover {
                 background-color: rgba(245, 158, 11, 0.1);
             }
@@ -173,38 +158,30 @@
     }
 }
 
-// ============================================================
-// FORM SECTION STYLES
-// ============================================================
-
 .form-section {
     margin-bottom: $spacing-xl;
-    
+
     &__header {
         margin-bottom: $spacing-sm;
     }
-    
+
     &__title {
         font-size: $font-size-base;
         font-weight: 600;
         color: var(--text-primary);
         margin-bottom: $spacing-xs;
     }
-    
+
     &__description {
         font-size: $font-size-xs;
         color: var(--text-secondary);
     }
-    
+
     &__divider {
         margin: $spacing-sm 0 $spacing-md;
         border-color: var(--border);
     }
 }
-
-// ============================================================
-// PAGE LOADING STATES
-// ============================================================
 
 .page-loading {
     display: flex;
@@ -213,10 +190,6 @@
     min-height: 400px;
 }
 
-// ============================================================
-// TABLE CONTAINER
-// ============================================================
-
 .menu-table {
     background-color: var(--card-bg);
     border-radius: $radius-lg;
@@ -224,10 +197,6 @@
     margin-bottom: $spacing-lg;
     border: 1px solid var(--border);
 }
-
-// ============================================================
-// SUMMARY STAT CARD
-// ============================================================
 
 .summary-stat-card {
     display: flex;
@@ -240,33 +209,10 @@
     border-radius: $radius-lg;
     border: 1px solid var(--border);
     transition: all $transition-fast;
-    
+
     &:hover {
         transform: translateY(-2px);
         box-shadow: $shadow-md;
         border-color: var(--primary);
     }
-}
-
-// ============================================================
-// SWEETALERT2 OVERRIDES
-// ============================================================
-
-.swal-popup {
-    border-radius: $radius-xl !important;
-    background-color: var(--card-bg) !important;
-    color: var(--text-primary) !important;
-    border: 1px solid var(--border) !important;
-}
-
-.swal-title {
-    color: var(--text-primary) !important;
-}
-
-.swal-text {
-    color: var(--text-secondary) !important;
-}
-
-.swal-footer {
-    border-top: 1px solid var(--border) !important;
 }

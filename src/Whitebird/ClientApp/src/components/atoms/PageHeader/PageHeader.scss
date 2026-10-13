@@ -1,0 +1,36 @@
+@use '../../../styles/variables' as *;
+
+.page-header-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+    margin-bottom: $spacing-lg;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: $spacing-md;
+    margin-bottom: 0;
+}
+
+.page-header__text {
+    flex: 1;
+    min-width: 0;
+}
+
+.page-header__actions {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    flex-wrap: wrap;
+}
+
+.page-header__filters {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    flex-wrap: wrap;
+}

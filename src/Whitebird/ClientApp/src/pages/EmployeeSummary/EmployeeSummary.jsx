@@ -1,7 +1,31 @@
 // src/pages/EmployeeSummary/EmployeeSummary.jsx
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { FiSearch, FiUser, FiBox, FiDollarSign, FiCalendar, FiMail, FiPhone, FiBriefcase, FiRefreshCw, FiAlertTriangle, FiLayers, FiTool, FiPieChart } from 'react-icons/fi';
-import { Grid, Box, Typography, Avatar, Chip, Paper, IconButton, Tooltip } from '@mui/material';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  FiSearch,
+  FiUser,
+  FiBox,
+  FiDollarSign,
+  FiCalendar,
+  FiMail,
+  FiPhone,
+  FiBriefcase,
+  FiRefreshCw,
+  FiAlertTriangle,
+  FiLayers,
+  FiTool,
+  FiPieChart,
+} from 'react-icons/fi';
+import {
+  Grid,
+  Box,
+  Typography,
+  Avatar,
+  Chip,
+  Paper,
+  IconButton,
+  Tooltip,
+} from '@mui/material';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { EmployeeSummaryData } from '../../core/services';
 import DataTable from '../../components/molecules/DataTable/DataTable';
@@ -81,39 +105,20 @@ const historyColumns = [
     width: 150,
     renderCell: (params) => {
       const row = params?.row || {};
-      const value = row.transactionTypeName || row.typeName || row.transactionType || '-';
+      const value =
+        row.transactionTypeName || row.typeName || row.transactionType || '-';
       return <span>{value}</span>;
     },
   },
-  {
-    field: 'assetCode',
-    headerName: 'Asset',
-    width: 130,
-    renderCell: (params) => {
-      const row = params?.row || {};
-      const value = row.assetCode || row.code || '-';
-      return <span>{value}</span>;
-    },
-  },
-  {
-    field: 'assetName',
-    headerName: 'Asset Name',
-    flex: 1,
-    minWidth: 180,
-    renderCell: (params) => {
-      const row = params?.row || {};
-      const value = row.assetName || row.name || '-';
-      return <span>{value}</span>;
-    },
-  },
+  { field: 'assetCode', headerName: 'Asset', width: 130 },
+  { field: 'assetName', headerName: 'Asset Name', flex: 1, minWidth: 180 },
   {
     field: 'employeeName',
     headerName: 'Employee',
     width: 150,
     renderCell: (params) => {
       const row = params?.row || {};
-      const value = row.employeeName || row.employee || '-';
-      return <span>{value}</span>;
+      return <span>{row.employeeName || row.employee || '-'}</span>;
     },
   },
   {
@@ -122,8 +127,11 @@ const historyColumns = [
     width: 100,
     renderCell: (params) => {
       const row = params?.row || {};
-      const value = row.conditionAfterName || row.conditionAfter || row.condition || '-';
-      return <span>{value}</span>;
+      return (
+        <span>
+          {row.conditionAfterName || row.conditionAfter || row.condition || '-'}
+        </span>
+      );
     },
   },
   {
@@ -132,195 +140,141 @@ const historyColumns = [
     width: 200,
     renderCell: (params) => {
       const row = params?.row || {};
-      const value = row.notes || row.note || '-';
-      return <span>{value}</span>;
+      return <span>{row.notes || row.note || '-'}</span>;
     },
   },
 ];
 
 const EmployeeSummary = () => {
-  const [loading, setLoading] = useState(true);
-  const [employees, setEmployees] = useState([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
-  const [employeeDetail, setEmployeeDetail] = useState(null);
-  const [assetSummary, setAssetSummary] = useState(null);
-  const [loadingData, setLoadingData] = useState(false);
-  const isMountedRef = useRef(true);
   const location = useLocation();
   const { toast } = useSweetAlert();
+  const queryClient = useQueryClient();
 
-  // ============================================================
-  // FUNCTIONS - DIDEKLARASIKAN SEBELUM useEffect
-  // ============================================================
-  const loadEmployees = useCallback(async () => {
-    setLoading(true);
-    const r = await summaryData.fetchEmployees();
-    if (isMountedRef.current && r.success) {
-      const employeesData = Array.isArray(r.data) ? r.data : [];
-      setEmployees(employeesData);
-      
-      const params = new URLSearchParams(location.search);
-      const employeeIdParam = params.get('employeeId');
-      if (employeeIdParam) {
-        const employeeId = parseInt(employeeIdParam, 10);
-        const employeeExists = employeesData.some(e => e.employeeId === employeeId);
-        if (employeeExists) {
-          handleEmployeeSelect(employeeId);
-        }
-      }
-    }
-    if (isMountedRef.current) {
-      setLoading(false);
-    }
-  }, [location.search]);
-
-  const handleEmployeeSelect = useCallback(
-    async (employeeId) => {
-      if (!employeeId) {
-        setSelectedEmployeeId(null);
-        setEmployeeDetail(null);
-        setAssetSummary(null);
-        return;
-      }
-      setSelectedEmployeeId(employeeId);
-      setLoadingData(true);
-
-      try {
-        const [detailRes, summaryRes] = await Promise.all([
-          summaryData.fetchEmployeeDetail(employeeId),
-          summaryData.fetchAssetSummary(employeeId),
-        ]);
-
-        if (isMountedRef.current) {
-          if (detailRes.success) setEmployeeDetail(detailRes.data);
-          if (summaryRes.success) {
-            const data = summaryRes.data;
-            setAssetSummary({
-              currentlyHeldAssets: data.currentlyHeldAssets || 0,
-              assetsOnLoan: data.assetsOnLoan || 0,
-              overdueLoans: data.overdueLoans || 0,
-              totalHistoricalAssets: data.totalHistoricalAssets || 0,
-              returnedAssets: data.returnedAssets || 0,
-              damagedReturns: data.damagedReturns || 0,
-              currentAssets: data.currentAssets || [],
-              assetHistory: data.assetHistory || [],
-            });
-          } else {
-            setAssetSummary({
-              currentlyHeldAssets: 0,
-              assetsOnLoan: 0,
-              overdueLoans: 0,
-              totalHistoricalAssets: 0,
-              returnedAssets: 0,
-              damagedReturns: 0,
-              currentAssets: [],
-              assetHistory: [],
-            });
-          }
-          setLoadingData(false);
-        }
-      } catch (error) {
-        console.error('Error fetching employee summary:', error);
-        if (isMountedRef.current) {
-          toast.error('Failed to load employee data');
-          setLoadingData(false);
-        }
-      }
+  // Employee dropdown
+  const { data: employees = [], isLoading: loading } = useQuery({
+    queryKey: ['employee-summary-list'],
+    queryFn: async () => {
+      const r = await summaryData.fetchEmployees();
+      return r.success ? r.data : [];
     },
-    [toast]
-  );
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const handleRefresh = useCallback(async () => {
+  // Employee detail
+  const { data: employeeDetail = null, isLoading: detailLoading } = useQuery({
+    queryKey: ['employee-summary-detail', selectedEmployeeId],
+    queryFn: async () => {
+      const r = await summaryData.fetchEmployeeDetail(selectedEmployeeId);
+      return r.success ? r.data : null;
+    },
+    enabled: !!selectedEmployeeId,
+    staleTime: 60 * 1000,
+  });
+
+  // Asset summary
+  const { data: assetSummary = null, isLoading: summaryLoading } = useQuery({
+    queryKey: ['employee-summary-assets', selectedEmployeeId],
+    queryFn: async () => {
+      const r = await summaryData.fetchAssetSummary(selectedEmployeeId);
+      if (!r.success) return null;
+      const data = r.data;
+      return {
+        currentlyHeldAssets: data.currentlyHeldAssets || 0,
+        assetsOnLoan: data.assetsOnLoan || 0,
+        overdueLoans: data.overdueLoans || 0,
+        totalHistoricalAssets: data.totalHistoricalAssets || 0,
+        returnedAssets: data.returnedAssets || 0,
+        damagedReturns: data.damagedReturns || 0,
+        currentAssets: data.currentAssets || [],
+        assetHistory: data.assetHistory || [],
+      };
+    },
+    enabled: !!selectedEmployeeId,
+    staleTime: 60 * 1000,
+  });
+
+  const loadingData = detailLoading || summaryLoading;
+
+  // URL param preselect
+  useEffect(() => {
+    if (!employees || employees.length === 0) return;
+    const params = new URLSearchParams(location.search);
+    const employeeIdParam = params.get('employeeId');
+    if (!employeeIdParam) return;
+    const employeeId = parseInt(employeeIdParam, 10);
+    if (isNaN(employeeId)) return;
+    const exists = employees.some((e) => e.employeeId === employeeId);
+    if (exists && selectedEmployeeId !== employeeId) {
+      setSelectedEmployeeId(employeeId);
+    }
+  }, [employees, location.search, selectedEmployeeId]);
+
+  const handleEmployeeSelect = useCallback((employeeId) => {
+    if (!employeeId) {
+      setSelectedEmployeeId(null);
+      return;
+    }
+    setSelectedEmployeeId(employeeId);
+  }, []);
+
+  const handleRefresh = useCallback(() => {
     if (!selectedEmployeeId) return;
-    setLoadingData(true);
-    const [detailRes, summaryRes] = await Promise.all([
-      summaryData.fetchEmployeeDetail(selectedEmployeeId),
-      summaryData.fetchAssetSummary(selectedEmployeeId),
-    ]);
-    if (isMountedRef.current) {
-      if (detailRes.success) setEmployeeDetail(detailRes.data);
-      if (summaryRes.success) {
-        const data = summaryRes.data;
-        setAssetSummary({
-          currentlyHeldAssets: data.currentlyHeldAssets || 0,
-          assetsOnLoan: data.assetsOnLoan || 0,
-          overdueLoans: data.overdueLoans || 0,
-          totalHistoricalAssets: data.totalHistoricalAssets || 0,
-          returnedAssets: data.returnedAssets || 0,
-          damagedReturns: data.damagedReturns || 0,
-          currentAssets: data.currentAssets || [],
-          assetHistory: data.assetHistory || [],
-        });
-      }
-      setLoadingData(false);
-      toast.success('Data refreshed');
-    }
-  }, [selectedEmployeeId, toast]);
-
-  // ============================================================
-  // EFFECTS - DIPINDAHKAN KE BAWAH
-  // ============================================================
-  useEffect(() => {
-    isMountedRef.current = true;
-    loadEmployees();
-    return () => { isMountedRef.current = false; };
-  }, [loadEmployees]);
-
-  useEffect(() => {
-    if (employees.length > 0) {
-      const params = new URLSearchParams(location.search);
-      const employeeIdParam = params.get('employeeId');
-      if (employeeIdParam) {
-        const employeeId = parseInt(employeeIdParam, 10);
-        const employeeExists = employees.some(e => e.employeeId === employeeId);
-        if (employeeExists && selectedEmployeeId !== employeeId) {
-          handleEmployeeSelect(employeeId);
-        }
-      }
-    }
-  }, [location.search, employees, selectedEmployeeId, handleEmployeeSelect]);
-
-  // ============================================================
-  // MEMOS
-  // ============================================================
-  const totalAssetValue = (assetSummary?.currentAssets || []).reduce(
-    (sum, a) => sum + (a.purchasePrice || 0),
-    0
-  );
-
-  const categorySummary = useMemo(() => {
-    const currentAssets = assetSummary?.currentAssets || [];
-    if (currentAssets.length === 0) return [];
-
-    const categoryMap = {};
-    currentAssets.forEach(asset => {
-      const category = asset.categoryName || 'Uncategorized';
-      categoryMap[category] = (categoryMap[category] || 0) + 1;
+    queryClient.invalidateQueries({
+      queryKey: ['employee-summary-detail', selectedEmployeeId],
     });
-
-    return Object.entries(categoryMap)
-      .map(([category, count]) => ({ category, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [assetSummary?.currentAssets]);
-
-  const employeeOptions = useOptions(
-    Array.isArray(employees)
-      ? employees.map(e => ({ value: e.employeeId, label: `${e.employeeCode} - ${e.fullName}` }))
-      : [],
-    'Choose an employee...'
-  );
+    queryClient.invalidateQueries({
+      queryKey: ['employee-summary-assets', selectedEmployeeId],
+    });
+    toast.success('Data refreshed');
+  }, [selectedEmployeeId, queryClient, toast]);
 
   const currentAssets = assetSummary?.currentAssets || [];
   const assetHistory = assetSummary?.assetHistory || [];
+
+  const totalAssetValue = useMemo(
+    () =>
+      currentAssets.reduce(
+        (sum, a) => sum + (a.purchasePrice || 0),
+        0
+      ),
+    [currentAssets]
+  );
+
+  const categorySummary = useMemo(() => {
+    if (currentAssets.length === 0) return [];
+    const categoryMap = {};
+    currentAssets.forEach((asset) => {
+      const category = asset.categoryName || 'Uncategorized';
+      categoryMap[category] = (categoryMap[category] || 0) + 1;
+    });
+    return Object.entries(categoryMap)
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [currentAssets]);
+
+  const employeeOptions = useOptions(
+    Array.isArray(employees)
+      ? employees.map((e) => ({
+          value: e.employeeId,
+          label: `${e.employeeCode} - ${e.fullName}`,
+        }))
+      : [],
+    'Choose an employee...'
+  );
 
   if (loading) {
     return (
       <div className="employee-summary">
         <div className="page-header">
           <h1 className="page-title">Employee Summary</h1>
-          <p className="page-description">View asset assignments and transaction history by employee</p>
+          <p className="page-description">
+            View asset assignments and transaction history by employee
+          </p>
         </div>
-        <div className="page-loading"><Spinner size="lg" /></div>
+        <div className="page-loading">
+          <Spinner size="lg" />
+        </div>
       </div>
     );
   }
@@ -329,7 +283,9 @@ const EmployeeSummary = () => {
     <div className="employee-summary">
       <div className="page-header">
         <h1 className="page-title">Employee Summary</h1>
-        <p className="page-description">View asset assignments and transaction history by employee</p>
+        <p className="page-description">
+          View asset assignments and transaction history by employee
+        </p>
       </div>
 
       <Grid container spacing={3}>
@@ -343,7 +299,7 @@ const EmployeeSummary = () => {
                 <Select
                   label="Select Employee"
                   value={selectedEmployeeId || ''}
-                  onChange={e => handleEmployeeSelect(e.target.value)}
+                  onChange={(e) => handleEmployeeSelect(e.target.value)}
                   options={employeeOptions}
                 />
               </div>
@@ -373,22 +329,59 @@ const EmployeeSummary = () => {
                     </Avatar>
                   </Grid>
                   <Grid item xs>
-                    <Typography variant="h5" fontWeight={700} className="employee-summary__profile-name">
+                    <Typography
+                      variant="h5"
+                      fontWeight={700}
+                      className="employee-summary__profile-name"
+                    >
                       {employeeDetail?.fullName || '-'}
                     </Typography>
                     <div className="employee-summary__profile-tags">
-                      <Chip icon={<FiBriefcase />} label={employeeDetail?.employeeCode || '-'} size="small" variant="outlined" />
-                      <Chip icon={<FiBriefcase />} label={employeeDetail?.positionName || '-'} size="small" variant="outlined" />
-                      <Chip icon={<FiBriefcase />} label={employeeDetail?.departmentName || '-'} size="small" variant="outlined" />
-                      <Chip icon={<FiMail />} label={employeeDetail?.email || '-'} size="small" variant="outlined" />
-                      <Chip icon={<FiPhone />} label={employeeDetail?.phoneNumber || '-'} size="small" variant="outlined" />
+                      <Chip
+                        icon={<FiBriefcase />}
+                        label={employeeDetail?.employeeCode || '-'}
+                        size="small"
+                        variant="outlined"
+                      />
+                      <Chip
+                        icon={<FiBriefcase />}
+                        label={employeeDetail?.positionName || '-'}
+                        size="small"
+                        variant="outlined"
+                      />
+                      <Chip
+                        icon={<FiBriefcase />}
+                        label={employeeDetail?.departmentName || '-'}
+                        size="small"
+                        variant="outlined"
+                      />
+                      <Chip
+                        icon={<FiMail />}
+                        label={employeeDetail?.email || '-'}
+                        size="small"
+                        variant="outlined"
+                      />
+                      <Chip
+                        icon={<FiPhone />}
+                        label={employeeDetail?.phoneNumber || '-'}
+                        size="small"
+                        variant="outlined"
+                      />
                       <StatusChip status={employeeDetail?.employmentStatusName} />
                     </div>
                   </Grid>
                   <Grid item>
-                    <InfoRow icon={FiCalendar} label="Join Date" value={formatDate(employeeDetail?.joinDate)} />
+                    <InfoRow
+                      icon={FiCalendar}
+                      label="Join Date"
+                      value={formatDate(employeeDetail?.joinDate)}
+                    />
                     {employeeDetail?.resignDate && (
-                      <InfoRow icon={FiCalendar} label="Resign Date" value={formatDate(employeeDetail?.resignDate)} />
+                      <InfoRow
+                        icon={FiCalendar}
+                        label="Resign Date"
+                        value={formatDate(employeeDetail?.resignDate)}
+                      />
                     )}
                   </Grid>
                 </Grid>
@@ -399,46 +392,91 @@ const EmployeeSummary = () => {
               <Grid container spacing={2}>
                 <Grid item xs={6} sm={4} md={2}>
                   <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiBox size={28} className="employee-summary__stat-icon employee-summary__stat-icon--red" />
-                    <Typography variant="h4" fontWeight={700}>{assetSummary?.currentlyHeldAssets || currentAssets.length}</Typography>
-                    <Typography variant="caption" color="text.secondary">Total Assets</Typography>
+                    <FiBox
+                      size={28}
+                      className="employee-summary__stat-icon employee-summary__stat-icon--red"
+                    />
+                    <Typography variant="h4" fontWeight={700}>
+                      {assetSummary?.currentlyHeldAssets || currentAssets.length}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Total Assets
+                    </Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={2}>
                   <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiLayers size={28} className="employee-summary__stat-icon employee-summary__stat-icon--purple" />
-                    <Typography variant="h4" fontWeight={700}>{assetSummary?.assetsOnLoan || 0}</Typography>
-                    <Typography variant="caption" color="text.secondary">On Loan</Typography>
+                    <FiLayers
+                      size={28}
+                      className="employee-summary__stat-icon employee-summary__stat-icon--purple"
+                    />
+                    <Typography variant="h4" fontWeight={700}>
+                      {assetSummary?.assetsOnLoan || 0}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      On Loan
+                    </Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={2}>
                   <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiTool size={28} className="employee-summary__stat-icon employee-summary__stat-icon--yellow" />
-                    <Typography variant="h4" fontWeight={700}>{assetSummary?.assetsInMaintenance || 0}</Typography>
-                    <Typography variant="caption" color="text.secondary">In Maintenance</Typography>
+                    <FiTool
+                      size={28}
+                      className="employee-summary__stat-icon employee-summary__stat-icon--yellow"
+                    />
+                    <Typography variant="h4" fontWeight={700}>
+                      {assetSummary?.assetsInMaintenance || 0}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      In Maintenance
+                    </Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={2}>
                   <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiDollarSign size={28} className="employee-summary__stat-icon employee-summary__stat-icon--green" />
-                    <Typography variant="h4" fontWeight={700}>{formatCurrency(totalAssetValue)}</Typography>
-                    <Typography variant="caption" color="text.secondary">Total Value</Typography>
+                    <FiDollarSign
+                      size={28}
+                      className="employee-summary__stat-icon employee-summary__stat-icon--green"
+                    />
+                    <Typography variant="h4" fontWeight={700}>
+                      {formatCurrency(totalAssetValue)}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Total Value
+                    </Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={2}>
                   <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiRefreshCw size={28} className="employee-summary__stat-icon employee-summary__stat-icon--blue" />
-                    <Typography variant="h4" fontWeight={700}>{assetSummary?.returnedAssets || assetHistory.filter(t =>
-                      t.transactionTypeName === 'RETURN' || t.transactionTypeName === 'LOAN_RETURN'
-                    ).length}</Typography>
-                    <Typography variant="caption" color="text.secondary">Returns</Typography>
+                    <FiRefreshCw
+                      size={28}
+                      className="employee-summary__stat-icon employee-summary__stat-icon--blue"
+                    />
+                    <Typography variant="h4" fontWeight={700}>
+                      {assetSummary?.returnedAssets ||
+                        assetHistory.filter(
+                          (t) =>
+                            t.transactionTypeName === 'RETURN' ||
+                            t.transactionTypeName === 'LOAN_RETURN'
+                        ).length}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Returns
+                    </Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={2}>
                   <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiAlertTriangle size={28} className="employee-summary__stat-icon employee-summary__stat-icon--red" />
-                    <Typography variant="h4" fontWeight={700}>{assetSummary?.damagedReturns || 0}</Typography>
-                    <Typography variant="caption" color="text.secondary">Damaged</Typography>
+                    <FiAlertTriangle
+                      size={28}
+                      className="employee-summary__stat-icon employee-summary__stat-icon--red"
+                    />
+                    <Typography variant="h4" fontWeight={700}>
+                      {assetSummary?.damagedReturns || 0}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Damaged
+                    </Typography>
                   </Paper>
                 </Grid>
               </Grid>
@@ -457,9 +495,16 @@ const EmployeeSummary = () => {
                 ) : (
                   <div className="employee-summary__category-grid">
                     {categorySummary.map(({ category, count }) => (
-                      <div key={category} className="employee-summary__category-item">
-                        <span className="employee-summary__category-name">{category}</span>
-                        <span className="employee-summary__category-count">{count}</span>
+                      <div
+                        key={category}
+                        className="employee-summary__category-item"
+                      >
+                        <span className="employee-summary__category-name">
+                          {category}
+                        </span>
+                        <span className="employee-summary__category-count">
+                          {count}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -468,10 +513,7 @@ const EmployeeSummary = () => {
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <Card
-                title="Last Transaction"
-                subtitle="Most recent activity"
-              >
+              <Card title="Last Transaction" subtitle="Most recent activity">
                 {assetHistory.length === 0 ? (
                   <div className="employee-summary__empty-state u-p-24">
                     <FiRefreshCw size={32} />
@@ -479,10 +521,32 @@ const EmployeeSummary = () => {
                   </div>
                 ) : (
                   <div className="employee-summary__last-transaction">
-                    <InfoRow icon={FiCalendar} label="Date" value={formatDateTime(assetHistory[0]?.transactionDate)} />
-                    <InfoRow icon={FiRefreshCw} label="Type" value={assetHistory[0]?.transactionTypeName || assetHistory[0]?.typeName} />
-                    <InfoRow icon={FiBox} label="Asset" value={`${assetHistory[0]?.assetCode || '-'} - ${assetHistory[0]?.assetName || '-'}`} />
-                    <InfoRow icon={FiTool} label="Condition" value={assetHistory[0]?.conditionAfterName || assetHistory[0]?.conditionAfter} />
+                    <InfoRow
+                      icon={FiCalendar}
+                      label="Date"
+                      value={formatDateTime(assetHistory[0]?.transactionDate)}
+                    />
+                    <InfoRow
+                      icon={FiRefreshCw}
+                      label="Type"
+                      value={
+                        assetHistory[0]?.transactionTypeName ||
+                        assetHistory[0]?.typeName
+                      }
+                    />
+                    <InfoRow
+                      icon={FiBox}
+                      label="Asset"
+                      value={`${assetHistory[0]?.assetCode || '-'} - ${assetHistory[0]?.assetName || '-'}`}
+                    />
+                    <InfoRow
+                      icon={FiTool}
+                      label="Condition"
+                      value={
+                        assetHistory[0]?.conditionAfterName ||
+                        assetHistory[0]?.conditionAfter
+                      }
+                    />
                   </div>
                 )}
               </Card>
@@ -493,13 +557,15 @@ const EmployeeSummary = () => {
                 title="Current Assets"
                 subtitle={`${currentAssets.length} asset(s) currently assigned`}
               >
-                {loadingData ? (
-                  <Box sx={{ py: 4 }}><Skeleton variant="rect" height={300} /></Box>
-                ) : currentAssets.length === 0 ? (
+                {currentAssets.length === 0 ? (
                   <div className="employee-summary__empty-state">
                     <FiBox size={48} />
-                    <Typography variant="h6" gutterBottom>No Assets Assigned</Typography>
-                    <Typography variant="body2">This employee has no assets currently assigned.</Typography>
+                    <Typography variant="h6" gutterBottom>
+                      No Assets Assigned
+                    </Typography>
+                    <Typography variant="body2">
+                      This employee has no assets currently assigned.
+                    </Typography>
                   </div>
                 ) : (
                   <DataTable
@@ -523,15 +589,21 @@ const EmployeeSummary = () => {
                 {assetHistory.length === 0 ? (
                   <div className="employee-summary__empty-state">
                     <FiRefreshCw size={48} />
-                    <Typography variant="h6" gutterBottom>No Transaction History</Typography>
-                    <Typography variant="body2">No asset transactions found for this employee.</Typography>
+                    <Typography variant="h6" gutterBottom>
+                      No Transaction History
+                    </Typography>
+                    <Typography variant="body2">
+                      No asset transactions found for this employee.
+                    </Typography>
                   </div>
                 ) : (
                   <DataTable
                     rows={assetHistory}
                     columns={historyColumns}
                     pageSize={10}
-                    getRowId={(row) => row.assetTransactionId || `hist-${Math.random()}`}
+                    getRowId={(row) =>
+                      row.assetTransactionId || `hist-${Math.random()}`
+                    }
                     hideFooter={false}
                     autoHeight={false}
                     ariaLabel="Employee asset history table"
@@ -557,9 +629,12 @@ const EmployeeSummary = () => {
             <Card>
               <div className="employee-summary__empty-state">
                 <FiUser size={64} />
-                <Typography variant="h6" gutterBottom>Select an Employee to View Summary</Typography>
+                <Typography variant="h6" gutterBottom>
+                  Select an Employee to View Summary
+                </Typography>
                 <Typography variant="body2">
-                  Choose an employee from the dropdown above to view their asset summary and transaction history.
+                  Choose an employee from the dropdown above to view their asset
+                  summary and transaction history.
                 </Typography>
               </div>
             </Card>

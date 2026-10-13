@@ -1,21 +1,27 @@
 // src/components/molecules/ImportModal/ImportModal.jsx
-import React, { useState, useCallback } from "react";
-import { FiUpload, FiDownload, FiX, FiCheckCircle, FiAlertCircle, FiFileText } from "react-icons/fi";
-import { Box, LinearProgress, Typography, Chip } from "@mui/material";
-import Modal from "../Modal/Modal";
-import Button from "../../atoms/Button/Button";
-import { handleSuccess } from "../../../core/services/successHandler";
-import "./ImportModal.scss";
+import React, { useState, useCallback } from 'react';
+import {
+  FiUpload,
+  FiDownload,
+  FiX,
+  FiCheckCircle,
+  FiAlertCircle,
+  FiFileText,
+} from 'react-icons/fi';
+import { Box, LinearProgress, Typography, Chip } from '@mui/material';
+import Modal from '../Modal/Modal';
+import Button from '../../atoms/Button/Button';
+import './ImportModal.scss';
 
-const ImportModal = ({ 
-  isOpen, 
-  onClose, 
-  onImport, 
-  onDownloadTemplate, 
-  isImporting = false, 
+const ImportModal = ({
+  isOpen,
+  onClose,
+  onImport,
+  onDownloadTemplate,
+  isImporting = false,
   importResult = null,
-  title = "Import Data",
-  description = "Upload Excel or TXT file with data. Data will be imported as INACTIVE and need activation."
+  title = 'Import Data',
+  description = 'Upload Excel or TXT file with data. Data will be imported as INACTIVE and need activation.',
 }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
@@ -23,9 +29,9 @@ const ImportModal = ({
   const handleDrag = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
+    if (e.type === 'dragenter' || e.type === 'dragover') {
       setDragActive(true);
-    } else if (e.type === "dragleave") {
+    } else if (e.type === 'dragleave') {
       setDragActive(false);
     }
   }, []);
@@ -34,7 +40,7 @@ const ImportModal = ({
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       setSelectedFile(e.dataTransfer.files[0]);
     }
@@ -81,7 +87,7 @@ const ImportModal = ({
 
         {!importResult ? (
           <>
-            <div 
+            <div
               className={`import-modal__dropzone ${dragActive ? 'import-modal__dropzone--active' : ''}`}
               onDragEnter={handleDrag}
               onDragLeave={handleDrag}
@@ -90,7 +96,8 @@ const ImportModal = ({
             >
               <FiUpload size={40} className="import-modal__dropzone-icon" />
               <p className="import-modal__dropzone-text">
-                Drag & drop your file here or <span className="import-modal__dropzone-link">browse</span>
+                Drag & drop your file here or{' '}
+                <span className="import-modal__dropzone-link">browse</span>
               </p>
               <p className="import-modal__dropzone-hint">
                 Supports .xlsx, .xls, .csv, .txt (max 10MB)
@@ -102,7 +109,10 @@ const ImportModal = ({
                 onChange={handleFileChange}
                 accept=".xlsx,.xls,.csv,.txt"
               />
-              <label htmlFor="import-file-input" className="import-modal__file-label">
+              <label
+                htmlFor="import-file-input"
+                className="import-modal__file-label"
+              >
                 Select File
               </label>
             </div>
@@ -110,11 +120,13 @@ const ImportModal = ({
             {selectedFile && (
               <div className="import-modal__selected-file">
                 <FiFileText size={20} />
-                <span className="import-modal__selected-file-name">{selectedFile.name}</span>
+                <span className="import-modal__selected-file-name">
+                  {selectedFile.name}
+                </span>
                 <span className="import-modal__selected-file-size">
                   {formatFileSize(selectedFile.size)}
                 </span>
-                <button 
+                <button
                   className="import-modal__selected-file-remove"
                   onClick={() => setSelectedFile(null)}
                 >
@@ -124,16 +136,16 @@ const ImportModal = ({
             )}
 
             <div className="import-modal__actions">
-              <Button 
-                variant="outline" 
-                onClick={handleDownload} 
+              <Button
+                variant="outline"
+                onClick={handleDownload}
                 startIcon={<FiDownload />}
               >
                 Download Template
               </Button>
-              <Button 
-                variant="primary" 
-                onClick={handleImport} 
+              <Button
+                variant="primary"
+                onClick={handleImport}
                 loading={isImporting}
                 disabled={!selectedFile}
                 startIcon={<FiUpload />}
@@ -144,28 +156,41 @@ const ImportModal = ({
           </>
         ) : (
           <div className="import-modal__result">
-            <div className={`import-modal__result-header import-modal__result-header--${isSuccess ? 'success' : hasErrors ? 'error' : 'warning'}`}>
+            <div
+              className={`import-modal__result-header import-modal__result-header--${isSuccess ? 'success' : hasErrors ? 'error' : 'warning'}`}
+            >
               {isSuccess && <FiCheckCircle size={32} />}
               {hasErrors && <FiAlertCircle size={32} />}
               {!isSuccess && !hasErrors && <FiAlertCircle size={32} />}
               <div>
                 <h3 className="import-modal__result-title">
-                  {isSuccess ? 'Import Successful' : hasErrors ? 'Import Completed with Errors' : 'Import Completed'}
+                  {isSuccess
+                    ? 'Import Successful'
+                    : hasErrors
+                      ? 'Import Completed with Errors'
+                      : 'Import Completed'}
                 </h3>
                 <p className="import-modal__result-summary">
-                  {importResult.successCount} successful, {importResult.errorCount} errors, {importResult.totalRows} total rows
+                  {importResult.successCount} successful, {importResult.errorCount}{' '}
+                  errors, {importResult.totalRows} total rows
                 </p>
               </div>
             </div>
 
             {hasWarnings && importResult.warnings?.length > 0 && (
               <div className="import-modal__warnings">
-                <h4 className="import-modal__warnings-title">Warnings ({importResult.warnings.length})</h4>
+                <h4 className="import-modal__warnings-title">
+                  Warnings ({importResult.warnings.length})
+                </h4>
                 <div className="import-modal__warnings-list">
                   {importResult.warnings.slice(0, 10).map((warning, idx) => (
                     <div key={idx} className="import-modal__warning">
-                      <span className="import-modal__warning-row">Row {warning.rowNumber}</span>
-                      <span className="import-modal__warning-message">{warning.message}</span>
+                      <span className="import-modal__warning-row">
+                        Row {warning.rowNumber}
+                      </span>
+                      <span className="import-modal__warning-message">
+                        {warning.message}
+                      </span>
                     </div>
                   ))}
                   {importResult.warnings.length > 10 && (
@@ -179,13 +204,21 @@ const ImportModal = ({
 
             {importResult.errors?.length > 0 && (
               <div className="import-modal__errors">
-                <h4 className="import-modal__errors-title">Errors ({importResult.errors.length})</h4>
+                <h4 className="import-modal__errors-title">
+                  Errors ({importResult.errors.length})
+                </h4>
                 <div className="import-modal__errors-list">
                   {importResult.errors.slice(0, 10).map((error, idx) => (
                     <div key={idx} className="import-modal__error">
-                      <span className="import-modal__error-row">Row {error.rowNumber}</span>
-                      <span className="import-modal__error-column">{error.column}</span>
-                      <span className="import-modal__error-message">{error.message}</span>
+                      <span className="import-modal__error-row">
+                        Row {error.rowNumber}
+                      </span>
+                      <span className="import-modal__error-column">
+                        {error.column}
+                      </span>
+                      <span className="import-modal__error-message">
+                        {error.message}
+                      </span>
                     </div>
                   ))}
                   {importResult.errors.length > 10 && (

@@ -7,12 +7,7 @@ export default defineConfig(({ mode }) => {
   const isDev = mode === "development";
   const isProd = mode === "production";
 
-  // PERBAIKAN: Jangan pakai fallback ke localhost:5001
-  // Biarkan kosong untuk production agar pakai relative path
-  const backendUrl = env.VITE_API_BASE_URL;
-  
-  // Hapus /api dari URL untuk proxy (karena proxy sudah pakai /api path)
-  const proxyTarget = backendUrl ? backendUrl.replace(/\/api$/, "") : "";
+  const backendUrl = env.VITE_BACKEND_URL || "https://localhost:5001";
 
   return {
     plugins: [react()],
@@ -24,36 +19,24 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       strictPort: true,
       open: isDev,
-      proxy: backendUrl ? {
-        "/api": {
-          target: proxyTarget,
-          changeOrigin: true,
-          secure: false,
-        },
-        "/health": {
-          target: proxyTarget,
-          changeOrigin: true,
-          secure: false,
-        },
-        "/swagger": {
-          target: proxyTarget,
-          changeOrigin: true,
-          secure: false,
-        },
-      } : {}, // Proxy hanya aktif jika ada backendUrl (development)
+      proxy: isDev
+        ? {
+            "/api": { target: backendUrl, changeOrigin: true, secure: false },
+            "/health": { target: backendUrl, changeOrigin: true, secure: false },
+            "/swagger": { target: backendUrl, changeOrigin: true, secure: false },
+          }
+        : undefined,
     },
 
     build: {
       outDir: "../wwwroot",
       emptyOutDir: true,
-      sourcemap: isDev,
+      sourcemap: false,
       minify: isProd ? "esbuild" : false,
       chunkSizeWarningLimit: 1000,
       target: "es2020",
       rollupOptions: {
-        input: {
-          main: resolve(process.cwd(), "index.html"),
-        },
+        input: { main: resolve(process.cwd(), "index.html") },
         output: {
           manualChunks: {
             "react-vendor": ["react", "react-dom", "react-router-dom"],
@@ -68,10 +51,7 @@ export default defineConfig(({ mode }) => {
       },
     },
 
-    preview: {
-      port: 4173,
-      strictPort: true,
-    },
+    preview: { port: 4173, strictPort: true },
 
     define: {
       __APP_VERSION__: JSON.stringify(env.VITE_APP_VERSION || "1.0.0"),

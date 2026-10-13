@@ -1,0 +1,12 @@
+@use '../../../styles/variables' as *;
+
+.bulk-action-bar {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    flex-wrap: wrap;
+
+    &:empty {
+        display: none;
+    }
+}

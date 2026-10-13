@@ -36,24 +36,14 @@ export const isImageFile = (fileName) => {
   return imageExtensions.includes(ext);
 };
 
-export const getFileExtension = (fileName) => {
-  if (!fileName) return '';
-  const ext = fileName.split('.').pop()?.toLowerCase();
-  return ext ? `.${ext}` : '';
-};
-
 export const getFileIcon = (fileName) => {
   if (!fileName) return 'file';
   const ext = `.${fileName.split('.').pop()?.toLowerCase()}`;
   const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
   if (imageExts.includes(ext)) return 'image';
-  const pdfExts = ['.pdf'];
-  if (pdfExts.includes(ext)) return 'pdf';
-  const docExts = ['.doc', '.docx'];
-  if (docExts.includes(ext)) return 'document';
-  const excelExts = ['.xls', '.xlsx'];
-  if (excelExts.includes(ext)) return 'excel';
-  const textExts = ['.txt', '.csv'];
-  if (textExts.includes(ext)) return 'text';
+  if (['.pdf'].includes(ext)) return 'pdf';
+  if (['.doc', '.docx'].includes(ext)) return 'document';
+  if (['.xls', '.xlsx'].includes(ext)) return 'excel';
+  if (['.txt', '.csv'].includes(ext)) return 'text';
   return 'file';
 };

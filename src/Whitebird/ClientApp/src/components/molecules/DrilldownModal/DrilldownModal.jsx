@@ -6,6 +6,7 @@ import DataTable from '../DataTable/DataTable';
 import Spinner from '../../atoms/Spinner/Spinner';
 import apiService from '../../../core/services/api.service';
 import { getStatusChipStyles } from '../../../core/constants/statusColors';
+import { formatCurrency } from '../../../core/utils/number.utils';
 
 const DrilldownModal = ({
   isOpen,
@@ -15,7 +16,7 @@ const DrilldownModal = ({
   params = {},
   columns = null,
   size = 'xl',
-  dataPath = 'data.data'
+  dataPath = 'data.data',
 }) => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
@@ -65,13 +66,12 @@ const DrilldownModal = ({
         }
       });
 
-      // FIX: Jika endpoint sudah mengandung query string, gunakan langsung
-      const url = endpoint.includes('?') 
+      const url = endpoint.includes('?')
         ? `${endpoint}&${queryParams.toString()}`
         : `${endpoint}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
       const response = await apiService.get(url, {
-        signal: abortControllerRef.current.signal
+        signal: abortControllerRef.current.signal,
       });
 
       const responseData = response.data;
@@ -79,8 +79,10 @@ const DrilldownModal = ({
       let items = [];
       let total = 0;
 
-      // Try multiple data paths
-      if (responseData?.data?.data && Array.isArray(responseData.data.data)) {
+      if (
+        responseData?.data?.data &&
+        Array.isArray(responseData.data.data)
+      ) {
         items = responseData.data.data;
         total = responseData.data.totalCount || items.length;
       } else if (responseData?.data && Array.isArray(responseData.data)) {
@@ -89,11 +91,13 @@ const DrilldownModal = ({
       } else if (Array.isArray(responseData)) {
         items = responseData;
         total = items.length;
-      } else if (responseData?.data?.items && Array.isArray(responseData.data.items)) {
+      } else if (
+        responseData?.data?.items &&
+        Array.isArray(responseData.data.items)
+      ) {
         items = responseData.data.items;
         total = responseData.data.totalCount || items.length;
       } else {
-        // Try custom dataPath
         const pathParts = dataPath.split('.');
         let current = responseData;
         for (const part of pathParts) {
@@ -155,29 +159,33 @@ const DrilldownModal = ({
 
     return [
       {
-        field: "assetCode",
-        headerName: "Code",
+        field: 'assetCode',
+        headerName: 'Code',
         width: 120,
         renderCell: (params) => {
           const row = params?.row || {};
           const value = row.assetCode || row.code || params?.value || '-';
           return <span>{value}</span>;
-        }
+        },
       },
       {
-        field: "assetName",
-        headerName: "Name",
+        field: 'assetName',
+        headerName: 'Name',
         flex: 1,
         minWidth: 180,
         renderCell: (params) => {
           const row = params?.row || {};
           const value = row.assetName || row.name || params?.value || '-';
           return <span>{value}</span>;
-        }
+        },
       },
       {
-        field: hasApprovedField ? "approved" : (hasCurrentStatus ? "currentStatus" : "status"),
-        headerName: "Status",
+        field: hasApprovedField
+          ? 'approved'
+          : hasCurrentStatus
+            ? 'currentStatus'
+            : 'status',
+        headerName: 'Status',
         width: 140,
         renderCell: (params) => {
           const row = params?.row || {};
@@ -189,32 +197,35 @@ const DrilldownModal = ({
             else if (approved === false) status = 'Rejected';
             else status = 'Pending';
           } else {
-            status = row.currentStatus || row.status || params?.value || 'Available';
+            status =
+              row.currentStatus || row.status || params?.value || 'Available';
           }
 
           return <Chip label={status} size="small" sx={getStatusChipStyles(status)} />;
-        }
+        },
       },
       {
-        field: "employeeName",
-        headerName: "Employee",
+        field: 'employeeName',
+        headerName: 'Employee',
         width: 150,
         renderCell: (params) => {
           const row = params?.row || {};
           const value = row.employeeName || row.employee || params?.value || '-';
           return <span>{value}</span>;
-        }
+        },
       },
       {
-        field: "purchasePrice",
-        headerName: "Price",
+        field: 'purchasePrice',
+        headerName: 'Price',
         width: 130,
         renderCell: (params) => {
           const row = params?.row || {};
           const value = row.purchasePrice || params?.value;
-          if (value === null || value === undefined) return <span className="u-text-muted">-</span>;
-          return <span>{utilsHelper.formatCurrency(value)}</span>;
-        }
+          if (value === null || value === undefined) {
+            return <span className="u-text-muted">-</span>;
+          }
+          return <span>{formatCurrency(value)}</span>;
+        },
       },
     ];
   }, [data]);
@@ -224,14 +235,23 @@ const DrilldownModal = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size={size}>
       {loading ? (
-        <div className="page-loading"><Spinner size="lg" /></div>
+        <div className="page-loading">
+          <Spinner size="lg" />
+        </div>
       ) : data.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 4, color: 'var(--text-secondary)' }}>
           <Typography>No data found</Typography>
         </Box>
       ) : (
         <>
-          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box
+            sx={{
+              mb: 2,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
             <Typography variant="body2" color="text.secondary">
               Total {totalCount} item(s)
             </Typography>
@@ -244,7 +264,12 @@ const DrilldownModal = ({
             totalRowCount={totalCount}
             onPageChange={handlePageChange}
             onPageSizeChange={handlePageSizeChange}
-            getRowId={(row) => row.assetId || row.assetTransactionId || row.id || Math.random().toString()}
+            getRowId={(row) =>
+              row.assetId ||
+              row.assetTransactionId ||
+              row.id ||
+              Math.random().toString()
+            }
             hideFooter={false}
             autoHeight={false}
             ariaLabel={`${title} details`}

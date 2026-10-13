@@ -1,17 +1,23 @@
 // src/pages/Suppliers/Suppliers.jsx
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Grid } from '@mui/material';
+import { Grid, Box } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
+import { FiCheckSquare, FiPlus, FiTrash2 } from 'react-icons/fi';
 import { SuppliersData } from '../../core/services';
-import GridView from '../../components/organisms/GridView/GridView';
-import CrudModal from '../../components/molecules/CrudModal/CrudModal';
-import FormSection from '../../components/atoms/FormSection/FormSection';
-import Input from '../../components/atoms/Input/Input';
-import Spinner from '../../components/atoms/Spinner/Spinner';
-import BulkActivateModal from '../../components/molecules/BulkActivateModal/BulkActivateModal';
+import PageHeader from '../../components/atoms/PageHeader';
+import BulkActionBar from '../../components/atoms/BulkActionBar';
+import RefreshButton from '../../components/atoms/RefreshButton';
 import Button from '../../components/atoms/Button/Button';
 import StatusChip from '../../components/atoms/StatusChip/StatusChip';
-import { FiCheckSquare } from 'react-icons/fi';
+import Spinner from '../../components/atoms/Spinner/Spinner';
+import Tabs from '../../components/molecules/Tabs/Tabs';
+import SearchToolbar from '../../components/molecules/SearchToolbar/SearchToolbar';
+import DataTable from '../../components/molecules/DataTable/DataTable';
+import CrudModal from '../../components/molecules/CrudModal/CrudModal';
+import BulkActivateModal from '../../components/molecules/BulkActivateModal/BulkActivateModal';
+import ActionMenu from '../../components/molecules/ActionMenu';
+import FormSection from '../../components/atoms/FormSection/FormSection';
+import Input from '../../components/atoms/Input/Input';
 import { ACTION_TYPES, useGridActions } from '../../hooks/useGridActions';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
@@ -39,36 +45,43 @@ const Suppliers = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showBulkActivateModal, setShowBulkActivateModal] = useState(false);
+  const [isViewMode, setIsViewMode] = useState(false);
   const isMountedRef = useRef(true);
   const queryClient = useQueryClient();
   const { toast, confirmDelete, confirm } = useSweetAlert();
 
-  // ============================================================
-  // BULK SELECTION - HARUS DI ATAS useEffect
-  // ============================================================
-  const { selectedRowIds, selectionCount, hasSelection, handleSelectionChange, clearSelection, getSelectedIds } =
-    useBulkSelection({ idField: 'supplierId' });
+  const {
+    selectedRowIds,
+    selectionCount,
+    hasSelection,
+    handleSelectionChange,
+    clearSelection,
+    getSelectedIds,
+  } = useBulkSelection({ idField: 'supplierId' });
 
-  const showCheckbox = activeTab === 'active' || activeTab === 'inactive';
+  const showCheckbox = true;
+  const showActivateToggle =
+    activeTab === 'active' || activeTab === 'inactive';
 
-  // ============================================================
-  // CRUD FORM
-  // ============================================================
   const {
     showModal,
     editingRecord: editingSupplier,
     isSubmitting,
     formData,
     setFormField,
-    handleCreate,
+    handleCreate: baseHandleCreate,
     handleEdit,
-    handleClose,
+    handleClose: baseHandleClose,
     handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, suppliersData, {
     idField: 'supplierId',
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] });
-      toast.success(editingSupplier ? 'Supplier updated successfully' : 'Supplier created successfully');
+      toast.success(
+        editingSupplier
+          ? 'Supplier updated successfully'
+          : 'Supplier created successfully'
+      );
       reload();
       clearSelection();
     },
@@ -77,9 +90,16 @@ const Suppliers = () => {
     },
   });
 
-  // ============================================================
-  // BUILD FILTERS
-  // ============================================================
+  const handleCreate = useCallback(() => {
+    setIsViewMode(false);
+    baseHandleCreate();
+  }, [baseHandleCreate]);
+
+  const handleClose = useCallback(() => {
+    setIsViewMode(false);
+    baseHandleClose();
+  }, [baseHandleClose]);
+
   const buildFilters = useCallback(() => {
     const filters = {};
     if (activeTab === 'active') filters.isActive = true;
@@ -88,9 +108,6 @@ const Suppliers = () => {
     return filters;
   }, [activeTab, searchTerm]);
 
-  // ============================================================
-  // FETCH GRID DATA
-  // ============================================================
   const fetchGridData = useCallback(
     async (params) => {
       const filters = buildFilters();
@@ -100,8 +117,7 @@ const Suppliers = () => {
         ...filters,
         ...params,
       };
-      const result = await suppliersData.fetchGridData(requestParams);
-      return result;
+      return await suppliersData.fetchGridData(requestParams);
     },
     [buildFilters]
   );
@@ -114,12 +130,11 @@ const Suppliers = () => {
     setPage,
     pageSize,
     setPageSize,
+    sortModel,
+    setSortModel,
     reload,
   } = useGridData(['suppliers', activeTab, searchTerm], fetchGridData);
 
-  // ============================================================
-  // EFFECTS
-  // ============================================================
   useEffect(() => {
     isMountedRef.current = true;
     reload();
@@ -129,9 +144,6 @@ const Suppliers = () => {
     };
   }, [activeTab, reload, clearSelection]);
 
-  // ============================================================
-  // HANDLERS
-  // ============================================================
   const handleSearch = useCallback(
     (search) => {
       setSearchTerm(search);
@@ -141,9 +153,17 @@ const Suppliers = () => {
     [setPage, clearSelection]
   );
 
+  const handleRefresh = useCallback(() => {
+    reload();
+    clearSelection();
+  }, [reload, clearSelection]);
+
   const handleDelete = useCallback(
     async (sup) => {
-      const confirmed = await confirmDelete('Delete Supplier', `Are you sure you want to delete "${sup.supplierName}"?`);
+      const confirmed = await confirmDelete(
+        'Delete Supplier',
+        `Are you sure you want to delete "${sup.supplierName}"?`
+      );
       if (!confirmed) return;
       const r = await suppliersData.delete(sup.supplierId);
       if (r.success && isMountedRef.current) {
@@ -154,6 +174,38 @@ const Suppliers = () => {
       }
     },
     [reload, queryClient, toast, confirmDelete, clearSelection]
+  );
+
+  const handleBulkDelete = useCallback(
+    async (ids) => {
+      if (!ids || ids.length === 0) return;
+      const confirmed = await confirm({
+        title: 'Delete Suppliers',
+        text: `Are you sure you want to delete ${ids.length} supplier(s)? This action cannot be undone.`,
+        icon: 'warning',
+        confirmButtonText: 'Yes, Delete',
+        confirmButtonColor: '#ef4444',
+      });
+      if (!confirmed) return;
+
+      const r = await suppliersData.bulkDelete(ids);
+      if (!isMountedRef.current) return;
+
+      if (r.success) {
+        toast.success(`${r.data.successCount} supplier(s) deleted`);
+      } else if (r.partial) {
+        toast.warning(
+          `${r.data.successCount} deleted, ${r.data.failCount} failed`
+        );
+      } else {
+        toast.error(r.error || 'Failed to delete suppliers');
+      }
+
+      clearSelection();
+      queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] });
+      reload();
+    },
+    [reload, queryClient, toast, confirm, clearSelection]
   );
 
   const handleBulkActivate = useCallback(
@@ -189,10 +241,25 @@ const Suppliers = () => {
 
   const handleGridAction = useCallback(
     (actionType, row) => {
-      if (actionType === ACTION_TYPES.EDIT) handleEdit(row);
-      else if (actionType === ACTION_TYPES.DELETE) handleDelete(row);
+      if (actionType === ACTION_TYPES.VIEW) {
+        setIsViewMode(true);
+        handleEdit(row);
+      } else if (actionType === ACTION_TYPES.EDIT) {
+        setIsViewMode(false);
+        handleEdit(row);
+      } else if (actionType === ACTION_TYPES.DELETE) {
+        handleDelete(row);
+      }
     },
     [handleEdit, handleDelete]
+  );
+
+  const handleRowClick = useCallback(
+    (row) => {
+      setIsViewMode(true);
+      handleEdit(row);
+    },
+    [handleEdit]
   );
 
   const getConditionalActions = useCallback((row) => {
@@ -202,7 +269,15 @@ const Suppliers = () => {
     return actions;
   }, []);
 
-  const { actionColumn } = useGridActions({
+  const {
+    actionColumn,
+    menuAnchorEl,
+    menuOpen,
+    menuActions,
+    selectedRow,
+    handleMenuClose,
+    handleActionClick,
+  } = useGridActions({
     actions: [ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
     onAction: handleGridAction,
     getConditionalActions,
@@ -215,11 +290,12 @@ const Suppliers = () => {
       { field: 'contactPerson', headerName: 'Contact', width: 160 },
       { field: 'phoneNumber', headerName: 'Phone', width: 140 },
       { field: 'email', headerName: 'Email', width: 200 },
-      { field: 'assetCount', headerName: 'Assets', width: 90 },
+      { field: 'assetCount', headerName: 'Assets', width: 90, sortable: false },
       {
         field: 'isActive',
         headerName: 'Status',
         width: 110,
+        sortable: false,
         renderCell: (p) => {
           const status = p?.value ? 'Active' : 'Inactive';
           return <StatusChip status={status} />;
@@ -230,68 +306,133 @@ const Suppliers = () => {
     [actionColumn]
   );
 
-  const extraActions = (
-    <>
-      {hasSelection && showCheckbox && (
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setShowBulkActivateModal(true)}
-          className="u-inline-flex u-btn-gap"
-        >
-          <FiCheckSquare size={16} /> {activeTab === 'active' ? 'Deactivate' : 'Activate'} ({selectionCount})
-        </Button>
-      )}
-    </>
-  );
-
-  if (loading && !data.length) return <div className="page-loading"><Spinner size="lg" /></div>;
-
   const bulkActivateValue = activeTab === 'active' ? false : true;
-  const bulkTitle = bulkActivateValue ? 'Activate Suppliers' : 'Deactivate Suppliers';
+
+  const bulkActions = hasSelection
+    ? [
+        ...(showActivateToggle
+          ? [
+              {
+                key: 'bulk-toggle',
+                label: `${bulkActivateValue ? 'Activate' : 'Deactivate'} (${selectionCount})`,
+                variant: 'primary',
+                icon: <FiCheckSquare size={16} />,
+                onClick: () => setShowBulkActivateModal(true),
+              },
+            ]
+          : []),
+        {
+          key: 'bulk-delete',
+          label: `Delete (${selectionCount})`,
+          variant: 'danger',
+          icon: <FiTrash2 size={16} />,
+          onClick: () => handleBulkDelete(getSelectedIds(data)),
+        },
+      ]
+    : [];
+
+  const bulkTitle = bulkActivateValue
+    ? 'Activate Suppliers'
+    : 'Deactivate Suppliers';
   const bulkDescription = `This action will ${bulkActivateValue ? 'activate' : 'deactivate'} the selected suppliers.`;
+
+  if (loading && !data.length) {
+    return (
+      <div className="page-loading">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="suppliers-menu">
-      <GridView
+      <PageHeader
         title="Supplier Management"
-        tabs={TABS}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        onCreate={handleCreate}
-        columns={columns}
-        data={data}
-        loading={loading}
-        totalCount={totalCount}
-        page={page}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-        onSearch={handleSearch}
-        showCheckbox={showCheckbox}
-        selectedRows={selectedRowIds}
-        onSelectionChange={handleSelectionChange}
-        createButtonText="Add Supplier"
-        ariaLabel="Suppliers data table"
-        extraActions={extraActions}
+        description="Manage suppliers for asset procurement"
+        actions={
+          <>
+            <RefreshButton onClick={handleRefresh} loading={loading} />
+            <BulkActionBar visible={bulkActions.length > 0} actions={bulkActions} />
+            <Button variant="primary" onClick={handleCreate} startIcon={<FiPlus />}>
+              Add Supplier
+            </Button>
+          </>
+        }
+      />
+
+      <Tabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+
+      <SearchToolbar onSearch={handleSearch} placeholder="Search suppliers..." />
+
+      <Box
+        sx={{
+          backgroundColor: 'var(--card-bg)',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          mb: 2,
+          border: '1px solid var(--border)',
+          width: '100%',
+          minWidth: 0,
+        }}
+      >
+        <DataTable
+          rows={data}
+          columns={columns}
+          loading={loading}
+          pageSize={pageSize}
+          page={page}
+          totalRowCount={totalCount}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          getRowId={(row) => row?.supplierId || `row-${Math.random()}`}
+          checkboxSelection={showCheckbox}
+          onRowSelectionModelChange={handleSelectionChange}
+          onRowClick={handleRowClick}
+          sortModel={sortModel}
+          onSortModelChange={setSortModel}
+          paginationMode="server"
+          sortingMode="server"
+          ariaLabel="Suppliers data table"
+        />
+      </Box>
+
+      <ActionMenu
+        anchorEl={menuAnchorEl}
+        open={menuOpen}
+        onClose={handleMenuClose}
+        actions={menuActions}
+        row={selectedRow}
+        onAction={handleActionClick}
       />
 
       <CrudModal
         isOpen={showModal}
         onClose={handleClose}
-        title={editingSupplier ? 'Edit Supplier' : 'Add Supplier'}
-        onSubmit={crudHandleSubmit}
+        title={
+          isViewMode
+            ? 'View Supplier'
+            : editingSupplier
+              ? 'Edit Supplier'
+              : 'Add Supplier'
+        }
+        onSubmit={isViewMode ? () => {} : crudHandleSubmit}
         isSubmitting={isSubmitting}
-        submitText={editingSupplier ? 'Update' : 'Create'}
+        submitText={isViewMode ? 'Close' : editingSupplier ? 'Update' : 'Create'}
+        cancelText={isViewMode ? 'Close' : 'Cancel'}
+        disableSubmit={isViewMode}
         size="lg"
       >
-        <FormSection title="Basic Information" description="Supplier name and contact person">
+        <FormSection
+          title="Basic Information"
+          description="Supplier name and contact person"
+        >
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <Input
                 label="Supplier Name"
                 value={formData.supplierName || ''}
                 onChange={(e) => setFormField('supplierName')(e.target.value)}
+                disabled={isViewMode}
                 required
               />
             </Grid>
@@ -300,18 +441,23 @@ const Suppliers = () => {
                 label="Contact Person"
                 value={formData.contactPerson || ''}
                 onChange={(e) => setFormField('contactPerson')(e.target.value)}
+                disabled={isViewMode}
               />
             </Grid>
           </Grid>
         </FormSection>
 
-        <FormSection title="Contact Information" description="Phone, email, and address">
+        <FormSection
+          title="Contact Information"
+          description="Phone, email, and address"
+        >
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <Input
                 label="Phone Number"
                 value={formData.phoneNumber || ''}
                 onChange={(e) => setFormField('phoneNumber')(e.target.value)}
+                disabled={isViewMode}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -320,6 +466,7 @@ const Suppliers = () => {
                 type="email"
                 value={formData.email || ''}
                 onChange={(e) => setFormField('email')(e.target.value)}
+                disabled={isViewMode}
               />
             </Grid>
             <Grid item xs={12}>
@@ -327,6 +474,7 @@ const Suppliers = () => {
                 label="Address"
                 value={formData.address || ''}
                 onChange={(e) => setFormField('address')(e.target.value)}
+                disabled={isViewMode}
                 multiline
                 rows={2}
               />

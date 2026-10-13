@@ -86,7 +86,16 @@
         }
     }
 
-    // Size variants - all consistent height
+    &--warning {
+        background-color: var(--warning);
+        color: white;
+        border-color: var(--warning);
+
+        &:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+    }
+
     &--sm {
         padding: 0 $spacing-md;
         font-size: $font-size-xs;
@@ -140,22 +149,6 @@
 
     &__text {
         color: inherit;
-    }
-}
-
-// Dark mode specific fixes
-[data-theme='dark'] {
-    .btn--outline {
-        color: #f9fafb;
-        border-color: #4b5563;
-
-        &:hover {
-            color: var(--primary);
-        }
-    }
-
-    .btn--text {
-        color: #f9fafb;
     }
 }
 

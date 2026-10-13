@@ -11,13 +11,16 @@ const PrimaryTransactionsGrid = ({
   pageSize,
   onPageChange,
   onPageSizeChange,
+  sortModel = [],
+  onSortModelChange = null,
   columns,
   checkboxSelection,
   onSelectionChange,
   getRowId,
+  onRowClick = null,
   bulkActions = null,
-  title = "Primary Transactions",
-  subtitle = "Handover, Transfer, Loan, Maintenance, Disposal, Operational Office"
+  title = 'Primary Transactions',
+  subtitle = 'Handover, Transfer, Loan, Maintenance, Disposal, Operational Office',
 }) => {
   return (
     <Card
@@ -38,6 +41,10 @@ const PrimaryTransactionsGrid = ({
         getRowId={getRowId}
         checkboxSelection={checkboxSelection}
         onRowSelectionModelChange={onSelectionChange}
+        onRowClick={onRowClick}
+        sortModel={sortModel}
+        onSortModelChange={onSortModelChange}
+        sortingMode="server"
         ariaLabel="Primary transactions"
         paginationMode="server"
       />

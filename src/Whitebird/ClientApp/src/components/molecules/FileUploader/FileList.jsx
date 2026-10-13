@@ -1,8 +1,21 @@
 import React from 'react';
-import { FiEye, FiX } from 'react-icons/fi';
-import { Chip, Typography } from '@mui/material';
-import { getFileIcon, formatFileSize, isImageFile } from '../../../core/utils/file.utils';
+import { FiEye, FiX, FiImage, FiFileText, FiFile } from 'react-icons/fi';
+import { Chip } from '@mui/material';
+import {
+  getFileIcon,
+  formatFileSize,
+  isImageFile,
+} from '../../../core/utils/file.utils';
 import './FileUploader.scss';
+
+const ICON_MAP = {
+  image: FiImage,
+  pdf: FiFileText,
+  document: FiFileText,
+  excel: FiFileText,
+  text: FiFileText,
+  file: FiFile,
+};
 
 const FileList = ({
   files,
@@ -16,12 +29,18 @@ const FileList = ({
   }
 
   const renderFileCard = (file, index) => {
-    const FileIcon = getFileIcon(file.originalFileName || file.fileName);
-    const isPreviewable = isImageFile(file.originalFileName || file.fileName);
+    const iconKey = getFileIcon(file.originalFileName || file.fileName);
+    const FileIcon = ICON_MAP[iconKey] || FiFile;
+    const isPreviewable = isImageFile(
+      file.originalFileName || file.fileName
+    );
     const isPdf = file.originalFileName?.toLowerCase().endsWith('.pdf') || false;
 
     return (
-      <div key={file.fileAttachmentId || index} className="file-uploader__file-card">
+      <div
+        key={file.fileAttachmentId || index}
+        className="file-uploader__file-card"
+      >
         <div className="file-uploader__file-card-content">
           <div className="file-uploader__file-icon">
             <FileIcon size={24} />
@@ -34,7 +53,12 @@ const FileList = ({
               {formatFileSize(file.fileSize)}
             </span>
             {file.isNew && (
-              <Chip label="New" size="small" color="info" className="file-uploader__file-badge" />
+              <Chip
+                label="New"
+                size="small"
+                color="info"
+                className="file-uploader__file-badge"
+              />
             )}
           </div>
         </div>

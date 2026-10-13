@@ -8,101 +8,28 @@ class AssetsData extends BaseData {
     this.setEntityName('asset');
   }
 
+  getTemplateFileName() {
+    return 'Asset_Import_Template.xlsx';
+  }
+
   // ============================================================
   // CREATE — with base64 files
   // ============================================================
   async create(data) {
-    try {
-      const submitData = this.buildSubmitData(data);
-      
-      if (data.photoFile instanceof File && data.photoFile.size > 0) {
-        try {
-          submitData.photoFileBase64 = await fileToBase64(data.photoFile);
-          submitData.photoFileName = data.photoFile.name;
-        } catch (err) {
-          console.error('Failed to convert photo to base64:', err);
-        }
-      }
-
-      if (data.attachmentFiles && data.attachmentFiles.length > 0) {
-        submitData.attachmentFilesBase64 = [];
-        submitData.attachmentFileNames = [];
-        for (const item of data.attachmentFiles) {
-          const file = this.extractFile(item);
-          if (file && file.size > 0) {
-            try {
-              const base64 = await fileToBase64(file);
-              submitData.attachmentFilesBase64.push(base64);
-              submitData.attachmentFileNames.push(file.name || 'file');
-            } catch (err) {
-              console.error('Failed to convert attachment to base64:', err);
-            }
-          }
-        }
-      }
-
-      const result = await this.api.create(submitData);
-      return this.handleApiResponse(result);
-    } catch (error) {
-      return this.handleError(error, 'Failed to create');
-    }
+    const submitData = await this._buildSubmitDataWithFiles(data, {
+      isUpdate: false,
+    });
+    return super.create(submitData);
   }
 
   // ============================================================
   // UPDATE — with base64 files
   // ============================================================
   async update(id, data) {
-    try {
-      const submitData = this.buildSubmitData(data);
-      submitData.isActive = data.isActive === true || data.isActive === 'true' || data.isActive === 1;
-
-      if (data.photoFile instanceof File && data.photoFile.size > 0) {
-        try {
-          submitData.photoFileBase64 = await fileToBase64(data.photoFile);
-          submitData.photoFileName = data.photoFile.name;
-        } catch (err) {
-          console.error('Failed to convert photo to base64:', err);
-        }
-      }
-
-      if (data.attachmentFiles && data.attachmentFiles.length > 0) {
-        submitData.attachmentFilesBase64 = [];
-        submitData.attachmentFileNames = [];
-        submitData.replaceAttachments = data.replaceAttachments !== undefined ? data.replaceAttachments : true;
-        for (const item of data.attachmentFiles) {
-          const file = this.extractFile(item);
-          if (file && file.size > 0) {
-            try {
-              const base64 = await fileToBase64(file);
-              submitData.attachmentFilesBase64.push(base64);
-              submitData.attachmentFileNames.push(file.name || 'file');
-            } catch (err) {
-              console.error('Failed to convert attachment to base64:', err);
-            }
-          }
-        }
-      } else {
-        submitData.attachmentFilesBase64 = [];
-        submitData.attachmentFileNames = [];
-        submitData.replaceAttachments = data.replaceAttachments !== undefined ? data.replaceAttachments : false;
-      }
-
-      if (data.attachmentIdsToKeep && data.attachmentIdsToKeep.length > 0) {
-        submitData.attachmentIdsToKeep = data.attachmentIdsToKeep;
-      }
-
-      const result = await this.api.update(id, submitData);
-      return this.handleApiResponse(result);
-    } catch (error) {
-      return this.handleError(error, 'Failed to update');
-    }
-  }
-
-  // ============================================================
-  // BULK ACTIVATE
-  // ============================================================
-  async bulkActivate(ids, activate) {
-    return super.bulkActivate(ids, activate);
+    const submitData = await this._buildSubmitDataWithFiles(data, {
+      isUpdate: true,
+    });
+    return super.update(id, submitData);
   }
 
   // ============================================================
@@ -113,9 +40,12 @@ class AssetsData extends BaseData {
       const result = await this.api.import(file);
       if (result.data?.isSuccess !== undefined) {
         if (!result.data.isSuccess) {
-          return { 
-            success: false, 
-            error: result.data.errors?.join('\n') || result.data.message || 'Import failed',
+          return {
+            success: false,
+            error:
+              result.data.errors?.join('\n') ||
+              result.data.message ||
+              'Import failed',
             errorType: result.data.errorType,
           };
         }
@@ -126,23 +56,74 @@ class AssetsData extends BaseData {
       if (this.isCanceledError(error)) {
         return { success: false, error: 'canceled', isCanceled: true };
       }
-      return { 
-        success: false, 
-        error: error.userMessage || error.message || 'Failed to import' 
+      return {
+        success: false,
+        error: error.userMessage || error.message || 'Failed to import',
       };
     }
   }
 
   // ============================================================
-  // DOWNLOAD TEMPLATE
-  // ============================================================
-  async downloadTemplate() {
-    return this.downloadTemplate('Asset_Import_Template.xlsx');
-  }
-
-  // ============================================================
   // PRIVATE HELPERS
   // ============================================================
+
+  async _buildSubmitDataWithFiles(data, { isUpdate = false } = {}) {
+    const submitData = this.buildSubmitData(data);
+
+    if (isUpdate) {
+      submitData.isActive =
+        data.isActive === true || data.isActive === 'true' || data.isActive === 1;
+    }
+
+    if (data.photoFile instanceof File && data.photoFile.size > 0) {
+      try {
+        submitData.photoFileBase64 = await fileToBase64(data.photoFile);
+        submitData.photoFileName = data.photoFile.name;
+      } catch (err) {
+        console.error('Failed to convert photo to base64:', err);
+      }
+    }
+
+    const attachFiles = Array.isArray(data.attachmentFiles)
+      ? data.attachmentFiles
+      : [];
+
+    if (attachFiles.length > 0) {
+      submitData.attachmentFilesBase64 = [];
+      submitData.attachmentFileNames = [];
+      if (isUpdate) {
+        submitData.replaceAttachments =
+          data.replaceAttachments !== undefined ? data.replaceAttachments : true;
+      }
+      for (const item of attachFiles) {
+        const file = this.extractFile(item);
+        if (file && file.size > 0) {
+          try {
+            const base64 = await fileToBase64(file);
+            submitData.attachmentFilesBase64.push(base64);
+            submitData.attachmentFileNames.push(file.name || 'file');
+          } catch (err) {
+            console.error('Failed to convert attachment to base64:', err);
+          }
+        }
+      }
+    } else if (isUpdate) {
+      submitData.attachmentFilesBase64 = [];
+      submitData.attachmentFileNames = [];
+      submitData.replaceAttachments =
+        data.replaceAttachments !== undefined ? data.replaceAttachments : false;
+    }
+
+    if (
+      isUpdate &&
+      Array.isArray(data.attachmentIdsToKeep) &&
+      data.attachmentIdsToKeep.length > 0
+    ) {
+      submitData.attachmentIdsToKeep = data.attachmentIdsToKeep;
+    }
+
+    return submitData;
+  }
 
   buildSubmitData(data) {
     return {
@@ -160,8 +141,12 @@ class AssetsData extends BaseData {
       purchasePrice: data.purchasePrice ? parseFloat(data.purchasePrice) : null,
       invoiceNumber: data.invoiceNumber || null,
       supplierId: data.supplierId ? parseInt(data.supplierId, 10) : null,
-      warrantyPeriod: data.warrantyPeriod ? parseInt(data.warrantyPeriod, 10) : null,
-      assetConditionPurchase: data.assetConditionPurchase ? parseInt(data.assetConditionPurchase, 10) : null,
+      warrantyPeriod: data.warrantyPeriod
+        ? parseInt(data.warrantyPeriod, 10)
+        : null,
+      assetConditionPurchase: data.assetConditionPurchase
+        ? parseInt(data.assetConditionPurchase, 10)
+        : null,
       notes: data.notes || null,
     };
   }
@@ -171,30 +156,6 @@ class AssetsData extends BaseData {
     if (item && item.file instanceof File) return item.file;
     if (item && item.isNew && item.file) return item.file;
     return null;
-  }
-
-  handleApiResponse(result) {
-    if (result.data?.isSuccess !== undefined) {
-      if (!result.data.isSuccess) {
-        return { 
-          success: false, 
-          errors: result.data.errors || [result.data.message || 'Operation failed'],
-          errorType: result.data.errorType,
-        };
-      }
-      return { success: true, data: result.data.data };
-    }
-    return { success: true, data: result.data };
-  }
-
-  handleError(error, defaultMessage) {
-    if (this.isCanceledError(error)) {
-      return { success: false, error: 'canceled', isCanceled: true };
-    }
-    return { 
-      success: false, 
-      error: error.userMessage || error.message || defaultMessage 
-    };
   }
 }
 
