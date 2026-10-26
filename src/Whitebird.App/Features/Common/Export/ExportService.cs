@@ -134,9 +134,15 @@ public class ExportService<T> : IExportService<T>
     }
 
     /// <inheritdoc />
-    public virtual async Task<byte[]> ExportPdfAsync(IEnumerable<T> data, string title, string? subtitle = null)
+    public virtual Task<byte[]> ExportPdfAsync(IEnumerable<T> data, string title, string? subtitle = null)
     {
-        // PDF generation - fallback to Excel for now
-        return await ExportExcelAsync(data, title, subtitle);
+        // PDF export is not implemented in this project (no PDF library is present in
+        // Directory.Packages.props). The previous implementation returned Excel bytes
+        // here, which callers then served with Content-Type application/pdf and a .pdf
+        // file name — producing corrupt downloads. Fail loudly so callers reject the
+        // request instead of serving an invalid file.
+        throw new NotSupportedException(
+            "PDF export is not implemented. Use format=excel. To enable PDF, add a PDF-generation " +
+            "library to Directory.Packages.props and implement ExportPdfAsync.");
     }
 }

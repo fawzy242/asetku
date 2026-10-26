@@ -101,6 +101,8 @@ public class AssetTransactionReps : IAssetTransactionReps
         var ids = transactionIds.ToList();
         if (!ids.Any()) return new Dictionary<int, List<AssetTransactionAttachmentView>>();
 
+        // Attachment URLs resolve to the AssetTransaction menu's own download
+        // endpoint. FileAttachment has no HTTP surface of its own.
         const string sql = @"
             SELECT 
                 ata.AssetTransactionId,
@@ -113,7 +115,7 @@ public class AssetTransactionReps : IAssetTransactionReps
                 fa.OriginalFileName,
                 fa.FileCategory,
                 fa.IsPrimary,
-                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl
+                '/api/AssetTransaction/' + CAST(ata.AssetTransactionId AS VARCHAR) + '/attachments/' + CAST(fa.FileAttachmentId AS VARCHAR) + '/download' as FileUrl
             FROM AssetTransactionAttachment ata
             INNER JOIN FileAttachment fa ON ata.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE ata.AssetTransactionId IN @Ids AND ata.IsActive = 1
@@ -129,6 +131,8 @@ public class AssetTransactionReps : IAssetTransactionReps
         var ids = transactionIds.ToList();
         if (!ids.Any()) return new Dictionary<int, List<AssetTransactionApproveAttachmentView>>();
 
+        // Approve-attachment URLs resolve to the AssetTransaction menu's own
+        // approve-attachments download endpoint.
         const string sql = @"
             SELECT 
                 ataa.AssetTransactionId,
@@ -142,7 +146,7 @@ public class AssetTransactionReps : IAssetTransactionReps
                 ataa.CreatedBy,
                 fa.FileName,
                 fa.OriginalFileName,
-                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl,
+                '/api/AssetTransaction/' + CAST(ataa.AssetTransactionId AS VARCHAR) + '/approve-attachments/' + CAST(fa.FileAttachmentId AS VARCHAR) + '/download' as FileUrl,
                 md.MasterDataName as DocumentTypeName,
                 CASE WHEN md.ReferenceCode IS NOT NULL THEN 1 ELSE 0 END as IsRequired
             FROM AssetTransactionApproveAttachment ataa
@@ -1013,12 +1017,14 @@ public class AssetTransactionReps : IAssetTransactionReps
 
     public async Task<IEnumerable<AssetTransactionAttachmentView>> GetAttachmentsByTransactionIdAsync(int transactionId)
     {
+        // Attachment URLs resolve to the AssetTransaction menu's own download
+        // endpoint. FileAttachment has no HTTP surface of its own.
         const string sql = @"
             SELECT 
                 ata.AssetTransactionAttachmentId, ata.AssetTransactionId, ata.FileAttachmentId,
                 ata.[Order], ata.CreatedDate, ata.CreatedBy,
                 fa.FileName, fa.OriginalFileName, fa.FileCategory, fa.IsPrimary,
-                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl
+                '/api/AssetTransaction/' + CAST(ata.AssetTransactionId AS VARCHAR) + '/attachments/' + CAST(fa.FileAttachmentId AS VARCHAR) + '/download' as FileUrl
             FROM AssetTransactionAttachment ata
             INNER JOIN FileAttachment fa ON ata.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE ata.AssetTransactionId = @TransactionId AND ata.IsActive = 1
@@ -1066,13 +1072,15 @@ public class AssetTransactionReps : IAssetTransactionReps
 
     public async Task<IEnumerable<AssetTransactionApproveAttachmentView>> GetApproveAttachmentsByTransactionIdAsync(int transactionId)
     {
+        // Approve-attachment URLs resolve to the AssetTransaction menu's own
+        // approve-attachments download endpoint.
         const string sql = @"
             SELECT 
                 ataa.AssetTransactionApproveAttachmentId, ataa.AssetTransactionId, ataa.FileAttachmentId,
                 ataa.[Order], ataa.DocumentType, ataa.NeedToChange, ataa.Approved,
                 ataa.CreatedDate, ataa.CreatedBy,
                 fa.FileName, fa.OriginalFileName,
-                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl,
+                '/api/AssetTransaction/' + CAST(ataa.AssetTransactionId AS VARCHAR) + '/approve-attachments/' + CAST(fa.FileAttachmentId AS VARCHAR) + '/download' as FileUrl,
                 md.MasterDataName as DocumentTypeName,
                 CASE WHEN md.ReferenceCode IS NOT NULL THEN 1 ELSE 0 END as IsRequired
             FROM AssetTransactionApproveAttachment ataa

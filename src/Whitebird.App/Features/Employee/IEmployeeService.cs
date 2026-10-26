@@ -82,4 +82,10 @@ public interface IEmployeeService
     /// Soft-deletes a single attachment (physical file is retained).
     /// </summary>
     Task<ServiceResult> DeleteAttachmentAsync(int employeeId, int fileAttachmentId);
+
+    /// <summary>
+    /// Streams the raw bytes of an attachment belonging to the given employee.
+    /// Verifies ownership before delegating to the internal FileAttachmentService.
+    /// </summary>
+    Task<ServiceResult<FileContentDto>> GetAttachmentFileAsync(int employeeId, int fileAttachmentId);
 }

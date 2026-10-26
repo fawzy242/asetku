@@ -10,13 +10,13 @@ public class UsersEntity : AuditableEntity
     public string PasswordHash { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
     public string? PhoneNumber { get; set; }
-    public string? RoleId { get; set; }
+    // NOTE: Role is NOT a column on Users. Roles live in Roles/UserRoles (many-to-many).
+    // Resolution is done via IUserReps.GetUserRoleAsync(userId); see AuthService and UserService.
     public string? SessionToken { get; set; }
     public DateTime? SessionExpiry { get; set; }
     public bool IsLocked { get; set; }
     public string? ResetToken { get; set; }
     public DateTime? ResetTokenExpiry { get; set; }
     public DateTime? LastLoginDate { get; set; }
-    // REMOVED: ProfilePhotoPath, ProfilePhotoFileName
     public bool MustChangePassword { get; set; }
 }

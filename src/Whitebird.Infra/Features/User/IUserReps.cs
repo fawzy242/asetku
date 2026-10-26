@@ -22,8 +22,14 @@ public interface IUserReps
     /// </summary>
     Task<int> UpdateUserAsync(UsersEntity user);
 
+    /// <summary>
+    /// Resolves the user's first active role via UserRoles/Roles.
+    /// Returns (null, null) when the user has no assigned role.
+    /// </summary>
+    Task<(int? RoleId, string? RoleName)> GetUserRoleAsync(int userId);
+
     // ============================================================
-    // USER PHOTO PROFILE - ADDED
+    // USER PHOTO PROFILE
     // ============================================================
 
     /// <summary>
@@ -32,7 +38,7 @@ public interface IUserReps
     Task<int> InsertPhotoProfileAsync(UsersPhotoProfileAttachmentEntity entity);
 
     /// <summary>
-    /// Get user photo profile by user ID
+    /// Get the most recent active user photo profile by user ID
     /// </summary>
     Task<UsersPhotoProfileAttachmentEntity?> GetPhotoProfileByUserIdAsync(int userId);
 

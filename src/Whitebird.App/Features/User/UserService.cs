@@ -54,6 +54,8 @@ public class UserService : BaseService, IUserService
                 return ServiceResult<UserDto>.NotFound("Invalid or expired session");
             }
 
+            var (roleId, roleName) = await _userReps.GetUserRoleAsync(user.UserId);
+
             var request = _httpContextAccessor.HttpContext?.Request;
             var profilePhotoUrl = request != null
                 ? $"{request.Scheme}://{request.Host}/api/User/profile-photo"
@@ -64,7 +66,8 @@ public class UserService : BaseService, IUserService
                 UserId = user.UserId,
                 Email = user.Email,
                 FullName = user.FullName,
-                RoleId = user.RoleId,
+                RoleId = roleId,
+                RoleName = roleName,
                 Username = user.Username,
                 ProfilePhotoUrl = profilePhotoUrl
             });
@@ -81,6 +84,8 @@ public class UserService : BaseService, IUserService
                 return ServiceResult<UserDto>.NotFound("User not found");
             }
 
+            var (roleId, roleName) = await _userReps.GetUserRoleAsync(user.UserId);
+
             var request = _httpContextAccessor.HttpContext?.Request;
             var profilePhotoUrl = request != null
                 ? $"{request.Scheme}://{request.Host}/api/User/profile-photo"
@@ -91,7 +96,8 @@ public class UserService : BaseService, IUserService
                 UserId = user.UserId,
                 Email = user.Email,
                 FullName = user.FullName,
-                RoleId = user.RoleId,
+                RoleId = roleId,
+                RoleName = roleName,
                 Username = user.Username,
                 ProfilePhotoUrl = profilePhotoUrl
             });
@@ -130,6 +136,8 @@ public class UserService : BaseService, IUserService
                 $"Profile updated: Name '{oldFullName}' -> '{request.FullName}', Email '{oldEmail}' -> '{request.Email}', Phone '{oldPhoneNumber}' -> '{request.PhoneNumber}'",
                 _currentUserService.GetDisplayName());
 
+            var (roleId, roleName) = await _userReps.GetUserRoleAsync(user.UserId);
+
             var requestContext = _httpContextAccessor.HttpContext?.Request;
             var profilePhotoUrl = requestContext != null
                 ? $"{requestContext.Scheme}://{requestContext.Host}/api/User/profile-photo"
@@ -140,7 +148,8 @@ public class UserService : BaseService, IUserService
                 UserId = user.UserId,
                 Email = user.Email,
                 FullName = user.FullName,
-                RoleId = user.RoleId,
+                RoleId = roleId,
+                RoleName = roleName,
                 Username = user.Username,
                 ProfilePhotoUrl = profilePhotoUrl
             }, "Profile updated successfully");

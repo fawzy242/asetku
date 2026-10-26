@@ -204,4 +204,18 @@ public class AssetController : ControllerBase
     [HttpDelete("{id:int}/attachments/{fileAttachmentId:int}")]
     public async Task<IActionResult> DeleteAttachment(int id, int fileAttachmentId)
         => this.HandleResult(await _assetService.DeleteAttachmentAsync(id, fileAttachmentId));
+
+    /// <summary>
+    /// Download a specific attachment belonging to this asset.
+    /// Streams the raw bytes with the correct Content-Type and original file name.
+    /// </summary>
+    [HttpGet("{id:int}/attachments/{fileAttachmentId:int}/download")]
+    public async Task<IActionResult> DownloadAttachment(int id, int fileAttachmentId)
+    {
+        var result = await _assetService.GetAttachmentFileAsync(id, fileAttachmentId);
+        if (!result.IsSuccess || result.Data == null)
+            return this.HandleResult(result);
+
+        return File(result.Data.Bytes, result.Data.ContentType, result.Data.FileName);
+    }
 }

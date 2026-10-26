@@ -118,7 +118,7 @@ public class ReportsService : BaseService, IReportsService
         return await ExecuteSafelyAsync(async () =>
         {
             if (!IsValidFormat(format))
-                return ServiceResult<byte[]>.BadRequest($"Invalid format: {format}. Valid: excel, pdf");
+                return ServiceResult<byte[]>.BadRequest($"Invalid format: {format}. Valid: excel");
 
             var data = await _reportsReps.GetAssetTransactionDataAsync(startDate, endDate, transactionType);
             var bytes = await _drawAssetTransaction.GenerateAsync(data, format);
@@ -133,7 +133,7 @@ public class ReportsService : BaseService, IReportsService
         return await ExecuteSafelyAsync(async () =>
         {
             if (!IsValidFormat(format))
-                return ServiceResult<byte[]>.BadRequest($"Invalid format: {format}. Valid: excel, pdf");
+                return ServiceResult<byte[]>.BadRequest($"Invalid format: {format}. Valid: excel");
 
             var data = await _reportsReps.GetAssetInventoryDataAsync(status, categoryId, supplierId);
             var bytes = await _drawAssetInventory.GenerateAsync(data, format);
@@ -148,7 +148,7 @@ public class ReportsService : BaseService, IReportsService
         return await ExecuteSafelyAsync(async () =>
         {
             if (!IsValidFormat(format))
-                return ServiceResult<byte[]>.BadRequest($"Invalid format: {format}. Valid: excel, pdf");
+                return ServiceResult<byte[]>.BadRequest($"Invalid format: {format}. Valid: excel");
 
             var data = await _reportsReps.GetEmployeeAssetDataAsync(employeeId);
             var bytes = await _drawEmployeeAsset.GenerateAsync(data, format);
@@ -163,7 +163,7 @@ public class ReportsService : BaseService, IReportsService
         return await ExecuteSafelyAsync(async () =>
         {
             if (!IsValidFormat(format))
-                return ServiceResult<byte[]>.BadRequest($"Invalid format: {format}. Valid: excel, pdf");
+                return ServiceResult<byte[]>.BadRequest($"Invalid format: {format}. Valid: excel");
 
             var data = await _reportsReps.GetMaintenanceDataAsync(startDate, endDate, isUpcoming);
             var bytes = await _drawMaintenance.GenerateAsync(data, format);
@@ -178,7 +178,7 @@ public class ReportsService : BaseService, IReportsService
         return await ExecuteSafelyAsync(async () =>
         {
             if (!IsValidFormat(format))
-                return ServiceResult<byte[]>.BadRequest($"Invalid format: {format}. Valid: excel, pdf");
+                return ServiceResult<byte[]>.BadRequest($"Invalid format: {format}. Valid: excel");
 
             var data = await _reportsReps.GetFinancialDataAsync(startDate, endDate);
             var bytes = await _drawFinancial.GenerateAsync(data, format);
@@ -191,9 +191,14 @@ public class ReportsService : BaseService, IReportsService
     // PRIVATE HELPERS
     // ============================================================
 
+    /// <summary>
+    /// Only Excel export is implemented. PDF was previously accepted here and silently
+    /// returned Excel bytes labelled as application/pdf — the contract is narrowed to
+    /// the honest set of supported formats.
+    /// </summary>
     private bool IsValidFormat(string format)
     {
-        return format?.ToLower() == "excel" || format?.ToLower() == "pdf";
+        return format?.ToLower() == "excel";
     }
 }
 

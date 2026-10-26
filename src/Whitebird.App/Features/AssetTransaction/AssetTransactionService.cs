@@ -236,7 +236,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     }
 
     // ============================================================
-    // UPDATE WITH ATTACHMENTS (Standar)
+    // UPDATE WITH ATTACHMENTS
     // ============================================================
 
     public async Task<ServiceResult<AssetTransactionDetailView>> UpdateWithAttachmentsAsync(
@@ -250,7 +250,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
             }
 
-            // Update basic fields
+            // Update basic fields.
             existing.AssetId = model.AssetId;
             existing.TransactionType = model.TransactionType;
             existing.EmployeeId = model.EmployeeId;
@@ -259,15 +259,17 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             existing.ExpectedLoanReturnDate = model.ExpectedLoanReturnDate;
             existing.Notes = model.Notes;
             existing.Condition = model.Condition;
-            existing.Approved = model.Approved;
-            existing.ApprovedBy = model.ApprovedBy;
-            existing.Completed = model.Completed;
-            existing.CompletedBy = model.CompletedBy;
             existing.MaintenanceType = model.MaintenanceType;
             existing.MaintenanceCost = model.MaintenanceCost;
             existing.IsActive = model.IsActive;
             existing.ModifiedDate = DateTime.Now;
             existing.ModifiedBy = _currentUserService.GetDisplayName();
+            // R3 FIX: Approved / ApprovedBy / Completed / CompletedBy are NOT copied from
+            // the client DTO on this endpoint. Those flags are set exclusively through
+            // BulkApprovedAsync / BulkPendingAsync / BulkRejectedAsync / CompleteAsync /
+            // UncompleteAsync / SetApproveAttachmentActionAsync so the document workflow
+            // cannot be bypassed here. The client DTO still carries those fields for
+            // serialization symmetry with the detail view; they are simply ignored.
 
             await _transactionReps.UpdateAsync(existing);
 
@@ -358,10 +360,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         }, "update transaction with attachments");
     }
 
-    // ============================================================
-    // UPDATE APPROVAL WITH ATTACHMENTS
-    // ============================================================
-
     public async Task<ServiceResult<AssetTransactionDetailView>> UpdateApprovalWithAttachmentsAsync(
         int id, AssetTransactionUpdateApprovalFormDto model)
     {
@@ -373,7 +371,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
             }
 
-            // Update basic fields
+            // Update basic fields.
             existing.AssetId = model.AssetId;
             existing.TransactionType = model.TransactionType;
             existing.EmployeeId = model.EmployeeId;
@@ -382,13 +380,14 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             existing.ExpectedLoanReturnDate = model.ExpectedLoanReturnDate;
             existing.Notes = model.Notes;
             existing.Condition = model.Condition;
-            existing.Approved = model.Approved;
-            existing.ApprovedBy = model.ApprovedBy;
-            existing.Completed = model.Completed;
-            existing.CompletedBy = model.CompletedBy;
             existing.MaintenanceType = model.MaintenanceType;
             existing.MaintenanceCost = model.MaintenanceCost;
             existing.IsActive = model.IsActive;
+            // This endpoint IS the approval endpoint, so Approved / ApprovedBy are
+            // accepted from the DTO. Completed / CompletedBy are NOT — completion
+            // is always re-derived by ReevaluateCompletedAsync below.
+            existing.Approved = model.Approved;
+            existing.ApprovedBy = model.ApprovedBy;
             existing.ModifiedDate = DateTime.Now;
             existing.ModifiedBy = _currentUserService.GetDisplayName();
 
@@ -1003,6 +1002,62 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             var attachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(transactionId);
             return ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>.Success(attachments);
         }, "get transaction approve attachments");
+    }
+
+    public async Task<ServiceResult<FileContentDto>> GetAttachmentFileAsync(int transactionId, int fileAttachmentId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
+            if (transaction == null)
+            {
+                return ServiceResult<FileContentDto>.NotFound($"Transaction with id {transactionId} not found");
+            }
+
+            // Ownership check: the attachment must belong to this transaction.
+            var attachments = await _transactionReps.GetAttachmentsByTransactionIdAsync(transactionId);
+            if (!attachments.Any(a => a.FileAttachmentId == fileAttachmentId))
+            {
+                return ServiceResult<FileContentDto>.NotFound($"Attachment {fileAttachmentId} not found for transaction {transactionId}");
+            }
+
+            // Delegate to the internal FileAttachment service — shared service with
+            // no HTTP surface of its own.
+            var downloadResult = await _fileAttachmentService.DownloadAsync(fileAttachmentId);
+            if (!downloadResult.IsSuccess || downloadResult.Data == null)
+            {
+                return ServiceResult<FileContentDto>.NotFound($"Attachment file {fileAttachmentId} could not be retrieved");
+            }
+
+            return downloadResult;
+        }, "get transaction attachment file");
+    }
+
+    public async Task<ServiceResult<FileContentDto>> GetApproveAttachmentFileAsync(int transactionId, int fileAttachmentId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
+            if (transaction == null)
+            {
+                return ServiceResult<FileContentDto>.NotFound($"Transaction with id {transactionId} not found");
+            }
+
+            // Ownership check: the approve attachment must belong to this transaction.
+            var attachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(transactionId);
+            if (!attachments.Any(a => a.FileAttachmentId == fileAttachmentId))
+            {
+                return ServiceResult<FileContentDto>.NotFound($"Approve attachment {fileAttachmentId} not found for transaction {transactionId}");
+            }
+
+            var downloadResult = await _fileAttachmentService.DownloadAsync(fileAttachmentId);
+            if (!downloadResult.IsSuccess || downloadResult.Data == null)
+            {
+                return ServiceResult<FileContentDto>.NotFound($"Approve attachment file {fileAttachmentId} could not be retrieved");
+            }
+
+            return downloadResult;
+        }, "get transaction approve attachment file");
     }
 
     // ============================================================

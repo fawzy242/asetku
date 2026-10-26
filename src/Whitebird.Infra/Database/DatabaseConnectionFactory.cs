@@ -1,17 +1,21 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using System.Data;
+using Whitebird.Infra.Configuration;
 
 namespace Whitebird.Infra.Database;
 
 public class DatabaseConnectionFactory : IDatabaseConnectionFactory
 {
     private readonly IConfiguration _configuration;
+    private readonly DatabaseSettings _settings;
     private readonly Dictionary<string, string> _connectionStrings;
 
-    public DatabaseConnectionFactory(IConfiguration configuration)
+    public DatabaseConnectionFactory(IConfiguration configuration, IOptions<DatabaseSettings> settings)
     {
         _configuration = configuration;
+        _settings = settings?.Value ?? new DatabaseSettings();
         _connectionStrings = new Dictionary<string, string>();
 
         var connectionStringsSection = _configuration.GetSection("ConnectionStrings");
@@ -53,7 +57,18 @@ public class DatabaseConnectionFactory : IDatabaseConnectionFactory
             throw new InvalidOperationException("Production connection must have Encrypt=True");
         }
 
-        return new SqlConnection(connectionString);
+        // Apply DatabaseSettings-driven pool/lifetime configuration.
+        var builder = new SqlConnectionStringBuilder(connectionString);
+        if (_settings.ConnectionPoolSize > 0)
+        {
+            builder.MaxPoolSize = _settings.ConnectionPoolSize;
+        }
+        if (_settings.ConnectionLifetimeSeconds > 0)
+        {
+            builder.ConnectionLifetime = _settings.ConnectionLifetimeSeconds;
+        }
+
+        return new SqlConnection(builder.ConnectionString);
     }
 
     public async Task<IDbConnection> CreateConnectionAsync()

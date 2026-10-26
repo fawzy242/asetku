@@ -39,13 +39,15 @@ public class SessionAuthenticationHandler : AuthenticationHandler<Authentication
             return AuthenticateResult.Fail("Invalid or expired session token");
         }
 
+        // Role claim now carries the resolved RoleName from UserRoles/Roles.
+        // Falls back to "User" when the authenticated user has no assigned role.
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, userResult.Data.UserId.ToString()),
             new Claim(ClaimTypes.Name, userResult.Data.Username ?? string.Empty),
             new Claim(ClaimTypes.Email, userResult.Data.Email ?? string.Empty),
             new Claim("FullName", userResult.Data.FullName ?? string.Empty),
-            new Claim(ClaimTypes.Role, userResult.Data.RoleId ?? "User")
+            new Claim(ClaimTypes.Role, userResult.Data.RoleName ?? "User")
         };
 
         var identity = new ClaimsIdentity(claims, Scheme.Name);

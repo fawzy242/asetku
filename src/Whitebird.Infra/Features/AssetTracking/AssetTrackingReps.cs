@@ -200,10 +200,13 @@ public class AssetTrackingReps : IAssetTrackingReps
 
     public async Task<IEnumerable<AssetTrackingAttachmentDto>> GetAttachmentsByAssetIdAsync(int assetId)
     {
+        // AssetTracking is a read-only view over the Asset resource. Attachment URLs
+        // resolve to the Asset menu's own download endpoint — FileAttachment has no
+        // HTTP surface of its own.
         const string sql = @"
             SELECT 
                 fa.FileAttachmentId, fa.FileName, fa.OriginalFileName, fa.FileCategory, fa.IsPrimary,
-                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl
+                '/api/Asset/' + CAST(aa.AssetId AS VARCHAR) + '/attachments/' + CAST(fa.FileAttachmentId AS VARCHAR) + '/download' as FileUrl
             FROM AssetAttachment aa
             INNER JOIN FileAttachment fa ON aa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE aa.AssetId = @AssetId AND aa.IsActive = 1
@@ -214,10 +217,12 @@ public class AssetTrackingReps : IAssetTrackingReps
 
     public async Task<AssetTrackingAttachmentDto?> GetPhotoProfileByAssetIdAsync(int assetId)
     {
+        // Asset photo resolves to the Asset menu's own photo endpoint
+        // (GET /api/Asset/{id}/photo).
         const string sql = @"
             SELECT TOP 1
                 fa.FileAttachmentId, fa.FileName, fa.OriginalFileName, fa.FileCategory, fa.IsPrimary,
-                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl
+                '/api/Asset/' + CAST(appa.AssetId AS VARCHAR) + '/photo' as FileUrl
             FROM AssetPhotoProfileAttachment appa
             INNER JOIN FileAttachment fa ON appa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE appa.AssetId = @AssetId AND appa.IsActive = 1

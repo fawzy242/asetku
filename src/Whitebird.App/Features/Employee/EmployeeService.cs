@@ -175,7 +175,6 @@ public class EmployeeService : BaseService, IEmployeeService
                 return ServiceResult<EmployeeDetailView>.NotFound($"Employee with id {id} not found");
             }
 
-            // Update basic fields
             existing.EmployeeCode = model.EmployeeCode;
             existing.FullName = model.FullName;
             existing.Address = model.Address;
@@ -193,9 +192,6 @@ public class EmployeeService : BaseService, IEmployeeService
 
             await _repository.UpdateAsync(existing);
 
-            // ============================================================
-            // PHOTO PROFILE
-            // ============================================================
             if (!string.IsNullOrEmpty(model.PhotoFileBase64))
             {
                 var oldPhoto = await _employeeReps.GetPhotoProfileByEmployeeIdAsync(id);
@@ -208,9 +204,6 @@ public class EmployeeService : BaseService, IEmployeeService
                 await AddPhotoProfileFromBase64Async(id, model.PhotoFileBase64, model.PhotoFileName ?? "photo.jpg");
             }
 
-            // ============================================================
-            // ATTACHMENTS
-            // ============================================================
             if (model.ReplaceAttachments || (model.AttachmentFilesBase64 != null && model.AttachmentFilesBase64.Any()))
             {
                 var existingAttachments = await _employeeReps.GetAttachmentsByEmployeeIdAsync(id);
@@ -755,6 +748,37 @@ public class EmployeeService : BaseService, IEmployeeService
 
             return ServiceResult.Success("Attachment deleted successfully");
         }, "delete employee attachment");
+    }
+
+    public async Task<ServiceResult<FileContentDto>> GetAttachmentFileAsync(int employeeId, int fileAttachmentId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var employee = await _employeeReps.GetByIdRawAsync(employeeId);
+            if (employee == null)
+            {
+                return ServiceResult<FileContentDto>.NotFound($"Employee with id {employeeId} not found");
+            }
+
+            // Ownership check: the attachment row must belong to this employee.
+            // Prevents downloading arbitrary FileAttachment ids through a foreign
+            // employee route.
+            var attachments = await _employeeReps.GetAttachmentsByEmployeeIdAsync(employeeId);
+            if (!attachments.Any(a => a.FileAttachmentId == fileAttachmentId))
+            {
+                return ServiceResult<FileContentDto>.NotFound($"Attachment {fileAttachmentId} not found for employee {employeeId}");
+            }
+
+            // Delegate to the internal FileAttachment service. Shared service, no HTTP
+            // surface of its own — used by every menu that owns attachments.
+            var downloadResult = await _fileAttachmentService.DownloadAsync(fileAttachmentId);
+            if (!downloadResult.IsSuccess || downloadResult.Data == null)
+            {
+                return ServiceResult<FileContentDto>.NotFound($"Attachment file {fileAttachmentId} could not be retrieved");
+            }
+
+            return downloadResult;
+        }, "get employee attachment file");
     }
 
     // ============================================================

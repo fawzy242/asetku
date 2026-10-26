@@ -71,6 +71,20 @@ public class EmailService : IEmailService
         var fromName = _configuration["Email:FromName"] ?? "Whitebird System";
         var fromEmail = _configuration["Email:FromEmail"] ?? smtpUser;
 
+        // Graceful no-op when SMTP credentials are not configured. The caller
+        // (ForgotPasswordAsync) intentionally returns a generic success message to
+        // prevent user enumeration, so this does not change externally-visible
+        // behaviour. It only prevents noisy exceptions when the deployment has not
+        // supplied SMTP credentials.
+        if (string.IsNullOrWhiteSpace(smtpUser) || string.IsNullOrWhiteSpace(smtpPass))
+        {
+            _logger.LogWarning(
+                "Email delivery skipped: Email:SmtpUser and/or Email:SmtpPass is not configured. " +
+                "Set both to enable outgoing email. Recipient={Recipient}, Subject={Subject}",
+                toEmail, subject);
+            return;
+        }
+
         var message = new MimeMessage();
         message.From.Add(new MailboxAddress(fromName, fromEmail));
         message.To.Add(new MailboxAddress("", toEmail));
@@ -79,10 +93,7 @@ public class EmailService : IEmailService
 
         using var client = new SmtpClient();
         await client.ConnectAsync(smtpHost, smtpPort, SecureSocketOptions.StartTls);
-
-        if (!string.IsNullOrEmpty(smtpUser) && !string.IsNullOrEmpty(smtpPass))
-            await client.AuthenticateAsync(smtpUser, smtpPass);
-
+        await client.AuthenticateAsync(smtpUser, smtpPass);
         await client.SendAsync(message);
         await client.DisconnectAsync(true);
     }

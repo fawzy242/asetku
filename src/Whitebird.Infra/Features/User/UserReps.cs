@@ -49,13 +49,31 @@ public class UserReps : IUserReps
         return await _context.ExecuteAsync(sql, user);
     }
 
+    public async Task<(int? RoleId, string? RoleName)> GetUserRoleAsync(int userId)
+    {
+        const string sql = @"
+            SELECT TOP 1 r.RoleId, r.RoleName
+            FROM UserRoles ur
+            INNER JOIN Roles r ON ur.RoleId = r.RoleId
+            WHERE ur.UserId = @UserId
+              AND ur.IsActive = 1
+              AND r.IsActive = 1
+            ORDER BY r.RoleId";
+
+        var row = await _context.QueryFirstOrDefaultAsync<RoleProjection>(sql, new { UserId = userId });
+        return row == null ? (null, null) : (row.RoleId, row.RoleName);
+    }
+
+    private sealed class RoleProjection
+    {
+        public int RoleId { get; set; }
+        public string RoleName { get; set; } = string.Empty;
+    }
+
     // ============================================================
-    // USER PHOTO PROFILE - FIXED
+    // USER PHOTO PROFILE
     // ============================================================
 
-    /// <summary>
-    /// Insert user photo profile attachment
-    /// </summary>
     public async Task<int> InsertPhotoProfileAsync(UsersPhotoProfileAttachmentEntity entity)
     {
         const string sql = @"
@@ -69,21 +87,17 @@ public class UserReps : IUserReps
         return await _context.ExecuteScalarAsync<int>(sql, entity);
     }
 
-    /// <summary>
-    /// Get user photo profile by user ID
-    /// </summary>
     public async Task<UsersPhotoProfileAttachmentEntity?> GetPhotoProfileByUserIdAsync(int userId)
     {
+        // Schema allows multiple rows per user; pick the most recent so the result is deterministic.
         const string sql = @"
-            SELECT * FROM UsersPhotoProfileAttachment 
-            WHERE UserId = @UserId AND IsActive = 1";
+            SELECT TOP 1 * FROM UsersPhotoProfileAttachment 
+            WHERE UserId = @UserId AND IsActive = 1
+            ORDER BY CreatedDate DESC";
 
         return await _context.QueryFirstOrDefaultAsync<UsersPhotoProfileAttachmentEntity>(sql, new { UserId = userId });
     }
 
-    /// <summary>
-    /// Delete user photo profile by user ID (soft delete)
-    /// </summary>
     public async Task<int> DeletePhotoProfileByUserIdAsync(int userId)
     {
         const string sql = @"
@@ -94,9 +108,6 @@ public class UserReps : IUserReps
         return await _context.ExecuteAsync(sql, new { UserId = userId });
     }
 
-    /// <summary>
-    /// Delete user photo profile by attachment ID (soft delete)
-    /// </summary>
     public async Task<int> DeletePhotoProfileByFileAttachmentIdAsync(int fileAttachmentId)
     {
         const string sql = @"

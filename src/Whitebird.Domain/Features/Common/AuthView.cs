@@ -79,7 +79,10 @@ public class UserDto
     public int UserId { get; set; }
     public string Email { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
-    public string? RoleId { get; set; }
+    // RoleId was previously a string and always null in practice because Users has no
+    // RoleId column. It is now resolved from UserRoles/Roles via IUserReps.GetUserRoleAsync.
+    public int? RoleId { get; set; }
+    public string? RoleName { get; set; }
     public string? Username { get; set; }
     public string? ProfilePhotoUrl { get; set; }
 }

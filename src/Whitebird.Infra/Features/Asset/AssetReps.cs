@@ -15,6 +15,19 @@ public class AssetReps : IAssetReps
 {
     private readonly DapperContext _context;
 
+    // Whitelist of Asset-table columns accepted for ORDER BY. Anything else falls
+    // back to AssetCode. The SQL builder prefixes columns with "a." so only Asset
+    // columns are valid; this guard prevents SQL injection through SortBy and
+    // guards against client-supplied values that would break the query.
+    private static readonly HashSet<string> _allowedSortColumns = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "AssetId", "AssetCode", "AssetName", "CategoryId", "SupplierId",
+        "Brand", "Model", "SerialNumber", "Imei", "Hostname", "IpAddress", "MacAddress",
+        "PurchaseDate", "PurchasePrice", "InvoiceNumber",
+        "WarrantyPeriod", "WarrantyExpiryDate", "AssetConditionPurchase",
+        "Notes", "IsActive", "CreatedDate", "CreatedBy", "ModifiedDate", "ModifiedBy"
+    };
+
     public AssetReps(DapperContext context)
     {
         _context = context;
@@ -73,11 +86,12 @@ public class AssetReps : IAssetReps
 
         if (result != null)
         {
-            // Get Photo Profile
+            // Photo profile — resolves through the Asset menu's own photo endpoint
+            // (GET /api/Asset/{id}/photo). FileAttachment itself has no HTTP surface.
             var photoSql = @"
             SELECT TOP 1
                 fa.FileAttachmentId,
-                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl
+                '/api/Asset/' + CAST(appa.AssetId AS VARCHAR) + '/photo' as FileUrl
             FROM AssetPhotoProfileAttachment appa
             INNER JOIN FileAttachment fa ON appa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE appa.AssetId = @AssetId AND appa.IsActive = 1
@@ -89,7 +103,8 @@ public class AssetReps : IAssetReps
                 result.PhotoProfileUrl = photo.FileUrl;
             }
 
-            // Get Attachments
+            // Attachments — resolve through the Asset menu's own download endpoint
+            // (GET /api/Asset/{id}/attachments/{fileAttachmentId}/download).
             var attSql = @"
             SELECT 
                 aa.AssetAttachmentId,
@@ -100,7 +115,7 @@ public class AssetReps : IAssetReps
                 fa.IsPrimary,
                 aa.[Order],
                 aa.CreatedDate,
-                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl
+                '/api/Asset/' + CAST(aa.AssetId AS VARCHAR) + '/attachments/' + CAST(fa.FileAttachmentId AS VARCHAR) + '/download' as FileUrl
             FROM AssetAttachment aa
             INNER JOIN FileAttachment fa ON aa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE aa.AssetId = @AssetId AND aa.IsActive = 1
@@ -125,14 +140,36 @@ public class AssetReps : IAssetReps
                 a.WarrantyPeriod, a.WarrantyExpiryDate,
                 a.AssetConditionPurchase, md.MasterDataName as AssetConditionPurchaseName,
                 a.Notes,
-                a.IsActive, a.CreatedDate, a.CreatedBy, a.ModifiedDate, a.ModifiedBy
+                a.IsActive, a.CreatedDate, a.CreatedBy, a.ModifiedDate, a.ModifiedBy,
+                CASE 
+                    WHEN a.IsActive = 0 THEN 'Inactive'
+                    WHEN lt.AssetId IS NULL THEN 'Available'
+                    WHEN lt.TransactionType = @LoanType THEN 'On Loan'
+                    WHEN lt.TransactionType IN (@HandoverType, @TransferType) THEN 'Assigned'
+                    WHEN lt.TransactionType = @MaintenanceType THEN 'In Maintenance'
+                    ELSE 'Available'
+                END as CurrentStatus
             FROM Asset a
             LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
             LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
             LEFT JOIN MasterData md ON a.AssetConditionPurchase = md.ReferenceCode AND md.ReferenceName = 'AssetConditionPurchase' AND md.IsActive = 1
+            LEFT JOIN (
+                SELECT AssetId, TransactionType,
+                       ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
+                FROM AssetTransaction
+                WHERE Approved = 1 AND IsActive = 1 AND FromAssetTransactionId IS NULL
+            ) lt ON a.AssetId = lt.AssetId AND lt.rn = 1
             ORDER BY a.AssetCode";
 
-        return await _context.QueryAsync<AssetListView>(sql);
+        var parameters = new
+        {
+            LoanType = TransactionTypeConstants.LOAN,
+            HandoverType = TransactionTypeConstants.HANDOVER,
+            TransferType = TransactionTypeConstants.TRANSFER,
+            MaintenanceType = TransactionTypeConstants.MAINTENANCE
+        };
+
+        return await _context.QueryAsync<AssetListView>(sql, parameters);
     }
 
     public async Task<IEnumerable<AssetListView>> GetByCategoryListViewAsync(int categoryId)
@@ -147,15 +184,38 @@ public class AssetReps : IAssetReps
                 a.WarrantyPeriod, a.WarrantyExpiryDate,
                 a.AssetConditionPurchase, md.MasterDataName as AssetConditionPurchaseName,
                 a.Notes,
-                a.IsActive, a.CreatedDate, a.CreatedBy, a.ModifiedDate, a.ModifiedBy
+                a.IsActive, a.CreatedDate, a.CreatedBy, a.ModifiedDate, a.ModifiedBy,
+                CASE 
+                    WHEN a.IsActive = 0 THEN 'Inactive'
+                    WHEN lt.AssetId IS NULL THEN 'Available'
+                    WHEN lt.TransactionType = @LoanType THEN 'On Loan'
+                    WHEN lt.TransactionType IN (@HandoverType, @TransferType) THEN 'Assigned'
+                    WHEN lt.TransactionType = @MaintenanceType THEN 'In Maintenance'
+                    ELSE 'Available'
+                END as CurrentStatus
             FROM Asset a
             LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
             LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
             LEFT JOIN MasterData md ON a.AssetConditionPurchase = md.ReferenceCode AND md.ReferenceName = 'AssetConditionPurchase' AND md.IsActive = 1
+            LEFT JOIN (
+                SELECT AssetId, TransactionType,
+                       ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
+                FROM AssetTransaction
+                WHERE Approved = 1 AND IsActive = 1 AND FromAssetTransactionId IS NULL
+            ) lt ON a.AssetId = lt.AssetId AND lt.rn = 1
             WHERE a.CategoryId = @CategoryId
             ORDER BY a.AssetCode";
 
-        return await _context.QueryAsync<AssetListView>(sql, new { CategoryId = categoryId });
+        var parameters = new
+        {
+            CategoryId = categoryId,
+            LoanType = TransactionTypeConstants.LOAN,
+            HandoverType = TransactionTypeConstants.HANDOVER,
+            TransferType = TransactionTypeConstants.TRANSFER,
+            MaintenanceType = TransactionTypeConstants.MAINTENANCE
+        };
+
+        return await _context.QueryAsync<AssetListView>(sql, parameters);
     }
 
     // ============================================================
@@ -181,13 +241,20 @@ public class AssetReps : IAssetReps
         parameters.Add("@MaintenanceType", maintenanceType);
         parameters.Add("@DisposalType", disposalType);
 
-        if (filters != null && filters.ContainsKey("isActive") && filters["isActive"] is bool isActive)
+        // Clone the caller-supplied dictionary so this method does not mutate it.
+        // (The previous implementation removed keys from the caller's dictionary as
+        // it consumed them, which made the filter bag single-use and surprising.)
+        var effectiveFilters = filters != null
+            ? new Dictionary<string, object>(filters)
+            : new Dictionary<string, object>();
+
+        if (effectiveFilters.ContainsKey("isActive") && effectiveFilters["isActive"] is bool isActive)
         {
             conditions.Add($"a.IsActive = {(isActive ? 1 : 0)}");
-            filters.Remove("isActive");
+            effectiveFilters.Remove("isActive");
         }
 
-        if (filters != null && filters.ContainsKey("status") && filters["status"] is string status)
+        if (effectiveFilters.ContainsKey("status") && effectiveFilters["status"] is string status)
         {
             switch (status)
             {
@@ -242,7 +309,7 @@ public class AssetReps : IAssetReps
                     conditions.Add("a.IsActive = 0");
                     break;
             }
-            filters.Remove("status");
+            effectiveFilters.Remove("status");
         }
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -251,21 +318,19 @@ public class AssetReps : IAssetReps
             parameters.Add("@Search", $"%{search}%");
         }
 
-        if (filters != null)
+        foreach (var filter in effectiveFilters.Where(f => f.Value != null && !string.IsNullOrEmpty(f.Value.ToString())))
         {
-            foreach (var filter in filters.Where(f => f.Value != null && !string.IsNullOrEmpty(f.Value.ToString())))
-            {
-                conditions.Add($"a.{filter.Key} = @{filter.Key}");
-                parameters.Add($"@{filter.Key}", filter.Value);
-            }
+            conditions.Add($"a.{filter.Key} = @{filter.Key}");
+            parameters.Add($"@{filter.Key}", filter.Value);
         }
 
         var whereClause = conditions.Any() ? $"WHERE {string.Join(" AND ", conditions)}" : "";
 
-        var defaultSort = "a.AssetCode";
-        var orderBy = string.IsNullOrEmpty(sortBy)
-            ? $"ORDER BY {defaultSort} ASC"
-            : $"ORDER BY a.{sortBy} {(sortDescending ? "DESC" : "ASC")}";
+        // Whitelisted sort column; anything else falls back to AssetCode.
+        var actualSort = !string.IsNullOrEmpty(sortBy) && _allowedSortColumns.Contains(sortBy)
+            ? sortBy
+            : "AssetCode";
+        var orderBy = $"ORDER BY a.{actualSort} {(sortDescending ? "DESC" : "ASC")}";
 
         var countSql = $"SELECT COUNT(*) FROM Asset a {whereClause}";
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
@@ -285,6 +350,14 @@ public class AssetReps : IAssetReps
                 a.AssetConditionPurchase, md.MasterDataName as AssetConditionPurchaseName,
                 a.Notes,
                 a.IsActive, a.CreatedDate, a.CreatedBy, a.ModifiedDate, a.ModifiedBy,
+                CASE 
+                    WHEN a.IsActive = 0 THEN 'Inactive'
+                    WHEN lt.AssetId IS NULL THEN 'Available'
+                    WHEN lt.TransactionType = @LoanType THEN 'On Loan'
+                    WHEN lt.TransactionType IN (@HandoverType, @TransferType) THEN 'Assigned'
+                    WHEN lt.TransactionType = @MaintenanceType THEN 'In Maintenance'
+                    ELSE 'Available'
+                END as CurrentStatus,
                 1 as CanEdit,
                 1 as CanDelete";
 
@@ -292,7 +365,13 @@ public class AssetReps : IAssetReps
             FROM Asset a
             LEFT JOIN Category c ON a.CategoryId = c.CategoryId AND c.IsActive = 1
             LEFT JOIN Supplier s ON a.SupplierId = s.SupplierId AND s.IsActive = 1
-            LEFT JOIN MasterData md ON a.AssetConditionPurchase = md.ReferenceCode AND md.ReferenceName = 'AssetConditionPurchase' AND md.IsActive = 1";
+            LEFT JOIN MasterData md ON a.AssetConditionPurchase = md.ReferenceCode AND md.ReferenceName = 'AssetConditionPurchase' AND md.IsActive = 1
+            LEFT JOIN (
+                SELECT AssetId, TransactionType,
+                       ROW_NUMBER() OVER (PARTITION BY AssetId ORDER BY TransactionDate DESC) as rn
+                FROM AssetTransaction
+                WHERE Approved = 1 AND IsActive = 1 AND FromAssetTransactionId IS NULL
+            ) lt ON a.AssetId = lt.AssetId AND lt.rn = 1";
 
         var dataSql = $@"
             {selectClause}

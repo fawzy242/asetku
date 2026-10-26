@@ -8,42 +8,36 @@ namespace Whitebird.App.Features.Common;
 /// <summary>
 /// Service for logging activities across the application
 /// </summary>
-public class ActivityLogService : IActivityLogService
+public class ActivityLogService : BaseService, IActivityLogService
 {
     private readonly IActivityLogReps _activityLogReps;
-    private readonly ILogger<ActivityLogService> _logger;
 
     public ActivityLogService(IActivityLogReps activityLogReps, ILogger<ActivityLogService> logger)
+        : base(logger)
     {
         _activityLogReps = activityLogReps;
-        _logger = logger;
     }
 
-    /// <inheritdoc />
     public async Task LogCreateAsync(string referenceTable, int referenceId, string description, string? createdBy = null)
     {
         await LogAsync(referenceTable, referenceId, "CREATE", description, createdBy);
     }
 
-    /// <inheritdoc />
     public async Task LogUpdateAsync(string referenceTable, int referenceId, string description, string? updatedBy = null)
     {
         await LogAsync(referenceTable, referenceId, "UPDATE", description, updatedBy);
     }
 
-    /// <inheritdoc />
     public async Task LogDeleteAsync(string referenceTable, int referenceId, string description, string? deletedBy = null)
     {
         await LogAsync(referenceTable, referenceId, "DELETE", description, deletedBy);
     }
 
-    /// <inheritdoc />
     public async Task LogSoftDeleteAsync(string referenceTable, int referenceId, string description, string? deletedBy = null)
     {
         await LogAsync(referenceTable, referenceId, "SOFT_DELETE", description, deletedBy);
     }
 
-    /// <inheritdoc />
     public async Task LogAsync(string referenceTable, int referenceId, string activityType, string description, string? createdBy = null)
     {
         try
@@ -66,14 +60,12 @@ public class ActivityLogService : IActivityLogService
         }
     }
 
-    /// <inheritdoc />
     public async Task LogErrorAsync(string referenceTable, int referenceId, string operation, Exception ex, string? createdBy = null)
     {
         var description = $"Error during {operation}: {ex.Message}";
         await LogAsync(referenceTable, referenceId, "ERROR", description, createdBy);
     }
 
-    /// <inheritdoc />
     public async Task LogAsyncSafe(string referenceTable, int referenceId, string activityType, string description, string? createdBy = null)
     {
         try
@@ -94,5 +86,24 @@ public class ActivityLogService : IActivityLogService
             _logger.LogWarning(ex, "Failed to insert activity log (safe mode) for {Table}.{Id}",
                 referenceTable, referenceId);
         }
+    }
+
+    public async Task<ServiceResult<IEnumerable<ActivityLogListViewModel>>> GetByReferenceAsync(string referenceTable, int referenceId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            if (string.IsNullOrWhiteSpace(referenceTable))
+            {
+                return ServiceResult<IEnumerable<ActivityLogListViewModel>>.BadRequest("referenceTable is required");
+            }
+
+            if (referenceId <= 0)
+            {
+                return ServiceResult<IEnumerable<ActivityLogListViewModel>>.BadRequest("referenceId must be greater than 0");
+            }
+
+            var data = await _activityLogReps.GetByReferenceAsync(referenceTable, referenceId);
+            return ServiceResult<IEnumerable<ActivityLogListViewModel>>.Success(data);
+        }, "get activity logs by reference");
     }
 }

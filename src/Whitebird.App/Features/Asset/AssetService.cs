@@ -211,7 +211,6 @@ public class AssetService : BaseService, IAssetService
                 return ServiceResult<AssetDetailView>.NotFound($"Asset with id {id} not found");
             }
 
-            // Update basic fields
             existing.AssetCode = model.AssetCode;
             existing.AssetName = model.AssetName;
             existing.CategoryId = model.CategoryId;
@@ -235,7 +234,6 @@ public class AssetService : BaseService, IAssetService
 
             await _repository.UpdateAsync(existing);
 
-            // Software Installation
             if (model.SoftwareInstallation != null)
             {
                 var existingSoftware = await _assetReps.GetSoftwareInstallationByAssetIdAsync(id);
@@ -257,9 +255,6 @@ public class AssetService : BaseService, IAssetService
                 }
             }
 
-            // ============================================================
-            // PHOTO PROFILE
-            // ============================================================
             if (!string.IsNullOrEmpty(model.PhotoFileBase64))
             {
                 var oldPhoto = await _assetReps.GetPhotoProfileByAssetIdAsync(id);
@@ -272,9 +267,6 @@ public class AssetService : BaseService, IAssetService
                 await AddPhotoProfileFromBase64Async(id, model.PhotoFileBase64, model.PhotoFileName ?? "photo.jpg");
             }
 
-            // ============================================================
-            // ATTACHMENTS
-            // ============================================================
             if (model.ReplaceAttachments || (model.AttachmentFilesBase64 != null && model.AttachmentFilesBase64.Any()))
             {
                 var existingAttachments = await _assetReps.GetAttachmentsByAssetIdAsync(id);
@@ -803,6 +795,36 @@ public class AssetService : BaseService, IAssetService
 
             return ServiceResult.Success("Attachment deleted successfully");
         }, "delete asset attachment");
+    }
+
+    public async Task<ServiceResult<FileContentDto>> GetAttachmentFileAsync(int assetId, int fileAttachmentId)
+    {
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var asset = await _assetReps.GetByIdRawAsync(assetId);
+            if (asset == null)
+            {
+                return ServiceResult<FileContentDto>.NotFound($"Asset with id {assetId} not found");
+            }
+
+            // Ownership check: the attachment row must belong to this asset. Prevents
+            // downloading arbitrary FileAttachment ids through a foreign asset route.
+            var attachments = await _assetReps.GetAttachmentsByAssetIdAsync(assetId);
+            if (!attachments.Any(a => a.FileAttachmentId == fileAttachmentId))
+            {
+                return ServiceResult<FileContentDto>.NotFound($"Attachment {fileAttachmentId} not found for asset {assetId}");
+            }
+
+            // Delegate to the internal FileAttachment service. This is a shared service
+            // — no HTTP surface of its own — used by every menu that owns attachments.
+            var downloadResult = await _fileAttachmentService.DownloadAsync(fileAttachmentId);
+            if (!downloadResult.IsSuccess || downloadResult.Data == null)
+            {
+                return ServiceResult<FileContentDto>.NotFound($"Attachment file {fileAttachmentId} could not be retrieved");
+            }
+
+            return downloadResult;
+        }, "get asset attachment file");
     }
 
     // ============================================================

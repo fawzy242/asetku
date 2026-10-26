@@ -9,7 +9,16 @@ using Whitebird.Infra.Features.FileAttachment;
 namespace Whitebird.App.Features.FileAttachment;
 
 /// <summary>
-/// Service implementation for File Attachment business logic
+/// Internal service for file attachment storage and metadata.
+///
+/// This is NOT an API module — each owning menu (Asset, Employee,
+/// AssetTransaction, User) exposes its own upload / download / delete
+/// endpoints and delegates to this service internally. Consequently:
+///
+///   * DownloadAsync returns bytes + content type + file name so callers can
+///     stream the file through their own controller endpoint.
+///   * FileUrl in FileAttachmentResponseDto always resolves to the owning
+///     menu's download endpoint (see BuildFileUrl).
 /// </summary>
 public class FileAttachmentService : BaseService, IFileAttachmentService
 {
@@ -34,7 +43,10 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         _httpContextAccessor = httpContextAccessor;
     }
 
-    /// <inheritdoc />
+    // ============================================================
+    // METADATA
+    // ============================================================
+
     public async Task<ServiceResult<FileAttachmentDetailViewModel>> GetByIdAsync(int id)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -49,7 +61,10 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         }, "get file attachment by id");
     }
 
-    /// <inheritdoc />
+    // ============================================================
+    // UPLOAD
+    // ============================================================
+
     public async Task<ServiceResult<FileAttachmentResponseDto>> UploadAsync(string referenceTable, int referenceId, FileAttachmentUploadDto model)
     {
         if (model.File == null || model.File.Length == 0)
@@ -60,7 +75,8 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         var extension = Path.GetExtension(model.File.FileName).ToLowerInvariant();
         if (!FileSizeConstants.IsAllowedAssetExtension(extension))
         {
-            return ServiceResult<FileAttachmentResponseDto>.BadRequest($"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedAssetExtensions)}");
+            return ServiceResult<FileAttachmentResponseDto>.BadRequest(
+                $"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedAssetExtensions)}");
         }
 
         if (model.File.Length > FileSizeConstants.MaxAssetAttachmentBytes)
@@ -88,7 +104,6 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         }, "upload file");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult<FileAttachmentResponseDto>> UploadBytesAsync(
         string referenceTable,
         int referenceId,
@@ -141,7 +156,6 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         }, "upload file bytes");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult<List<FileAttachmentResponseDto>>> UploadMultipleAsync(string referenceTable, int referenceId, FileAttachmentMultipleUploadViewModel model)
     {
         if (model.Files == null || model.Files.Count == 0)
@@ -182,7 +196,10 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         return ServiceResult<List<FileAttachmentResponseDto>>.Success(results, message);
     }
 
-    /// <inheritdoc />
+    // ============================================================
+    // METADATA UPDATE / DELETE
+    // ============================================================
+
     public async Task<ServiceResult<FileAttachmentResponseDto>> UpdateAsync(int id, FileAttachmentUpdateViewModel model)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -206,16 +223,16 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
                 return ServiceResult<FileAttachmentResponseDto>.Failure("Failed to update attachment metadata");
             }
 
-            var request = _httpContextAccessor.HttpContext?.Request;
+            // No reference context here (no referenceTable / referenceId), so we cannot
+            // build a valid per-menu download URL. FileUrl / PreviewUrl are left null;
+            // callers should resolve URLs via the owning menu's endpoint.
             var response = new FileAttachmentResponseDto
             {
                 FileAttachmentId = existing.FileAttachmentId,
                 FileName = existing.FileName,
                 OriginalFileName = existing.OriginalFileName,
-                FileUrl = request != null ? $"{request.Scheme}://{request.Host}/api/FileAttachment/download/{id}" : null,
-                PreviewUrl = _storageService.IsImageFile(existing.OriginalFileName) && request != null
-                    ? $"{request.Scheme}://{request.Host}/api/FileAttachment/preview/{id}"
-                    : null,
+                FileUrl = null,
+                PreviewUrl = null,
                 FileSize = existing.FileSize,
                 FileCategory = existing.FileCategory,
                 IsPrimary = existing.IsPrimary
@@ -231,7 +248,6 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         }, "update file attachment");
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -259,40 +275,46 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         }, "delete file attachment");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<byte[]>> DownloadAsync(int id)
+    // ============================================================
+    // DOWNLOAD (returns bytes + metadata; caller streams via its own endpoint)
+    // ============================================================
+
+    public async Task<ServiceResult<FileContentDto>> DownloadAsync(int id)
     {
         return await ExecuteSafelyAsync(async () =>
         {
             var attachment = await _fileAttachmentReps.GetByIdAsync(id);
             if (attachment == null)
             {
-                return ServiceResult<byte[]>.NotFound($"Attachment with id {id} not found");
+                return ServiceResult<FileContentDto>.NotFound($"Attachment with id {id} not found");
             }
 
             var fileBytes = await _storageService.ReadFileAsync(attachment.FilePath);
-            return ServiceResult<byte[]>.Success(fileBytes);
+
+            var contentType = !string.IsNullOrEmpty(attachment.FileMimeType)
+                ? attachment.FileMimeType
+                : _storageService.GetMimeType(attachment.OriginalFileName);
+
+            return ServiceResult<FileContentDto>.Success(new FileContentDto
+            {
+                Bytes = fileBytes,
+                ContentType = contentType,
+                FileName = attachment.OriginalFileName
+            });
         }, "download file");
     }
 
-    /// <inheritdoc />
-    public async Task<ServiceResult<string>> GetFileUrlAsync(int id)
+    public Task<ServiceResult<string>> GetFileUrlAsync(int id)
     {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            var attachment = await _fileAttachmentReps.GetByIdAsync(id);
-            if (attachment == null)
-            {
-                return ServiceResult<string>.NotFound($"Attachment with id {id} not found");
-            }
-
-            var request = _httpContextAccessor.HttpContext?.Request;
-            var url = request != null ? $"{request.Scheme}://{request.Host}/api/FileAttachment/download/{id}" : null;
-            return ServiceResult<string>.Success(url ?? string.Empty);
-        }, "get file url");
+        // URLs are context-dependent: the correct download route is owned by the
+        // menu the file belongs to. This context-blind overload cannot produce
+        // a valid URL under the current architecture.
+        return Task.FromResult(ServiceResult<string>.NotFound(
+            "File URLs are resolved through the owning menu's download endpoint. " +
+            "Use the FileUrl returned by the upload response, or construct the " +
+            "owning menu's endpoint (e.g. /api/Asset/{assetId}/attachments/{fileAttachmentId}/download)."));
     }
 
-    /// <inheritdoc />
     public async Task<ServiceResult<bool>> IsImageFileAsync(int id)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -313,9 +335,8 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
     // ============================================================
 
     /// <summary>
-    /// Persists a FileAttachment row and builds the response DTO.
-    /// Shared by <see cref="UploadAsync"/> and <see cref="UploadBytesAsync"/>
-    /// to keep the DB-insert + response-construction logic in one place.
+    /// Persists a FileAttachment row and builds the response DTO with a URL
+    /// that points at the owning menu's download endpoint.
     /// </summary>
     private async Task<ServiceResult<FileAttachmentResponseDto>> PersistAsync(
         string referenceTable,
@@ -349,11 +370,11 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
 
         var id = await _fileAttachmentReps.InsertAsync(entity);
 
-        var request = _httpContextAccessor.HttpContext?.Request;
-        var fileUrl = request != null ? $"{request.Scheme}://{request.Host}/api/FileAttachment/download/{id}" : null;
-        var previewUrl = _storageService.IsImageFile(originalFileName) && request != null
-            ? $"{request.Scheme}://{request.Host}/api/FileAttachment/preview/{id}"
-            : null;
+        var fileUrl = BuildFileUrl(referenceTable, referenceId, id);
+        // PreviewUrl is set to the same value only for images; browsers will render it
+        // inline via <img src> regardless of Content-Disposition. Non-image files have
+        // no meaningful preview URL in this architecture.
+        var previewUrl = fileUrl != null && _storageService.IsImageFile(originalFileName) ? fileUrl : null;
 
         var response = new FileAttachmentResponseDto
         {
@@ -374,5 +395,31 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
             _currentUserService.GetDisplayName());
 
         return ServiceResult<FileAttachmentResponseDto>.Success(response, "File uploaded successfully");
+    }
+
+    /// <summary>
+    /// Builds the per-menu download URL for a stored file based on the reference
+    /// table and reference id supplied by the owning service.
+    ///
+    /// URLs resolve to the owning menu's controller (see AssetController,
+    /// EmployeeController, AssetTransactionController); FileAttachment itself
+    /// exposes no HTTP surface.
+    /// </summary>
+    private string? BuildFileUrl(string referenceTable, int referenceId, int fileAttachmentId)
+    {
+        var request = _httpContextAccessor.HttpContext?.Request;
+        if (request == null) return null;
+        var baseUrl = $"{request.Scheme}://{request.Host}";
+
+        return referenceTable switch
+        {
+            "Asset" => $"{baseUrl}/api/Asset/{referenceId}/attachments/{fileAttachmentId}/download",
+            "AssetPhotoProfile" => $"{baseUrl}/api/Asset/{referenceId}/photo",
+            "Employee" => $"{baseUrl}/api/Employee/{referenceId}/attachments/{fileAttachmentId}/download",
+            "EmployeePhotoProfile" => $"{baseUrl}/api/Employee/{referenceId}/photo",
+            "AssetTransaction" => $"{baseUrl}/api/AssetTransaction/{referenceId}/attachments/{fileAttachmentId}/download",
+            "AssetTransactionApprove" => $"{baseUrl}/api/AssetTransaction/{referenceId}/approve-attachments/{fileAttachmentId}/download",
+            _ => null
+        };
     }
 }

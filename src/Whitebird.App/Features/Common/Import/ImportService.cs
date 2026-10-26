@@ -151,8 +151,51 @@ public abstract class ImportService<TDto, TEntity> : BaseService, IImportService
     /// <inheritdoc />
     public virtual async Task<ServiceResult<ImportResult>> ValidateOnlyAsync(Stream fileStream)
     {
-        var result = new ImportResult();
-        // FIX: Remove async keyword, return Task directly
-        return await Task.FromResult(ServiceResult<ImportResult>.Success(result));
+        // Dry run: execute the same per-row processing and uniqueness pipeline as
+        // ImportFromFileAsync, but do not persist anything. Lets the UI pre-check a
+        // file and surface errors before the operator commits to an import.
+        return await ExecuteSafelyAsync(async () =>
+        {
+            var result = new ImportResult();
+            var createdByUser = _currentUserService.GetDisplayName();
+            var cache = new Dictionary<string, object>();
+
+            var dataTable = await ExcelHelper.ReadExcelToDataTableAsync(fileStream, true);
+            result.TotalRows = dataTable.Rows.Count;
+
+            await InitializeCachesAsync(cache);
+
+            for (int i = 0; i < dataTable.Rows.Count; i++)
+            {
+                var row = dataTable.Rows[i];
+                var rowNumber = i + 2;
+
+                try
+                {
+                    var entity = await ProcessRowAsync(row, rowNumber, result, cache, createdByUser);
+
+                    if (entity == null || result.Errors.Any(e => e.RowNumber == rowNumber))
+                    {
+                        continue;
+                    }
+
+                    var isUnique = await IsEntityUniqueAsync(entity, result, rowNumber);
+                    if (!isUnique)
+                    {
+                        continue;
+                    }
+
+                    result.SuccessCount++;
+                }
+                catch (Exception ex)
+                {
+                    result.AddError(rowNumber, "General", $"Error processing row: {ex.Message}");
+                    _logger.LogError(ex, "Error validating {EntityName} import row {RowNumber}", _entityName, rowNumber);
+                }
+            }
+
+            var message = $"Validation completed: {result.SuccessCount} valid, {result.ErrorCount} errors";
+            return ServiceResult<ImportResult>.Success(result, message);
+        }, $"validate {_entityName.ToLowerInvariant()}s import");
     }
 }

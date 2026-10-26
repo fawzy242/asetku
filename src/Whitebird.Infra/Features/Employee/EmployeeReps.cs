@@ -70,11 +70,12 @@ public class EmployeeReps : IEmployeeReps
 
         if (result != null)
         {
-            // Get Photo Profile
+            // Photo profile — resolves through the Employee menu's own photo endpoint
+            // (GET /api/Employee/{id}/photo). FileAttachment has no HTTP surface of its own.
             var photoSql = @"
             SELECT TOP 1
                 fa.FileAttachmentId,
-                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl
+                '/api/Employee/' + CAST(eppa.EmployeeId AS VARCHAR) + '/photo' as FileUrl
             FROM EmployeePhotoProfileAttachment eppa
             INNER JOIN FileAttachment fa ON eppa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE eppa.EmployeeId = @EmployeeId AND eppa.IsActive = 1
@@ -86,7 +87,8 @@ public class EmployeeReps : IEmployeeReps
                 result.PhotoProfileUrl = photo.FileUrl;
             }
 
-            // Get Attachments
+            // Attachments — resolve through the Employee menu's own download endpoint
+            // (GET /api/Employee/{id}/attachments/{fileAttachmentId}/download).
             var attSql = @"
             SELECT 
                 ea.EmployeeAttachmentId,
@@ -97,7 +99,7 @@ public class EmployeeReps : IEmployeeReps
                 fa.IsPrimary,
                 ea.[Order],
                 ea.CreatedDate,
-                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl
+                '/api/Employee/' + CAST(ea.EmployeeId AS VARCHAR) + '/attachments/' + CAST(fa.FileAttachmentId AS VARCHAR) + '/download' as FileUrl
             FROM EmployeeAttachment ea
             INNER JOIN FileAttachment fa ON ea.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE ea.EmployeeId = @EmployeeId AND ea.IsActive = 1
@@ -133,7 +135,7 @@ public class EmployeeReps : IEmployeeReps
     }
 
     // ============================================================
-    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
+    // PAGINATION
     // ============================================================
 
     public async Task<PaginatedResult<EmployeeListView>> GetPagedListAsync(EmployeeGridRequest request)
@@ -263,7 +265,7 @@ public class EmployeeReps : IEmployeeReps
     }
 
     // ============================================================
-    // EMPLOYEE PHOTO PROFILE (NEW)
+    // EMPLOYEE PHOTO PROFILE
     // ============================================================
 
     public async Task<int> InsertPhotoProfileAsync(EmployeePhotoProfileAttachmentEntity entity)

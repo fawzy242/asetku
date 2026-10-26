@@ -548,10 +548,13 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
 
     public async Task<IEnumerable<EmployeeSummaryAttachmentDto>> GetAttachmentsByEmployeeIdAsync(int employeeId)
     {
+        // EmployeeSummary is a read-only view over the Employee resource. Attachment
+        // URLs resolve to the Employee menu's own download endpoint — FileAttachment
+        // has no HTTP surface of its own.
         const string sql = @"
             SELECT 
                 fa.FileAttachmentId, fa.FileName, fa.OriginalFileName, fa.FileCategory, fa.IsPrimary,
-                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl
+                '/api/Employee/' + CAST(ea.EmployeeId AS VARCHAR) + '/attachments/' + CAST(fa.FileAttachmentId AS VARCHAR) + '/download' as FileUrl
             FROM EmployeeAttachment ea
             INNER JOIN FileAttachment fa ON ea.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE ea.EmployeeId = @EmployeeId AND ea.IsActive = 1
@@ -562,11 +565,13 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
 
     public async Task<EmployeeSummaryAttachmentDto?> GetPhotoProfileByEmployeeIdAsync(int employeeId)
     {
+        // Employee photo resolves to the Employee menu's own photo endpoint
+        // (GET /api/Employee/{id}/photo).
         const string sql = @"
             SELECT TOP 1
                 fa.FileAttachmentId, fa.FileName, fa.OriginalFileName, fa.FileCategory, fa.IsPrimary,
-                '/api/FileAttachment/download/' + CAST(fa.FileAttachmentId AS VARCHAR) as FileUrl
-            FROM EmployeePhotoProfileAttachment eppa
+                '/api/Employee/' + CAST(eppa.EmployeeId AS VARCHAR) + '/photo' as FileUrl
+            FROM EmployeePhotoAttachment eppa
             INNER JOIN FileAttachment fa ON eppa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE eppa.EmployeeId = @EmployeeId AND eppa.IsActive = 1
             ORDER BY fa.IsPrimary DESC, fa.CreatedDate DESC";

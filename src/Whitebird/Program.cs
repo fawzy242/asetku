@@ -5,13 +5,16 @@ using FluentMigrator.Runner;
 using Whitebird.Api.Middleware;
 using Microsoft.AspNetCore.Authentication;
 using Whitebird.Middleware;
+using Whitebird.Infra.Configuration;
+using Whitebird.Infra.Resilience;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ========== SERVICES ==========
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddHttpContextAccessor();
+// NOTE: AddHttpContextAccessor() is called inside AddApplicationServices().
+// Do not add a second registration here.
 builder.Services.AddAuthentication("Session").AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>("Session", null);
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddApplicationServices();
@@ -88,12 +91,28 @@ builder.Logging.AddDebug();
 
 var app = builder.Build();
 
-// ========== DATABASE MIGRATION ==========
-using (var scope = app.Services.CreateScope())
+// ========== CONFIGURATION VALIDATION ==========
+// Fail fast on invalid configuration (missing connection string, missing storage path,
+// default credentials, etc.). Previously the ConfigurationValidator helper existed but
+// was never invoked.
+var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
+if (!ConfigurationValidator.Validate(app.Configuration, startupLogger))
 {
+    throw new InvalidOperationException("Application configuration is invalid. See logs for details.");
+}
+
+// ========== DATABASE MIGRATION ==========
+// Wrapped in a Polly retry policy so transient SQL errors during startup do not take
+// the app down. The policy is only invoked here; queries are not retried at runtime
+// (TransactionScope semantics are not retry-friendly).
+var migrationRetryPolicy = PollyRetryPolicy.CreateRetryPolicy(startupLogger, maxRetries: 3, retryDelaySeconds: 2);
+await migrationRetryPolicy.ExecuteAsync(() =>
+{
+    using var scope = app.Services.CreateScope();
     var runner = scope.ServiceProvider.GetRequiredService<IMigrationRunner>();
     if (runner.HasMigrationsToApplyUp()) runner.MigrateUp();
-}
+    return Task.CompletedTask;
+});
 
 // ========== MIDDLEWARE ==========
 app.UseCors();
@@ -102,12 +121,21 @@ app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseMiddleware<AuthRateLimitingMiddleware>();
 
 // ========== SWAGGER ==========
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+// Swagger is exposed only when Swagger:Enabled is true. Development defaults to true;
+// Production config explicitly sets it to false. This prevents accidental API-doc
+// exposure on public deployments.
+var swaggerEnabled = app.Configuration.GetValue<bool?>("Swagger:Enabled")
+                     ?? app.Environment.IsDevelopment();
+
+if (swaggerEnabled)
 {
-    c.SwaggerEndpoint("/swagger/v2/swagger.json", "Asetku API V2");
-    c.RoutePrefix = "swagger";
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v2/swagger.json", "Asetku API V2");
+        c.RoutePrefix = "swagger";
+    });
+}
 
 // ========== STATIC FILES & SPA ==========
 app.UseDefaultFiles();

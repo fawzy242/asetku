@@ -67,6 +67,9 @@ public class AuthService : BaseService, IAuthService
 
             await _activityLogService.LogAsync("User", user.UserId, "LOGIN", $"User '{user.Username}' logged in successfully", user.Username);
 
+            // Users has no RoleId column; role comes from UserRoles/Roles via the repo.
+            var (roleId, roleName) = await _userReps.GetUserRoleAsync(user.UserId);
+
             var response = new LoginResponse
             {
                 SessionToken = sessionToken,
@@ -76,7 +79,8 @@ public class AuthService : BaseService, IAuthService
                     UserId = user.UserId,
                     Email = user.Email,
                     FullName = user.FullName,
-                    RoleId = user.RoleId,
+                    RoleId = roleId,
+                    RoleName = roleName,
                     Username = user.Username,
                     ProfilePhotoUrl = null
                 }

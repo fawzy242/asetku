@@ -32,12 +32,17 @@ public interface IAssetTransactionService
 
     /// <summary>
     /// Update transaction with attachments (base64) - for standard grid data.
+    /// Approval / completion flags are NOT accepted from this DTO; they are
+    /// managed exclusively through the dedicated endpoints (BulkApproved/
+    /// BulkPending/BulkRejected/Complete/Uncomplete/document-action).
     /// After the update, the backend re-evaluates the transaction Completed state.
     /// </summary>
     Task<ServiceResult<AssetTransactionDetailView>> UpdateWithAttachmentsAsync(int id, AssetTransactionUpdateFormDto model);
 
     /// <summary>
     /// Update transaction approval with attachments (base64) - for pending approval grid data.
+    /// Accepts Approved / ApprovedBy (approval-flow endpoint), but NOT Completed /
+    /// CompletedBy — completion is derived from the document state.
     /// After the update, the backend re-evaluates the transaction Completed state.
     /// </summary>
     Task<ServiceResult<AssetTransactionDetailView>> UpdateApprovalWithAttachmentsAsync(int id, AssetTransactionUpdateApprovalFormDto model);
@@ -104,6 +109,18 @@ public interface IAssetTransactionService
 
     Task<ServiceResult<IEnumerable<AssetTransactionAttachmentView>>> GetAttachmentsAsync(int transactionId);
     Task<ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>> GetApproveAttachmentsAsync(int transactionId);
+
+    /// <summary>
+    /// Streams the raw bytes of an attachment belonging to the given transaction.
+    /// Verifies ownership before delegating to the internal FileAttachmentService.
+    /// </summary>
+    Task<ServiceResult<FileContentDto>> GetAttachmentFileAsync(int transactionId, int fileAttachmentId);
+
+    /// <summary>
+    /// Streams the raw bytes of an approve attachment belonging to the given transaction.
+    /// Verifies ownership before delegating to the internal FileAttachmentService.
+    /// </summary>
+    Task<ServiceResult<FileContentDto>> GetApproveAttachmentFileAsync(int transactionId, int fileAttachmentId);
 
     // ============================================================
     // APPROVAL DOCUMENT WORKFLOW

@@ -138,17 +138,16 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
         }
         catch (Exception ex) when (ex.Message.Contains("OUTPUT") || ex.Message.Contains("trigger"))
         {
-            _logger.LogWarning(ex, "OUTPUT clause failed for {TableName}, using fallback INSERT + IDENTITY/SCOPE_IDENTITY", _tableName);
+            _logger.LogWarning(ex, "OUTPUT clause failed for {TableName}, falling back to INSERT + SCOPE_IDENTITY", _tableName);
 
-            var insertQuery = $"INSERT INTO {_tableName} ({columns}) VALUES ({values});";
-            await _context.Connection.ExecuteAsync(insertQuery, parameters, transaction);
+            // Fallback for tables with triggers: OUTPUT INSERTED is not supported when a trigger
+            // is present. SCOPE_IDENTITY() must be executed in the same batch as the INSERT so it
+            // returns the identity produced by this statement.
+            var insertQuery = $@"
+                INSERT INTO {_tableName} ({columns}) VALUES ({values});
+                SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
-            var getLastIdQuery = $@"
-                SELECT CAST(current_value AS INT) 
-                FROM sys.sequences 
-                WHERE name = 'Seq_{_tableName}Id'";
-
-            var newId = await _context.Connection.ExecuteScalarAsync<object>(getLastIdQuery, transaction: transaction);
+            var newId = await _context.Connection.ExecuteScalarAsync<object>(insertQuery, parameters, transaction);
 
             var idProperty = typeof(T).GetProperty(_primaryKeyName);
             if (idProperty != null && newId != null && newId != DBNull.Value)

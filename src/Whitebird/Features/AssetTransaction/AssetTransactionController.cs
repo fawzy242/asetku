@@ -405,7 +405,7 @@ public class AssetTransactionController : ControllerBase
     }
 
     // ============================================================
-    // ATTACHMENTS (standalone retrieval)
+    // ATTACHMENTS (standalone retrieval + download)
     // ============================================================
 
     [HttpGet("{id:int}/attachments")]
@@ -415,6 +415,34 @@ public class AssetTransactionController : ControllerBase
     [HttpGet("{id:int}/approve-attachments")]
     public async Task<IActionResult> GetApproveAttachments(int id)
         => this.HandleResult(await _transactionService.GetApproveAttachmentsAsync(id));
+
+    /// <summary>
+    /// Download a specific attachment belonging to this transaction.
+    /// Streams the raw bytes with the correct Content-Type and original file name.
+    /// </summary>
+    [HttpGet("{id:int}/attachments/{fileAttachmentId:int}/download")]
+    public async Task<IActionResult> DownloadAttachment(int id, int fileAttachmentId)
+    {
+        var result = await _transactionService.GetAttachmentFileAsync(id, fileAttachmentId);
+        if (!result.IsSuccess || result.Data == null)
+            return this.HandleResult(result);
+
+        return File(result.Data.Bytes, result.Data.ContentType, result.Data.FileName);
+    }
+
+    /// <summary>
+    /// Download a specific approve attachment belonging to this transaction.
+    /// Streams the raw bytes with the correct Content-Type and original file name.
+    /// </summary>
+    [HttpGet("{id:int}/approve-attachments/{fileAttachmentId:int}/download")]
+    public async Task<IActionResult> DownloadApproveAttachment(int id, int fileAttachmentId)
+    {
+        var result = await _transactionService.GetApproveAttachmentFileAsync(id, fileAttachmentId);
+        if (!result.IsSuccess || result.Data == null)
+            return this.HandleResult(result);
+
+        return File(result.Data.Bytes, result.Data.ContentType, result.Data.FileName);
+    }
 
     // ============================================================
     // APPROVAL DOCUMENT WORKFLOW
