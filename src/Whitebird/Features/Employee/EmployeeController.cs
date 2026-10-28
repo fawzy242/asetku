@@ -117,12 +117,25 @@ public class EmployeeController : ControllerBase
     // ============================================================
     // IMPORT
     // ============================================================
+    //
+    // Pre-H7 this endpoint accepted any upload and let EPPlus throw on a
+    // non-Excel file, producing a 400 with the raw EPPlus exception text
+    // (information disclosure + inconsistent UX versus the Asset and
+    // AssetTransaction import endpoints). The extension guard below matches
+    // the pattern used in AssetController.Import and
+    // AssetTransactionController.Import.
 
     [HttpPost("import")]
     public async Task<IActionResult> Import(IFormFile file)
     {
         if (file == null || file.Length == 0)
             return BadRequest("No file provided");
+
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (extension != ".xlsx" && extension != ".xls")
+        {
+            return BadRequest("Unsupported file format. Please upload Excel file (.xlsx or .xls).");
+        }
 
         using var stream = file.OpenReadStream();
         var result = await _employeeImportService.ImportFromFileAsync(stream);
@@ -143,9 +156,6 @@ public class EmployeeController : ControllerBase
     // PHOTO PROFILE
     // ============================================================
 
-    /// <summary>
-    /// Get employee profile photo. Returns the image bytes with the correct Content-Type.
-    /// </summary>
     [HttpGet("{id:int}/photo")]
     public async Task<IActionResult> GetPhoto(int id)
     {
@@ -156,9 +166,6 @@ public class EmployeeController : ControllerBase
         return File(result.Data.Bytes, result.Data.ContentType);
     }
 
-    /// <summary>
-    /// Upload (or replace) the employee profile photo.
-    /// </summary>
     [HttpPost("{id:int}/photo")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadPhoto(int id, IFormFile file)
@@ -169,9 +176,6 @@ public class EmployeeController : ControllerBase
         return this.HandleResult(await _employeeService.UploadPhotoAsync(id, file));
     }
 
-    /// <summary>
-    /// Delete the employee profile photo (soft-delete).
-    /// </summary>
     [HttpDelete("{id:int}/photo")]
     public async Task<IActionResult> DeletePhoto(int id)
         => this.HandleResult(await _employeeService.DeletePhotoAsync(id));
@@ -180,16 +184,10 @@ public class EmployeeController : ControllerBase
     // ATTACHMENTS
     // ============================================================
 
-    /// <summary>
-    /// Get employee attachment list.
-    /// </summary>
     [HttpGet("{id:int}/attachments")]
     public async Task<IActionResult> GetAttachments(int id)
         => this.HandleResult(await _employeeService.GetAttachmentsAsync(id));
 
-    /// <summary>
-    /// Upload a standalone attachment (does not require sending the whole employee).
-    /// </summary>
     [HttpPost("{id:int}/attachments")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadAttachment(int id, [FromForm] AttachmentUploadDto model)
@@ -203,17 +201,10 @@ public class EmployeeController : ControllerBase
         return this.HandleResult(await _employeeService.UploadAttachmentAsync(id, model));
     }
 
-    /// <summary>
-    /// Delete a single attachment (soft-delete).
-    /// </summary>
     [HttpDelete("{id:int}/attachments/{fileAttachmentId:int}")]
     public async Task<IActionResult> DeleteAttachment(int id, int fileAttachmentId)
         => this.HandleResult(await _employeeService.DeleteAttachmentAsync(id, fileAttachmentId));
 
-    /// <summary>
-    /// Download a specific attachment belonging to this employee.
-    /// Streams the raw bytes with the correct Content-Type and original file name.
-    /// </summary>
     [HttpGet("{id:int}/attachments/{fileAttachmentId:int}/download")]
     public async Task<IActionResult> DownloadAttachment(int id, int fileAttachmentId)
     {

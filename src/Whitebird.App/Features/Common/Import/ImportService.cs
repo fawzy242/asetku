@@ -4,23 +4,18 @@ using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.App.Features.Common.Import;
 
-/// <summary>
-/// Base abstract class for import services providing common Excel/TXT import functionality
-/// </summary>
-/// <typeparam name="TDto">The DTO type for the import data</typeparam>
-/// <typeparam name="TEntity">The entity type to be created from the DTO</typeparam>
 public abstract class ImportService<TDto, TEntity> : BaseService, IImportService<TDto, TEntity>
     where TDto : class, new()
     where TEntity : class
 {
-    protected readonly IGenericRepository<TEntity> _repository;
+    protected readonly ICommonReps _repository;
     protected readonly ICurrentUserService _currentUserService;
     protected readonly IActivityLogService _activityLogService;
     protected readonly string _tableName;
     protected readonly string _entityName;
 
     protected ImportService(
-        IGenericRepository<TEntity> repository,
+        ICommonReps repository,
         ICurrentUserService currentUserService,
         IActivityLogService activityLogService,
         ILogger logger,
@@ -35,40 +30,13 @@ public abstract class ImportService<TDto, TEntity> : BaseService, IImportService
         _entityName = entityName;
     }
 
-    /// <summary>
-    /// Gets the column template for Excel generation
-    /// </summary>
     protected abstract Dictionary<string, string> GetTemplateColumns();
-
-    /// <summary>
-    /// Processes a single row from the import file and returns the entity
-    /// </summary>
-    protected abstract Task<TEntity?> ProcessRowAsync(
-        DataRow row,
-        int rowNumber,
-        ImportResult result,
-        Dictionary<string, object> cache,
-        string createdBy);
-
-    /// <summary>
-    /// Validates entity uniqueness before insertion
-    /// </summary>
+    protected abstract Task<TEntity?> ProcessRowAsync(DataRow row, int rowNumber, ImportResult result, Dictionary<string, object> cache, string createdBy);
     protected abstract Task<bool> IsEntityUniqueAsync(TEntity entity, ImportResult result, int rowNumber);
-
-    /// <summary>
-    /// Gets the entity identifier for logging
-    /// </summary>
     protected abstract string GetEntityIdentifier(TEntity entity);
 
-    /// <summary>
-    /// Initializes caches before processing rows
-    /// </summary>
-    protected virtual Task InitializeCachesAsync(Dictionary<string, object> cache)
-    {
-        return Task.CompletedTask;
-    }
+    protected virtual Task InitializeCachesAsync(Dictionary<string, object> cache) => Task.CompletedTask;
 
-    /// <inheritdoc />
     public virtual async Task<ServiceResult<ImportResult>> ImportFromFileAsync(Stream fileStream, string? createdBy = null)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -83,6 +51,8 @@ public abstract class ImportService<TDto, TEntity> : BaseService, IImportService
 
             await InitializeCachesAsync(cache);
 
+            // Do NOT increment result.SuccessCount inside the loop. SuccessCount must
+            // reflect how many rows were actually persisted.
             for (int i = 0; i < dataTable.Rows.Count; i++)
             {
                 var row = dataTable.Rows[i];
@@ -91,20 +61,11 @@ public abstract class ImportService<TDto, TEntity> : BaseService, IImportService
                 try
                 {
                     var entity = await ProcessRowAsync(row, rowNumber, result, cache, createdByUser);
+                    if (entity == null || result.Errors.Any(e => e.RowNumber == rowNumber)) continue;
 
-                    if (entity == null || result.Errors.Any(e => e.RowNumber == rowNumber))
-                    {
-                        continue;
-                    }
-
-                    var isUnique = await IsEntityUniqueAsync(entity, result, rowNumber);
-                    if (!isUnique)
-                    {
-                        continue;
-                    }
+                    if (!await IsEntityUniqueAsync(entity, result, rowNumber)) continue;
 
                     entitiesToInsert.Add(entity);
-                    result.SuccessCount++;
                 }
                 catch (Exception ex)
                 {
@@ -115,13 +76,25 @@ public abstract class ImportService<TDto, TEntity> : BaseService, IImportService
 
             if (entitiesToInsert.Any())
             {
-                await _repository.BulkInsertOptimizedAsync(entitiesToInsert);
+                var insertedCount = await _repository.BulkInsertOptimizedAsync(entitiesToInsert);
+                result.SuccessCount = insertedCount;
+
+                if (insertedCount < entitiesToInsert.Count)
+                {
+                    var missing = entitiesToInsert.Count - insertedCount;
+                    result.Errors.Add(new ImportError
+                    {
+                        RowNumber = -1,
+                        Column = "BulkInsert",
+                        Message = $"{missing} row(s) were not persisted (bulk insert returned {insertedCount} of {entitiesToInsert.Count})"
+                    });
+                    result.ErrorCount += missing;
+                }
 
                 foreach (var entity in entitiesToInsert)
                 {
                     await _activityLogService.LogCreateAsync(
-                        _tableName,
-                        0,
+                        _tableName, 0,
                         $"{_entityName} '{GetEntityIdentifier(entity)}' imported successfully",
                         createdByUser);
                 }
@@ -135,7 +108,6 @@ public abstract class ImportService<TDto, TEntity> : BaseService, IImportService
         });
     }
 
-    /// <inheritdoc />
     public virtual async Task<ServiceResult<byte[]>> GenerateTemplateAsync()
     {
         return await ExecuteSafelyAsync(() =>
@@ -148,12 +120,8 @@ public abstract class ImportService<TDto, TEntity> : BaseService, IImportService
         }, $"generate {_entityName.ToLowerInvariant()} import template");
     }
 
-    /// <inheritdoc />
     public virtual async Task<ServiceResult<ImportResult>> ValidateOnlyAsync(Stream fileStream)
     {
-        // Dry run: execute the same per-row processing and uniqueness pipeline as
-        // ImportFromFileAsync, but do not persist anything. Lets the UI pre-check a
-        // file and surface errors before the operator commits to an import.
         return await ExecuteSafelyAsync(async () =>
         {
             var result = new ImportResult();
@@ -173,17 +141,9 @@ public abstract class ImportService<TDto, TEntity> : BaseService, IImportService
                 try
                 {
                     var entity = await ProcessRowAsync(row, rowNumber, result, cache, createdByUser);
+                    if (entity == null || result.Errors.Any(e => e.RowNumber == rowNumber)) continue;
 
-                    if (entity == null || result.Errors.Any(e => e.RowNumber == rowNumber))
-                    {
-                        continue;
-                    }
-
-                    var isUnique = await IsEntityUniqueAsync(entity, result, rowNumber);
-                    if (!isUnique)
-                    {
-                        continue;
-                    }
+                    if (!await IsEntityUniqueAsync(entity, result, rowNumber)) continue;
 
                     result.SuccessCount++;
                 }

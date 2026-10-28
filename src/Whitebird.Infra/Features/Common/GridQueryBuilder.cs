@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using Dapper;
 
 namespace Whitebird.Infra.Features.Common;
@@ -9,11 +10,42 @@ namespace Whitebird.Infra.Features.Common;
 public static class GridQueryBuilder
 {
     /// <summary>
-    /// Build WHERE clause from filter conditions
+    /// Upper bound for a client-supplied page size. Prevents DOS via
+    /// <c>pageSize=int.MaxValue</c> on grid endpoints while still allowing
+    /// legitimate large pages (e.g. 100, 200, 500 rows).
+    ///
+    /// <see cref="int.MaxValue"/> is treated as an explicit "unbounded"
+    /// sentinel for internal callers (e.g. <c>AssetTransactionService.GetAllAsync</c>)
+    /// and bypasses the clamp. No external client should ever pass it.
     /// </summary>
-    /// <param name="conditions">List of SQL conditions</param>
-    /// <param name="parameters">DynamicParameters to add parameter values</param>
-    /// <returns>WHERE clause string</returns>
+    public const int MaxPageSize = 500;
+
+    /// <summary>
+    /// Fallback page size for callers that pass <c>pageSize &lt;= 0</c>.
+    /// </summary>
+    public const int DefaultPageSize = 10;
+
+    /// <summary>
+    /// Clamps a client-supplied page size to <see cref="MaxPageSize"/>. Preserves
+    /// the <see cref="int.MaxValue"/> "unbounded" sentinel used internally.
+    /// </summary>
+    public static int ClampPageSize(int pageSize)
+    {
+        if (pageSize <= 0) return DefaultPageSize;
+        if (pageSize == int.MaxValue) return int.MaxValue;
+        return Math.Min(pageSize, MaxPageSize);
+    }
+
+    /// <summary>
+    /// Pattern for a safe sort-column reference: "ColumnName" or "Table.ColumnName".
+    /// Blocks SQL injection through SortBy (semicolons, comments, quotes, function
+    /// calls, commas, subqueries) while still allowing any legitimate column reference
+    /// the caller may pass. Case-insensitive.
+    /// </summary>
+    private static readonly Regex _safeSortColumnPattern = new(
+        @"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     public static string BuildWhereClause(List<string> conditions, DynamicParameters parameters)
     {
         if (conditions == null || conditions.Count == 0)
@@ -25,40 +57,59 @@ public static class GridQueryBuilder
     }
 
     /// <summary>
-    /// Build ORDER BY clause
+    /// Build ORDER BY clause. Sanitises user-supplied <paramref name="sortBy"/>
+    /// against a strict column-reference pattern; anything unsafe falls back to
+    /// <paramref name="defaultSortBy"/>.
     /// </summary>
-    /// <param name="sortBy">Column name to sort by</param>
-    /// <param name="sortDescending">True for descending, false for ascending</param>
-    /// <param name="defaultSortBy">Default column name if sortBy is null or empty</param>
-    /// <param name="defaultDescending">Default sort direction if sortBy is null or empty</param>
-    /// <returns>ORDER BY clause string</returns>
     public static string BuildOrderByClause(string? sortBy, bool sortDescending, string defaultSortBy, bool defaultDescending = true)
     {
         var actualSortBy = string.IsNullOrEmpty(sortBy) ? defaultSortBy : sortBy;
         var actualDescending = string.IsNullOrEmpty(sortBy) ? defaultDescending : sortDescending;
 
+        if (!IsSafeSortColumn(actualSortBy))
+        {
+            actualSortBy = defaultSortBy;
+            actualDescending = defaultDescending;
+        }
+
         return $"ORDER BY {actualSortBy} {(actualDescending ? "DESC" : "ASC")}";
     }
 
     /// <summary>
-    /// Build pagination clause (OFFSET FETCH)
+    /// Returns true when <paramref name="column"/> is a plain column reference
+    /// (<c>ColumnName</c> or <c>Table.ColumnName</c>).
     /// </summary>
-    /// <param name="page">Page number (1-indexed)</param>
-    /// <param name="pageSize">Number of items per page</param>
-    /// <param name="parameters">DynamicParameters to add offset and pageSize</param>
-    /// <returns>OFFSET FETCH clause string</returns>
+    public static bool IsSafeSortColumn(string? column)
+    {
+        if (string.IsNullOrWhiteSpace(column)) return false;
+        return _safeSortColumnPattern.IsMatch(column);
+    }
+
+    /// <summary>
+    /// Build pagination clause (OFFSET FETCH). Page size is clamped via
+    /// <see cref="ClampPageSize"/>; the <see cref="int.MaxValue"/> sentinel is
+    /// preserved so internal "get all" callers keep working.
+    /// </summary>
     public static string BuildPaginationClause(int page, int pageSize, DynamicParameters parameters)
     {
-        var offset = (page - 1) * pageSize;
-        parameters.Add("@Offset", offset);
-        parameters.Add("@PageSize", pageSize);
+        var effectivePageSize = ClampPageSize(pageSize);
+        var effectivePage = page <= 0 ? 1 : page;
+
+        if (effectivePageSize == int.MaxValue)
+        {
+            // Sentinel: unbounded fetch (used by AssetTransactionService.GetAllAsync).
+            parameters.Add("@Offset", 0);
+            parameters.Add("@PageSize", int.MaxValue);
+        }
+        else
+        {
+            parameters.Add("@Offset", (effectivePage - 1) * effectivePageSize);
+            parameters.Add("@PageSize", effectivePageSize);
+        }
 
         return "OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
     }
 
-    /// <summary>
-    /// Build complete paginated query with WHERE, ORDER BY, and OFFSET FETCH
-    /// </summary>
     public static (string DataQuery, string CountQuery, DynamicParameters Parameters) BuildPaginatedQuery(
         string selectClause,
         string fromClause,
@@ -92,9 +143,6 @@ public static class GridQueryBuilder
         return (dataQuery, countQuery, parameters);
     }
 
-    /// <summary>
-    /// Add search condition with multiple columns
-    /// </summary>
     public static void AddSearchCondition(List<string> conditions, DynamicParameters parameters, string? search, string[] columns)
     {
         if (string.IsNullOrWhiteSpace(search))
@@ -108,9 +156,6 @@ public static class GridQueryBuilder
         parameters.Add("@Search", searchPattern);
     }
 
-    /// <summary>
-    /// Add equals filter condition
-    /// </summary>
     public static void AddEqualsFilter<T>(List<string> conditions, DynamicParameters parameters, string column, T? value)
     {
         if (value == null || (value is string str && string.IsNullOrWhiteSpace(str)))
@@ -123,9 +168,6 @@ public static class GridQueryBuilder
         parameters.Add(paramName, value);
     }
 
-    /// <summary>
-    /// Add date range filter condition
-    /// </summary>
     public static void AddDateRangeFilter(List<string> conditions, DynamicParameters parameters, string column, DateTime? from, DateTime? to)
     {
         if (from.HasValue)
@@ -143,9 +185,6 @@ public static class GridQueryBuilder
         }
     }
 
-    /// <summary>
-    /// Add IN filter condition
-    /// </summary>
     public static void AddInFilter<T>(List<string> conditions, DynamicParameters parameters, string column, IEnumerable<T>? values)
     {
         if (values == null || !values.Any())

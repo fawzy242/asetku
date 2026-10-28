@@ -7,18 +7,10 @@ using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.Asset;
 
-/// <summary>
-/// Repository implementation for Asset operations using Dapper
-/// (PURE INFRASTRUCTURE — NO APPLICATION DEPENDENCIES)
-/// </summary>
 public class AssetReps : IAssetReps
 {
     private readonly DapperContext _context;
 
-    // Whitelist of Asset-table columns accepted for ORDER BY. Anything else falls
-    // back to AssetCode. The SQL builder prefixes columns with "a." so only Asset
-    // columns are valid; this guard prevents SQL injection through SortBy and
-    // guards against client-supplied values that would break the query.
     private static readonly HashSet<string> _allowedSortColumns = new(StringComparer.OrdinalIgnoreCase)
     {
         "AssetId", "AssetCode", "AssetName", "CategoryId", "SupplierId",
@@ -59,6 +51,36 @@ public class AssetReps : IAssetReps
     }
 
     // ============================================================
+    // HARD-DELETE FK GUARDS
+    // ============================================================
+    // No IsActive filter on any of these: FKs fire for any dependent row
+    // regardless of whether the row has been soft-deleted.
+
+    public async Task<int> GetAssetTransactionCountAsync(int assetId)
+    {
+        const string sql = "SELECT COUNT(*) FROM AssetTransaction WHERE AssetId = @AssetId";
+        return await _context.ExecuteScalarAsync<int>(sql, new { AssetId = assetId });
+    }
+
+    public async Task<int> GetScheduleHandoverCountAsync(int assetId)
+    {
+        const string sql = "SELECT COUNT(*) FROM ScheduleHandover WHERE AssetId = @AssetId";
+        return await _context.ExecuteScalarAsync<int>(sql, new { AssetId = assetId });
+    }
+
+    public async Task<int> GetScheduleReturnCountAsync(int assetId)
+    {
+        const string sql = "SELECT COUNT(*) FROM ScheduleReturn WHERE AssetId = @AssetId";
+        return await _context.ExecuteScalarAsync<int>(sql, new { AssetId = assetId });
+    }
+
+    public async Task<int> GetScheduleMaintenanceCountAsync(int assetId)
+    {
+        const string sql = "SELECT COUNT(*) FROM ScheduleMaintenance WHERE AssetId = @AssetId";
+        return await _context.ExecuteScalarAsync<int>(sql, new { AssetId = assetId });
+    }
+
+    // ============================================================
     // GET METHODS - return View
     // ============================================================
 
@@ -86,8 +108,6 @@ public class AssetReps : IAssetReps
 
         if (result != null)
         {
-            // Photo profile — resolves through the Asset menu's own photo endpoint
-            // (GET /api/Asset/{id}/photo). FileAttachment itself has no HTTP surface.
             var photoSql = @"
             SELECT TOP 1
                 fa.FileAttachmentId,
@@ -103,8 +123,6 @@ public class AssetReps : IAssetReps
                 result.PhotoProfileUrl = photo.FileUrl;
             }
 
-            // Attachments — resolve through the Asset menu's own download endpoint
-            // (GET /api/Asset/{id}/attachments/{fileAttachmentId}/download).
             var attSql = @"
             SELECT 
                 aa.AssetAttachmentId,
@@ -241,9 +259,6 @@ public class AssetReps : IAssetReps
         parameters.Add("@MaintenanceType", maintenanceType);
         parameters.Add("@DisposalType", disposalType);
 
-        // Clone the caller-supplied dictionary so this method does not mutate it.
-        // (The previous implementation removed keys from the caller's dictionary as
-        // it consumed them, which made the filter bag single-use and surprising.)
         var effectiveFilters = filters != null
             ? new Dictionary<string, object>(filters)
             : new Dictionary<string, object>();
@@ -326,7 +341,6 @@ public class AssetReps : IAssetReps
 
         var whereClause = conditions.Any() ? $"WHERE {string.Join(" AND ", conditions)}" : "";
 
-        // Whitelisted sort column; anything else falls back to AssetCode.
         var actualSort = !string.IsNullOrEmpty(sortBy) && _allowedSortColumns.Contains(sortBy)
             ? sortBy
             : "AssetCode";

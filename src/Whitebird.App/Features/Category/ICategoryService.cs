@@ -1,43 +1,18 @@
-using Whitebird.Domain.Features.Category;
-using Whitebird.Domain.Features.Common;
 using Whitebird.App.Features.Common;
-using Whitebird.Infra.Features.Common;
+using Whitebird.Domain.Features.Category;
 
 namespace Whitebird.App.Features.Category;
 
 /// <summary>
-/// Service interface for Category business logic
+/// Service interface for Category business logic.
+///
+/// Inherits the standard CRUD surface from <see cref="ICommonService{TDetailView, TListView, TGridRequest, TCreateVM, TUpdateVM}"/>
+/// and the dropdown surface from <see cref="IDropdownProvider{TDropdownView}"/>.
+/// No Category-specific methods are declared here — the standard set covers the
+/// menu exactly.
 /// </summary>
-public interface ICategoryService
+public interface ICategoryService :
+    ICommonService<CategoryDetailView, CategoryListView, CategoryGridRequest, CategoryCreateViewModel, CategoryUpdateViewModel>,
+    IDropdownProvider<CategoryDropdownView>
 {
-    // ============================================================
-    // BASIC CRUD
-    // ============================================================
-
-    Task<ServiceResult<CategoryDetailView>> GetByIdAsync(int id);
-    Task<ServiceResult<IEnumerable<CategoryListView>>> GetAllAsync();
-    Task<ServiceResult<CategoryDetailView>> CreateAsync(CategoryCreateViewModel model);
-    Task<ServiceResult<CategoryDetailView>> UpdateAsync(int id, CategoryUpdateViewModel model);
-    Task<ServiceResult> DeleteAsync(int id);
-    Task<ServiceResult> SoftDeleteAsync(int id);
-
-    // ============================================================
-    // GRID
-    // ============================================================
-
-    Task<ServiceResult<PaginatedResult<CategoryListView>>> GetGridDataAsync(CategoryGridRequest request);
-
-    // ============================================================
-    // DROPDOWN
-    // ============================================================
-
-    Task<ServiceResult<IEnumerable<CategoryDropdownView>>> GetDropdownListAsync();
-
-    // ============================================================
-    // BULK OPERATIONS
-    // ============================================================
-
-    Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request);
-    Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request);
-    Task<ServiceResult<int>> BulkDeleteAsync(BulkDeleteRequest request);
 }

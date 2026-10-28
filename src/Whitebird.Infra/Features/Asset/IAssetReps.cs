@@ -15,6 +15,26 @@ public interface IAssetReps
     Task<AssetEntity?> GetByIdRawAsync(int assetId);
     Task<bool> IsAssetCodeExistsAsync(string assetCode, int? excludeAssetId = null);
 
+    /// <summary>
+    /// Counts AssetTransaction rows pointing at this asset. Hard-delete FK guard.
+    /// </summary>
+    Task<int> GetAssetTransactionCountAsync(int assetId);
+
+    /// <summary>
+    /// Counts ScheduleHandover rows pointing at this asset. Hard-delete FK guard.
+    /// </summary>
+    Task<int> GetScheduleHandoverCountAsync(int assetId);
+
+    /// <summary>
+    /// Counts ScheduleReturn rows pointing at this asset. Hard-delete FK guard.
+    /// </summary>
+    Task<int> GetScheduleReturnCountAsync(int assetId);
+
+    /// <summary>
+    /// Counts ScheduleMaintenance rows pointing at this asset. Hard-delete FK guard.
+    /// </summary>
+    Task<int> GetScheduleMaintenanceCountAsync(int assetId);
+
     // ============================================================
     // DETAIL VIEW METHODS
     // ============================================================

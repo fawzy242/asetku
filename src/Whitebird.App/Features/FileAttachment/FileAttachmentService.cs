@@ -19,6 +19,15 @@ namespace Whitebird.App.Features.FileAttachment;
 ///     stream the file through their own controller endpoint.
 ///   * FileUrl in FileAttachmentResponseDto always resolves to the owning
 ///     menu's download endpoint (see BuildFileUrl).
+///
+/// Storage-layer extension validation (H6 fix):
+///   This service is the shared storage primitive for BOTH profile photos and
+///   menu attachments. Callers validate the correct profile-specific rules
+///   (FileUploadValidator.ValidateProfilePhoto / ValidateAssetAttachment) at
+///   the boundary before reaching here. The service performs a defence-in-depth
+///   check that accepts any extension from either allow-list (asset-attachment
+///   OR profile-photo). The previous version hardcoded the asset-attachment list
+///   and wrongly rejected .webp profile photos.
 /// </summary>
 public class FileAttachmentService : BaseService, IFileAttachmentService
 {
@@ -27,6 +36,12 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
     private readonly IHttpContextAccessor _httpContextAccessor;
+
+    // Union of the two allow-lists, computed once per process. Kept as a static
+    // readonly field so the rejection message construction is allocation-free on
+    // the success path.
+    private static readonly string[] _allowedUploadExtensions = BuildAllowedUploadExtensions();
+    private static readonly string _allowedUploadExtensionsDisplay = string.Join(", ", _allowedUploadExtensions);
 
     public FileAttachmentService(
         IFileAttachmentReps fileAttachmentReps,
@@ -73,10 +88,10 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         }
 
         var extension = Path.GetExtension(model.File.FileName).ToLowerInvariant();
-        if (!FileSizeConstants.IsAllowedAssetExtension(extension))
+        if (!IsAllowedUploadExtension(extension))
         {
             return ServiceResult<FileAttachmentResponseDto>.BadRequest(
-                $"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedAssetExtensions)}");
+                $"File type '{extension}' is not allowed. Allowed: {_allowedUploadExtensionsDisplay}");
         }
 
         if (model.File.Length > FileSizeConstants.MaxAssetAttachmentBytes)
@@ -124,10 +139,10 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         }
 
         var extension = Path.GetExtension(originalFileName).ToLowerInvariant();
-        if (!FileSizeConstants.IsAllowedAssetExtension(extension))
+        if (!IsAllowedUploadExtension(extension))
         {
             return ServiceResult<FileAttachmentResponseDto>.BadRequest(
-                $"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedAssetExtensions)}");
+                $"File type '{extension}' is not allowed. Allowed: {_allowedUploadExtensionsDisplay}");
         }
 
         if (bytes.Length > FileSizeConstants.MaxAssetAttachmentBytes)
@@ -276,7 +291,7 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
     }
 
     // ============================================================
-    // DOWNLOAD (returns bytes + metadata; caller streams via its own endpoint)
+    // DOWNLOAD
     // ============================================================
 
     public async Task<ServiceResult<FileContentDto>> DownloadAsync(int id)
@@ -331,13 +346,34 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
     }
 
     // ============================================================
-    // PRIVATE HELPERS
+    // EXTENSION HELPERS (H6 fix)
     // ============================================================
 
     /// <summary>
-    /// Persists a FileAttachment row and builds the response DTO with a URL
-    /// that points at the owning menu's download endpoint.
+    /// Union of the asset-attachment and profile-photo allow-lists. The storage
+    /// layer is a shared primitive; callers validate the flow-specific rule
+    /// upstream (FileUploadValidator), and this service accepts any extension
+    /// that either list permits. Previously this hardcoded the asset-attachment
+    /// list and wrongly rejected .webp profile photos.
     /// </summary>
+    private static string[] BuildAllowedUploadExtensions()
+    {
+        var union = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var ext in FileSizeConstants.AllowedAssetExtensions) union.Add(ext);
+        foreach (var ext in FileSizeConstants.AllowedProfilePhotoExtensions) union.Add(ext);
+        return union.ToArray();
+    }
+
+    private static bool IsAllowedUploadExtension(string extension)
+    {
+        if (string.IsNullOrEmpty(extension)) return false;
+        return Array.IndexOf(_allowedUploadExtensions, extension) >= 0;
+    }
+
+    // ============================================================
+    // PRIVATE HELPERS
+    // ============================================================
+
     private async Task<ServiceResult<FileAttachmentResponseDto>> PersistAsync(
         string referenceTable,
         int referenceId,
@@ -371,9 +407,6 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         var id = await _fileAttachmentReps.InsertAsync(entity);
 
         var fileUrl = BuildFileUrl(referenceTable, referenceId, id);
-        // PreviewUrl is set to the same value only for images; browsers will render it
-        // inline via <img src> regardless of Content-Disposition. Non-image files have
-        // no meaningful preview URL in this architecture.
         var previewUrl = fileUrl != null && _storageService.IsImageFile(originalFileName) ? fileUrl : null;
 
         var response = new FileAttachmentResponseDto
@@ -397,14 +430,6 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         return ServiceResult<FileAttachmentResponseDto>.Success(response, "File uploaded successfully");
     }
 
-    /// <summary>
-    /// Builds the per-menu download URL for a stored file based on the reference
-    /// table and reference id supplied by the owning service.
-    ///
-    /// URLs resolve to the owning menu's controller (see AssetController,
-    /// EmployeeController, AssetTransactionController); FileAttachment itself
-    /// exposes no HTTP surface.
-    /// </summary>
     private string? BuildFileUrl(string referenceTable, int referenceId, int fileAttachmentId)
     {
         var request = _httpContextAccessor.HttpContext?.Request;

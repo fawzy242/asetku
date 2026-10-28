@@ -14,6 +14,8 @@ using Whitebird.Infra.Features.MasterData;
 using Whitebird.Infra.Features.Department;
 using Whitebird.Infra.Features.Office;
 using Whitebird.Infra.Features.FileAttachment;
+using Whitebird.Infra.Features.Roles;
+using Whitebird.Infra.Features.UserRoles;
 using Whitebird.Migrations.Features.ActivityLog;
 using Whitebird.Infra.Features.User;
 using Whitebird.Infra.Features.Schedule;
@@ -40,8 +42,9 @@ public static class InfrastructureServiceRegistration
                 .ScanIn(typeof(CreateTableActivityLog).Assembly).For.Migrations())
             .AddLogging(lb => lb.AddFluentMigratorConsole());
 
-        // ========== GENERIC REPOSITORY ==========
-        services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+        // ========== GENERIC REPOSITORY PRIMITIVES ==========
+        // Single abstraction replacing the previous IGenericRepository<T> + GenericRepository<T> pair.
+        services.AddScoped<ICommonReps, CommonReps>();
 
         // ========== SPECIFIC REPOSITORIES ==========
         // Core modules
@@ -60,6 +63,8 @@ public static class InfrastructureServiceRegistration
         services.AddScoped<IOfficeReps, OfficeReps>();
         services.AddScoped<IFileAttachmentReps, FileAttachmentReps>();
         services.AddScoped<IUserReps, UserReps>();
+        services.AddScoped<IRolesReps, RolesReps>();
+        services.AddScoped<IUserRolesReps, UserRolesReps>();
         services.AddScoped<IScheduleHandoverReps, ScheduleHandoverReps>();
         services.AddScoped<IScheduleReturnReps, ScheduleReturnReps>();
         services.AddScoped<IScheduleMaintenanceReps, ScheduleMaintenanceReps>();

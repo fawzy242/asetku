@@ -67,12 +67,21 @@ public class CategoryReps : ICategoryReps
         return await _context.ExecuteScalarAsync<int>(sql, new { CategoryId = categoryId });
     }
 
+    public async Task<int> GetAssetCountAsync(int categoryId)
+    {
+        // No IsActive filter: the FK on Asset.CategoryId fires for any Asset row,
+        // active or inactive, so hard-delete must be refused in either case.
+        const string sql = "SELECT COUNT(*) FROM Asset WHERE CategoryId = @CategoryId";
+        return await _context.ExecuteScalarAsync<int>(sql, new { CategoryId = categoryId });
+    }
+
     // ============================================================
     // GET METHODS - return View
     // ============================================================
 
     public async Task<CategoryDetailView?> GetDetailByIdAsync(int categoryId)
     {
+        // No IsActive filter: detail-by-id must return the record in any state.
         const string sql = @"
             SELECT 
                 c.CategoryId, c.CategoryCode, c.CategoryName, c.Description,
@@ -81,7 +90,7 @@ public class CategoryReps : ICategoryReps
                 c.IsActive, c.CreatedDate, c.CreatedBy, c.ModifiedDate, c.ModifiedBy
             FROM Category c
             LEFT JOIN Category p ON c.ParentCategoryId = p.CategoryId
-            WHERE c.CategoryId = @CategoryId AND c.IsActive = 1";
+            WHERE c.CategoryId = @CategoryId";
 
         return await _context.QueryFirstOrDefaultAsync<CategoryDetailView>(sql, new { CategoryId = categoryId });
     }
@@ -103,7 +112,7 @@ public class CategoryReps : ICategoryReps
     }
 
     // ============================================================
-    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
+    // PAGINATION
     // ============================================================
 
     public async Task<PaginatedResult<CategoryListView>> GetPagedListAsync(CategoryGridRequest request)

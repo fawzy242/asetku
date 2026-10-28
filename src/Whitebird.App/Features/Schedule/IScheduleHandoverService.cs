@@ -1,42 +1,19 @@
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.Schedule;
-using Whitebird.Domain.Features.Common;
-using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.App.Features.Schedule;
 
-public interface IScheduleHandoverService
+/// <summary>
+/// Service interface for Schedule Handover.
+///
+/// Standard CRUD / grid / bulk operations are inherited from
+/// <see cref="ICommonService{TDetailView, TListView, TGridRequest, TCreateVM, TUpdateVM}"/>.
+/// Only Handover-specific custom operations are declared here.
+/// </summary>
+public interface IScheduleHandoverService :
+    ICommonService<ScheduleHandoverView, ScheduleHandoverListView, ScheduleGridRequest, ScheduleHandoverCreateDto, ScheduleHandoverUpdateDto>
 {
-    // ============================================================
-    // BASIC CRUD
-    // ============================================================
-
-    Task<ServiceResult<ScheduleHandoverView>> GetByIdAsync(int id);
-    Task<ServiceResult<IEnumerable<ScheduleHandoverListView>>> GetAllAsync();
     Task<ServiceResult<IEnumerable<ScheduleHandoverListView>>> GetByAssetIdAsync(int assetId);
     Task<ServiceResult<IEnumerable<ScheduleHandoverListView>>> GetByEmployeeIdAsync(int employeeId);
-    Task<ServiceResult<ScheduleHandoverView>> CreateAsync(ScheduleHandoverCreateDto dto);
-    Task<ServiceResult<ScheduleHandoverView>> UpdateAsync(int id, ScheduleHandoverUpdateDto dto);
-    Task<ServiceResult> DeleteAsync(int id);
-    Task<ServiceResult> SoftDeleteAsync(int id);
-
-    // ============================================================
-    // GRID - Using GridRequest
-    // ============================================================
-
-    Task<ServiceResult<PaginatedResult<ScheduleHandoverListView>>> GetGridDataAsync(ScheduleGridRequest request);
-
-    // ============================================================
-    // BULK OPERATIONS
-    // ============================================================
-
-    Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request);
-    Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request);
-    Task<ServiceResult<int>> BulkDeleteAsync(BulkDeleteRequest request);
-
-    // ============================================================
-    // GENERATE
-    // ============================================================
-
     Task<ServiceResult<ScheduleGenerateResultDto>> GenerateAsync(ScheduleHandoverGenerateDto dto);
 }

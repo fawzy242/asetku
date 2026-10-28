@@ -1,5 +1,4 @@
 using System.Data;
-using Mapster;
 using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Common.Import;
 using Whitebird.App.Features.Common;
@@ -36,7 +35,7 @@ public class EmployeeImportService : ImportService<EmployeeImportDto, EmployeeEn
     };
 
     public EmployeeImportService(
-        IGenericRepository<EmployeeEntity> repository,
+        ICommonReps repository,
         IEmployeeReps employeeReps,
         IDepartmentReps departmentReps,
         IOfficeReps officeReps,
@@ -57,46 +56,28 @@ public class EmployeeImportService : ImportService<EmployeeImportDto, EmployeeEn
     protected override async Task InitializeCachesAsync(Dictionary<string, object> cache)
     {
         var departmentDict = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var allDepartments = await _departmentReps.GetAllListViewAsync();
-        foreach (var d in allDepartments)
-        {
-            departmentDict[d.DepartmentName] = d.DepartmentId;
-        }
+        foreach (var d in await _departmentReps.GetAllListViewAsync()) departmentDict[d.DepartmentName] = d.DepartmentId;
         cache["Departments"] = departmentDict;
 
         var officeDict = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var allOffices = await _officeReps.GetAllListViewAsync();
-        foreach (var o in allOffices)
-        {
-            officeDict[o.OfficeName] = o.OfficeId;
-        }
+        foreach (var o in await _officeReps.GetAllListViewAsync()) officeDict[o.OfficeName] = o.OfficeId;
         cache["Offices"] = officeDict;
 
         var positionCache = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var positions = await _masterDataService.GetEmployeePositionsAsync();
         if (positions.IsSuccess && positions.Data != null)
-        {
-            foreach (var p in positions.Data)
-                positionCache[p.Name] = p.Code;
-        }
+            foreach (var p in positions.Data) positionCache[p.Name] = p.Code;
         cache["Positions"] = positionCache;
 
         var statusCache = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var statuses = await _masterDataService.GetEmployeeStatusesAsync();
         if (statuses.IsSuccess && statuses.Data != null)
-        {
-            foreach (var s in statuses.Data)
-                statusCache[s.Name] = s.Code;
-        }
+            foreach (var s in statuses.Data) statusCache[s.Name] = s.Code;
         cache["Statuses"] = statusCache;
     }
 
     protected override async Task<EmployeeEntity?> ProcessRowAsync(
-        DataRow row,
-        int rowNumber,
-        ImportResult result,
-        Dictionary<string, object> cache,
-        string createdBy)
+        DataRow row, int rowNumber, ImportResult result, Dictionary<string, object> cache, string createdBy)
     {
         var departmentDict = cache["Departments"] as Dictionary<string, int>;
         var officeDict = cache["Offices"] as Dictionary<string, int>;
@@ -115,17 +96,8 @@ public class EmployeeImportService : ImportService<EmployeeImportDto, EmployeeEn
         var joinDate = ExcelDataReader.GetNullableDateTime(row, "JoinDate");
         var resignDate = ExcelDataReader.GetNullableDateTime(row, "ResignDate");
 
-        if (string.IsNullOrWhiteSpace(employeeCode))
-        {
-            result.AddError(rowNumber, "EmployeeCode", "EmployeeCode is required");
-            return null;
-        }
-
-        if (string.IsNullOrWhiteSpace(fullName))
-        {
-            result.AddError(rowNumber, "FullName", "FullName is required");
-            return null;
-        }
+        if (string.IsNullOrWhiteSpace(employeeCode)) { result.AddError(rowNumber, "EmployeeCode", "EmployeeCode is required"); return null; }
+        if (string.IsNullOrWhiteSpace(fullName)) { result.AddError(rowNumber, "FullName", "FullName is required"); return null; }
 
         if (await _employeeReps.IsEmployeeCodeExistsAsync(employeeCode))
         {
@@ -138,8 +110,7 @@ public class EmployeeImportService : ImportService<EmployeeImportDto, EmployeeEn
         {
             if (!departmentDict.TryGetValue(departmentName, out int deptId))
                 result.AddError(rowNumber, "DepartmentName", $"Department '{departmentName}' not found", departmentName);
-            else
-                departmentId = deptId;
+            else departmentId = deptId;
         }
 
         int? officeId = null;
@@ -147,8 +118,7 @@ public class EmployeeImportService : ImportService<EmployeeImportDto, EmployeeEn
         {
             if (!officeDict.TryGetValue(officeName, out int offId))
                 result.AddError(rowNumber, "OfficeName", $"Office '{officeName}' not found", officeName);
-            else
-                officeId = offId;
+            else officeId = offId;
         }
 
         int? positionId = null;
@@ -156,8 +126,7 @@ public class EmployeeImportService : ImportService<EmployeeImportDto, EmployeeEn
         {
             if (!positionCache.TryGetValue(positionName, out int posId))
                 result.AddError(rowNumber, "PositionName", $"Invalid Position '{positionName}'", positionName);
-            else
-                positionId = posId;
+            else positionId = posId;
         }
 
         int? statusId = null;
@@ -165,8 +134,7 @@ public class EmployeeImportService : ImportService<EmployeeImportDto, EmployeeEn
         {
             if (!statusCache.TryGetValue(employmentStatusName, out int statId))
                 result.AddError(rowNumber, "EmploymentStatusName", $"Invalid EmploymentStatus '{employmentStatusName}'", employmentStatusName);
-            else
-                statusId = statId;
+            else statusId = statId;
         }
 
         if (!string.IsNullOrWhiteSpace(email) && !ExcelDataReader.IsValidEmail(email))
@@ -175,8 +143,7 @@ public class EmployeeImportService : ImportService<EmployeeImportDto, EmployeeEn
             return null;
         }
 
-        if (result.Errors.Any(e => e.RowNumber == rowNumber))
-            return null;
+        if (result.Errors.Any(e => e.RowNumber == rowNumber)) return null;
 
         return new EmployeeEntity
         {
@@ -199,8 +166,7 @@ public class EmployeeImportService : ImportService<EmployeeImportDto, EmployeeEn
 
     protected override async Task<bool> IsEntityUniqueAsync(EmployeeEntity entity, ImportResult result, int rowNumber)
     {
-        var exists = await _employeeReps.IsEmployeeCodeExistsAsync(entity.EmployeeCode);
-        if (exists)
+        if (await _employeeReps.IsEmployeeCodeExistsAsync(entity.EmployeeCode))
         {
             result.AddError(rowNumber, "EmployeeCode", $"EmployeeCode '{entity.EmployeeCode}' already exists", entity.EmployeeCode);
             return false;

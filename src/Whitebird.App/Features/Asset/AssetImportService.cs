@@ -44,7 +44,7 @@ public class AssetImportService : ImportService<AssetImportDto, AssetEntity>
     };
 
     public AssetImportService(
-        IGenericRepository<AssetEntity> repository,
+        ICommonReps repository,
         IAssetReps assetReps,
         ICategoryReps categoryReps,
         ISupplierReps supplierReps,
@@ -67,37 +67,22 @@ public class AssetImportService : ImportService<AssetImportDto, AssetEntity>
     protected override async Task InitializeCachesAsync(Dictionary<string, object> cache)
     {
         var categoryDict = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var allCategories = await _categoryReps.GetAllListViewAsync();
-        foreach (var c in allCategories)
-        {
-            categoryDict[c.CategoryName] = c.CategoryId;
-        }
+        foreach (var c in await _categoryReps.GetAllListViewAsync()) categoryDict[c.CategoryName] = c.CategoryId;
         cache["Categories"] = categoryDict;
 
         var supplierDict = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var allSuppliers = await _supplierReps.GetAllListViewAsync();
-        foreach (var s in allSuppliers)
-        {
-            supplierDict[s.SupplierName] = s.SupplierId;
-        }
+        foreach (var s in await _supplierReps.GetAllListViewAsync()) supplierDict[s.SupplierName] = s.SupplierId;
         cache["Suppliers"] = supplierDict;
 
         var conditionPurchaseCache = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var conditionPurchases = await _masterDataService.GetAssetConditionPurchasesAsync();
         if (conditionPurchases.IsSuccess && conditionPurchases.Data != null)
-        {
-            foreach (var c in conditionPurchases.Data)
-                conditionPurchaseCache[c.Name] = c.Code;
-        }
+            foreach (var c in conditionPurchases.Data) conditionPurchaseCache[c.Name] = c.Code;
         cache["ConditionPurchases"] = conditionPurchaseCache;
     }
 
     protected override async Task<AssetEntity?> ProcessRowAsync(
-        DataRow row,
-        int rowNumber,
-        ImportResult result,
-        Dictionary<string, object> cache,
-        string createdBy)
+        DataRow row, int rowNumber, ImportResult result, Dictionary<string, object> cache, string createdBy)
     {
         var dto = new AssetImportDto
         {
@@ -121,18 +106,8 @@ public class AssetImportService : ImportService<AssetImportDto, AssetEntity>
             PurchaseDate = ExcelDataReader.GetNullableDateTime(row, "PurchaseDate")
         };
 
-        if (string.IsNullOrWhiteSpace(dto.AssetCode))
-        {
-            result.AddError(rowNumber, "AssetCode", "AssetCode is required");
-            return null;
-        }
-
-        if (string.IsNullOrWhiteSpace(dto.AssetName))
-        {
-            result.AddError(rowNumber, "AssetName", "AssetName is required");
-            return null;
-        }
-
+        if (string.IsNullOrWhiteSpace(dto.AssetCode)) { result.AddError(rowNumber, "AssetCode", "AssetCode is required"); return null; }
+        if (string.IsNullOrWhiteSpace(dto.AssetName)) { result.AddError(rowNumber, "AssetName", "AssetName is required"); return null; }
         if (await _assetReps.IsAssetCodeExistsAsync(dto.AssetCode))
         {
             result.AddError(rowNumber, "AssetCode", $"AssetCode '{dto.AssetCode}' already exists", dto.AssetCode);
@@ -146,35 +121,25 @@ public class AssetImportService : ImportService<AssetImportDto, AssetEntity>
         int? categoryId = null;
         if (dto.CategoryId > 0)
         {
-            var category = await _categoryReps.GetByIdRawAsync(dto.CategoryId);
-            if (category == null)
+            if (await _categoryReps.GetByIdRawAsync(dto.CategoryId) == null)
                 result.AddError(rowNumber, "CategoryId", $"Category with id {dto.CategoryId} not found", dto.CategoryId.ToString());
-            else
-                categoryId = dto.CategoryId;
+            else categoryId = dto.CategoryId;
         }
         else if (!string.IsNullOrWhiteSpace(dto.CategoryName) && categoryDict != null)
         {
-            if (categoryDict.TryGetValue(dto.CategoryName, out int catId))
-                categoryId = catId;
-            else
-                result.AddError(rowNumber, "CategoryName", $"Category '{dto.CategoryName}' not found", dto.CategoryName);
+            if (categoryDict.TryGetValue(dto.CategoryName, out int cid)) categoryId = cid;
+            else result.AddError(rowNumber, "CategoryName", $"Category '{dto.CategoryName}' not found", dto.CategoryName);
         }
-        else
-        {
-            result.AddError(rowNumber, "Category", "Either CategoryId or CategoryName is required");
-            return null;
-        }
+        else { result.AddError(rowNumber, "Category", "Either CategoryId or CategoryName is required"); return null; }
 
-        if (!categoryId.HasValue)
-            return null;
+        if (!categoryId.HasValue) return null;
 
         int? supplierId = null;
         if (!string.IsNullOrWhiteSpace(dto.SupplierName) && supplierDict != null)
         {
-            if (!supplierDict.TryGetValue(dto.SupplierName, out int supId))
+            if (!supplierDict.TryGetValue(dto.SupplierName, out int sid))
                 result.AddWarning(rowNumber, "SupplierName", $"Supplier '{dto.SupplierName}' not found", dto.SupplierName);
-            else
-                supplierId = supId;
+            else supplierId = sid;
         }
 
         int? conditionPurchaseId = null;
@@ -182,12 +147,10 @@ public class AssetImportService : ImportService<AssetImportDto, AssetEntity>
         {
             if (!conditionPurchaseCache.TryGetValue(dto.AssetConditionPurchase, out int condId))
                 result.AddError(rowNumber, "AssetConditionPurchase", $"Invalid AssetConditionPurchase '{dto.AssetConditionPurchase}'. Valid: New, Second Hand", dto.AssetConditionPurchase);
-            else
-                conditionPurchaseId = condId;
+            else conditionPurchaseId = condId;
         }
 
-        if (result.Errors.Any(e => e.RowNumber == rowNumber))
-            return null;
+        if (result.Errors.Any(e => e.RowNumber == rowNumber)) return null;
 
         return new AssetEntity
         {
@@ -216,8 +179,7 @@ public class AssetImportService : ImportService<AssetImportDto, AssetEntity>
 
     protected override async Task<bool> IsEntityUniqueAsync(AssetEntity entity, ImportResult result, int rowNumber)
     {
-        var exists = await _assetReps.IsAssetCodeExistsAsync(entity.AssetCode);
-        if (exists)
+        if (await _assetReps.IsAssetCodeExistsAsync(entity.AssetCode))
         {
             result.AddError(rowNumber, "AssetCode", $"AssetCode '{entity.AssetCode}' already exists", entity.AssetCode);
             return false;

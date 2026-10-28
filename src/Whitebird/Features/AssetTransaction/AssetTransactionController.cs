@@ -376,6 +376,8 @@ public class AssetTransactionController : ControllerBase
     // ============================================================
     // IMPORT
     // ============================================================
+    //
+    // H9: EPPlus only reads .xlsx. Narrowing the gate to .xlsx to match reality.
 
     [HttpPost("import")]
     public async Task<IActionResult> Import(IFormFile file)
@@ -384,9 +386,9 @@ public class AssetTransactionController : ControllerBase
             return BadRequest("No file provided");
 
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (extension != ".xlsx" && extension != ".xls")
+        if (extension != ".xlsx")
         {
-            return BadRequest("Unsupported file format. Please upload Excel file (.xlsx or .xls).");
+            return BadRequest("Unsupported file format. Please upload an Excel Workbook (.xlsx).");
         }
 
         using var stream = file.OpenReadStream();
@@ -416,10 +418,6 @@ public class AssetTransactionController : ControllerBase
     public async Task<IActionResult> GetApproveAttachments(int id)
         => this.HandleResult(await _transactionService.GetApproveAttachmentsAsync(id));
 
-    /// <summary>
-    /// Download a specific attachment belonging to this transaction.
-    /// Streams the raw bytes with the correct Content-Type and original file name.
-    /// </summary>
     [HttpGet("{id:int}/attachments/{fileAttachmentId:int}/download")]
     public async Task<IActionResult> DownloadAttachment(int id, int fileAttachmentId)
     {
@@ -430,10 +428,6 @@ public class AssetTransactionController : ControllerBase
         return File(result.Data.Bytes, result.Data.ContentType, result.Data.FileName);
     }
 
-    /// <summary>
-    /// Download a specific approve attachment belonging to this transaction.
-    /// Streams the raw bytes with the correct Content-Type and original file name.
-    /// </summary>
     [HttpGet("{id:int}/approve-attachments/{fileAttachmentId:int}/download")]
     public async Task<IActionResult> DownloadApproveAttachment(int id, int fileAttachmentId)
     {
@@ -448,19 +442,10 @@ public class AssetTransactionController : ControllerBase
     // APPROVAL DOCUMENT WORKFLOW
     // ============================================================
 
-    /// <summary>
-    /// Returns the required approval-document checklist for the transaction.
-    /// Derived from MasterData.ReferenceName = 'ApproveDocumentType' joined with
-    /// the transaction's current approval attachments.
-    /// </summary>
     [HttpGet("{id:int}/required-documents")]
     public async Task<IActionResult> GetRequiredDocuments(int id)
         => this.HandleResult(await _transactionService.GetRequiredDocumentsAsync(id));
 
-    /// <summary>
-    /// Apply an action (approve / revision) to a single approval document.
-    /// The transaction's Completed flag is automatically re-evaluated afterward.
-    /// </summary>
     [HttpPost("{id:int}/approve-attachments/{attachmentId:int}/action")]
     public async Task<IActionResult> SetApproveAttachmentAction(
         int id, int attachmentId, [FromBody] ApproveAttachmentActionDto dto)

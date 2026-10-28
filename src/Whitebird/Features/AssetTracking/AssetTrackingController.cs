@@ -53,12 +53,21 @@ public class AssetTrackingController : ControllerBase
         => this.HandleResult(await _assetTrackingService.GetTimelineAsync(assetId));
 
     // ============================================================
-    // SCHEDULE STATS - Using GridRequest
+    // SCHEDULE STATS — route assetId is the source of truth
     // ============================================================
+    //
+    // Pre-H7 the {assetId:int} route parameter was declared but ignored; the
+    // service read request.AssetId from the querystring. A client that put the
+    // ID only in the route received 0 rows silently. The route is now bound
+    // into the request before delegation, matching GetTrackingDetail /
+    // GetTimeline / GetTransactionTypeStats / GetPhoto / GetAttachments.
 
     [HttpGet("{assetId:int}/schedule-stats")]
-    public async Task<IActionResult> GetScheduleStats([FromQuery] AssetTrackingGridRequest request)
-        => this.HandleResult(await _assetTrackingService.GetScheduleStatsAsync(request));
+    public async Task<IActionResult> GetScheduleStats(int assetId, [FromQuery] AssetTrackingGridRequest request)
+    {
+        request.AssetId = assetId;
+        return this.HandleResult(await _assetTrackingService.GetScheduleStatsAsync(request));
+    }
 
     // ============================================================
     // TRANSACTION TYPE STATS
@@ -69,12 +78,18 @@ public class AssetTrackingController : ControllerBase
         => this.HandleResult(await _assetTrackingService.GetTransactionTypeStatsAsync(assetId));
 
     // ============================================================
-    // EMPLOYEE HISTORY - Using GridRequest
+    // EMPLOYEE HISTORY — route assetId is the source of truth
     // ============================================================
+    //
+    // Same fix as schedule-stats above: the route parameter is bound into the
+    // request so a route-only client no longer receives 0 rows.
 
     [HttpGet("{assetId:int}/employee-history")]
-    public async Task<IActionResult> GetEmployeeHistory([FromQuery] AssetTrackingGridRequest request)
-        => this.HandleResult(await _assetTrackingService.GetEmployeeHistoryAsync(request));
+    public async Task<IActionResult> GetEmployeeHistory(int assetId, [FromQuery] AssetTrackingGridRequest request)
+    {
+        request.AssetId = assetId;
+        return this.HandleResult(await _assetTrackingService.GetEmployeeHistoryAsync(request));
+    }
 
     // ============================================================
     // PHOTO & ATTACHMENTS (delegated to AssetService)

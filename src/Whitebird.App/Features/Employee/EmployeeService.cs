@@ -16,12 +16,9 @@ using Whitebird.Infra.Features.Employee;
 
 namespace Whitebird.App.Features.Employee;
 
-/// <summary>
-/// Service implementation for Employee business logic
-/// </summary>
 public class EmployeeService : BaseService, IEmployeeService
 {
-    private readonly IGenericRepository<EmployeeEntity> _repository;
+    private readonly ICommonReps _repository;
     private readonly IEmployeeReps _employeeReps;
     private readonly IOfficeService _officeService;
     private readonly IDepartmentService _departmentService;
@@ -32,7 +29,7 @@ public class EmployeeService : BaseService, IEmployeeService
     private readonly IActivityLogService _activityLogService;
 
     public EmployeeService(
-        IGenericRepository<EmployeeEntity> repository,
+        ICommonReps repository,
         IEmployeeReps employeeReps,
         IOfficeService officeService,
         IDepartmentService departmentService,
@@ -64,9 +61,7 @@ public class EmployeeService : BaseService, IEmployeeService
         {
             var employee = await _employeeReps.GetDetailByIdAsync(id);
             if (employee == null)
-            {
                 return ServiceResult<EmployeeDetailView>.NotFound($"Employee with id {id} not found");
-            }
             return ServiceResult<EmployeeDetailView>.Success(employee);
         }, "get employee by id");
     }
@@ -83,55 +78,39 @@ public class EmployeeService : BaseService, IEmployeeService
     public async Task<ServiceResult<EmployeeDetailView>> CreateAsync(EmployeeCreateViewModel model)
     {
         if (string.IsNullOrWhiteSpace(model.FullName))
-        {
             return ServiceResult<EmployeeDetailView>.BadRequest("Full name is required");
-        }
-
         if (string.IsNullOrWhiteSpace(model.EmployeeCode))
-        {
             return ServiceResult<EmployeeDetailView>.BadRequest("Employee code is required");
-        }
 
-        var codeExists = await _employeeReps.IsEmployeeCodeExistsAsync(model.EmployeeCode);
-        if (codeExists)
-        {
+        if (await _employeeReps.IsEmployeeCodeExistsAsync(model.EmployeeCode))
             return ServiceResult<EmployeeDetailView>.Conflict($"Employee code '{model.EmployeeCode}' already exists");
-        }
 
         if (model.DepartmentId.HasValue && model.DepartmentId.Value > 0)
         {
             var department = await _departmentService.GetByIdAsync(model.DepartmentId.Value);
             if (!department.IsSuccess || department.Data == null)
-            {
                 return ServiceResult<EmployeeDetailView>.BadRequest($"Department with id {model.DepartmentId} does not exist");
-            }
         }
 
         if (model.OfficeId.HasValue && model.OfficeId.Value > 0)
         {
             var office = await _officeService.GetByIdAsync(model.OfficeId.Value);
             if (!office.IsSuccess || office.Data == null)
-            {
                 return ServiceResult<EmployeeDetailView>.BadRequest($"Office with id {model.OfficeId} does not exist");
-            }
         }
 
         if (model.Position.HasValue)
         {
-            var positionExists = await _masterDataService.GetValueAsync("Position", model.Position.Value);
-            if (!positionExists.IsSuccess || positionExists.Data == null)
-            {
+            var p = await _masterDataService.GetValueAsync("Position", model.Position.Value);
+            if (!p.IsSuccess || p.Data == null)
                 return ServiceResult<EmployeeDetailView>.BadRequest($"Invalid Position value: {model.Position}");
-            }
         }
 
         if (model.EmploymentStatus.HasValue)
         {
-            var statusExists = await _masterDataService.GetValueAsync("EmployeeStatus", model.EmploymentStatus.Value);
-            if (!statusExists.IsSuccess || statusExists.Data == null)
-            {
+            var s = await _masterDataService.GetValueAsync("EmployeeStatus", model.EmploymentStatus.Value);
+            if (!s.IsSuccess || s.Data == null)
                 return ServiceResult<EmployeeDetailView>.BadRequest($"Invalid EmploymentStatus value: {model.EmploymentStatus}");
-            }
         }
 
         return await ExecuteWithTransactionAsync(async () =>
@@ -146,9 +125,7 @@ public class EmployeeService : BaseService, IEmployeeService
 
             if (created != null)
             {
-                await _activityLogService.LogCreateAsync(
-                    TableNames.Employee,
-                    created.EmployeeId,
+                await _activityLogService.LogCreateAsync(TableNames.Employee, created.EmployeeId,
                     $"Employee '{created.EmployeeCode}' - '{created.FullName}' created successfully",
                     _currentUserService.GetDisplayName());
             }
@@ -161,19 +138,50 @@ public class EmployeeService : BaseService, IEmployeeService
 
     public async Task<ServiceResult<EmployeeDetailView>> UpdateAsync(int id, EmployeeUpdateFormDto model)
     {
-        var codeExists = await _employeeReps.IsEmployeeCodeExistsAsync(model.EmployeeCode, id);
-        if (codeExists)
-        {
+        if (string.IsNullOrWhiteSpace(model.EmployeeCode))
+            return ServiceResult<EmployeeDetailView>.BadRequest("Employee code is required");
+        if (string.IsNullOrWhiteSpace(model.FullName))
+            return ServiceResult<EmployeeDetailView>.BadRequest("Full name is required");
+
+        if (await _employeeReps.IsEmployeeCodeExistsAsync(model.EmployeeCode, id))
             return ServiceResult<EmployeeDetailView>.Conflict($"Employee code '{model.EmployeeCode}' already exists");
+
+        if (!string.IsNullOrWhiteSpace(model.Email) &&
+            !System.Text.RegularExpressions.Regex.IsMatch(model.Email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+            return ServiceResult<EmployeeDetailView>.BadRequest($"Invalid email format: {model.Email}");
+
+        if (model.DepartmentId.HasValue && model.DepartmentId.Value > 0)
+        {
+            var d = await _departmentService.GetByIdAsync(model.DepartmentId.Value);
+            if (!d.IsSuccess || d.Data == null)
+                return ServiceResult<EmployeeDetailView>.BadRequest($"Department with id {model.DepartmentId} does not exist");
+        }
+
+        if (model.OfficeId.HasValue && model.OfficeId.Value > 0)
+        {
+            var o = await _officeService.GetByIdAsync(model.OfficeId.Value);
+            if (!o.IsSuccess || o.Data == null)
+                return ServiceResult<EmployeeDetailView>.BadRequest($"Office with id {model.OfficeId} does not exist");
+        }
+
+        if (model.Position.HasValue)
+        {
+            var p = await _masterDataService.GetValueAsync("Position", model.Position.Value);
+            if (!p.IsSuccess || p.Data == null)
+                return ServiceResult<EmployeeDetailView>.BadRequest($"Invalid Position value: {model.Position}");
+        }
+
+        if (model.EmploymentStatus.HasValue)
+        {
+            var s = await _masterDataService.GetValueAsync("EmployeeStatus", model.EmploymentStatus.Value);
+            if (!s.IsSuccess || s.Data == null)
+                return ServiceResult<EmployeeDetailView>.BadRequest($"Invalid EmploymentStatus value: {model.EmploymentStatus}");
         }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _employeeReps.GetByIdRawAsync(id);
-            if (existing == null)
-            {
-                return ServiceResult<EmployeeDetailView>.NotFound($"Employee with id {id} not found");
-            }
+            if (existing == null) return ServiceResult<EmployeeDetailView>.NotFound($"Employee with id {id} not found");
 
             existing.EmployeeCode = model.EmployeeCode;
             existing.FullName = model.FullName;
@@ -200,7 +208,6 @@ public class EmployeeService : BaseService, IEmployeeService
                     await _employeeReps.DeletePhotoProfileByEmployeeIdAsync(id);
                     await _fileAttachmentService.DeleteAsync(oldPhoto.FileAttachmentId);
                 }
-
                 await AddPhotoProfileFromBase64Async(id, model.PhotoFileBase64, model.PhotoFileName ?? "photo.jpg");
             }
 
@@ -236,9 +243,7 @@ public class EmployeeService : BaseService, IEmployeeService
 
             var updated = await _employeeReps.GetDetailByIdAsync(id);
 
-            await _activityLogService.LogUpdateAsync(
-                TableNames.Employee,
-                id,
+            await _activityLogService.LogUpdateAsync(TableNames.Employee, id,
                 $"Employee updated: Code '{model.EmployeeCode}', Name '{model.FullName}'",
                 _currentUserService.GetDisplayName());
 
@@ -246,23 +251,73 @@ public class EmployeeService : BaseService, IEmployeeService
         }, "update employee");
     }
 
+    // ============================================================
+    // DELETE
+    // ============================================================
+
+    /// <summary>
+    /// Determines whether the employee can be hard-deleted. Blocks on
+    /// AssetTransaction and ScheduleHandover/Return dependents (business records).
+    /// Attachments / photo profile are cascaded by
+    /// <see cref="CascadeDeleteDependentsAsync"/>.
+    /// </summary>
+    private async Task<string?> GetDeleteBlockReasonAsync(int id)
+    {
+        var transactionCount = await _employeeReps.GetAssetTransactionCountAsync(id);
+        if (transactionCount > 0)
+            return $"Cannot delete employee with {transactionCount} associated transaction(s)";
+
+        var handoverCount = await _employeeReps.GetScheduleHandoverCountAsync(id);
+        if (handoverCount > 0)
+            return $"Cannot delete employee with {handoverCount} associated handover schedule(s)";
+
+        var returnCount = await _employeeReps.GetScheduleReturnCountAsync(id);
+        if (returnCount > 0)
+            return $"Cannot delete employee with {returnCount} associated return schedule(s)";
+
+        return null;
+    }
+
+    /// <summary>
+    /// Hard-deletes the employee's dependent attachment rows (join rows only;
+    /// FileAttachment metadata is soft-deleted first, matching the pattern used
+    /// in UpdateAsync). Runs inside the caller's transaction.
+    /// </summary>
+    private async Task CascadeDeleteDependentsAsync(int id)
+    {
+        var attachments = await _employeeReps.GetAttachmentsByEmployeeIdAsync(id);
+        foreach (var att in attachments)
+        {
+            await _fileAttachmentService.DeleteAsync(att.FileAttachmentId);
+            await _repository.DeleteAsync<EmployeeAttachmentEntity>(att.EmployeeAttachmentId);
+        }
+
+        var photo = await _employeeReps.GetPhotoProfileByEmployeeIdAsync(id);
+        if (photo != null)
+        {
+            await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
+            await _repository.DeleteAsync<EmployeePhotoProfileAttachmentEntity>(photo.EmployeePhotoProfileAttachmentId);
+        }
+    }
+
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _employeeReps.GetByIdRawAsync(id);
-            if (existing == null)
-            {
-                return ServiceResult.NotFound($"Employee with id {id} not found");
-            }
+            if (existing == null) return ServiceResult.NotFound($"Employee with id {id} not found");
 
-            var result = await _repository.DeleteAsync(id);
+            var blockReason = await GetDeleteBlockReasonAsync(id);
+            if (blockReason != null)
+                return ServiceResult.BadRequest(blockReason);
+
+            await CascadeDeleteDependentsAsync(id);
+
+            var result = await _repository.DeleteAsync<EmployeeEntity>(id);
 
             if (result > 0)
             {
-                await _activityLogService.LogDeleteAsync(
-                    TableNames.Employee,
-                    id,
+                await _activityLogService.LogDeleteAsync(TableNames.Employee, id,
                     $"Employee '{existing.EmployeeCode}' - '{existing.FullName}' deleted permanently",
                     _currentUserService.GetDisplayName());
             }
@@ -278,10 +333,7 @@ public class EmployeeService : BaseService, IEmployeeService
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _employeeReps.GetByIdRawAsync(id);
-            if (existing == null)
-            {
-                return ServiceResult.NotFound($"Employee with id {id} not found");
-            }
+            if (existing == null) return ServiceResult.NotFound($"Employee with id {id} not found");
 
             existing.IsActive = false;
             existing.ModifiedDate = DateTime.Now;
@@ -291,9 +343,7 @@ public class EmployeeService : BaseService, IEmployeeService
 
             if (result > 0)
             {
-                await _activityLogService.LogSoftDeleteAsync(
-                    TableNames.Employee,
-                    id,
+                await _activityLogService.LogSoftDeleteAsync(TableNames.Employee, id,
                     $"Employee '{existing.EmployeeCode}' - '{existing.FullName}' soft deleted",
                     _currentUserService.GetDisplayName());
             }
@@ -332,18 +382,12 @@ public class EmployeeService : BaseService, IEmployeeService
 
     public async Task<ServiceResult<IEnumerable<OfficeDropdownView>>> GetOfficeListAsync()
     {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            return await _officeService.GetDropdownListAsync();
-        }, "get office list for employee form");
+        return await ExecuteSafelyAsync(async () => await _officeService.GetDropdownListAsync(), "get office list for employee form");
     }
 
     public async Task<ServiceResult<IEnumerable<DepartmentDropdownView>>> GetDepartmentListAsync()
     {
-        return await ExecuteSafelyAsync(async () =>
-        {
-            return await _departmentService.GetDropdownListAsync();
-        }, "get department list for employee form");
+        return await ExecuteSafelyAsync(async () => await _departmentService.GetDropdownListAsync(), "get department list for employee form");
     }
 
     public async Task<ServiceResult<IEnumerable<MasterDataDto>>> GetMasterDataListAsync(string referenceName)
@@ -351,15 +395,11 @@ public class EmployeeService : BaseService, IEmployeeService
         return await ExecuteSafelyAsync(async () =>
         {
             if (string.IsNullOrWhiteSpace(referenceName))
-            {
                 return ServiceResult<IEnumerable<MasterDataDto>>.BadRequest("referenceName is required");
-            }
 
-            var validReferences = new[] { "Position", "EmployeeStatus" };
-            if (!validReferences.Contains(referenceName))
-            {
-                return ServiceResult<IEnumerable<MasterDataDto>>.BadRequest($"Invalid referenceName: {referenceName}. Valid: {string.Join(", ", validReferences)}");
-            }
+            var valid = new[] { "Position", "EmployeeStatus" };
+            if (!valid.Contains(referenceName))
+                return ServiceResult<IEnumerable<MasterDataDto>>.BadRequest($"Invalid referenceName: {referenceName}. Valid: {string.Join(", ", valid)}");
 
             return await _masterDataService.GetByReferenceNameAsync(referenceName);
         }, "get masterdata list for employee form");
@@ -372,110 +412,84 @@ public class EmployeeService : BaseService, IEmployeeService
     public async Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request)
     {
         if (request.Ids == null || !request.Ids.Any())
-        {
             return ServiceResult<int>.BadRequest("No employee IDs provided");
-        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var activatedCount = 0;
-
+            var count = 0;
             foreach (var id in request.Ids)
             {
-                var employee = await _employeeReps.GetByIdRawAsync(id);
-                if (employee != null && !employee.IsActive)
+                var e = await _employeeReps.GetByIdRawAsync(id);
+                if (e != null && !e.IsActive)
                 {
-                    employee.IsActive = true;
-                    employee.ModifiedDate = DateTime.Now;
-                    employee.ModifiedBy = _currentUserService.GetDisplayName();
-                    await _repository.UpdateAsync(employee);
-                    activatedCount++;
-
-                    await _activityLogService.LogUpdateAsync(
-                        TableNames.Employee,
-                        id,
-                        $"Employee '{employee.EmployeeCode}' activated via bulk operation",
+                    e.IsActive = true; e.ModifiedDate = DateTime.Now; e.ModifiedBy = _currentUserService.GetDisplayName();
+                    await _repository.UpdateAsync(e);
+                    count++;
+                    await _activityLogService.LogUpdateAsync(TableNames.Employee, id,
+                        $"Employee '{e.EmployeeCode}' activated via bulk operation",
                         _currentUserService.GetDisplayName());
                 }
             }
-
-            return ServiceResult<int>.Success(activatedCount,
-                $"{activatedCount} employee(s) activated successfully");
+            return ServiceResult<int>.Success(count, $"{count} employee(s) activated successfully");
         }, "bulk activate employees");
     }
 
     public async Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request)
     {
         if (request.Ids == null || !request.Ids.Any())
-        {
             return ServiceResult<int>.BadRequest("No employee IDs provided");
-        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var deactivatedCount = 0;
-
+            var count = 0;
             foreach (var id in request.Ids)
             {
-                var employee = await _employeeReps.GetByIdRawAsync(id);
-                if (employee != null && employee.IsActive)
+                var e = await _employeeReps.GetByIdRawAsync(id);
+                if (e != null && e.IsActive)
                 {
-                    employee.IsActive = false;
-                    employee.ModifiedDate = DateTime.Now;
-                    employee.ModifiedBy = _currentUserService.GetDisplayName();
-                    await _repository.UpdateAsync(employee);
-                    deactivatedCount++;
-
-                    await _activityLogService.LogUpdateAsync(
-                        TableNames.Employee,
-                        id,
-                        $"Employee '{employee.EmployeeCode}' deactivated via bulk operation",
+                    e.IsActive = false; e.ModifiedDate = DateTime.Now; e.ModifiedBy = _currentUserService.GetDisplayName();
+                    await _repository.UpdateAsync(e);
+                    count++;
+                    await _activityLogService.LogUpdateAsync(TableNames.Employee, id,
+                        $"Employee '{e.EmployeeCode}' deactivated via bulk operation",
                         _currentUserService.GetDisplayName());
                 }
             }
-
-            return ServiceResult<int>.Success(deactivatedCount,
-                $"{deactivatedCount} employee(s) deactivated successfully");
+            return ServiceResult<int>.Success(count, $"{count} employee(s) deactivated successfully");
         }, "bulk deactivate employees");
     }
 
     public async Task<ServiceResult<int>> BulkDeleteAsync(BulkDeleteRequest request)
     {
         if (request.Ids == null || !request.Ids.Any())
-        {
             return ServiceResult<int>.BadRequest("No employee IDs provided");
-        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var deletedCount = 0;
-
+            var count = 0;
             foreach (var id in request.Ids)
             {
                 var existing = await _employeeReps.GetByIdRawAsync(id);
-                if (existing == null)
-                {
-                    continue;
-                }
+                if (existing == null) continue;
 
-                var result = await _repository.DeleteAsync(id);
+                var blockReason = await GetDeleteBlockReasonAsync(id);
+                if (blockReason != null) continue;
+
+                await CascadeDeleteDependentsAsync(id);
+
+                var result = await _repository.DeleteAsync<EmployeeEntity>(id);
                 if (result > 0)
                 {
-                    deletedCount++;
-
-                    await _activityLogService.LogDeleteAsync(
-                        TableNames.Employee,
-                        id,
+                    count++;
+                    await _activityLogService.LogDeleteAsync(TableNames.Employee, id,
                         $"Employee '{existing.EmployeeCode}' - '{existing.FullName}' deleted via bulk operation",
                         _currentUserService.GetDisplayName());
                 }
             }
-
-            var message = deletedCount > 0
-                ? $"{deletedCount} employee(s) deleted successfully"
-                : "No employees were deleted.";
-
-            return ServiceResult<int>.Success(deletedCount, message);
+            var message = count > 0
+                ? $"{count} employee(s) deleted successfully"
+                : "No employees were deleted. Employees with associated transactions or schedules cannot be deleted.";
+            return ServiceResult<int>.Success(count, message);
         }, "bulk delete employees");
     }
 
@@ -488,22 +502,14 @@ public class EmployeeService : BaseService, IEmployeeService
         return await ExecuteSafelyAsync(async () =>
         {
             var employee = await _employeeReps.GetByIdRawAsync(employeeId);
-            if (employee == null)
-            {
-                return ServiceResult<FileContentDto>.NotFound($"Employee with id {employeeId} not found");
-            }
+            if (employee == null) return ServiceResult<FileContentDto>.NotFound($"Employee with id {employeeId} not found");
 
             var photo = await _employeeReps.GetPhotoProfileByEmployeeIdAsync(employeeId);
-            if (photo == null)
-            {
-                return ServiceResult<FileContentDto>.NotFound("Profile photo not found");
-            }
+            if (photo == null) return ServiceResult<FileContentDto>.NotFound("Profile photo not found");
 
             var fileResult = await _fileAttachmentService.GetByIdAsync(photo.FileAttachmentId);
             if (!fileResult.IsSuccess || fileResult.Data == null)
-            {
                 return ServiceResult<FileContentDto>.NotFound("Profile photo file not found");
-            }
 
             var fileBytes = await _storageService.ReadFileAsync(fileResult.Data.FilePath);
             var contentType = _storageService.GetMimeType(fileResult.Data.OriginalFileName);
@@ -519,32 +525,14 @@ public class EmployeeService : BaseService, IEmployeeService
 
     public async Task<ServiceResult<string>> UploadPhotoAsync(int employeeId, IFormFile file)
     {
-        if (file == null || file.Length == 0)
-        {
-            return ServiceResult<string>.BadRequest("No file provided");
-        }
-
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!FileSizeConstants.IsAllowedProfilePhotoExtension(extension))
-        {
-            return ServiceResult<string>.BadRequest(
-                $"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedProfilePhotoExtensions)}");
-        }
-
-        if (file.Length > FileSizeConstants.MaxProfilePhotoBytes)
-        {
-            return ServiceResult<string>.BadRequest($"File size exceeds {FileSizeConstants.MaxProfilePhotoMB}MB limit");
-        }
+        var (isValid, error) = FileUploadValidator.ValidateProfilePhoto(file);
+        if (!isValid) return ServiceResult<string>.BadRequest(error!);
 
         var employee = await _employeeReps.GetByIdRawAsync(employeeId);
-        if (employee == null)
-        {
-            return ServiceResult<string>.NotFound($"Employee with id {employeeId} not found");
-        }
+        if (employee == null) return ServiceResult<string>.NotFound($"Employee with id {employeeId} not found");
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            // Soft-delete the previous photo if present.
             var oldPhoto = await _employeeReps.GetPhotoProfileByEmployeeIdAsync(employeeId);
             if (oldPhoto != null)
             {
@@ -552,24 +540,19 @@ public class EmployeeService : BaseService, IEmployeeService
                 await _fileAttachmentService.DeleteAsync(oldPhoto.FileAttachmentId);
             }
 
-            using var stream = file.OpenReadStream();
+            using var stream = file!.OpenReadStream();
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);
             var bytes = ms.ToArray();
 
             var uploadResult = await _fileAttachmentService.UploadBytesAsync(
-                referenceTable: "EmployeePhotoProfile",
-                referenceId: employeeId,
-                originalFileName: file.FileName,
-                bytes: bytes,
-                fileCategory: "ProfilePhoto",
-                description: $"Profile photo for Employee {employeeId}",
+                referenceTable: "EmployeePhotoProfile", referenceId: employeeId,
+                originalFileName: file.FileName, bytes: bytes,
+                fileCategory: "ProfilePhoto", description: $"Profile photo for Employee {employeeId}",
                 isPrimary: true);
 
             if (!uploadResult.IsSuccess || uploadResult.Data == null)
-            {
                 return ServiceResult<string>.Failure(uploadResult.Errors);
-            }
 
             var entity = new EmployeePhotoProfileAttachmentEntity
             {
@@ -581,11 +564,8 @@ public class EmployeeService : BaseService, IEmployeeService
             };
             await _employeeReps.InsertPhotoProfileAsync(entity);
 
-            await _activityLogService.LogUpdateAsync(
-                TableNames.Employee,
-                employeeId,
-                $"Profile photo uploaded",
-                _currentUserService.GetDisplayName());
+            await _activityLogService.LogUpdateAsync(TableNames.Employee, employeeId,
+                "Profile photo uploaded", _currentUserService.GetDisplayName());
 
             return ServiceResult<string>.Success(uploadResult.Data.FileUrl ?? string.Empty, "Profile photo uploaded successfully");
         }, "upload employee photo");
@@ -594,27 +574,18 @@ public class EmployeeService : BaseService, IEmployeeService
     public async Task<ServiceResult> DeletePhotoAsync(int employeeId)
     {
         var employee = await _employeeReps.GetByIdRawAsync(employeeId);
-        if (employee == null)
-        {
-            return ServiceResult.NotFound($"Employee with id {employeeId} not found");
-        }
+        if (employee == null) return ServiceResult.NotFound($"Employee with id {employeeId} not found");
 
         return await ExecuteWithTransactionAsync(async () =>
         {
             var photo = await _employeeReps.GetPhotoProfileByEmployeeIdAsync(employeeId);
-            if (photo == null)
-            {
-                return ServiceResult.Success("No profile photo to delete");
-            }
+            if (photo == null) return ServiceResult.Success("No profile photo to delete");
 
             await _employeeReps.DeletePhotoProfileByEmployeeIdAsync(employeeId);
             await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
 
-            await _activityLogService.LogUpdateAsync(
-                TableNames.Employee,
-                employeeId,
-                $"Profile photo deleted",
-                _currentUserService.GetDisplayName());
+            await _activityLogService.LogUpdateAsync(TableNames.Employee, employeeId,
+                "Profile photo deleted", _currentUserService.GetDisplayName());
 
             return ServiceResult.Success("Profile photo deleted successfully");
         }, "delete employee photo");
@@ -628,63 +599,37 @@ public class EmployeeService : BaseService, IEmployeeService
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            // GetDetailByIdAsync already returns the attachment list (joined with FileAttachment).
-            // No redundant repo call needed.
             var detail = await _employeeReps.GetDetailByIdAsync(employeeId);
             if (detail == null)
-            {
                 return ServiceResult<IEnumerable<EmployeeAttachmentViewDto>>.NotFound($"Employee with id {employeeId} not found");
-            }
-
             return ServiceResult<IEnumerable<EmployeeAttachmentViewDto>>.Success(detail.Attachments);
         }, "get employee attachments");
     }
 
     public async Task<ServiceResult<EmployeeAttachmentViewDto>> UploadAttachmentAsync(int employeeId, AttachmentUploadDto model)
     {
-        if (model.File == null || model.File.Length == 0)
-        {
-            return ServiceResult<EmployeeAttachmentViewDto>.BadRequest("No file provided");
-        }
-
-        var extension = Path.GetExtension(model.File.FileName).ToLowerInvariant();
-        if (!FileSizeConstants.IsAllowedAssetExtension(extension))
-        {
-            return ServiceResult<EmployeeAttachmentViewDto>.BadRequest(
-                $"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedAssetExtensions)}");
-        }
-
-        if (model.File.Length > FileSizeConstants.MaxAssetAttachmentBytes)
-        {
-            return ServiceResult<EmployeeAttachmentViewDto>.BadRequest($"File size exceeds {FileSizeConstants.MaxAssetAttachmentMB}MB limit");
-        }
+        var (isValid, error) = FileUploadValidator.ValidateAssetAttachment(model.File);
+        if (!isValid) return ServiceResult<EmployeeAttachmentViewDto>.BadRequest(error!);
 
         var employee = await _employeeReps.GetByIdRawAsync(employeeId);
-        if (employee == null)
-        {
-            return ServiceResult<EmployeeAttachmentViewDto>.NotFound($"Employee with id {employeeId} not found");
-        }
+        if (employee == null) return ServiceResult<EmployeeAttachmentViewDto>.NotFound($"Employee with id {employeeId} not found");
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            using var stream = model.File.OpenReadStream();
+            using var stream = model.File!.OpenReadStream();
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);
             var bytes = ms.ToArray();
 
             var uploadResult = await _fileAttachmentService.UploadBytesAsync(
-                referenceTable: "Employee",
-                referenceId: employeeId,
-                originalFileName: model.File.FileName,
-                bytes: bytes,
+                referenceTable: "Employee", referenceId: employeeId,
+                originalFileName: model.File.FileName, bytes: bytes,
                 fileCategory: model.FileCategory ?? "EmployeeAttachment",
                 description: model.Description ?? $"Attachment for Employee {employeeId}",
                 isPrimary: false);
 
             if (!uploadResult.IsSuccess || uploadResult.Data == null)
-            {
                 return ServiceResult<EmployeeAttachmentViewDto>.Failure(uploadResult.Errors);
-            }
 
             var attachmentEntity = new EmployeeAttachmentEntity
             {
@@ -697,13 +642,11 @@ public class EmployeeService : BaseService, IEmployeeService
             };
             var attachmentId = await _employeeReps.InsertAttachmentAsync(attachmentEntity);
 
-            await _activityLogService.LogCreateAsync(
-                TableNames.Employee,
-                employeeId,
+            await _activityLogService.LogCreateAsync(TableNames.Employee, employeeId,
                 $"Attachment uploaded: {model.File.FileName}",
                 _currentUserService.GetDisplayName());
 
-            var dto = new EmployeeAttachmentViewDto
+            return ServiceResult<EmployeeAttachmentViewDto>.Success(new EmployeeAttachmentViewDto
             {
                 EmployeeAttachmentId = attachmentId,
                 FileAttachmentId = uploadResult.Data.FileAttachmentId,
@@ -714,35 +657,25 @@ public class EmployeeService : BaseService, IEmployeeService
                 IsPrimary = false,
                 Order = model.Order,
                 CreatedDate = DateTime.Now
-            };
-
-            return ServiceResult<EmployeeAttachmentViewDto>.Success(dto, "Attachment uploaded successfully");
+            }, "Attachment uploaded successfully");
         }, "upload employee attachment");
     }
 
     public async Task<ServiceResult> DeleteAttachmentAsync(int employeeId, int fileAttachmentId)
     {
         var employee = await _employeeReps.GetByIdRawAsync(employeeId);
-        if (employee == null)
-        {
-            return ServiceResult.NotFound($"Employee with id {employeeId} not found");
-        }
+        if (employee == null) return ServiceResult.NotFound($"Employee with id {employeeId} not found");
 
         var attachments = await _employeeReps.GetAttachmentsByEmployeeIdAsync(employeeId);
         var target = attachments.FirstOrDefault(a => a.FileAttachmentId == fileAttachmentId);
-        if (target == null)
-        {
-            return ServiceResult.NotFound($"Attachment {fileAttachmentId} not found for employee {employeeId}");
-        }
+        if (target == null) return ServiceResult.NotFound($"Attachment {fileAttachmentId} not found for employee {employeeId}");
 
         return await ExecuteWithTransactionAsync(async () =>
         {
             await _employeeReps.DeleteAttachmentAsync(target.EmployeeAttachmentId);
             await _fileAttachmentService.DeleteAsync(fileAttachmentId);
 
-            await _activityLogService.LogDeleteAsync(
-                TableNames.Employee,
-                employeeId,
+            await _activityLogService.LogDeleteAsync(TableNames.Employee, employeeId,
                 $"Attachment deleted: {fileAttachmentId}",
                 _currentUserService.GetDisplayName());
 
@@ -755,27 +688,15 @@ public class EmployeeService : BaseService, IEmployeeService
         return await ExecuteSafelyAsync(async () =>
         {
             var employee = await _employeeReps.GetByIdRawAsync(employeeId);
-            if (employee == null)
-            {
-                return ServiceResult<FileContentDto>.NotFound($"Employee with id {employeeId} not found");
-            }
+            if (employee == null) return ServiceResult<FileContentDto>.NotFound($"Employee with id {employeeId} not found");
 
-            // Ownership check: the attachment row must belong to this employee.
-            // Prevents downloading arbitrary FileAttachment ids through a foreign
-            // employee route.
             var attachments = await _employeeReps.GetAttachmentsByEmployeeIdAsync(employeeId);
             if (!attachments.Any(a => a.FileAttachmentId == fileAttachmentId))
-            {
                 return ServiceResult<FileContentDto>.NotFound($"Attachment {fileAttachmentId} not found for employee {employeeId}");
-            }
 
-            // Delegate to the internal FileAttachment service. Shared service, no HTTP
-            // surface of its own — used by every menu that owns attachments.
             var downloadResult = await _fileAttachmentService.DownloadAsync(fileAttachmentId);
             if (!downloadResult.IsSuccess || downloadResult.Data == null)
-            {
                 return ServiceResult<FileContentDto>.NotFound($"Attachment file {fileAttachmentId} could not be retrieved");
-            }
 
             return downloadResult;
         }, "get employee attachment file");
@@ -788,20 +709,14 @@ public class EmployeeService : BaseService, IEmployeeService
     private async Task AddPhotoProfileFromBase64Async(int employeeId, string base64String, string fileName)
     {
         var bytes = Convert.FromBase64String(base64String);
-
         var result = await _fileAttachmentService.UploadBytesAsync(
-            referenceTable: "EmployeePhotoProfile",
-            referenceId: employeeId,
-            originalFileName: fileName,
-            bytes: bytes,
-            fileCategory: "ProfilePhoto",
-            description: $"Profile photo for Employee {employeeId}",
+            referenceTable: "EmployeePhotoProfile", referenceId: employeeId,
+            originalFileName: fileName, bytes: bytes,
+            fileCategory: "ProfilePhoto", description: $"Profile photo for Employee {employeeId}",
             isPrimary: true);
 
         if (!result.IsSuccess || result.Data == null)
-        {
             throw new Exception($"Upload profile photo failed: {string.Join(", ", result.Errors)}");
-        }
 
         var entity = new EmployeePhotoProfileAttachmentEntity
         {
@@ -813,30 +728,22 @@ public class EmployeeService : BaseService, IEmployeeService
         };
         await _employeeReps.InsertPhotoProfileAsync(entity);
 
-        await _activityLogService.LogUpdateAsync(
-            TableNames.Employee,
-            employeeId,
-            $"Profile photo uploaded",
-            _currentUserService.GetDisplayName());
+        await _activityLogService.LogUpdateAsync(TableNames.Employee, employeeId,
+            "Profile photo uploaded", _currentUserService.GetDisplayName());
     }
 
     private async Task AddAttachmentFromBase64Async(int employeeId, string base64String, string fileName, int order)
     {
         var bytes = Convert.FromBase64String(base64String);
-
         var fileResult = await _fileAttachmentService.UploadBytesAsync(
-            referenceTable: "Employee",
-            referenceId: employeeId,
-            originalFileName: fileName,
-            bytes: bytes,
+            referenceTable: "Employee", referenceId: employeeId,
+            originalFileName: fileName, bytes: bytes,
             fileCategory: "EmployeeAttachment",
             description: $"Attachment for Employee {employeeId}",
             isPrimary: false);
 
         if (!fileResult.IsSuccess || fileResult.Data == null)
-        {
             throw new Exception($"Upload attachment failed: {string.Join(", ", fileResult.Errors)}");
-        }
 
         var attachmentEntity = new EmployeeAttachmentEntity
         {
@@ -847,12 +754,9 @@ public class EmployeeService : BaseService, IEmployeeService
             CreatedDate = DateTime.Now,
             CreatedBy = _currentUserService.GetDisplayName()
         };
-
         await _employeeReps.InsertAttachmentAsync(attachmentEntity);
 
-        await _activityLogService.LogCreateAsync(
-            TableNames.Employee,
-            employeeId,
+        await _activityLogService.LogCreateAsync(TableNames.Employee, employeeId,
             $"Attachment added: {fileName}",
             _currentUserService.GetDisplayName());
     }

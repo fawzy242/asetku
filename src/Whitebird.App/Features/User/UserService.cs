@@ -191,20 +191,11 @@ public class UserService : BaseService, IUserService
 
     public async Task<ServiceResult<string>> UploadProfilePhotoAsync(int userId, IFormFile file)
     {
-        if (file == null || file.Length == 0)
+        // Centralised upload validation (extension + size).
+        var (isValid, error) = FileUploadValidator.ValidateProfilePhoto(file);
+        if (!isValid)
         {
-            return ServiceResult<string>.BadRequest("No file provided");
-        }
-
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!FileSizeConstants.IsAllowedProfilePhotoExtension(extension))
-        {
-            return ServiceResult<string>.BadRequest($"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedProfilePhotoExtensions)}");
-        }
-
-        if (file.Length > FileSizeConstants.MaxProfilePhotoBytes)
-        {
-            return ServiceResult<string>.BadRequest($"File size exceeds {FileSizeConstants.MaxProfilePhotoMB}MB limit");
+            return ServiceResult<string>.BadRequest(error!);
         }
 
         var user = await _userReps.GetUserByIdAsync(userId);
@@ -215,7 +206,6 @@ public class UserService : BaseService, IUserService
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            // 1. Delete existing photo profile (soft delete)
             var existingPhoto = await _userReps.GetPhotoProfileByUserIdAsync(userId);
             if (existingPhoto != null)
             {
@@ -223,11 +213,10 @@ public class UserService : BaseService, IUserService
                 await _fileAttachmentReps.DeleteAsync(existingPhoto.FileAttachmentId);
             }
 
-            // 2. Save physical file
+            var extension = Path.GetExtension(file!.FileName).ToLowerInvariant();
             var subDirectory = Path.Combine("Users", userId.ToString(), "Profile");
             var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
 
-            // 3. Insert to FileAttachment
             var fileAttachmentEntity = new FileAttachmentEntity
             {
                 FileCategory = "ProfilePhoto",
@@ -248,7 +237,6 @@ public class UserService : BaseService, IUserService
 
             var fileAttachmentId = await _fileAttachmentReps.InsertAsync(fileAttachmentEntity);
 
-            // 4. Insert to UsersPhotoProfileAttachment
             var photoProfileEntity = new UsersPhotoProfileAttachmentEntity
             {
                 UserId = userId,
@@ -260,7 +248,6 @@ public class UserService : BaseService, IUserService
 
             await _userReps.InsertPhotoProfileAsync(photoProfileEntity);
 
-            // 5. Update user ModifiedDate
             user.ModifiedDate = DateTime.Now;
             user.ModifiedBy = _currentUserService.GetDisplayName();
             await _userReps.UpdateUserAsync(user);
@@ -288,21 +275,18 @@ public class UserService : BaseService, IUserService
                 return ServiceResult<FileContentDto>.NotFound("User not found");
             }
 
-            // 1. Get photo profile from UsersPhotoProfileAttachment
             var photoProfile = await _userReps.GetPhotoProfileByUserIdAsync(userId);
             if (photoProfile == null)
             {
                 return ServiceResult<FileContentDto>.NotFound("Profile photo not found");
             }
 
-            // 2. Get file attachment
             var fileEntity = await _fileAttachmentReps.GetByIdAsync(photoProfile.FileAttachmentId);
             if (fileEntity == null)
             {
                 return ServiceResult<FileContentDto>.NotFound("Profile photo not found");
             }
 
-            // 3. Read physical file
             var fileBytes = await _storageService.ReadFileAsync(fileEntity.FilePath);
 
             return ServiceResult<FileContentDto>.Success(new FileContentDto

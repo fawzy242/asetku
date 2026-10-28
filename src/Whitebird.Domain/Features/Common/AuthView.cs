@@ -26,7 +26,7 @@ public class ResetPasswordRequest
     public string CurrentPassword { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "New password is required")]
-    [MinLength(4, ErrorMessage = "New password must be at least 4 characters")]
+    [RegularExpression(PasswordRules.ComplexityPattern, ErrorMessage = PasswordRules.ComplexityMessage)]
     public string NewPassword { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Confirm password is required")]
@@ -45,7 +45,7 @@ public class ResetPasswordWithTokenRequest
     public string ResetToken { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "New password is required")]
-    [MinLength(4, ErrorMessage = "New password must be at least 4 characters")]
+    [RegularExpression(PasswordRules.ComplexityPattern, ErrorMessage = PasswordRules.ComplexityMessage)]
     public string NewPassword { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Confirm password is required")]
@@ -59,7 +59,7 @@ public class ChangePasswordRequest
     public string OldPassword { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "New password is required")]
-    [MinLength(4, ErrorMessage = "New password must be at least 4 characters")]
+    [RegularExpression(PasswordRules.ComplexityPattern, ErrorMessage = PasswordRules.ComplexityMessage)]
     public string NewPassword { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Confirm password is required")]

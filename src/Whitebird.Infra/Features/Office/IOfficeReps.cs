@@ -12,28 +12,38 @@ public interface IOfficeReps
     // ============================================================
     // RAW ENTITY METHODS
     // ============================================================
-    
+
     Task<OfficeEntity?> GetByIdRawAsync(int officeId);
     Task<bool> IsOfficeCodeExistsAsync(string officeCode, int? excludeOfficeId = null);
     Task<bool> IsOfficeNameExistsAsync(string officeName, int? excludeOfficeId = null);
     Task<int> GetChildCountAsync(int officeId);
-    
+
+    /// <summary>
+    /// Counts Employee rows pointing at this office. Used as a hard-delete FK guard.
+    /// </summary>
+    Task<int> GetEmployeeCountAsync(int officeId);
+
+    /// <summary>
+    /// Counts AssetTransaction rows pointing at this office. Used as a hard-delete FK guard.
+    /// </summary>
+    Task<int> GetAssetTransactionCountAsync(int officeId);
+
     // ============================================================
     // DETAIL VIEW METHODS
     // ============================================================
-    
+
     Task<OfficeDetailView?> GetDetailByIdAsync(int officeId);
     Task<IEnumerable<OfficeListView>> GetAllListViewAsync();
 
     // ============================================================
     // PAGINATION
     // ============================================================
-    
+
     Task<PaginatedResult<OfficeListView>> GetPagedListAsync(OfficeGridRequest request);
-    
+
     // ============================================================
     // DROPDOWN
     // ============================================================
-    
+
     Task<IEnumerable<OfficeDropdownView>> GetDropdownListAsync();
 }

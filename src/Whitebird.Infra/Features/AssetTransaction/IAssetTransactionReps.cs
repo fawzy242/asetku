@@ -47,6 +47,18 @@ public interface IAssetTransactionReps
     Task<AssetTransactionEntity?> GetPairedTransactionAsync(int transactionId);
 
     // ============================================================
+    // HARD-DELETE FK DEPENDENCY COUNTS
+    // ============================================================
+    // No IsActive filter on any of these: an inactive row still
+    // satisfies its FK, so hard-delete must be refused in either case.
+
+    Task<int> GetAttachmentCountAsync(int transactionId);
+    Task<int> GetApproveAttachmentCountAsync(int transactionId);
+    Task<int> GetScheduleHandoverCountAsync(int transactionId);
+    Task<int> GetScheduleReturnCountAsync(int transactionId);
+    Task<int> GetScheduleMaintenanceCountAsync(int transactionId);
+
+    // ============================================================
     // CRUD
     // ============================================================
 

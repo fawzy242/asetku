@@ -55,6 +55,7 @@ public class SupplierReps : ISupplierReps
 
     public async Task<SupplierDetailView?> GetDetailByIdAsync(int supplierId)
     {
+        // No IsActive filter: detail-by-id must return the record in any state.
         const string sql = @"
             SELECT 
                 s.SupplierId, s.SupplierName, s.ContactPerson,
@@ -83,7 +84,7 @@ public class SupplierReps : ISupplierReps
     }
 
     // ============================================================
-    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
+    // PAGINATION
     // ============================================================
 
     public async Task<PaginatedResult<SupplierListView>> GetPagedListAsync(SupplierGridRequest request)

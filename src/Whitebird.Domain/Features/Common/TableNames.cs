@@ -12,6 +12,8 @@ public static class TableNames
     public const string Office = "Office";
     public const string Supplier = "Supplier";
     public const string Users = "Users";
+    public const string Roles = "Roles";
+    public const string UserRoles = "UserRoles";
     public const string ActivityLogs = "ActivityLogs";
     public const string ScheduleHandover = "ScheduleHandover";
     public const string ScheduleReturn = "ScheduleReturn";

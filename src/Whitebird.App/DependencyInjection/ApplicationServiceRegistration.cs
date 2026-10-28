@@ -16,9 +16,11 @@ using Whitebird.App.Features.MasterData;
 using Whitebird.App.Features.Office;
 using Whitebird.App.Features.Reports;
 using Whitebird.App.Features.Reports.Draw;
+using Whitebird.App.Features.Roles;
 using Whitebird.App.Features.Schedule;
 using Whitebird.App.Features.Supplier;
 using Whitebird.App.Features.User;
+using Whitebird.App.Features.UserRoles;
 
 namespace Whitebird.App.DependencyInjection;
 
@@ -53,6 +55,8 @@ public static class ApplicationServiceRegistration
         services.AddScoped<IFileAttachmentService, FileAttachmentService>();
         services.AddScoped<IStorageService, StorageService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IRolesService, RolesService>();
+        services.AddScoped<IUserRolesService, UserRolesService>();
 
         // ========== SCHEDULE ==========
         services.AddScoped<IScheduleHandoverService, ScheduleHandoverService>();
@@ -78,9 +82,6 @@ public static class ApplicationServiceRegistration
         services.AddScoped<AssetImportService>();
         services.AddScoped<EmployeeImportService>();
         services.AddScoped<TransactionImportService>();
-
-        // REMOVED: FirstTimeSetupService (dead code)
-        // REMOVED: IMasterDataLookupService / MasterDataLookupService (unnecessary abstraction)
 
         return services;
     }

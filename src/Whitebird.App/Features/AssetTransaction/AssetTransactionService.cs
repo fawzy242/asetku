@@ -29,6 +29,15 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
 
+    private static readonly int[] _addTypes = {
+        TransactionTypeConstants.HANDOVER,
+        TransactionTypeConstants.TRANSFER,
+        TransactionTypeConstants.LOAN,
+        TransactionTypeConstants.MAINTENANCE,
+        TransactionTypeConstants.DISPOSAL,
+        TransactionTypeConstants.OPERATIONAL_OFFICE
+    };
+
     public AssetTransactionService(
         IAssetTransactionReps transactionReps,
         IAssetService assetService,
@@ -60,9 +69,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         {
             var result = await _transactionReps.GetDetailByIdAsync(id);
             if (result == null)
-            {
                 return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
-            }
             return ServiceResult<AssetTransactionDetailView>.Success(result);
         }, "get transaction by id");
     }
@@ -88,26 +95,12 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
     public async Task<ServiceResult<AssetTransactionDetailView>> CreateAsync(AssetTransactionCreateViewModel model)
     {
-        var addTypes = new[] {
-            TransactionTypeConstants.HANDOVER,
-            TransactionTypeConstants.TRANSFER,
-            TransactionTypeConstants.LOAN,
-            TransactionTypeConstants.MAINTENANCE,
-            TransactionTypeConstants.DISPOSAL,
-            TransactionTypeConstants.OPERATIONAL_OFFICE
-        };
-
-        if (!addTypes.Contains(model.TransactionType))
-        {
+        if (!_addTypes.Contains(model.TransactionType))
             return ServiceResult<AssetTransactionDetailView>.BadRequest(
                 $"Transaction type {model.TransactionType} cannot be created manually. Use shortcut endpoint.");
-        }
 
         var validationResult = await ValidateTransactionAsync(model, null);
-        if (validationResult != null)
-        {
-            return validationResult;
-        }
+        if (validationResult != null) return validationResult;
 
         return await ExecuteWithTransactionAsync(async () =>
         {
@@ -117,7 +110,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             entity.Completed = null;
             entity.CreatedDate = DateTime.Now;
             entity.CreatedBy = _currentUserService.GetDisplayName();
-
             entity.AssetTransactionCode = GenerateTransactionCode(model.TransactionType);
 
             var id = await _transactionReps.InsertAsync(entity);
@@ -137,8 +129,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             var created = await _transactionReps.GetDetailByIdAsync(id);
 
             await _activityLogService.LogCreateAsync(
-                TableNames.AssetTransaction,
-                id,
+                TableNames.AssetTransaction, id,
                 $"Transaction created: Type {model.TransactionType}, Asset {model.AssetId}",
                 _currentUserService.GetDisplayName());
 
@@ -148,30 +139,39 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
     public async Task<ServiceResult<AssetTransactionDetailView>> UpdateAsync(int id, AssetTransactionUpdateViewModel model)
     {
+        var validation = await ValidateTransactionReferencesAsync(
+            model.AssetId, model.TransactionType, model.EmployeeId, model.OfficeId,
+            model.Condition, model.MaintenanceType, model.TransactionDate, model.ExpectedLoanReturnDate);
+        if (validation != null) return validation;
+
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _transactionReps.GetByIdRawAsync(id);
-            if (existing == null)
-            {
-                return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
-            }
+            if (existing == null) return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
 
             if (existing.Approved != null)
-            {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("Cannot update approved/rejected transaction");
-            }
 
-            model.Adapt(existing);
+            existing.AssetId = model.AssetId;
+            existing.TransactionType = model.TransactionType;
+            existing.EmployeeId = model.EmployeeId;
+            existing.OfficeId = model.OfficeId;
+            existing.TransactionDate = model.TransactionDate;
+            existing.ExpectedLoanReturnDate = model.ExpectedLoanReturnDate;
+            existing.Notes = model.Notes;
+            existing.Condition = model.Condition;
+            existing.MaintenanceType = model.MaintenanceType;
+            existing.MaintenanceCost = model.MaintenanceCost;
             existing.ModifiedDate = DateTime.Now;
             existing.ModifiedBy = _currentUserService.GetDisplayName();
 
             await _transactionReps.UpdateAsync(existing);
+            await ReevaluateCompletedAsync(id);
 
             var updated = await _transactionReps.GetDetailByIdAsync(id);
 
             await _activityLogService.LogUpdateAsync(
-                TableNames.AssetTransaction,
-                id,
+                TableNames.AssetTransaction, id,
                 $"Transaction updated: Type {model.TransactionType}",
                 _currentUserService.GetDisplayName());
 
@@ -184,22 +184,43 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _transactionReps.GetByIdRawAsync(id);
-            if (existing == null)
-            {
-                return ServiceResult.NotFound($"Transaction with id {id} not found");
-            }
+            if (existing == null) return ServiceResult.NotFound($"Transaction with id {id} not found");
 
             var paired = await _transactionReps.GetPairedTransactionAsync(id);
             if (paired != null)
-            {
                 return ServiceResult.BadRequest("Cannot delete transaction that has a paired transaction");
-            }
+
+            // H9: FK dependency checks — a hard delete on AssetTransaction fires
+            // every inbound FK, so verify them all before touching the parent row.
+            var attachmentCount = await _transactionReps.GetAttachmentCountAsync(id);
+            if (attachmentCount > 0)
+                return ServiceResult.BadRequest(
+                    $"Cannot delete transaction with {attachmentCount} attachment(s)");
+
+            var approveAttachmentCount = await _transactionReps.GetApproveAttachmentCountAsync(id);
+            if (approveAttachmentCount > 0)
+                return ServiceResult.BadRequest(
+                    $"Cannot delete transaction with {approveAttachmentCount} approval-document attachment(s)");
+
+            var handoverCount = await _transactionReps.GetScheduleHandoverCountAsync(id);
+            if (handoverCount > 0)
+                return ServiceResult.BadRequest(
+                    $"Cannot delete transaction with {handoverCount} linked handover schedule(s)");
+
+            var returnCount = await _transactionReps.GetScheduleReturnCountAsync(id);
+            if (returnCount > 0)
+                return ServiceResult.BadRequest(
+                    $"Cannot delete transaction with {returnCount} linked return schedule(s)");
+
+            var maintenanceCount = await _transactionReps.GetScheduleMaintenanceCountAsync(id);
+            if (maintenanceCount > 0)
+                return ServiceResult.BadRequest(
+                    $"Cannot delete transaction with {maintenanceCount} linked maintenance schedule(s)");
 
             await _transactionReps.DeleteAsync(id);
 
             await _activityLogService.LogDeleteAsync(
-                TableNames.AssetTransaction,
-                id,
+                TableNames.AssetTransaction, id,
                 $"Transaction deleted permanently",
                 _currentUserService.GetDisplayName());
 
@@ -212,22 +233,16 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _transactionReps.GetByIdRawAsync(id);
-            if (existing == null)
-            {
-                return ServiceResult.NotFound($"Transaction with id {id} not found");
-            }
+            if (existing == null) return ServiceResult.NotFound($"Transaction with id {id} not found");
 
             var paired = await _transactionReps.GetPairedTransactionAsync(id);
             if (paired != null)
-            {
                 return ServiceResult.BadRequest("Cannot soft delete transaction that has a paired transaction");
-            }
 
             await _transactionReps.SoftDeleteAsync(id);
 
             await _activityLogService.LogSoftDeleteAsync(
-                TableNames.AssetTransaction,
-                id,
+                TableNames.AssetTransaction, id,
                 $"Transaction soft deleted",
                 _currentUserService.GetDisplayName());
 
@@ -242,15 +257,16 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     public async Task<ServiceResult<AssetTransactionDetailView>> UpdateWithAttachmentsAsync(
         int id, AssetTransactionUpdateFormDto model)
     {
+        var validation = await ValidateTransactionReferencesAsync(
+            model.AssetId, model.TransactionType, model.EmployeeId, model.OfficeId,
+            model.Condition, model.MaintenanceType, model.TransactionDate, model.ExpectedLoanReturnDate);
+        if (validation != null) return validation;
+
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _transactionReps.GetByIdRawAsync(id);
-            if (existing == null)
-            {
-                return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
-            }
+            if (existing == null) return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
 
-            // Update basic fields.
             existing.AssetId = model.AssetId;
             existing.TransactionType = model.TransactionType;
             existing.EmployeeId = model.EmployeeId;
@@ -264,18 +280,9 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             existing.IsActive = model.IsActive;
             existing.ModifiedDate = DateTime.Now;
             existing.ModifiedBy = _currentUserService.GetDisplayName();
-            // R3 FIX: Approved / ApprovedBy / Completed / CompletedBy are NOT copied from
-            // the client DTO on this endpoint. Those flags are set exclusively through
-            // BulkApprovedAsync / BulkPendingAsync / BulkRejectedAsync / CompleteAsync /
-            // UncompleteAsync / SetApproveAttachmentActionAsync so the document workflow
-            // cannot be bypassed here. The client DTO still carries those fields for
-            // serialization symmetry with the detail view; they are simply ignored.
 
             await _transactionReps.UpdateAsync(existing);
 
-            // ============================================================
-            // HANDLE ATTACHMENTS (base64)
-            // ============================================================
             if (model.ReplaceAttachments || (model.AttachmentFilesBase64 != null && model.AttachmentFilesBase64.Any()))
             {
                 var existingAttachments = await _transactionReps.GetAttachmentsByTransactionIdAsync(id);
@@ -288,9 +295,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                         await _fileAttachmentService.DeleteAsync(att.FileAttachmentId);
                         var attEntity = await _transactionReps.GetAttachmentByIdAsync(att.AssetTransactionAttachmentId);
                         if (attEntity != null)
-                        {
                             await _transactionReps.DeleteAttachmentAsync(attEntity.AssetTransactionAttachmentId);
-                        }
                     }
                 }
 
@@ -310,9 +315,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 }
             }
 
-            // ============================================================
-            // HANDLE APPROVE ATTACHMENTS
-            // ============================================================
             if (model.ReplaceApproveAttachments || (model.ApproveAttachments != null && model.ApproveAttachments.Any()))
             {
                 var existingApproveAttachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(id);
@@ -325,9 +327,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                         await _fileAttachmentService.DeleteAsync(att.FileAttachmentId);
                         var attEntity = await _transactionReps.GetApproveAttachmentByIdAsync(att.AssetTransactionApproveAttachmentId);
                         if (attEntity != null)
-                        {
                             await _transactionReps.DeleteApproveAttachmentAsync(attEntity.AssetTransactionApproveAttachmentId);
-                        }
                     }
                 }
 
@@ -345,14 +345,12 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 }
             }
 
-            // AT-01/AT-02: auto-re-evaluate Completed based on the current document state.
             await ReevaluateCompletedAsync(id);
 
             var updated = await _transactionReps.GetDetailByIdAsync(id);
 
             await _activityLogService.LogUpdateAsync(
-                TableNames.AssetTransaction,
-                id,
+                TableNames.AssetTransaction, id,
                 $"Transaction updated with attachments",
                 _currentUserService.GetDisplayName());
 
@@ -363,15 +361,16 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     public async Task<ServiceResult<AssetTransactionDetailView>> UpdateApprovalWithAttachmentsAsync(
         int id, AssetTransactionUpdateApprovalFormDto model)
     {
+        var validation = await ValidateTransactionReferencesAsync(
+            model.AssetId, model.TransactionType, model.EmployeeId, model.OfficeId,
+            model.Condition, model.MaintenanceType, model.TransactionDate, model.ExpectedLoanReturnDate);
+        if (validation != null) return validation;
+
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _transactionReps.GetByIdRawAsync(id);
-            if (existing == null)
-            {
-                return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
-            }
+            if (existing == null) return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
 
-            // Update basic fields.
             existing.AssetId = model.AssetId;
             existing.TransactionType = model.TransactionType;
             existing.EmployeeId = model.EmployeeId;
@@ -383,9 +382,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             existing.MaintenanceType = model.MaintenanceType;
             existing.MaintenanceCost = model.MaintenanceCost;
             existing.IsActive = model.IsActive;
-            // This endpoint IS the approval endpoint, so Approved / ApprovedBy are
-            // accepted from the DTO. Completed / CompletedBy are NOT — completion
-            // is always re-derived by ReevaluateCompletedAsync below.
             existing.Approved = model.Approved;
             existing.ApprovedBy = model.ApprovedBy;
             existing.ModifiedDate = DateTime.Now;
@@ -393,9 +389,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
             await _transactionReps.UpdateAsync(existing);
 
-            // ============================================================
-            // HANDLE APPROVE ATTACHMENTS
-            // ============================================================
             if (model.ReplaceApproveAttachments || (model.ApproveAttachments != null && model.ApproveAttachments.Any()))
             {
                 var existingApproveAttachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(id);
@@ -408,9 +401,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                         await _fileAttachmentService.DeleteAsync(att.FileAttachmentId);
                         var attEntity = await _transactionReps.GetApproveAttachmentByIdAsync(att.AssetTransactionApproveAttachmentId);
                         if (attEntity != null)
-                        {
                             await _transactionReps.DeleteApproveAttachmentAsync(attEntity.AssetTransactionApproveAttachmentId);
-                        }
                     }
                 }
 
@@ -428,14 +419,12 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 }
             }
 
-            // AT-01/AT-02: auto-re-evaluate Completed based on the current document state.
             await ReevaluateCompletedAsync(id);
 
             var updated = await _transactionReps.GetDetailByIdAsync(id);
 
             await _activityLogService.LogUpdateAsync(
-                TableNames.AssetTransaction,
-                id,
+                TableNames.AssetTransaction, id,
                 $"Transaction approval updated with attachments",
                 _currentUserService.GetDisplayName());
 
@@ -450,9 +439,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     public async Task<ServiceResult<int>> BulkApprovedAsync(BulkApprovalRequest request)
     {
         if (request.Ids == null || !request.Ids.Any())
-        {
             return ServiceResult<int>.BadRequest("No transaction IDs provided");
-        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
@@ -468,15 +455,12 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                     transaction.ModifiedBy = _currentUserService.GetDisplayName();
                     await _transactionReps.UpdateAsync(transaction);
                     count++;
-
-                    // AT-02: auto-re-evaluate Completed for each affected transaction.
                     await ReevaluateCompletedAsync(id);
                 }
             }
 
             await _activityLogService.LogUpdateAsync(
-                TableNames.AssetTransaction,
-                0,
+                TableNames.AssetTransaction, 0,
                 $"{count} transaction(s) approved via bulk operation",
                 _currentUserService.GetDisplayName());
 
@@ -487,9 +471,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     public async Task<ServiceResult<int>> BulkPendingAsync(BulkApprovalRequest request)
     {
         if (request.Ids == null || !request.Ids.Any())
-        {
             return ServiceResult<int>.BadRequest("No transaction IDs provided");
-        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
@@ -505,15 +487,12 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                     transaction.ModifiedBy = _currentUserService.GetDisplayName();
                     await _transactionReps.UpdateAsync(transaction);
                     count++;
-
-                    // AT-02: auto-re-evaluate Completed for each affected transaction.
                     await ReevaluateCompletedAsync(id);
                 }
             }
 
             await _activityLogService.LogUpdateAsync(
-                TableNames.AssetTransaction,
-                0,
+                TableNames.AssetTransaction, 0,
                 $"{count} transaction(s) moved to pending via bulk operation",
                 _currentUserService.GetDisplayName());
 
@@ -524,9 +503,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     public async Task<ServiceResult<int>> BulkRejectedAsync(BulkApprovalRequest request)
     {
         if (request.Ids == null || !request.Ids.Any())
-        {
             return ServiceResult<int>.BadRequest("No transaction IDs provided");
-        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
@@ -536,7 +513,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 var transaction = await _transactionReps.GetByIdRawAsync(id);
                 if (transaction != null && transaction.Approved != false && transaction.IsActive == true)
                 {
-                    // AT-08: rejected definition = IsActive = 0, Approved = 0, Completed = 0
                     transaction.Approved = false;
                     transaction.ApprovedBy = _currentUserService.GetDisplayName();
                     transaction.IsActive = false;
@@ -550,8 +526,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             }
 
             await _activityLogService.LogUpdateAsync(
-                TableNames.AssetTransaction,
-                0,
+                TableNames.AssetTransaction, 0,
                 $"{count} transaction(s) rejected via bulk operation",
                 _currentUserService.GetDisplayName());
 
@@ -568,51 +543,33 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         return await ExecuteWithTransactionAsync(async () =>
         {
             var transaction = await _transactionReps.GetByIdRawAsync(id);
-            if (transaction == null)
-            {
-                return ServiceResult.NotFound($"Transaction with id {id} not found");
-            }
+            if (transaction == null) return ServiceResult.NotFound($"Transaction with id {id} not found");
 
             if (transaction.Approved != true)
-            {
                 return ServiceResult.BadRequest("Transaction must be approved before complete");
-            }
 
             if (transaction.Completed == true)
-            {
                 return ServiceResult.BadRequest("Transaction already completed");
-            }
 
-            // Pre-check documents so we can return precise error messages.
             var requiredDocs = (await _transactionReps.GetRequiredDocumentTypesAsync(id)).ToList();
             if (requiredDocs.Count == 0)
-            {
                 return ServiceResult.BadRequest("Cannot complete: no approval document types configured in MasterData");
-            }
 
             if (!requiredDocs.All(d => d.IsUploaded))
-            {
                 return ServiceResult.BadRequest("All required documents must be uploaded before complete");
-            }
 
             var allApproved = await _transactionReps.IsAllRequiredDocumentsApprovedAsync(id);
             if (!allApproved)
-            {
                 return ServiceResult.BadRequest("All uploaded documents must be approved before complete");
-            }
 
-            // Backend source of truth: re-evaluate the flag from document state.
             await ReevaluateCompletedAsync(id);
 
             var reloaded = await _transactionReps.GetByIdRawAsync(id);
             if (reloaded?.Completed != true)
-            {
                 return ServiceResult.Failure("Failed to complete transaction: document state re-check did not yield Completed = true");
-            }
 
             await _activityLogService.LogUpdateAsync(
-                TableNames.AssetTransaction,
-                id,
+                TableNames.AssetTransaction, id,
                 $"Transaction completed",
                 _currentUserService.GetDisplayName());
 
@@ -625,24 +582,17 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         return await ExecuteWithTransactionAsync(async () =>
         {
             var transaction = await _transactionReps.GetByIdRawAsync(id);
-            if (transaction == null)
-            {
-                return ServiceResult.NotFound($"Transaction with id {id} not found");
-            }
+            if (transaction == null) return ServiceResult.NotFound($"Transaction with id {id} not found");
 
             if (transaction.Completed != true)
-            {
                 return ServiceResult.BadRequest("Transaction is not completed");
-            }
 
-            // AT-03: re-evaluate from document state rather than blindly flipping the flag.
             await ReevaluateCompletedAsync(id);
 
             var reloaded = await _transactionReps.GetByIdRawAsync(id);
 
             await _activityLogService.LogUpdateAsync(
-                TableNames.AssetTransaction,
-                id,
+                TableNames.AssetTransaction, id,
                 $"Transaction uncomplete requested; re-evaluated Completed = {reloaded?.Completed}",
                 _currentUserService.GetDisplayName());
 
@@ -688,10 +638,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         }, "get grid pending approval");
     }
 
-    // ============================================================
-    // COMPLETE TRANSACTIONS
-    // ============================================================
-
     public async Task<ServiceResult<PaginatedResult<AssetTransactionListView>>> GetCompleteTransactionsAsync(AssetTransactionGridRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -700,10 +646,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             return ServiceResult<PaginatedResult<AssetTransactionListView>>.Success(result);
         }, "get complete transactions");
     }
-
-    // ============================================================
-    // OUTSTANDING (VIEW ONLY)
-    // ============================================================
 
     public async Task<ServiceResult<PaginatedResult<AssetTransactionListView>>> GetActiveLoansAsync(AssetTransactionGridRequest request)
     {
@@ -741,10 +683,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         return await ExecuteWithTransactionAsync(async () =>
         {
             var source = await _transactionReps.GetByIdRawAsync(sourceTransactionId);
-            if (source == null)
-            {
-                return ServiceResult<AssetTransactionDetailView>.NotFound($"Source transaction with id {sourceTransactionId} not found");
-            }
+            if (source == null) return ServiceResult<AssetTransactionDetailView>.NotFound($"Source transaction with id {sourceTransactionId} not found");
 
             var returnableTypes = new[] {
                 TransactionTypeConstants.HANDOVER,
@@ -753,30 +692,20 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             };
 
             if (!returnableTypes.Contains(source.TransactionType))
-            {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest(
                     $"Transaction type {source.TransactionType} cannot be returned. Allowed: HANDOVER, LOAN, OPERATIONAL OFFICE");
-            }
 
             if (source.Approved != true)
-            {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("Source transaction must be approved");
-            }
 
             if (source.FromAssetTransactionId != null)
-            {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("Source transaction already has a paired return");
-            }
 
             int returnType;
             if (source.TransactionType == TransactionTypeConstants.LOAN)
-            {
                 returnType = TransactionTypeConstants.LOAN_RETURN;
-            }
             else
-            {
                 returnType = TransactionTypeConstants.RETURN;
-            }
 
             var returnEntity = new AssetTransactionEntity
             {
@@ -804,8 +733,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             var created = await _transactionReps.GetDetailByIdAsync(id);
 
             await _activityLogService.LogCreateAsync(
-                TableNames.AssetTransaction,
-                id,
+                TableNames.AssetTransaction, id,
                 $"RETURN created from transaction {sourceTransactionId}",
                 _currentUserService.GetDisplayName());
 
@@ -818,25 +746,16 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         return await ExecuteWithTransactionAsync(async () =>
         {
             var source = await _transactionReps.GetByIdRawAsync(sourceTransactionId);
-            if (source == null)
-            {
-                return ServiceResult<AssetTransactionDetailView>.NotFound($"Source transaction with id {sourceTransactionId} not found");
-            }
+            if (source == null) return ServiceResult<AssetTransactionDetailView>.NotFound($"Source transaction with id {sourceTransactionId} not found");
 
             if (source.TransactionType != TransactionTypeConstants.MAINTENANCE)
-            {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("Only MAINTENANCE can create POST_MAINTENANCE");
-            }
 
             if (source.Approved != true)
-            {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("Source transaction must be approved");
-            }
 
             if (source.FromAssetTransactionId != null)
-            {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("Source transaction already has a paired post-maintenance");
-            }
 
             var postEntity = new AssetTransactionEntity
             {
@@ -865,8 +784,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             var created = await _transactionReps.GetDetailByIdAsync(id);
 
             await _activityLogService.LogCreateAsync(
-                TableNames.AssetTransaction,
-                id,
+                TableNames.AssetTransaction, id,
                 $"POST_MAINTENANCE created from transaction {sourceTransactionId}",
                 _currentUserService.GetDisplayName());
 
@@ -882,20 +800,9 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     {
         var result = await _masterDataService.GetTransactionTypesAsync();
         if (!result.IsSuccess || result.Data == null)
-        {
             return ServiceResult<IEnumerable<MasterDataDto>>.Failure("Failed to get transaction types");
-        }
 
-        var addTypes = new[] {
-            TransactionTypeConstants.HANDOVER,
-            TransactionTypeConstants.TRANSFER,
-            TransactionTypeConstants.LOAN,
-            TransactionTypeConstants.MAINTENANCE,
-            TransactionTypeConstants.DISPOSAL,
-            TransactionTypeConstants.OPERATIONAL_OFFICE
-        };
-
-        var filtered = result.Data.Where(d => addTypes.Contains(d.Code));
+        var filtered = result.Data.Where(d => _addTypes.Contains(d.Code));
         return ServiceResult<IEnumerable<MasterDataDto>>.Success(filtered);
     }
 
@@ -903,9 +810,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     {
         var result = await _masterDataService.GetTransactionTypesAsync();
         if (!result.IsSuccess || result.Data == null)
-        {
             return ServiceResult<IEnumerable<MasterDataDto>>.Failure("Failed to get transaction types");
-        }
 
         var returnTypes = new[] {
             TransactionTypeConstants.RETURN,
@@ -931,9 +836,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     {
         var result = await _masterDataService.GetByReferenceNameAsync("ApproveDocumentType");
         if (!result.IsSuccess || result.Data == null)
-        {
             return ServiceResult<IEnumerable<ApproveDocumentTypeDto>>.Failure("Failed to get approve document types");
-        }
 
         var dtos = result.Data.Select(d => new ApproveDocumentTypeDto
         {
@@ -956,9 +859,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         {
             var assetsResult = await _assetService.GetDropdownListByTransactionTypeAsync(transactionTypeId);
             if (!assetsResult.IsSuccess || assetsResult.Data == null)
-            {
                 return ServiceResult<IEnumerable<AssetTransactionAssetDto>>.Failure("Failed to get assets");
-            }
 
             var result = assetsResult.Data.Select(a => new AssetTransactionAssetDto
             {
@@ -980,9 +881,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         {
             var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
             if (transaction == null)
-            {
                 return ServiceResult<IEnumerable<AssetTransactionAttachmentView>>.NotFound($"Transaction with id {transactionId} not found");
-            }
 
             var attachments = await _transactionReps.GetAttachmentsByTransactionIdAsync(transactionId);
             return ServiceResult<IEnumerable<AssetTransactionAttachmentView>>.Success(attachments);
@@ -995,9 +894,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         {
             var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
             if (transaction == null)
-            {
                 return ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>.NotFound($"Transaction with id {transactionId} not found");
-            }
 
             var attachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(transactionId);
             return ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>.Success(attachments);
@@ -1009,25 +906,15 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         return await ExecuteSafelyAsync(async () =>
         {
             var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
-            if (transaction == null)
-            {
-                return ServiceResult<FileContentDto>.NotFound($"Transaction with id {transactionId} not found");
-            }
+            if (transaction == null) return ServiceResult<FileContentDto>.NotFound($"Transaction with id {transactionId} not found");
 
-            // Ownership check: the attachment must belong to this transaction.
             var attachments = await _transactionReps.GetAttachmentsByTransactionIdAsync(transactionId);
             if (!attachments.Any(a => a.FileAttachmentId == fileAttachmentId))
-            {
                 return ServiceResult<FileContentDto>.NotFound($"Attachment {fileAttachmentId} not found for transaction {transactionId}");
-            }
 
-            // Delegate to the internal FileAttachment service — shared service with
-            // no HTTP surface of its own.
             var downloadResult = await _fileAttachmentService.DownloadAsync(fileAttachmentId);
             if (!downloadResult.IsSuccess || downloadResult.Data == null)
-            {
                 return ServiceResult<FileContentDto>.NotFound($"Attachment file {fileAttachmentId} could not be retrieved");
-            }
 
             return downloadResult;
         }, "get transaction attachment file");
@@ -1038,23 +925,15 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         return await ExecuteSafelyAsync(async () =>
         {
             var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
-            if (transaction == null)
-            {
-                return ServiceResult<FileContentDto>.NotFound($"Transaction with id {transactionId} not found");
-            }
+            if (transaction == null) return ServiceResult<FileContentDto>.NotFound($"Transaction with id {transactionId} not found");
 
-            // Ownership check: the approve attachment must belong to this transaction.
             var attachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(transactionId);
             if (!attachments.Any(a => a.FileAttachmentId == fileAttachmentId))
-            {
                 return ServiceResult<FileContentDto>.NotFound($"Approve attachment {fileAttachmentId} not found for transaction {transactionId}");
-            }
 
             var downloadResult = await _fileAttachmentService.DownloadAsync(fileAttachmentId);
             if (!downloadResult.IsSuccess || downloadResult.Data == null)
-            {
                 return ServiceResult<FileContentDto>.NotFound($"Approve attachment file {fileAttachmentId} could not be retrieved");
-            }
 
             return downloadResult;
         }, "get transaction approve attachment file");
@@ -1070,9 +949,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         {
             var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
             if (transaction == null)
-            {
                 return ServiceResult<IEnumerable<RequiredDocumentTypeDto>>.NotFound($"Transaction with id {transactionId} not found");
-            }
 
             var required = await _transactionReps.GetRequiredDocumentTypesAsync(transactionId);
             return ServiceResult<IEnumerable<RequiredDocumentTypeDto>>.Success(required);
@@ -1083,59 +960,40 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         int transactionId, int attachmentId, ApproveAttachmentActionDto dto)
     {
         if (dto == null || string.IsNullOrWhiteSpace(dto.Action))
-        {
             return ServiceResult<AssetTransactionDetailView>.BadRequest("Action is required");
-        }
 
         var action = dto.Action.Trim().ToLowerInvariant();
         if (action != "approve" && action != "revision")
-        {
             return ServiceResult<AssetTransactionDetailView>.BadRequest(
                 $"Invalid action '{dto.Action}'. Supported: approve, revision");
-        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
             var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
-            if (transaction == null)
-            {
-                return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {transactionId} not found");
-            }
+            if (transaction == null) return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {transactionId} not found");
 
             var attachment = await _transactionReps.GetApproveAttachmentByIdAsync(attachmentId);
-            if (attachment == null)
-            {
-                return ServiceResult<AssetTransactionDetailView>.NotFound($"Approve attachment with id {attachmentId} not found");
-            }
+            if (attachment == null) return ServiceResult<AssetTransactionDetailView>.NotFound($"Approve attachment with id {attachmentId} not found");
 
             if (attachment.AssetTransactionId != transactionId)
-            {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest(
                     $"Approve attachment {attachmentId} does not belong to transaction {transactionId}");
-            }
 
             if (action == "approve")
             {
                 if (attachment.Approved)
-                {
                     return ServiceResult<AssetTransactionDetailView>.BadRequest("Document is already approved");
-                }
                 if (attachment.NeedToChange)
-                {
                     return ServiceResult<AssetTransactionDetailView>.BadRequest(
                         "Document is marked for revision. Upload the revised document before approving.");
-                }
                 attachment.Approved = true;
                 attachment.NeedToChange = false;
             }
-            else // revision
+            else
             {
                 if (attachment.Approved)
-                {
-                    // AT-10: prevent silently invalidating a completed transaction.
                     return ServiceResult<AssetTransactionDetailView>.BadRequest(
                         "Cannot mark an approved document for revision. Re-upload the document to replace it.");
-                }
                 attachment.Approved = false;
                 attachment.NeedToChange = true;
             }
@@ -1145,12 +1003,10 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             await _transactionReps.UpdateApproveAttachmentAsync(attachment);
 
             await _activityLogService.LogUpdateAsync(
-                TableNames.AssetTransaction,
-                transactionId,
+                TableNames.AssetTransaction, transactionId,
                 $"Approval document {attachmentId} (Type {attachment.DocumentType}) action: {action}",
                 _currentUserService.GetDisplayName());
 
-            // AT-01/AT-02: re-evaluate Completed after document action.
             await ReevaluateCompletedAsync(transactionId);
 
             var updated = await _transactionReps.GetDetailByIdAsync(transactionId);
@@ -1162,14 +1018,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     // PRIVATE HELPERS
     // ============================================================
 
-    /// <summary>
-    /// AT-01 / AT-02: Backend source of truth for Completed.
-    /// Sets Completed = 1 iff (IsActive = 1) AND (Approved = 1) AND
-    /// (all required approval document types have been uploaded) AND
-    /// (all of them are approved and none is flagged for revision).
-    /// Otherwise sets Completed = 0.
-    /// No-op when the transaction does not exist.
-    /// </summary>
     private async Task ReevaluateCompletedAsync(int transactionId)
     {
         var transaction = await _transactionReps.GetByIdRawAsync(transactionId);
@@ -1183,7 +1031,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
             if (requiredDocs.Count == 0)
             {
-                // AT-11: avoid silently completing when MasterData is misconfigured.
                 _logger.LogWarning(
                     "Transaction {TransactionId}: no ApproveDocumentType entries configured in MasterData; Completed will not be set.",
                     transactionId);
@@ -1209,137 +1056,115 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         }
     }
 
+    private async Task<ServiceResult<AssetTransactionDetailView>?> ValidateTransactionReferencesAsync(
+        int assetId,
+        int transactionType,
+        int? employeeId,
+        int? officeId,
+        int? condition,
+        int? maintenanceType,
+        DateTime transactionDate,
+        DateTime? expectedLoanReturnDate)
+    {
+        if (!_addTypes.Contains(transactionType))
+            return ServiceResult<AssetTransactionDetailView>.BadRequest(
+                $"Transaction type {transactionType} cannot be set manually. Use shortcut endpoint.");
+
+        var assetResult = await _assetService.GetByIdAsync(assetId);
+        if (!assetResult.IsSuccess || assetResult.Data == null)
+            return ServiceResult<AssetTransactionDetailView>.BadRequest($"Asset with id {assetId} not found");
+
+        var typeName = await _masterDataService.GetValueAsync("TransactionType", transactionType);
+        if (!typeName.IsSuccess || typeName.Data == null)
+            return ServiceResult<AssetTransactionDetailView>.BadRequest($"Invalid TransactionType: {transactionType}");
+
+        if (transactionType == TransactionTypeConstants.HANDOVER && !employeeId.HasValue)
+            return ServiceResult<AssetTransactionDetailView>.BadRequest("HANDOVER requires EmployeeId");
+
+        if (transactionType == TransactionTypeConstants.TRANSFER && !employeeId.HasValue)
+            return ServiceResult<AssetTransactionDetailView>.BadRequest("TRANSFER requires EmployeeId (receiver)");
+
+        if (transactionType == TransactionTypeConstants.LOAN)
+        {
+            if (!employeeId.HasValue)
+                return ServiceResult<AssetTransactionDetailView>.BadRequest("LOAN requires EmployeeId");
+            if (!expectedLoanReturnDate.HasValue)
+                return ServiceResult<AssetTransactionDetailView>.BadRequest("LOAN requires ExpectedLoanReturnDate");
+            if (expectedLoanReturnDate.Value <= transactionDate)
+                return ServiceResult<AssetTransactionDetailView>.BadRequest("ExpectedLoanReturnDate must be after TransactionDate");
+        }
+
+        if (transactionType == TransactionTypeConstants.MAINTENANCE && !maintenanceType.HasValue)
+            return ServiceResult<AssetTransactionDetailView>.BadRequest("MAINTENANCE requires MaintenanceType");
+
+        if (transactionType == TransactionTypeConstants.OPERATIONAL_OFFICE && !officeId.HasValue)
+            return ServiceResult<AssetTransactionDetailView>.BadRequest("OPERATIONAL OFFICE requires OfficeId");
+
+        if (employeeId.HasValue)
+        {
+            var employee = await _employeeService.GetByIdAsync(employeeId.Value);
+            if (!employee.IsSuccess || employee.Data == null)
+                return ServiceResult<AssetTransactionDetailView>.BadRequest($"Employee with id {employeeId} not found");
+        }
+
+        if (officeId.HasValue)
+        {
+            var office = await _officeService.GetByIdAsync(officeId.Value);
+            if (!office.IsSuccess || office.Data == null)
+                return ServiceResult<AssetTransactionDetailView>.BadRequest($"Office with id {officeId} not found");
+        }
+
+        if (condition.HasValue)
+        {
+            var cond = await _masterDataService.GetValueAsync("AssetCondition", condition.Value);
+            if (!cond.IsSuccess || cond.Data == null)
+                return ServiceResult<AssetTransactionDetailView>.BadRequest($"Invalid Condition: {condition}");
+        }
+
+        if (maintenanceType.HasValue)
+        {
+            var mt = await _masterDataService.GetValueAsync("MaintenanceType", maintenanceType.Value);
+            if (!mt.IsSuccess || mt.Data == null)
+                return ServiceResult<AssetTransactionDetailView>.BadRequest($"Invalid MaintenanceType: {maintenanceType}");
+        }
+
+        return null;
+    }
+
     private async Task<ServiceResult<AssetTransactionDetailView>?> ValidateTransactionAsync(
         AssetTransactionCreateViewModel model, AssetTransactionEntity? existing)
     {
-        var assetResult = await _assetService.GetByIdAsync(model.AssetId);
-        if (!assetResult.IsSuccess || assetResult.Data == null)
-        {
-            return ServiceResult<AssetTransactionDetailView>.NotFound($"Asset with id {model.AssetId} not found");
-        }
+        var shared = await ValidateTransactionReferencesAsync(
+            model.AssetId,
+            model.TransactionType,
+            model.EmployeeId,
+            model.OfficeId,
+            model.Condition,
+            model.MaintenanceType,
+            model.TransactionDate,
+            model.ExpectedLoanReturnDate);
 
-        var typeName = await _masterDataService.GetValueAsync("TransactionType", model.TransactionType);
-        if (!typeName.IsSuccess || typeName.Data == null)
-        {
-            return ServiceResult<AssetTransactionDetailView>.BadRequest($"Invalid TransactionType: {model.TransactionType}");
-        }
+        if (shared != null) return shared;
 
-        var type = model.TransactionType;
-
-        if (type == TransactionTypeConstants.HANDOVER && !model.EmployeeId.HasValue)
-        {
-            return ServiceResult<AssetTransactionDetailView>.BadRequest("HANDOVER requires EmployeeId");
-        }
-
-        if (type == TransactionTypeConstants.TRANSFER)
-        {
-            if (!model.EmployeeId.HasValue)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest("TRANSFER requires EmployeeId (receiver)");
-            }
-            if (!model.FromAssetTransactionId.HasValue)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest("TRANSFER requires FromAssetTransactionId");
-            }
-        }
-
-        if (type == TransactionTypeConstants.LOAN)
-        {
-            if (!model.EmployeeId.HasValue)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest("LOAN requires EmployeeId");
-            }
-            if (!model.ExpectedLoanReturnDate.HasValue)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest("LOAN requires ExpectedLoanReturnDate");
-            }
-            if (model.ExpectedLoanReturnDate.Value <= model.TransactionDate)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest("ExpectedLoanReturnDate must be after TransactionDate");
-            }
-        }
-
-        if (type == TransactionTypeConstants.MAINTENANCE)
-        {
-            if (!model.MaintenanceType.HasValue)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest("MAINTENANCE requires MaintenanceType");
-            }
-        }
-
-        if (type == TransactionTypeConstants.OPERATIONAL_OFFICE)
-        {
-            if (!model.OfficeId.HasValue)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest("OPERATIONAL OFFICE requires OfficeId");
-            }
-        }
-
-        if (type == TransactionTypeConstants.LOAN_RETURN || type == TransactionTypeConstants.POST_MAINTENANCE)
-        {
-            return ServiceResult<AssetTransactionDetailView>.BadRequest($"Transaction type {type} cannot be created manually. Use shortcut endpoint.");
-        }
-
-        if (model.EmployeeId.HasValue)
-        {
-            var employee = await _employeeService.GetByIdAsync(model.EmployeeId.Value);
-            if (!employee.IsSuccess || employee.Data == null)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest($"Employee with id {model.EmployeeId} not found");
-            }
-        }
-
-        if (model.OfficeId.HasValue)
-        {
-            var office = await _officeService.GetByIdAsync(model.OfficeId.Value);
-            if (!office.IsSuccess || office.Data == null)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest($"Office with id {model.OfficeId} not found");
-            }
-        }
-
-        if (model.Condition.HasValue)
-        {
-            var condition = await _masterDataService.GetValueAsync("AssetCondition", model.Condition.Value);
-            if (!condition.IsSuccess || condition.Data == null)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest($"Invalid Condition: {model.Condition}");
-            }
-        }
-
-        if (model.MaintenanceType.HasValue)
-        {
-            var maintType = await _masterDataService.GetValueAsync("MaintenanceType", model.MaintenanceType.Value);
-            if (!maintType.IsSuccess || maintType.Data == null)
-            {
-                return ServiceResult<AssetTransactionDetailView>.BadRequest($"Invalid MaintenanceType: {model.MaintenanceType}");
-            }
-        }
+        if (model.TransactionType == TransactionTypeConstants.TRANSFER && !model.FromAssetTransactionId.HasValue)
+            return ServiceResult<AssetTransactionDetailView>.BadRequest("TRANSFER requires FromAssetTransactionId");
 
         if (model.FromAssetTransactionId.HasValue)
         {
             var source = await _transactionReps.GetByIdRawAsync(model.FromAssetTransactionId.Value);
             if (source == null || source.IsActive == false)
-            {
                 return ServiceResult<AssetTransactionDetailView>.NotFound($"Source transaction {model.FromAssetTransactionId} not found");
-            }
             if (source.Approved != true)
-            {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("Source transaction must be approved");
-            }
             if (source.FromAssetTransactionId != null)
-            {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("Source transaction already has a paired transaction");
-            }
         }
 
         if (!model.FromAssetTransactionId.HasValue)
         {
             var active = await _transactionReps.GetActiveTransactionByAssetIdAsync(model.AssetId);
             if (active != null)
-            {
                 return ServiceResult<AssetTransactionDetailView>.BadRequest($"Asset is currently in active transaction: {active.TransactionTypeName}");
-            }
         }
 
         return null;
@@ -1383,9 +1208,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 isPrimary: false);
 
             if (!fileResult.IsSuccess || fileResult.Data == null)
-            {
                 throw new Exception($"Upload attachment failed: {string.Join(", ", fileResult.Errors)}");
-            }
 
             var attachmentEntity = new AssetTransactionAttachmentEntity
             {
@@ -1421,12 +1244,8 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 isPrimary: false);
 
             if (!fileResult.IsSuccess || fileResult.Data == null)
-            {
                 throw new Exception($"Upload approve attachment failed: {string.Join(", ", fileResult.Errors)}");
-            }
 
-            // AT-16: enforce one active approval attachment per (TransactionId, DocumentType).
-            // Any previously active attachment of the same type is soft-deleted before the new one is inserted.
             var existingApproveAttachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(transactionId);
             foreach (var att in existingApproveAttachments.Where(a => a.DocumentType == documentType))
             {

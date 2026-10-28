@@ -67,12 +67,27 @@ public class OfficeReps : IOfficeReps
         return await _context.ExecuteScalarAsync<int>(sql, new { OfficeId = officeId });
     }
 
+    public async Task<int> GetEmployeeCountAsync(int officeId)
+    {
+        // No IsActive filter: FK on Employee.OfficeId fires for any Employee row.
+        const string sql = "SELECT COUNT(*) FROM Employee WHERE OfficeId = @OfficeId";
+        return await _context.ExecuteScalarAsync<int>(sql, new { OfficeId = officeId });
+    }
+
+    public async Task<int> GetAssetTransactionCountAsync(int officeId)
+    {
+        // No IsActive filter: FK on AssetTransaction.OfficeId fires for any row.
+        const string sql = "SELECT COUNT(*) FROM AssetTransaction WHERE OfficeId = @OfficeId";
+        return await _context.ExecuteScalarAsync<int>(sql, new { OfficeId = officeId });
+    }
+
     // ============================================================
     // GET METHODS - return View
     // ============================================================
 
     public async Task<OfficeDetailView?> GetDetailByIdAsync(int officeId)
     {
+        // No IsActive filter: detail-by-id must return the record in any state.
         const string sql = @"
             SELECT 
                 o.OfficeId, o.OfficeCode, o.OfficeName, o.OfficeType,
@@ -84,7 +99,7 @@ public class OfficeReps : IOfficeReps
             FROM Office o
             LEFT JOIN Office p ON o.ParentOfficeId = p.OfficeId
             LEFT JOIN MasterData md ON o.OfficeType = md.ReferenceCode AND md.ReferenceName = 'OfficeType' AND md.IsActive = 1
-            WHERE o.OfficeId = @OfficeId AND o.IsActive = 1";
+            WHERE o.OfficeId = @OfficeId";
 
         return await _context.QueryFirstOrDefaultAsync<OfficeDetailView>(sql, new { OfficeId = officeId });
     }
@@ -109,7 +124,7 @@ public class OfficeReps : IOfficeReps
     }
 
     // ============================================================
-    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
+    // PAGINATION
     // ============================================================
 
     public async Task<PaginatedResult<OfficeListView>> GetPagedListAsync(OfficeGridRequest request)

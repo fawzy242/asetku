@@ -3,6 +3,7 @@ using Whitebird.Infra.Database;
 using Whitebird.Domain.Features.AssetTransaction;
 using Whitebird.Domain.Features.MasterData;
 using Whitebird.Domain.Features.Common;
+using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.AssetTransaction;
 
@@ -16,6 +17,65 @@ public class AssetTransactionReps : IAssetTransactionReps
     public AssetTransactionReps(DapperContext context)
     {
         _context = context;
+    }
+
+    // ============================================================
+    // SHARED SQL HELPERS
+    // ============================================================
+
+    /// <summary>
+    /// Builds a safe ORDER BY clause for asset transaction grids.
+    /// </summary>
+    private static string BuildSafeOrderBy(string? requestedSortBy, bool sortDescending)
+    {
+        const string defaultSort = "t.TransactionDate";
+
+        var sortBy = !string.IsNullOrEmpty(requestedSortBy) && GridQueryBuilder.IsSafeSortColumn(requestedSortBy)
+            ? requestedSortBy!
+            : defaultSort;
+
+        if (!sortBy.Contains('.'))
+        {
+            sortBy = $"t.{sortBy}";
+        }
+
+        return $"ORDER BY {sortBy} {(sortDescending ? "DESC" : "ASC")}";
+    }
+
+    /// <summary>
+    /// Applies OFFSET / FETCH parameters, clamping PageSize to
+    /// <see cref="GridQueryBuilder.MaxPageSize"/> except the int.MaxValue sentinel.
+    /// </summary>
+    private static void AddPaginationParameters(int page, int pageSize, DynamicParameters parameters)
+    {
+        var effectivePageSize = GridQueryBuilder.ClampPageSize(pageSize);
+        var effectivePage = page <= 0 ? 1 : page;
+        var offset = effectivePageSize == int.MaxValue ? 0 : (effectivePage - 1) * effectivePageSize;
+        parameters.Add("@Offset", offset);
+        parameters.Add("@PageSize", effectivePageSize);
+    }
+
+    /// <summary>
+    /// Loads the master list of required approve document types from MasterData.
+    /// </summary>
+    private async Task<List<ApproveDocumentTypeMaster>> GetMasterApproveDocumentTypesAsync()
+    {
+        const string sql = @"
+            SELECT 
+                ReferenceCode AS DocumentType,
+                MasterDataName AS DocumentTypeName
+            FROM MasterData
+            WHERE ReferenceName = 'ApproveDocumentType' AND IsActive = 1
+            ORDER BY ReferenceCode";
+
+        var rows = await _context.QueryAsync<ApproveDocumentTypeMaster>(sql);
+        return rows.ToList();
+    }
+
+    private sealed class ApproveDocumentTypeMaster
+    {
+        public int DocumentType { get; set; }
+        public string? DocumentTypeName { get; set; }
     }
 
     // ============================================================
@@ -60,7 +120,7 @@ public class AssetTransactionReps : IAssetTransactionReps
     }
 
     // ============================================================
-    // GRID - ADD
+    // GRID - ADD / RETURN
     // ============================================================
 
     public async Task<PaginatedResult<AssetTransactionListView>> GetGridAddAsync(AssetTransactionGridRequest request)
@@ -76,10 +136,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         return await GetGridBaseAsync(request, addTypes, false);
     }
-
-    // ============================================================
-    // GRID - RETURN
-    // ============================================================
 
     public async Task<PaginatedResult<AssetTransactionListView>> GetGridReturnAsync(AssetTransactionGridRequest request)
     {
@@ -101,8 +157,6 @@ public class AssetTransactionReps : IAssetTransactionReps
         var ids = transactionIds.ToList();
         if (!ids.Any()) return new Dictionary<int, List<AssetTransactionAttachmentView>>();
 
-        // Attachment URLs resolve to the AssetTransaction menu's own download
-        // endpoint. FileAttachment has no HTTP surface of its own.
         const string sql = @"
             SELECT 
                 ata.AssetTransactionId,
@@ -131,8 +185,6 @@ public class AssetTransactionReps : IAssetTransactionReps
         var ids = transactionIds.ToList();
         if (!ids.Any()) return new Dictionary<int, List<AssetTransactionApproveAttachmentView>>();
 
-        // Approve-attachment URLs resolve to the AssetTransaction menu's own
-        // approve-attachments download endpoint.
         const string sql = @"
             SELECT 
                 ataa.AssetTransactionId,
@@ -161,6 +213,51 @@ public class AssetTransactionReps : IAssetTransactionReps
     }
 
     // ============================================================
+    // BATCH PAIR LOOKUP (Fixes N+1 in action-flag calculation)
+    // ============================================================
+
+    private async Task<Dictionary<int, HashSet<int>>> GetPairedTransactionsAsync(IEnumerable<int> rootIds)
+    {
+        var ids = rootIds.Distinct().ToList();
+        if (!ids.Any()) return new Dictionary<int, HashSet<int>>();
+
+        const string sql = @"
+            SELECT FromAssetTransactionId, TransactionType
+            FROM AssetTransaction
+            WHERE FromAssetTransactionId IN @Ids
+              AND TransactionType IN (@ReturnType, @LoanReturnType, @PostType)
+              AND IsActive = 1";
+
+        var parameters = new
+        {
+            Ids = ids,
+            ReturnType = TransactionTypeConstants.RETURN,
+            LoanReturnType = TransactionTypeConstants.LOAN_RETURN,
+            PostType = TransactionTypeConstants.POST_MAINTENANCE
+        };
+
+        var rows = await _context.QueryAsync<PairedTransactionRow>(sql, parameters);
+
+        var result = new Dictionary<int, HashSet<int>>();
+        foreach (var row in rows)
+        {
+            if (!result.TryGetValue(row.FromAssetTransactionId, out var types))
+            {
+                types = new HashSet<int>();
+                result[row.FromAssetTransactionId] = types;
+            }
+            types.Add(row.TransactionType);
+        }
+        return result;
+    }
+
+    private sealed class PairedTransactionRow
+    {
+        public int FromAssetTransactionId { get; set; }
+        public int TransactionType { get; set; }
+    }
+
+    // ============================================================
     // GRID - BASE
     // ============================================================
 
@@ -174,10 +271,6 @@ public class AssetTransactionReps : IAssetTransactionReps
         parameters.Add("@TransactionTypes", transactionTypes);
         conditions.Add("t.IsActive = 1");
 
-        // ============================================================
-        // Status Filter
-        // AT-09: Pending widened to include both NULL and 0 (Approved = 0).
-        // ============================================================
         if (!string.IsNullOrWhiteSpace(request.Status))
         {
             switch (request.Status.ToLower())
@@ -235,14 +328,7 @@ public class AssetTransactionReps : IAssetTransactionReps
         }
 
         var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
-
-        var sortBy = string.IsNullOrEmpty(request.SortBy) ? "t.TransactionDate" : request.SortBy;
-        if (!sortBy.StartsWith("t.") && !sortBy.StartsWith("a.") && !sortBy.StartsWith("e."))
-        {
-            sortBy = $"t.{sortBy}";
-        }
-
-        var orderBy = $"ORDER BY {sortBy} {(request.SortDescending ? "DESC" : "ASC")}";
+        var orderBy = BuildSafeOrderBy(request.SortBy, request.SortDescending);
 
         var countSql = $@"
         SELECT COUNT(*)
@@ -253,9 +339,7 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        var offset = (request.Page - 1) * request.PageSize;
-        parameters.Add("@Offset", offset);
-        parameters.Add("@PageSize", request.PageSize);
+        AddPaginationParameters(request.Page, request.PageSize, parameters);
 
         var selectClause = @"
         SELECT 
@@ -295,6 +379,7 @@ public class AssetTransactionReps : IAssetTransactionReps
             var transactionIds = result.Select(x => x.AssetTransactionId).ToList();
             var attachmentsDict = await GetAttachmentsForTransactionsAsync(transactionIds);
             var approveAttachmentsDict = await GetApproveAttachmentsForTransactionsAsync(transactionIds);
+            var pairedByRoot = await GetPairedTransactionsAsync(transactionIds);
 
             foreach (var item in result)
             {
@@ -328,7 +413,7 @@ public class AssetTransactionReps : IAssetTransactionReps
                     }).ToList();
                 }
 
-                var flags = await CalculateActionFlagsAsync(item, isReturnGrid);
+                var flags = CalculateActionFlags(item, isReturnGrid, pairedByRoot);
                 item.CanEdit = flags.CanEdit;
                 item.CanDelete = flags.CanDelete;
                 item.CanReturn = flags.CanReturn;
@@ -347,11 +432,13 @@ public class AssetTransactionReps : IAssetTransactionReps
     }
 
     // ============================================================
-    // ACTION FLAGS
+    // ACTION FLAGS (pure in-memory; no DB access)
     // ============================================================
 
-    private async Task<(bool CanEdit, bool CanDelete, bool CanReturn, bool CanPost)> CalculateActionFlagsAsync(
-        AssetTransactionListView item, bool isReturnGrid)
+    private static (bool CanEdit, bool CanDelete, bool CanReturn, bool CanPost) CalculateActionFlags(
+        AssetTransactionListView item,
+        bool isReturnGrid,
+        IReadOnlyDictionary<int, HashSet<int>> pairedByRoot)
     {
         bool canEdit = false, canDelete = false, canReturn = false, canPost = false;
 
@@ -373,41 +460,27 @@ public class AssetTransactionReps : IAssetTransactionReps
 
             if (item.FromAssetTransactionId == null && item.Approved == true)
             {
-                var hasReturn = await HasPairedTransactionAsync(item.AssetTransactionId, item.TransactionType);
-                var hasPost = await HasPostMaintenanceAsync(item.AssetTransactionId);
+                var pairedTypes = pairedByRoot.TryGetValue(item.AssetTransactionId, out var types)
+                    ? types
+                    : null;
 
                 if (item.TransactionType == TransactionTypeConstants.MAINTENANCE)
                 {
+                    var hasPost = pairedTypes?.Contains(TransactionTypeConstants.POST_MAINTENANCE) ?? false;
                     canPost = !hasPost;
                 }
                 else
                 {
+                    var pairedReturnType = item.TransactionType == TransactionTypeConstants.LOAN
+                        ? TransactionTypeConstants.LOAN_RETURN
+                        : TransactionTypeConstants.RETURN;
+                    var hasReturn = pairedTypes?.Contains(pairedReturnType) ?? false;
                     canReturn = !hasReturn;
                 }
             }
         }
 
         return (canEdit, canDelete, canReturn, canPost);
-    }
-
-    private async Task<bool> HasPairedTransactionAsync(int transactionId, int transactionType)
-    {
-        if (transactionType == TransactionTypeConstants.LOAN)
-        {
-            const string sql = "SELECT COUNT(1) FROM AssetTransaction WHERE FromAssetTransactionId = @Id AND TransactionType = @ReturnType AND IsActive = 1";
-            return await _context.ExecuteScalarAsync<int>(sql, new { Id = transactionId, ReturnType = TransactionTypeConstants.LOAN_RETURN }) > 0;
-        }
-        else
-        {
-            const string sql = "SELECT COUNT(1) FROM AssetTransaction WHERE FromAssetTransactionId = @Id AND TransactionType = @ReturnType AND IsActive = 1";
-            return await _context.ExecuteScalarAsync<int>(sql, new { Id = transactionId, ReturnType = TransactionTypeConstants.RETURN }) > 0;
-        }
-    }
-
-    private async Task<bool> HasPostMaintenanceAsync(int transactionId)
-    {
-        const string sql = "SELECT COUNT(1) FROM AssetTransaction WHERE FromAssetTransactionId = @Id AND TransactionType = @PostType AND IsActive = 1";
-        return await _context.ExecuteScalarAsync<int>(sql, new { Id = transactionId, PostType = TransactionTypeConstants.POST_MAINTENANCE }) > 0;
     }
 
     // ============================================================
@@ -423,15 +496,6 @@ public class AssetTransactionReps : IAssetTransactionReps
         conditions.Add("(t.Completed IS NULL OR t.Completed = 0)");
         conditions.Add("t.IsActive = 1");
 
-        // ============================================================
-        // AT-04 — Defense-in-depth:
-        // Exclude transactions that already have every required approval-document
-        // type attached. Those satisfy the "Uncompleted" definition only when
-        // all docs are attached; further exclusion is intentional here to keep
-        // the query aligned with the business definition and to prevent the
-        // Pending Approval query from returning transactions whose document
-        // state is already complete-eligible.
-        // ============================================================
         conditions.Add(@"
             NOT EXISTS (
                 SELECT 1
@@ -484,14 +548,7 @@ public class AssetTransactionReps : IAssetTransactionReps
         }
 
         var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
-
-        var sortBy = string.IsNullOrEmpty(request.SortBy) ? "t.TransactionDate" : request.SortBy;
-        if (!sortBy.StartsWith("t.") && !sortBy.StartsWith("a.") && !sortBy.StartsWith("e."))
-        {
-            sortBy = $"t.{sortBy}";
-        }
-
-        var orderBy = $"ORDER BY {sortBy} {(request.SortDescending ? "DESC" : "ASC")}";
+        var orderBy = BuildSafeOrderBy(request.SortBy, request.SortDescending);
 
         var countSql = $@"
             SELECT COUNT(*)
@@ -502,9 +559,7 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        var offset = (request.Page - 1) * request.PageSize;
-        parameters.Add("@Offset", offset);
-        parameters.Add("@PageSize", request.PageSize);
+        AddPaginationParameters(request.Page, request.PageSize, parameters);
 
         var dataSql = $@"
             SELECT 
@@ -528,44 +583,56 @@ public class AssetTransactionReps : IAssetTransactionReps
         var data = await _context.QueryAsync<AssetTransactionPendingApprovalView>(dataSql, parameters);
 
         var result = data.ToList();
-        foreach (var item in result)
+        if (result.Any())
         {
-            var attachments = await GetApproveAttachmentsByTransactionIdAsync(item.AssetTransactionId);
-            item.Attachments = attachments.Select(a => new ApproveAttachmentStatusDto
-            {
-                AttachmentId = a.AssetTransactionApproveAttachmentId,
-                DocumentType = a.DocumentType,
-                DocumentTypeName = a.DocumentTypeName,
-                IsRequired = a.IsRequired,
-                IsUploaded = true,
-                NeedToChange = a.NeedToChange,
-                Approved = a.Approved,
-                FileName = a.OriginalFileName
-            }).ToList();
+            var transactionIds = result.Select(x => x.AssetTransactionId).ToList();
+            var approveAttachmentsDict = await GetApproveAttachmentsForTransactionsAsync(transactionIds);
+            var masterDocTypes = await GetMasterApproveDocumentTypesAsync();
 
-            var requiredDocs = await GetRequiredDocumentTypesAsync(item.AssetTransactionId);
-            foreach (var doc in requiredDocs.Where(d => !d.IsUploaded))
+            foreach (var item in result)
             {
-                item.Attachments.Add(new ApproveAttachmentStatusDto
+                var itemAttachments = approveAttachmentsDict.TryGetValue(item.AssetTransactionId, out var list)
+                    ? list
+                    : new List<AssetTransactionApproveAttachmentView>();
+
+                item.Attachments = itemAttachments.Select(a => new ApproveAttachmentStatusDto
                 {
-                    DocumentType = doc.DocumentType,
-                    DocumentTypeName = doc.DocumentTypeName,
-                    IsRequired = doc.IsRequired,
-                    IsUploaded = false,
-                    NeedToChange = false,
-                    Approved = false
-                });
-            }
+                    AttachmentId = a.AssetTransactionApproveAttachmentId,
+                    DocumentType = a.DocumentType,
+                    DocumentTypeName = a.DocumentTypeName,
+                    IsRequired = a.IsRequired,
+                    IsUploaded = true,
+                    NeedToChange = a.NeedToChange,
+                    Approved = a.Approved,
+                    FileName = a.OriginalFileName
+                }).ToList();
 
-            item.AllAttachmentsApproved = item.Attachments.All(a => !a.IsRequired || a.Approved);
-            item.HasNeedToChange = item.Attachments.Any(a => a.NeedToChange);
+                var uploadedDocTypes = new HashSet<int>(itemAttachments.Select(a => a.DocumentType));
+                foreach (var required in masterDocTypes)
+                {
+                    if (uploadedDocTypes.Contains(required.DocumentType)) continue;
 
-            if (item.AllAttachmentsApproved && !item.HasNeedToChange)
-            {
-                item.CanEdit = false;
-                item.CanDelete = false;
-                item.CanReturn = false;
-                item.CanPost = false;
+                    item.Attachments.Add(new ApproveAttachmentStatusDto
+                    {
+                        DocumentType = required.DocumentType,
+                        DocumentTypeName = required.DocumentTypeName,
+                        IsRequired = true,
+                        IsUploaded = false,
+                        NeedToChange = false,
+                        Approved = false
+                    });
+                }
+
+                item.AllAttachmentsApproved = item.Attachments.All(a => !a.IsRequired || a.Approved);
+                item.HasNeedToChange = item.Attachments.Any(a => a.NeedToChange);
+
+                if (item.AllAttachmentsApproved && !item.HasNeedToChange)
+                {
+                    item.CanEdit = false;
+                    item.CanDelete = false;
+                    item.CanReturn = false;
+                    item.CanPost = false;
+                }
             }
         }
 
@@ -626,14 +693,7 @@ public class AssetTransactionReps : IAssetTransactionReps
         }
 
         var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
-
-        var sortBy = string.IsNullOrEmpty(request.SortBy) ? "t.TransactionDate" : request.SortBy;
-        if (!sortBy.StartsWith("t.") && !sortBy.StartsWith("a.") && !sortBy.StartsWith("e."))
-        {
-            sortBy = $"t.{sortBy}";
-        }
-
-        var orderBy = $"ORDER BY {sortBy} {(request.SortDescending ? "DESC" : "ASC")}";
+        var orderBy = BuildSafeOrderBy(request.SortBy, request.SortDescending);
 
         var countSql = $@"
             SELECT COUNT(*)
@@ -644,9 +704,7 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        var offset = (request.Page - 1) * request.PageSize;
-        parameters.Add("@Offset", offset);
-        parameters.Add("@PageSize", request.PageSize);
+        AddPaginationParameters(request.Page, request.PageSize, parameters);
 
         var dataSql = $@"
             SELECT 
@@ -730,14 +788,7 @@ public class AssetTransactionReps : IAssetTransactionReps
         }
 
         var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
-
-        var sortBy = string.IsNullOrEmpty(request.SortBy) ? "t.ExpectedLoanReturnDate" : request.SortBy;
-        if (!sortBy.StartsWith("t.") && !sortBy.StartsWith("a.") && !sortBy.StartsWith("e."))
-        {
-            sortBy = $"t.{sortBy}";
-        }
-
-        var orderBy = $"ORDER BY {sortBy} {(request.SortDescending ? "DESC" : "ASC")}";
+        var orderBy = BuildSafeOrderBy(request.SortBy, request.SortDescending);
 
         var countSql = $@"
             SELECT COUNT(*)
@@ -748,9 +799,7 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        var offset = (request.Page - 1) * request.PageSize;
-        parameters.Add("@Offset", offset);
-        parameters.Add("@PageSize", request.PageSize);
+        AddPaginationParameters(request.Page, request.PageSize, parameters);
 
         var dataSql = $@"
             SELECT 
@@ -827,14 +876,7 @@ public class AssetTransactionReps : IAssetTransactionReps
         }
 
         var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
-
-        var sortBy = string.IsNullOrEmpty(request.SortBy) ? "t.TransactionDate" : request.SortBy;
-        if (!sortBy.StartsWith("t.") && !sortBy.StartsWith("a.") && !sortBy.StartsWith("e."))
-        {
-            sortBy = $"t.{sortBy}";
-        }
-
-        var orderBy = $"ORDER BY {sortBy} {(request.SortDescending ? "DESC" : "ASC")}";
+        var orderBy = BuildSafeOrderBy(request.SortBy, request.SortDescending);
 
         var countSql = $@"
             SELECT COUNT(*)
@@ -844,9 +886,7 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        var offset = (request.Page - 1) * request.PageSize;
-        parameters.Add("@Offset", offset);
-        parameters.Add("@PageSize", request.PageSize);
+        AddPaginationParameters(request.Page, request.PageSize, parameters);
 
         var dataSql = $@"
             SELECT 
@@ -934,6 +974,47 @@ public class AssetTransactionReps : IAssetTransactionReps
     }
 
     // ============================================================
+    // HARD-DELETE FK DEPENDENCY COUNTS (H9)
+    // ============================================================
+    // No IsActive filter: an inactive row still satisfies its FK on
+    // AssetTransaction, so hard-delete must be refused in either case.
+
+    public async Task<int> GetAttachmentCountAsync(int transactionId)
+    {
+        const string sql = "SELECT COUNT(*) FROM AssetTransactionAttachment WHERE AssetTransactionId = @TransactionId";
+        return await _context.ExecuteScalarAsync<int>(sql, new { TransactionId = transactionId });
+    }
+
+    public async Task<int> GetApproveAttachmentCountAsync(int transactionId)
+    {
+        const string sql = "SELECT COUNT(*) FROM AssetTransactionApproveAttachment WHERE AssetTransactionId = @TransactionId";
+        return await _context.ExecuteScalarAsync<int>(sql, new { TransactionId = transactionId });
+    }
+
+    public async Task<int> GetScheduleHandoverCountAsync(int transactionId)
+    {
+        const string sql = "SELECT COUNT(*) FROM ScheduleHandover WHERE HandoverAssetTransactionId = @TransactionId";
+        return await _context.ExecuteScalarAsync<int>(sql, new { TransactionId = transactionId });
+    }
+
+    public async Task<int> GetScheduleReturnCountAsync(int transactionId)
+    {
+        const string sql = "SELECT COUNT(*) FROM ScheduleReturn WHERE ReturnAssetTransactionId = @TransactionId";
+        return await _context.ExecuteScalarAsync<int>(sql, new { TransactionId = transactionId });
+    }
+
+    public async Task<int> GetScheduleMaintenanceCountAsync(int transactionId)
+    {
+        // Two FK columns point at AssetTransaction from ScheduleMaintenance:
+        // MaintenanceAssetTransactionId and PostAssetTransactionId.
+        const string sql = @"
+            SELECT COUNT(*) FROM ScheduleMaintenance 
+            WHERE MaintenanceAssetTransactionId = @TransactionId 
+               OR PostAssetTransactionId = @TransactionId";
+        return await _context.ExecuteScalarAsync<int>(sql, new { TransactionId = transactionId });
+    }
+
+    // ============================================================
     // CRUD
     // ============================================================
 
@@ -1017,8 +1098,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
     public async Task<IEnumerable<AssetTransactionAttachmentView>> GetAttachmentsByTransactionIdAsync(int transactionId)
     {
-        // Attachment URLs resolve to the AssetTransaction menu's own download
-        // endpoint. FileAttachment has no HTTP surface of its own.
         const string sql = @"
             SELECT 
                 ata.AssetTransactionAttachmentId, ata.AssetTransactionId, ata.FileAttachmentId,
@@ -1072,8 +1151,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
     public async Task<IEnumerable<AssetTransactionApproveAttachmentView>> GetApproveAttachmentsByTransactionIdAsync(int transactionId)
     {
-        // Approve-attachment URLs resolve to the AssetTransaction menu's own
-        // approve-attachments download endpoint.
         const string sql = @"
             SELECT 
                 ataa.AssetTransactionApproveAttachmentId, ataa.AssetTransactionId, ataa.FileAttachmentId,
@@ -1211,14 +1288,7 @@ public class AssetTransactionReps : IAssetTransactionReps
         }
 
         var whereClause = $"WHERE {string.Join(" AND ", conditions)}";
-
-        var sortBy = string.IsNullOrEmpty(request.SortBy) ? "t.TransactionDate" : request.SortBy;
-        if (!sortBy.StartsWith("t.") && !sortBy.StartsWith("a.") && !sortBy.StartsWith("e."))
-        {
-            sortBy = $"t.{sortBy}";
-        }
-
-        var orderBy = $"ORDER BY {sortBy} {(request.SortDescending ? "DESC" : "ASC")}";
+        var orderBy = BuildSafeOrderBy(request.SortBy, request.SortDescending);
 
         var countSql = $@"
         SELECT COUNT(*)
@@ -1229,9 +1299,7 @@ public class AssetTransactionReps : IAssetTransactionReps
 
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
-        var offset = (request.Page - 1) * request.PageSize;
-        parameters.Add("@Offset", offset);
-        parameters.Add("@PageSize", request.PageSize);
+        AddPaginationParameters(request.Page, request.PageSize, parameters);
 
         var selectClause = @"
         SELECT 

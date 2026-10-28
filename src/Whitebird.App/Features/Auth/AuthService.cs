@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.Common;
@@ -112,10 +113,16 @@ public class AuthService : BaseService, IAuthService
 
             if (user == null || !user.IsActive)
             {
+                // Non-enumerating response: same message whether the email exists or not.
                 return ServiceResult.Success("If your email is registered, you will receive a password reset link");
             }
 
-            var resetToken = new Random().Next(100000, 999999).ToString();
+            // Cryptographic RNG. The token is a bearer credential (valid 1 hour) and
+            // must not be produced by System.Random. Range [100000, 1000000) →
+            // every 6-digit numeric string is reachable. Format unchanged: 6 digits,
+            // fits Users.ResetToken NVARCHAR(255), consumed verbatim by the email
+            // template and by ResetPasswordWithTokenAsync.
+            var resetToken = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
             var resetTokenExpiry = DateTime.Now.AddHours(1);
 
             var updated = await _authReps.UpdateResetTokenAsync(user.UserId, resetToken, resetTokenExpiry);

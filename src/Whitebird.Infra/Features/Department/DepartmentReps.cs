@@ -73,13 +73,14 @@ public class DepartmentReps : IDepartmentReps
 
     public async Task<DepartmentDetailView?> GetDetailByIdAsync(int departmentId)
     {
+        // No IsActive filter: detail-by-id must return the record in any state.
         const string sql = @"
             SELECT 
                 d.DepartmentId, d.DepartmentCode, d.DepartmentName, d.Description,
                 d.IsActive, d.CreatedDate, d.CreatedBy, d.ModifiedDate, d.ModifiedBy,
                 (SELECT COUNT(*) FROM Employee WHERE DepartmentId = d.DepartmentId AND IsActive = 1) as EmployeeCount
             FROM Department d
-            WHERE d.DepartmentId = @DepartmentId AND d.IsActive = 1";
+            WHERE d.DepartmentId = @DepartmentId";
 
         return await _context.QueryFirstOrDefaultAsync<DepartmentDetailView>(sql, new { DepartmentId = departmentId });
     }
@@ -99,7 +100,7 @@ public class DepartmentReps : IDepartmentReps
     }
 
     // ============================================================
-    // PAGINATION - FIXED: tambah CanEdit dan CanDelete
+    // PAGINATION
     // ============================================================
 
     public async Task<PaginatedResult<DepartmentListView>> GetPagedListAsync(DepartmentGridRequest request)

@@ -51,11 +51,53 @@ public static class ControllerHelper
         };
     }
 
+    /// <summary>
+    /// Validates ModelState and returns a structured <c>400 BadRequest</c> when
+    /// invalid. Response includes both the flat <c>errors</c> list (backward
+    /// compatible) and a per-field <c>fieldErrors</c> dictionary so callers can
+    /// highlight specific inputs.
+    /// </summary>
     public static IActionResult? HandleModelState(this ControllerBase controller)
     {
         if (controller.ModelState.IsValid) return null;
 
-        var errors = controller.ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
-        return controller.BadRequest(ServiceResult.Failure(string.Join("; ", errors), "Validation failed"));
+        var fieldErrors = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var flatErrors = new List<string>();
+
+        foreach (var kvp in controller.ModelState)
+        {
+            var fieldName = string.IsNullOrEmpty(kvp.Key) ? "(general)" : kvp.Key;
+            var messages = new List<string>();
+
+            foreach (var error in kvp.Value.Errors)
+            {
+                var message = string.IsNullOrEmpty(error.ErrorMessage)
+                    ? error.Exception?.Message ?? "Validation failed"
+                    : error.ErrorMessage;
+
+                if (!string.IsNullOrEmpty(message))
+                    messages.Add(message);
+            }
+
+            if (messages.Count == 0) continue;
+
+            // Accumulate under the field name (ModelState can report multiple
+            // entries for the same key if multiple attributes fail).
+            if (fieldErrors.TryGetValue(fieldName, out var existing))
+            {
+                existing.AddRange(messages);
+            }
+            else
+            {
+                fieldErrors[fieldName] = messages;
+            }
+
+            foreach (var m in messages)
+                flatErrors.Add($"{fieldName}: {m}");
+        }
+
+        var result = ServiceResult.BadRequest(flatErrors, "Validation failed");
+        result.FieldErrors = fieldErrors;
+        return controller.BadRequest(result);
     }
 }

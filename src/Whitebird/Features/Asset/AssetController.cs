@@ -70,6 +70,12 @@ public class AssetController : ControllerBase
     // ============================================================
     // IMPORT
     // ============================================================
+    //
+    // H9: EPPlus reads only the OpenXML .xlsx format. It has never supported
+    // the legacy BIFF8 .xls binary format, so the previous "(.xlsx or .xls)"
+    // promise never matched reality — a valid .xls file reached ExcelPackage
+    // and threw, exposing the raw exception to the client. Narrowing the gate
+    // to .xlsx makes the promise truthful.
 
     [HttpPost("import")]
     public async Task<IActionResult> Import(IFormFile file)
@@ -78,9 +84,9 @@ public class AssetController : ControllerBase
             return BadRequest("No file provided");
 
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (extension != ".xlsx" && extension != ".xls")
+        if (extension != ".xlsx")
         {
-            return BadRequest("Unsupported file format. Please upload Excel file (.xlsx or .xls).");
+            return BadRequest("Unsupported file format. Please upload an Excel Workbook (.xlsx).");
         }
 
         using var stream = file.OpenReadStream();
@@ -138,9 +144,6 @@ public class AssetController : ControllerBase
     // PHOTO PROFILE
     // ============================================================
 
-    /// <summary>
-    /// Get asset profile photo. Returns the image bytes with the correct Content-Type.
-    /// </summary>
     [HttpGet("{id:int}/photo")]
     public async Task<IActionResult> GetPhoto(int id)
     {
@@ -151,9 +154,6 @@ public class AssetController : ControllerBase
         return File(result.Data.Bytes, result.Data.ContentType);
     }
 
-    /// <summary>
-    /// Upload (or replace) the asset profile photo.
-    /// </summary>
     [HttpPost("{id:int}/photo")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadPhoto(int id, IFormFile file)
@@ -164,9 +164,6 @@ public class AssetController : ControllerBase
         return this.HandleResult(await _assetService.UploadPhotoAsync(id, file));
     }
 
-    /// <summary>
-    /// Delete the asset profile photo (soft-delete).
-    /// </summary>
     [HttpDelete("{id:int}/photo")]
     public async Task<IActionResult> DeletePhoto(int id)
         => this.HandleResult(await _assetService.DeletePhotoAsync(id));
@@ -175,16 +172,10 @@ public class AssetController : ControllerBase
     // ATTACHMENTS
     // ============================================================
 
-    /// <summary>
-    /// Get asset attachment list.
-    /// </summary>
     [HttpGet("{id:int}/attachments")]
     public async Task<IActionResult> GetAttachments(int id)
         => this.HandleResult(await _assetService.GetAttachmentsAsync(id));
 
-    /// <summary>
-    /// Upload a standalone attachment (does not require sending the whole asset).
-    /// </summary>
     [HttpPost("{id:int}/attachments")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadAttachment(int id, [FromForm] AttachmentUploadDto model)
@@ -198,17 +189,10 @@ public class AssetController : ControllerBase
         return this.HandleResult(await _assetService.UploadAttachmentAsync(id, model));
     }
 
-    /// <summary>
-    /// Delete a single attachment (soft-delete).
-    /// </summary>
     [HttpDelete("{id:int}/attachments/{fileAttachmentId:int}")]
     public async Task<IActionResult> DeleteAttachment(int id, int fileAttachmentId)
         => this.HandleResult(await _assetService.DeleteAttachmentAsync(id, fileAttachmentId));
 
-    /// <summary>
-    /// Download a specific attachment belonging to this asset.
-    /// Streams the raw bytes with the correct Content-Type and original file name.
-    /// </summary>
     [HttpGet("{id:int}/attachments/{fileAttachmentId:int}/download")]
     public async Task<IActionResult> DownloadAttachment(int id, int fileAttachmentId)
     {

@@ -4,9 +4,6 @@ using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.Employee;
 
-/// <summary>
-/// Repository interface for Employee operations
-/// </summary>
 public interface IEmployeeReps
 {
     // ============================================================
@@ -15,6 +12,22 @@ public interface IEmployeeReps
 
     Task<EmployeeEntity?> GetByIdRawAsync(int employeeId);
     Task<bool> IsEmployeeCodeExistsAsync(string employeeCode, int? excludeEmployeeId = null);
+
+    /// <summary>
+    /// Counts AssetTransaction rows pointing at this employee (EmployeeId or
+    /// MaintenanceEmployeeId). Hard-delete FK guard.
+    /// </summary>
+    Task<int> GetAssetTransactionCountAsync(int employeeId);
+
+    /// <summary>
+    /// Counts ScheduleHandover rows pointing at this employee. Hard-delete FK guard.
+    /// </summary>
+    Task<int> GetScheduleHandoverCountAsync(int employeeId);
+
+    /// <summary>
+    /// Counts ScheduleReturn rows pointing at this employee. Hard-delete FK guard.
+    /// </summary>
+    Task<int> GetScheduleReturnCountAsync(int employeeId);
 
     // ============================================================
     // DETAIL VIEW METHODS
@@ -46,7 +59,7 @@ public interface IEmployeeReps
     Task<int> DeleteAttachmentsByEmployeeIdAsync(int employeeId);
 
     // ============================================================
-    // EMPLOYEE PHOTO PROFILE (NEW)
+    // EMPLOYEE PHOTO PROFILE
     // ============================================================
 
     Task<int> InsertPhotoProfileAsync(EmployeePhotoProfileAttachmentEntity entity);

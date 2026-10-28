@@ -9,6 +9,7 @@ using Whitebird.Domain.Features.MasterData;
 using Whitebird.Domain.Features.Department;
 using Whitebird.Domain.Features.Office;
 using Whitebird.Domain.Features.FileAttachment;
+using Whitebird.Domain.Features.Roles;
 using Whitebird.App.Features.Asset;
 using Whitebird.App.Features.AssetTransaction;
 using Whitebird.App.Features.Category;
@@ -18,6 +19,7 @@ using Whitebird.App.Features.Department;
 using Whitebird.App.Features.Office;
 using Whitebird.App.Features.FileAttachment;
 using Whitebird.App.Features.MasterData;
+using Whitebird.App.Features.Roles;
 
 namespace Whitebird.App.DependencyInjection;
 
@@ -184,5 +186,22 @@ public static class MapsterServiceRegistration
         TypeAdapterConfig<MasterDataEntity, MasterDataDto>.NewConfig()
             .Map(dest => dest.Code, src => src.ReferenceCode)
             .Map(dest => dest.Name, src => src.MasterDataName ?? string.Empty);
+
+        // ========== ROLES MAPPINGS ==========
+        TypeAdapterConfig<RolesListView, RolesListViewModel>.NewConfig()
+            .Map(dest => dest.RoleId, src => src.RoleId)
+            .Map(dest => dest.RoleCode, src => src.RoleCode)
+            .Map(dest => dest.RoleName, src => src.RoleName ?? string.Empty)
+            .Map(dest => dest.Description, src => src.Description)
+            .Map(dest => dest.AssignedUserCount, src => src.AssignedUserCount)
+            .Map(dest => dest.IsActive, src => src.IsActive);
+
+        TypeAdapterConfig<RolesCreateViewModel, RolesEntity>.NewConfig()
+            .Ignore(dest => dest.RoleId)
+            .Ignore(dest => dest.IsActive)
+            .Ignore(dest => dest.CreatedDate)
+            .Ignore(dest => dest.CreatedBy)
+            .Ignore(dest => dest.ModifiedDate)
+            .Ignore(dest => dest.ModifiedBy);
     }
 }

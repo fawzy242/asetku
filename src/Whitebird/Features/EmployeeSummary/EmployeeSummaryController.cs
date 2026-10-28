@@ -45,28 +45,41 @@ public class EmployeeSummaryController : ControllerBase
         => this.HandleResult(await _employeeSummaryService.GetStatsAsync(employeeId));
 
     // ============================================================
-    // CURRENT HOLDING - Using GridRequest
+    // CURRENT HOLDING — route employeeId is the source of truth
     // ============================================================
+    //
+    // Pre-H7 the {employeeId:int} route parameter was declared but ignored; the
+    // service read request.EmployeeId from the querystring. Route-only clients
+    // received 0 rows. The route is now bound into the request before delegation.
 
     [HttpGet("{employeeId:int}/current-holding")]
-    public async Task<IActionResult> GetCurrentHolding([FromQuery] EmployeeSummaryGridRequest request)
-        => this.HandleResult(await _employeeSummaryService.GetCurrentHoldingAsync(request));
+    public async Task<IActionResult> GetCurrentHolding(int employeeId, [FromQuery] EmployeeSummaryGridRequest request)
+    {
+        request.EmployeeId = employeeId;
+        return this.HandleResult(await _employeeSummaryService.GetCurrentHoldingAsync(request));
+    }
 
     // ============================================================
-    // ASSETS HISTORY - Using GridRequest
+    // ASSETS HISTORY — route employeeId is the source of truth
     // ============================================================
 
     [HttpGet("{employeeId:int}/assets-history")]
-    public async Task<IActionResult> GetAssetsHistory([FromQuery] EmployeeSummaryGridRequest request)
-        => this.HandleResult(await _employeeSummaryService.GetAssetsHistoryAsync(request));
+    public async Task<IActionResult> GetAssetsHistory(int employeeId, [FromQuery] EmployeeSummaryGridRequest request)
+    {
+        request.EmployeeId = employeeId;
+        return this.HandleResult(await _employeeSummaryService.GetAssetsHistoryAsync(request));
+    }
 
     // ============================================================
-    // TRANSACTION HISTORY - Using GridRequest
+    // TRANSACTION HISTORY — route employeeId is the source of truth
     // ============================================================
 
     [HttpGet("{employeeId:int}/transaction-history")]
-    public async Task<IActionResult> GetTransactionHistory([FromQuery] EmployeeSummaryGridRequest request)
-        => this.HandleResult(await _employeeSummaryService.GetTransactionHistoryAsync(request));
+    public async Task<IActionResult> GetTransactionHistory(int employeeId, [FromQuery] EmployeeSummaryGridRequest request)
+    {
+        request.EmployeeId = employeeId;
+        return this.HandleResult(await _employeeSummaryService.GetTransactionHistoryAsync(request));
+    }
 
     // ============================================================
     // CURRENT HOLDING STATS (Chart)

@@ -16,6 +16,13 @@ builder.Services.AddEndpointsApiExplorer();
 // NOTE: AddHttpContextAccessor() is called inside AddApplicationServices().
 // Do not add a second registration here.
 builder.Services.AddAuthentication("Session").AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>("Session", null);
+// H10: explicit authorization services. Standard ASP.NET Core practice — never
+// depend on framework-version-specific implicit registration. If the runtime
+// would have registered these anyway, this is a no-op; if it would not, this
+// is the difference between "every [Authorize] attribute is enforced" and
+// "every [Authorize] attribute is a silent no-op". Relying on this being
+// implicitly registered is not a safe assumption across .NET versions.
+builder.Services.AddAuthorization();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddApplicationServices();
 builder.Services.AddMapsterConfiguration();
@@ -46,7 +53,6 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // ========== CORS ==========
-// Production-ready CORS: restrict to configured origins
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
                      ?? new[] { "http://localhost:3000", "http://localhost:4200", "http://localhost:8080" };
 
@@ -92,9 +98,6 @@ builder.Logging.AddDebug();
 var app = builder.Build();
 
 // ========== CONFIGURATION VALIDATION ==========
-// Fail fast on invalid configuration (missing connection string, missing storage path,
-// default credentials, etc.). Previously the ConfigurationValidator helper existed but
-// was never invoked.
 var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
 if (!ConfigurationValidator.Validate(app.Configuration, startupLogger))
 {
@@ -102,9 +105,6 @@ if (!ConfigurationValidator.Validate(app.Configuration, startupLogger))
 }
 
 // ========== DATABASE MIGRATION ==========
-// Wrapped in a Polly retry policy so transient SQL errors during startup do not take
-// the app down. The policy is only invoked here; queries are not retried at runtime
-// (TransactionScope semantics are not retry-friendly).
 var migrationRetryPolicy = PollyRetryPolicy.CreateRetryPolicy(startupLogger, maxRetries: 3, retryDelaySeconds: 2);
 await migrationRetryPolicy.ExecuteAsync(() =>
 {
@@ -115,15 +115,20 @@ await migrationRetryPolicy.ExecuteAsync(() =>
 });
 
 // ========== MIDDLEWARE ==========
+// H10: response compression moved to the TOP of the pipeline (before static
+// files and the SPA fallback branch). Previously it was placed after the SPA
+// branch, which meant static-file responses short-circuited before reaching it,
+// and SPA-fallback responses entered a branch that never returned to the main
+// pipeline — so neither was compressed. Only API responses were. Microsoft's
+// recommended placement is before UseStaticFiles, which is now the case.
+app.UseResponseCompression();
+
 app.UseCors();
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseMiddleware<AuthRateLimitingMiddleware>();
 
 // ========== SWAGGER ==========
-// Swagger is exposed only when Swagger:Enabled is true. Development defaults to true;
-// Production config explicitly sets it to false. This prevents accidental API-doc
-// exposure on public deployments.
 var swaggerEnabled = app.Configuration.GetValue<bool?>("Swagger:Enabled")
                      ?? app.Environment.IsDevelopment();
 
@@ -149,7 +154,6 @@ app.MapWhen(ctx => !ctx.Request.Path.StartsWithSegments("/api") &&
 });
 
 // ========== ENDPOINTS ==========
-app.UseResponseCompression();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();

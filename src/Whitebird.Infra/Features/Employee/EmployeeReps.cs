@@ -6,9 +6,6 @@ using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.Infra.Features.Employee;
 
-/// <summary>
-/// Repository implementation for Employee operations using Dapper
-/// </summary>
 public class EmployeeReps : IEmployeeReps
 {
     private readonly DapperContext _context;
@@ -44,6 +41,33 @@ public class EmployeeReps : IEmployeeReps
     }
 
     // ============================================================
+    // HARD-DELETE FK GUARDS
+    // ============================================================
+    // No IsActive filter on any of these: FKs fire for any dependent row.
+
+    public async Task<int> GetAssetTransactionCountAsync(int employeeId)
+    {
+        // Employee appears on two FK columns in AssetTransaction:
+        // EmployeeId (receiver) and MaintenanceEmployeeId (maintenance assignee).
+        const string sql = @"
+            SELECT COUNT(*) FROM AssetTransaction 
+            WHERE EmployeeId = @EmployeeId OR MaintenanceEmployeeId = @EmployeeId";
+        return await _context.ExecuteScalarAsync<int>(sql, new { EmployeeId = employeeId });
+    }
+
+    public async Task<int> GetScheduleHandoverCountAsync(int employeeId)
+    {
+        const string sql = "SELECT COUNT(*) FROM ScheduleHandover WHERE EmployeeId = @EmployeeId";
+        return await _context.ExecuteScalarAsync<int>(sql, new { EmployeeId = employeeId });
+    }
+
+    public async Task<int> GetScheduleReturnCountAsync(int employeeId)
+    {
+        const string sql = "SELECT COUNT(*) FROM ScheduleReturn WHERE EmployeeId = @EmployeeId";
+        return await _context.ExecuteScalarAsync<int>(sql, new { EmployeeId = employeeId });
+    }
+
+    // ============================================================
     // GET METHODS - return View
     // ============================================================
 
@@ -70,8 +94,6 @@ public class EmployeeReps : IEmployeeReps
 
         if (result != null)
         {
-            // Photo profile — resolves through the Employee menu's own photo endpoint
-            // (GET /api/Employee/{id}/photo). FileAttachment has no HTTP surface of its own.
             var photoSql = @"
             SELECT TOP 1
                 fa.FileAttachmentId,
@@ -87,8 +109,6 @@ public class EmployeeReps : IEmployeeReps
                 result.PhotoProfileUrl = photo.FileUrl;
             }
 
-            // Attachments — resolve through the Employee menu's own download endpoint
-            // (GET /api/Employee/{id}/attachments/{fileAttachmentId}/download).
             var attSql = @"
             SELECT 
                 ea.EmployeeAttachmentId,

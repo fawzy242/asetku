@@ -13,12 +13,9 @@ using Whitebird.Infra.Features.Supplier;
 
 namespace Whitebird.App.Features.Asset;
 
-/// <summary>
-/// Service implementation for Asset business logic
-/// </summary>
 public class AssetService : BaseService, IAssetService
 {
-    private readonly IGenericRepository<AssetEntity> _repository;
+    private readonly ICommonReps _repository;
     private readonly IAssetReps _assetReps;
     private readonly ICategoryReps _categoryReps;
     private readonly ISupplierReps _supplierReps;
@@ -29,7 +26,7 @@ public class AssetService : BaseService, IAssetService
     private readonly IFileAttachmentService _fileAttachmentService;
 
     public AssetService(
-        IGenericRepository<AssetEntity> repository,
+        ICommonReps repository,
         IAssetReps assetReps,
         ICategoryReps categoryReps,
         ISupplierReps supplierReps,
@@ -61,9 +58,7 @@ public class AssetService : BaseService, IAssetService
         {
             var asset = await _assetReps.GetDetailByIdAsync(id);
             if (asset == null)
-            {
                 return ServiceResult<AssetDetailView>.NotFound($"Asset with id {id} not found");
-            }
 
             var software = await _assetReps.GetSoftwareInstallationByAssetIdAsync(id);
             if (software != null)
@@ -111,9 +106,7 @@ public class AssetService : BaseService, IAssetService
         {
             var category = await _categoryReps.GetByIdRawAsync(categoryId);
             if (category == null)
-            {
                 return ServiceResult<IEnumerable<AssetListView>>.NotFound($"Category with id {categoryId} not found");
-            }
 
             var assets = await _assetReps.GetByCategoryListViewAsync(categoryId);
             return ServiceResult<IEnumerable<AssetListView>>.Success(assets);
@@ -123,39 +116,22 @@ public class AssetService : BaseService, IAssetService
     public async Task<ServiceResult<AssetDetailView>> CreateAsync(AssetCreateViewModel model)
     {
         if (string.IsNullOrWhiteSpace(model.AssetCode))
-        {
             return ServiceResult<AssetDetailView>.BadRequest("Asset code is required");
-        }
-
         if (string.IsNullOrWhiteSpace(model.AssetName))
-        {
             return ServiceResult<AssetDetailView>.BadRequest("Asset name is required");
-        }
-
         if (model.CategoryId <= 0)
-        {
             return ServiceResult<AssetDetailView>.BadRequest("Valid category is required");
-        }
 
-        var codeExists = await _assetReps.IsAssetCodeExistsAsync(model.AssetCode);
-        if (codeExists)
-        {
+        if (await _assetReps.IsAssetCodeExistsAsync(model.AssetCode))
             return ServiceResult<AssetDetailView>.Conflict($"Asset code '{model.AssetCode}' already exists");
-        }
 
-        var category = await _categoryReps.GetByIdRawAsync(model.CategoryId);
-        if (category == null)
-        {
+        if (await _categoryReps.GetByIdRawAsync(model.CategoryId) == null)
             return ServiceResult<AssetDetailView>.BadRequest($"Category with id {model.CategoryId} does not exist");
-        }
 
         if (model.SupplierId.HasValue && model.SupplierId.Value > 0)
         {
-            var supplier = await _supplierReps.GetByIdRawAsync(model.SupplierId.Value);
-            if (supplier == null)
-            {
+            if (await _supplierReps.GetByIdRawAsync(model.SupplierId.Value) == null)
                 return ServiceResult<AssetDetailView>.BadRequest($"Supplier with id {model.SupplierId} does not exist");
-            }
         }
 
         return await ExecuteWithTransactionAsync(async () =>
@@ -183,8 +159,7 @@ public class AssetService : BaseService, IAssetService
             if (created != null)
             {
                 await _activityLogService.LogCreateAsync(
-                    TableNames.Asset,
-                    created.AssetId,
+                    TableNames.Asset, created.AssetId,
                     $"Asset '{created.AssetCode}' - '{created.AssetName}' created successfully",
                     _currentUserService.GetDisplayName());
             }
@@ -197,19 +172,36 @@ public class AssetService : BaseService, IAssetService
 
     public async Task<ServiceResult<AssetDetailView>> UpdateAsync(int id, AssetUpdateFormDto model)
     {
-        var codeExists = await _assetReps.IsAssetCodeExistsAsync(model.AssetCode, id);
-        if (codeExists)
-        {
+        if (string.IsNullOrWhiteSpace(model.AssetCode))
+            return ServiceResult<AssetDetailView>.BadRequest("Asset code is required");
+        if (string.IsNullOrWhiteSpace(model.AssetName))
+            return ServiceResult<AssetDetailView>.BadRequest("Asset name is required");
+        if (model.CategoryId <= 0)
+            return ServiceResult<AssetDetailView>.BadRequest("Valid category is required");
+
+        if (await _assetReps.IsAssetCodeExistsAsync(model.AssetCode, id))
             return ServiceResult<AssetDetailView>.Conflict($"Asset code '{model.AssetCode}' already exists");
+
+        if (await _categoryReps.GetByIdRawAsync(model.CategoryId) == null)
+            return ServiceResult<AssetDetailView>.BadRequest($"Category with id {model.CategoryId} does not exist");
+
+        if (model.SupplierId.HasValue && model.SupplierId.Value > 0)
+        {
+            if (await _supplierReps.GetByIdRawAsync(model.SupplierId.Value) == null)
+                return ServiceResult<AssetDetailView>.BadRequest($"Supplier with id {model.SupplierId} does not exist");
+        }
+
+        if (model.AssetConditionPurchase.HasValue)
+        {
+            var cond = await _masterDataService.GetValueAsync("AssetConditionPurchase", model.AssetConditionPurchase.Value);
+            if (!cond.IsSuccess || cond.Data == null)
+                return ServiceResult<AssetDetailView>.BadRequest($"Invalid AssetConditionPurchase: {model.AssetConditionPurchase}");
         }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _assetReps.GetByIdRawAsync(id);
-            if (existing == null)
-            {
-                return ServiceResult<AssetDetailView>.NotFound($"Asset with id {id} not found");
-            }
+            if (existing == null) return ServiceResult<AssetDetailView>.NotFound($"Asset with id {id} not found");
 
             existing.AssetCode = model.AssetCode;
             existing.AssetName = model.AssetName;
@@ -263,7 +255,6 @@ public class AssetService : BaseService, IAssetService
                     await _assetReps.DeletePhotoProfileByAssetIdAsync(id);
                     await _fileAttachmentService.DeleteAsync(oldPhoto.FileAttachmentId);
                 }
-
                 await AddPhotoProfileFromBase64Async(id, model.PhotoFileBase64, model.PhotoFileName ?? "photo.jpg");
             }
 
@@ -299,9 +290,7 @@ public class AssetService : BaseService, IAssetService
 
             var updated = await _assetReps.GetDetailByIdAsync(id);
 
-            await _activityLogService.LogUpdateAsync(
-                TableNames.Asset,
-                id,
+            await _activityLogService.LogUpdateAsync(TableNames.Asset, id,
                 $"Asset updated: Code '{model.AssetCode}', Name '{model.AssetName}'",
                 _currentUserService.GetDisplayName());
 
@@ -309,24 +298,88 @@ public class AssetService : BaseService, IAssetService
         }, "update asset");
     }
 
+    // ============================================================
+    // DELETE
+    // ============================================================
+
+    /// <summary>
+    /// Determines whether the asset can be hard-deleted. Blocks on
+    /// AssetTransaction and Schedule* dependents (business records).
+    /// Attachments / photo profile / software installation are cascaded
+    /// automatically by <see cref="CascadeDeleteDependentsAsync"/>.
+    /// </summary>
+    private async Task<string?> GetDeleteBlockReasonAsync(int id)
+    {
+        var transactionCount = await _assetReps.GetAssetTransactionCountAsync(id);
+        if (transactionCount > 0)
+            return $"Cannot delete asset with {transactionCount} associated transaction(s)";
+
+        var handoverCount = await _assetReps.GetScheduleHandoverCountAsync(id);
+        if (handoverCount > 0)
+            return $"Cannot delete asset with {handoverCount} associated handover schedule(s)";
+
+        var returnCount = await _assetReps.GetScheduleReturnCountAsync(id);
+        if (returnCount > 0)
+            return $"Cannot delete asset with {returnCount} associated return schedule(s)";
+
+        var maintenanceCount = await _assetReps.GetScheduleMaintenanceCountAsync(id);
+        if (maintenanceCount > 0)
+            return $"Cannot delete asset with {maintenanceCount} associated maintenance schedule(s)";
+
+        return null;
+    }
+
+    /// <summary>
+    /// Hard-deletes the asset's dependent rows that are otherwise inaccessible
+    /// via the API (attachments, photo profile, software installation).
+    /// FileAttachment metadata is soft-deleted first (matching the pattern used
+    /// during UpdateAsync attachment removal), then the join row is hard-deleted
+    /// so the FK on the asset is cleared. Runs inside the caller's transaction.
+    /// </summary>
+    private async Task CascadeDeleteDependentsAsync(int id)
+    {
+        // Asset attachments
+        var attachments = await _assetReps.GetAttachmentsByAssetIdAsync(id);
+        foreach (var att in attachments)
+        {
+            await _fileAttachmentService.DeleteAsync(att.FileAttachmentId);
+            await _repository.DeleteAsync<AssetAttachmentEntity>(att.AssetAttachmentId);
+        }
+
+        // Asset photo profile (0 or 1)
+        var photo = await _assetReps.GetPhotoProfileByAssetIdAsync(id);
+        if (photo != null)
+        {
+            await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
+            await _repository.DeleteAsync<AssetPhotoProfileAttachmentEntity>(photo.AssetPhotoProfileAttachmentId);
+        }
+
+        // Software installation (0 or 1 due to UNIQUE(AssetId))
+        var software = await _assetReps.GetSoftwareInstallationByAssetIdAsync(id);
+        if (software != null)
+        {
+            await _repository.DeleteAsync<SoftwareInstallationEntity>(software.SoftwareInstallationId);
+        }
+    }
+
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _assetReps.GetByIdRawAsync(id);
-            if (existing == null)
-            {
-                return ServiceResult.NotFound($"Asset with id {id} not found");
-            }
+            if (existing == null) return ServiceResult.NotFound($"Asset with id {id} not found");
 
-            await _assetReps.DeleteSoftwareInstallationByAssetIdAsync(id);
-            var result = await _repository.DeleteAsync(id);
+            var blockReason = await GetDeleteBlockReasonAsync(id);
+            if (blockReason != null)
+                return ServiceResult.BadRequest(blockReason);
+
+            await CascadeDeleteDependentsAsync(id);
+
+            var result = await _repository.DeleteAsync<AssetEntity>(id);
 
             if (result > 0)
             {
-                await _activityLogService.LogDeleteAsync(
-                    TableNames.Asset,
-                    id,
+                await _activityLogService.LogDeleteAsync(TableNames.Asset, id,
                     $"Asset '{existing.AssetCode}' - '{existing.AssetName}' deleted permanently",
                     _currentUserService.GetDisplayName());
             }
@@ -342,10 +395,7 @@ public class AssetService : BaseService, IAssetService
         return await ExecuteWithTransactionAsync(async () =>
         {
             var existing = await _assetReps.GetByIdRawAsync(id);
-            if (existing == null)
-            {
-                return ServiceResult.NotFound($"Asset with id {id} not found");
-            }
+            if (existing == null) return ServiceResult.NotFound($"Asset with id {id} not found");
 
             await _assetReps.DeleteSoftwareInstallationByAssetIdAsync(id);
 
@@ -357,9 +407,7 @@ public class AssetService : BaseService, IAssetService
 
             if (result > 0)
             {
-                await _activityLogService.LogSoftDeleteAsync(
-                    TableNames.Asset,
-                    id,
+                await _activityLogService.LogSoftDeleteAsync(TableNames.Asset, id,
                     $"Asset '{existing.AssetCode}' - '{existing.AssetName}' soft deleted",
                     _currentUserService.GetDisplayName());
             }
@@ -379,19 +427,13 @@ public class AssetService : BaseService, IAssetService
         return await ExecuteSafelyAsync(async () =>
         {
             var filters = new Dictionary<string, object>();
-
             if (!string.IsNullOrEmpty(request.Status)) filters["status"] = request.Status;
             if (request.CategoryId.HasValue) filters["categoryId"] = request.CategoryId.Value;
             if (request.SupplierId.HasValue) filters["supplierId"] = request.SupplierId.Value;
             if (request.IsActive.HasValue) filters["isActive"] = request.IsActive.Value;
 
             var result = await _assetReps.GetPagedListAsync(
-                request.Page,
-                request.PageSize,
-                request.Search,
-                request.SortBy,
-                request.SortDescending,
-                filters);
+                request.Page, request.PageSize, request.Search, request.SortBy, request.SortDescending, filters);
 
             return ServiceResult<PaginatedResult<AssetListView>>.Success(result);
         }, "get asset grid data");
@@ -404,14 +446,11 @@ public class AssetService : BaseService, IAssetService
     public async Task<ServiceResult<int>> BulkActivateAsync(BulkActivateRequest request)
     {
         if (request.Ids == null || !request.Ids.Any())
-        {
             return ServiceResult<int>.BadRequest("No asset IDs provided");
-        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var activatedCount = 0;
-
+            var count = 0;
             foreach (var id in request.Ids)
             {
                 var asset = await _assetReps.GetByIdRawAsync(id);
@@ -421,32 +460,24 @@ public class AssetService : BaseService, IAssetService
                     asset.ModifiedDate = DateTime.Now;
                     asset.ModifiedBy = _currentUserService.GetDisplayName();
                     await _repository.UpdateAsync(asset);
-                    activatedCount++;
-
-                    await _activityLogService.LogUpdateAsync(
-                        TableNames.Asset,
-                        id,
+                    count++;
+                    await _activityLogService.LogUpdateAsync(TableNames.Asset, id,
                         $"Asset '{asset.AssetCode}' activated via bulk operation",
                         _currentUserService.GetDisplayName());
                 }
             }
-
-            return ServiceResult<int>.Success(activatedCount,
-                $"{activatedCount} asset(s) activated successfully");
+            return ServiceResult<int>.Success(count, $"{count} asset(s) activated successfully");
         }, "bulk activate assets");
     }
 
     public async Task<ServiceResult<int>> BulkDeactivateAsync(BulkActivateRequest request)
     {
         if (request.Ids == null || !request.Ids.Any())
-        {
             return ServiceResult<int>.BadRequest("No asset IDs provided");
-        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var deactivatedCount = 0;
-
+            var count = 0;
             foreach (var id in request.Ids)
             {
                 var asset = await _assetReps.GetByIdRawAsync(id);
@@ -456,65 +487,49 @@ public class AssetService : BaseService, IAssetService
                     asset.ModifiedDate = DateTime.Now;
                     asset.ModifiedBy = _currentUserService.GetDisplayName();
                     await _repository.UpdateAsync(asset);
-                    deactivatedCount++;
-
-                    await _activityLogService.LogUpdateAsync(
-                        TableNames.Asset,
-                        id,
+                    count++;
+                    await _activityLogService.LogUpdateAsync(TableNames.Asset, id,
                         $"Asset '{asset.AssetCode}' deactivated via bulk operation",
                         _currentUserService.GetDisplayName());
                 }
             }
-
-            return ServiceResult<int>.Success(deactivatedCount,
-                $"{deactivatedCount} asset(s) deactivated successfully");
+            return ServiceResult<int>.Success(count, $"{count} asset(s) deactivated successfully");
         }, "bulk deactivate assets");
     }
 
     public async Task<ServiceResult<int>> BulkDeleteAsync(BulkDeleteRequest request)
     {
         if (request.Ids == null || !request.Ids.Any())
-        {
             return ServiceResult<int>.BadRequest("No asset IDs provided");
-        }
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var deletedCount = 0;
-
+            var count = 0;
             foreach (var id in request.Ids)
             {
                 var existing = await _assetReps.GetByIdRawAsync(id);
-                if (existing == null)
-                {
-                    continue;
-                }
+                if (existing == null) continue;
 
-                await _assetReps.DeleteSoftwareInstallationByAssetIdAsync(id);
-                var result = await _repository.DeleteAsync(id);
+                var blockReason = await GetDeleteBlockReasonAsync(id);
+                if (blockReason != null) continue;
+
+                await CascadeDeleteDependentsAsync(id);
+
+                var result = await _repository.DeleteAsync<AssetEntity>(id);
                 if (result > 0)
                 {
-                    deletedCount++;
-
-                    await _activityLogService.LogDeleteAsync(
-                        TableNames.Asset,
-                        id,
+                    count++;
+                    await _activityLogService.LogDeleteAsync(TableNames.Asset, id,
                         $"Asset '{existing.AssetCode}' - '{existing.AssetName}' deleted via bulk operation",
                         _currentUserService.GetDisplayName());
                 }
             }
-
-            var message = deletedCount > 0
-                ? $"{deletedCount} asset(s) deleted successfully"
-                : "No assets were deleted.";
-
-            return ServiceResult<int>.Success(deletedCount, message);
+            var message = count > 0
+                ? $"{count} asset(s) deleted successfully"
+                : "No assets were deleted. Assets with associated transactions or schedules cannot be deleted.";
+            return ServiceResult<int>.Success(count, message);
         }, "bulk delete assets");
     }
-
-    // ============================================================
-    // DROPDOWN
-    // ============================================================
 
     public async Task<ServiceResult<IEnumerable<AssetDropdownView>>> GetDropdownListByTransactionTypeAsync(int transactionType)
     {
@@ -534,22 +549,14 @@ public class AssetService : BaseService, IAssetService
         return await ExecuteSafelyAsync(async () =>
         {
             var asset = await _assetReps.GetByIdRawAsync(assetId);
-            if (asset == null)
-            {
-                return ServiceResult<FileContentDto>.NotFound($"Asset with id {assetId} not found");
-            }
+            if (asset == null) return ServiceResult<FileContentDto>.NotFound($"Asset with id {assetId} not found");
 
             var photo = await _assetReps.GetPhotoProfileByAssetIdAsync(assetId);
-            if (photo == null)
-            {
-                return ServiceResult<FileContentDto>.NotFound("Profile photo not found");
-            }
+            if (photo == null) return ServiceResult<FileContentDto>.NotFound("Profile photo not found");
 
             var fileResult = await _fileAttachmentService.GetByIdAsync(photo.FileAttachmentId);
             if (!fileResult.IsSuccess || fileResult.Data == null)
-            {
                 return ServiceResult<FileContentDto>.NotFound("Profile photo file not found");
-            }
 
             var fileBytes = await _storageService.ReadFileAsync(fileResult.Data.FilePath);
             var contentType = _storageService.GetMimeType(fileResult.Data.OriginalFileName);
@@ -565,32 +572,14 @@ public class AssetService : BaseService, IAssetService
 
     public async Task<ServiceResult<string>> UploadPhotoAsync(int assetId, IFormFile file)
     {
-        if (file == null || file.Length == 0)
-        {
-            return ServiceResult<string>.BadRequest("No file provided");
-        }
-
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!FileSizeConstants.IsAllowedProfilePhotoExtension(extension))
-        {
-            return ServiceResult<string>.BadRequest(
-                $"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedProfilePhotoExtensions)}");
-        }
-
-        if (file.Length > FileSizeConstants.MaxProfilePhotoBytes)
-        {
-            return ServiceResult<string>.BadRequest($"File size exceeds {FileSizeConstants.MaxProfilePhotoMB}MB limit");
-        }
+        var (isValid, error) = FileUploadValidator.ValidateProfilePhoto(file);
+        if (!isValid) return ServiceResult<string>.BadRequest(error!);
 
         var asset = await _assetReps.GetByIdRawAsync(assetId);
-        if (asset == null)
-        {
-            return ServiceResult<string>.NotFound($"Asset with id {assetId} not found");
-        }
+        if (asset == null) return ServiceResult<string>.NotFound($"Asset with id {assetId} not found");
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            // Soft-delete the previous photo if present.
             var oldPhoto = await _assetReps.GetPhotoProfileByAssetIdAsync(assetId);
             if (oldPhoto != null)
             {
@@ -598,25 +587,19 @@ public class AssetService : BaseService, IAssetService
                 await _fileAttachmentService.DeleteAsync(oldPhoto.FileAttachmentId);
             }
 
-            // Read the incoming file into a byte array.
-            using var stream = file.OpenReadStream();
+            using var stream = file!.OpenReadStream();
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);
             var bytes = ms.ToArray();
 
             var uploadResult = await _fileAttachmentService.UploadBytesAsync(
-                referenceTable: "AssetPhotoProfile",
-                referenceId: assetId,
-                originalFileName: file.FileName,
-                bytes: bytes,
-                fileCategory: "ProfilePhoto",
-                description: $"Profile photo for Asset {assetId}",
+                referenceTable: "AssetPhotoProfile", referenceId: assetId,
+                originalFileName: file.FileName, bytes: bytes,
+                fileCategory: "ProfilePhoto", description: $"Profile photo for Asset {assetId}",
                 isPrimary: true);
 
             if (!uploadResult.IsSuccess || uploadResult.Data == null)
-            {
                 return ServiceResult<string>.Failure(uploadResult.Errors);
-            }
 
             var entity = new AssetPhotoProfileAttachmentEntity
             {
@@ -628,11 +611,8 @@ public class AssetService : BaseService, IAssetService
             };
             await _assetReps.InsertPhotoProfileAsync(entity);
 
-            await _activityLogService.LogUpdateAsync(
-                TableNames.Asset,
-                assetId,
-                $"Profile photo uploaded",
-                _currentUserService.GetDisplayName());
+            await _activityLogService.LogUpdateAsync(TableNames.Asset, assetId,
+                "Profile photo uploaded", _currentUserService.GetDisplayName());
 
             return ServiceResult<string>.Success(uploadResult.Data.FileUrl ?? string.Empty, "Profile photo uploaded successfully");
         }, "upload asset photo");
@@ -641,27 +621,18 @@ public class AssetService : BaseService, IAssetService
     public async Task<ServiceResult> DeletePhotoAsync(int assetId)
     {
         var asset = await _assetReps.GetByIdRawAsync(assetId);
-        if (asset == null)
-        {
-            return ServiceResult.NotFound($"Asset with id {assetId} not found");
-        }
+        if (asset == null) return ServiceResult.NotFound($"Asset with id {assetId} not found");
 
         return await ExecuteWithTransactionAsync(async () =>
         {
             var photo = await _assetReps.GetPhotoProfileByAssetIdAsync(assetId);
-            if (photo == null)
-            {
-                return ServiceResult.Success("No profile photo to delete");
-            }
+            if (photo == null) return ServiceResult.Success("No profile photo to delete");
 
             await _assetReps.DeletePhotoProfileByAssetIdAsync(assetId);
             await _fileAttachmentService.DeleteAsync(photo.FileAttachmentId);
 
-            await _activityLogService.LogUpdateAsync(
-                TableNames.Asset,
-                assetId,
-                $"Profile photo deleted",
-                _currentUserService.GetDisplayName());
+            await _activityLogService.LogUpdateAsync(TableNames.Asset, assetId,
+                "Profile photo deleted", _currentUserService.GetDisplayName());
 
             return ServiceResult.Success("Profile photo deleted successfully");
         }, "delete asset photo");
@@ -675,63 +646,37 @@ public class AssetService : BaseService, IAssetService
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            // GetDetailByIdAsync already returns the attachment list (joined with FileAttachment).
-            // No redundant repo call needed.
             var detail = await _assetReps.GetDetailByIdAsync(assetId);
             if (detail == null)
-            {
                 return ServiceResult<IEnumerable<AssetAttachmentViewDto>>.NotFound($"Asset with id {assetId} not found");
-            }
-
             return ServiceResult<IEnumerable<AssetAttachmentViewDto>>.Success(detail.Attachments);
         }, "get asset attachments");
     }
 
     public async Task<ServiceResult<AssetAttachmentViewDto>> UploadAttachmentAsync(int assetId, AttachmentUploadDto model)
     {
-        if (model.File == null || model.File.Length == 0)
-        {
-            return ServiceResult<AssetAttachmentViewDto>.BadRequest("No file provided");
-        }
-
-        var extension = Path.GetExtension(model.File.FileName).ToLowerInvariant();
-        if (!FileSizeConstants.IsAllowedAssetExtension(extension))
-        {
-            return ServiceResult<AssetAttachmentViewDto>.BadRequest(
-                $"File type '{extension}' is not allowed. Allowed: {string.Join(", ", FileSizeConstants.AllowedAssetExtensions)}");
-        }
-
-        if (model.File.Length > FileSizeConstants.MaxAssetAttachmentBytes)
-        {
-            return ServiceResult<AssetAttachmentViewDto>.BadRequest($"File size exceeds {FileSizeConstants.MaxAssetAttachmentMB}MB limit");
-        }
+        var (isValid, error) = FileUploadValidator.ValidateAssetAttachment(model.File);
+        if (!isValid) return ServiceResult<AssetAttachmentViewDto>.BadRequest(error!);
 
         var asset = await _assetReps.GetByIdRawAsync(assetId);
-        if (asset == null)
-        {
-            return ServiceResult<AssetAttachmentViewDto>.NotFound($"Asset with id {assetId} not found");
-        }
+        if (asset == null) return ServiceResult<AssetAttachmentViewDto>.NotFound($"Asset with id {assetId} not found");
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            using var stream = model.File.OpenReadStream();
+            using var stream = model.File!.OpenReadStream();
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);
             var bytes = ms.ToArray();
 
             var uploadResult = await _fileAttachmentService.UploadBytesAsync(
-                referenceTable: "Asset",
-                referenceId: assetId,
-                originalFileName: model.File.FileName,
-                bytes: bytes,
+                referenceTable: "Asset", referenceId: assetId,
+                originalFileName: model.File.FileName, bytes: bytes,
                 fileCategory: model.FileCategory ?? "AssetAttachment",
                 description: model.Description ?? $"Attachment for Asset {assetId}",
                 isPrimary: false);
 
             if (!uploadResult.IsSuccess || uploadResult.Data == null)
-            {
                 return ServiceResult<AssetAttachmentViewDto>.Failure(uploadResult.Errors);
-            }
 
             var attachmentEntity = new AssetAttachmentEntity
             {
@@ -744,13 +689,11 @@ public class AssetService : BaseService, IAssetService
             };
             var attachmentId = await _assetReps.InsertAttachmentAsync(attachmentEntity);
 
-            await _activityLogService.LogCreateAsync(
-                TableNames.Asset,
-                assetId,
+            await _activityLogService.LogCreateAsync(TableNames.Asset, assetId,
                 $"Attachment uploaded: {model.File.FileName}",
                 _currentUserService.GetDisplayName());
 
-            var dto = new AssetAttachmentViewDto
+            return ServiceResult<AssetAttachmentViewDto>.Success(new AssetAttachmentViewDto
             {
                 AssetAttachmentId = attachmentId,
                 FileAttachmentId = uploadResult.Data.FileAttachmentId,
@@ -761,35 +704,25 @@ public class AssetService : BaseService, IAssetService
                 IsPrimary = false,
                 Order = model.Order,
                 CreatedDate = DateTime.Now
-            };
-
-            return ServiceResult<AssetAttachmentViewDto>.Success(dto, "Attachment uploaded successfully");
+            }, "Attachment uploaded successfully");
         }, "upload asset attachment");
     }
 
     public async Task<ServiceResult> DeleteAttachmentAsync(int assetId, int fileAttachmentId)
     {
         var asset = await _assetReps.GetByIdRawAsync(assetId);
-        if (asset == null)
-        {
-            return ServiceResult.NotFound($"Asset with id {assetId} not found");
-        }
+        if (asset == null) return ServiceResult.NotFound($"Asset with id {assetId} not found");
 
         var attachments = await _assetReps.GetAttachmentsByAssetIdAsync(assetId);
         var target = attachments.FirstOrDefault(a => a.FileAttachmentId == fileAttachmentId);
-        if (target == null)
-        {
-            return ServiceResult.NotFound($"Attachment {fileAttachmentId} not found for asset {assetId}");
-        }
+        if (target == null) return ServiceResult.NotFound($"Attachment {fileAttachmentId} not found for asset {assetId}");
 
         return await ExecuteWithTransactionAsync(async () =>
         {
             await _assetReps.DeleteAttachmentAsync(target.AssetAttachmentId);
             await _fileAttachmentService.DeleteAsync(fileAttachmentId);
 
-            await _activityLogService.LogDeleteAsync(
-                TableNames.Asset,
-                assetId,
+            await _activityLogService.LogDeleteAsync(TableNames.Asset, assetId,
                 $"Attachment deleted: {fileAttachmentId}",
                 _currentUserService.GetDisplayName());
 
@@ -802,26 +735,15 @@ public class AssetService : BaseService, IAssetService
         return await ExecuteSafelyAsync(async () =>
         {
             var asset = await _assetReps.GetByIdRawAsync(assetId);
-            if (asset == null)
-            {
-                return ServiceResult<FileContentDto>.NotFound($"Asset with id {assetId} not found");
-            }
+            if (asset == null) return ServiceResult<FileContentDto>.NotFound($"Asset with id {assetId} not found");
 
-            // Ownership check: the attachment row must belong to this asset. Prevents
-            // downloading arbitrary FileAttachment ids through a foreign asset route.
             var attachments = await _assetReps.GetAttachmentsByAssetIdAsync(assetId);
             if (!attachments.Any(a => a.FileAttachmentId == fileAttachmentId))
-            {
                 return ServiceResult<FileContentDto>.NotFound($"Attachment {fileAttachmentId} not found for asset {assetId}");
-            }
 
-            // Delegate to the internal FileAttachment service. This is a shared service
-            // — no HTTP surface of its own — used by every menu that owns attachments.
             var downloadResult = await _fileAttachmentService.DownloadAsync(fileAttachmentId);
             if (!downloadResult.IsSuccess || downloadResult.Data == null)
-            {
                 return ServiceResult<FileContentDto>.NotFound($"Attachment file {fileAttachmentId} could not be retrieved");
-            }
 
             return downloadResult;
         }, "get asset attachment file");
@@ -834,20 +756,14 @@ public class AssetService : BaseService, IAssetService
     private async Task AddPhotoProfileFromBase64Async(int assetId, string base64String, string fileName)
     {
         var bytes = Convert.FromBase64String(base64String);
-
         var result = await _fileAttachmentService.UploadBytesAsync(
-            referenceTable: "AssetPhotoProfile",
-            referenceId: assetId,
-            originalFileName: fileName,
-            bytes: bytes,
-            fileCategory: "ProfilePhoto",
-            description: $"Profile photo for Asset {assetId}",
+            referenceTable: "AssetPhotoProfile", referenceId: assetId,
+            originalFileName: fileName, bytes: bytes,
+            fileCategory: "ProfilePhoto", description: $"Profile photo for Asset {assetId}",
             isPrimary: true);
 
         if (!result.IsSuccess || result.Data == null)
-        {
             throw new Exception($"Upload profile photo failed: {string.Join(", ", result.Errors)}");
-        }
 
         var entity = new AssetPhotoProfileAttachmentEntity
         {
@@ -859,30 +775,22 @@ public class AssetService : BaseService, IAssetService
         };
         await _assetReps.InsertPhotoProfileAsync(entity);
 
-        await _activityLogService.LogUpdateAsync(
-            TableNames.Asset,
-            assetId,
-            $"Profile photo uploaded",
-            _currentUserService.GetDisplayName());
+        await _activityLogService.LogUpdateAsync(TableNames.Asset, assetId,
+            "Profile photo uploaded", _currentUserService.GetDisplayName());
     }
 
     private async Task AddAttachmentFromBase64Async(int assetId, string base64String, string fileName, int order)
     {
         var bytes = Convert.FromBase64String(base64String);
-
         var fileResult = await _fileAttachmentService.UploadBytesAsync(
-            referenceTable: "Asset",
-            referenceId: assetId,
-            originalFileName: fileName,
-            bytes: bytes,
+            referenceTable: "Asset", referenceId: assetId,
+            originalFileName: fileName, bytes: bytes,
             fileCategory: "AssetAttachment",
             description: $"Attachment for Asset {assetId}",
             isPrimary: false);
 
         if (!fileResult.IsSuccess || fileResult.Data == null)
-        {
             throw new Exception($"Upload attachment failed: {string.Join(", ", fileResult.Errors)}");
-        }
 
         var attachmentEntity = new AssetAttachmentEntity
         {
@@ -893,12 +801,9 @@ public class AssetService : BaseService, IAssetService
             CreatedDate = DateTime.Now,
             CreatedBy = _currentUserService.GetDisplayName()
         };
-
         await _assetReps.InsertAttachmentAsync(attachmentEntity);
 
-        await _activityLogService.LogCreateAsync(
-            TableNames.Asset,
-            assetId,
+        await _activityLogService.LogCreateAsync(TableNames.Asset, assetId,
             $"Attachment added: {fileName}",
             _currentUserService.GetDisplayName());
     }
