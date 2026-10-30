@@ -1,5 +1,35 @@
 import { useState, useCallback } from 'react';
 
+// Flatten backend { fieldName: ["msg1", "msg2"] } to { fieldName: "msg1" }.
+// Case-insensitive key matching: ModelState may return "AssetCode" while
+// formData uses "assetCode"; we normalize to the formData key when possible
+// so dialogs' `errors?.fieldName` lookups work regardless of server casing.
+const flattenFieldErrors = (fieldErrors, formData) => {
+  const flattened = {};
+  if (!fieldErrors || typeof fieldErrors !== 'object' || Array.isArray(fieldErrors)) {
+    return flattened;
+  }
+
+  const lowercaseToActualKey = {};
+  Object.keys(formData || {}).forEach((k) => {
+    lowercaseToActualKey[k.toLowerCase()] = k;
+  });
+
+  for (const [field, messages] of Object.entries(fieldErrors)) {
+    let msg = null;
+    if (Array.isArray(messages) && messages.length > 0) {
+      msg = messages[0];
+    } else if (typeof messages === 'string') {
+      msg = messages;
+    }
+    if (!msg) continue;
+    const actualKey = lowercaseToActualKey[field.toLowerCase()] || field;
+    flattened[actualKey] = msg;
+  }
+
+  return flattened;
+};
+
 export const useCrudFormBase = (initialFormData, dataService, options = {}) => {
   const {
     idField,
@@ -8,6 +38,7 @@ export const useCrudFormBase = (initialFormData, dataService, options = {}) => {
     transformFormData,
     onSuccess,
     onError,
+    schema,
   } = options;
 
   const [showModal, setShowModal] = useState(false);
@@ -66,7 +97,12 @@ export const useCrudFormBase = (initialFormData, dataService, options = {}) => {
   const setFieldValue = useCallback((field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+      setErrors(prev => {
+        if (!prev[field]) return prev;
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
     }
   }, [errors]);
 
@@ -80,6 +116,25 @@ export const useCrudFormBase = (initialFormData, dataService, options = {}) => {
     }
     
     if (isSubmitting) return;
+
+    // 1. Client-side schema validation (optional; only runs if schema provided)
+    if (schema) {
+      const parseResult = schema.safeParse(formData);
+      if (!parseResult.success) {
+        const fieldErrors = {};
+        for (const issue of parseResult.error.issues) {
+          const field = issue.path[0];
+          if (field && !fieldErrors[field]) {
+            fieldErrors[field] = issue.message;
+          }
+        }
+        setErrors(fieldErrors);
+        return { success: false, errors: fieldErrors };
+      }
+    }
+
+    // 2. Clear any client-side errors before proceeding to server call
+    setErrors({});
 
     if (onBeforeSubmit) {
       const canProceed = await onBeforeSubmit(formData);
@@ -124,18 +179,35 @@ export const useCrudFormBase = (initialFormData, dataService, options = {}) => {
         data: result.data,
       };
     } else if (!result.cancelled) {
-      if (result.errors) {
-        setErrors(result.errors);
+      // Prefer backend fieldErrors (per-field) over flat errors array.
+      if (result.fieldErrors) {
+        const flattened = flattenFieldErrors(result.fieldErrors, formData);
+        if (Object.keys(flattened).length > 0) {
+          setErrors(flattened);
+        } else if (result.errors) {
+          if (Array.isArray(result.errors)) {
+            setErrors({ _form: result.errors.join('\n') });
+          } else if (typeof result.errors === 'object') {
+            setErrors(result.errors);
+          }
+        }
+      } else if (result.errors) {
+        if (Array.isArray(result.errors)) {
+          setErrors({ _form: result.errors.join('\n') });
+        } else if (typeof result.errors === 'object') {
+          setErrors(result.errors);
+        }
       }
       if (onError) onError(result.error || 'Operation failed');
       return { 
         success: false, 
         error: result.error || 'Operation failed',
         errors: result.errors,
+        fieldErrors: result.fieldErrors || null,
       };
     }
     return { success: false, error: 'Operation failed' };
-  }, [isSubmitting, editingRecord, formData, dataService, getRecordId, transformFormData, onBeforeSubmit, onAfterSubmit, onSuccess, onError, initialFormData]);
+  }, [isSubmitting, editingRecord, formData, dataService, getRecordId, transformFormData, onBeforeSubmit, onAfterSubmit, onSuccess, onError, initialFormData, schema]);
 
   const resetForm = useCallback(() => {
     setFormData({ ...initialFormData });

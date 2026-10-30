@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Box } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
-import { FiPlus, FiUserMinus } from 'react-icons/fi';
+import { FiPlus } from 'react-icons/fi';
 import { UserRolesData } from '../../core/services';
 import PageHeader from '../../components/atoms/PageHeader';
 import RefreshButton from '../../components/atoms/RefreshButton';
@@ -13,7 +13,7 @@ import SearchToolbar from '../../components/molecules/SearchToolbar/SearchToolba
 import DataTable from '../../components/molecules/DataTable/DataTable';
 import ActionMenu from '../../components/molecules/ActionMenu';
 import { useGridData } from '../../hooks/useGridData';
-import { useGridActions } from '../../hooks/useGridActions';
+import { ACTION_TYPES, useGridActions } from '../../hooks/useGridActions';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
 import { useReferenceData } from '../../hooks/useReferenceData';
 import { getAssignmentColumns } from './columns';
@@ -46,7 +46,7 @@ const UserRoles = () => {
 
   const isMountedRef = useRef(true);
   const queryClient = useQueryClient();
-  const { toast, confirm, confirmDelete } = useSweetAlert();
+  const { toast, confirmDelete } = useSweetAlert();
   const { roles } = useReferenceData();
 
   const roleOptions = useMemo(
@@ -231,19 +231,18 @@ const UserRoles = () => {
   // GRID ACTIONS
   // ============================================================
   const getRowActions = useCallback((row) => {
-    const actions = [];
-    actions.push('replaceRoles');
+    const actions = [ACTION_TYPES.REPLACE_ROLES];
     if (row.roleId !== undefined && row.roleId !== null) {
-      actions.push('unassign');
+      actions.push(ACTION_TYPES.UNASSIGN);
     }
     return actions;
   }, []);
 
   const handleRowAction = useCallback(
     (actionType, row) => {
-      if (actionType === 'replaceRoles') {
+      if (actionType === ACTION_TYPES.REPLACE_ROLES) {
         openReplace(row);
-      } else if (actionType === 'unassign') {
+      } else if (actionType === ACTION_TYPES.UNASSIGN) {
         handleUnassign(row);
       }
     },
@@ -332,11 +331,7 @@ const UserRoles = () => {
         anchorEl={menuAnchorEl}
         open={menuOpen}
         onClose={handleMenuClose}
-        actions={menuActions.map((a) =>
-          a.type === 'unassign'
-            ? { ...a, label: 'Remove Role', icon: FiUserMinus, color: 'error' }
-            : a
-        )}
+        actions={menuActions}
         row={selectedRow}
         onAction={handleActionClick}
       />

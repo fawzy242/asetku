@@ -23,6 +23,7 @@ import { useCrudFormBase } from '../../hooks/useCrudFormBase';
 import { useOptions } from '../../hooks/useOptions';
 import { getCategoryColumns } from './columns';
 import CategoryFormDialog from './components/CategoryFormDialog';
+import { categorySchema } from './schema';
 import './Categories.scss';
 
 const categoriesData = new CategoriesData();
@@ -67,6 +68,7 @@ const Categories = () => {
     editingRecord: editingCategory,
     isSubmitting,
     formData,
+    errors,
     setFormField,
     handleCreate: baseHandleCreate,
     handleEdit,
@@ -74,6 +76,7 @@ const Categories = () => {
     handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, categoriesData, {
     idField: 'categoryId',
+    schema: categorySchema,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reference', 'categories'] });
       toast.success(
@@ -402,6 +405,7 @@ const Categories = () => {
         isViewMode={isViewMode}
         editingRecord={editingCategory}
         formData={formData}
+        errors={errors}
         setFormField={setFormField}
         parentCategoryOptions={parentCategoryOptions}
       />

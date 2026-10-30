@@ -21,6 +21,7 @@ import { useGridData } from '../../hooks/useGridData';
 import { useCrudFormBase } from '../../hooks/useCrudFormBase';
 import { getSupplierColumns } from './columns';
 import SupplierFormDialog from './components/SupplierFormDialog';
+import { supplierSchema } from './schema';
 import './Suppliers.scss';
 
 const suppliersData = new SuppliersData();
@@ -66,6 +67,7 @@ const Suppliers = () => {
     editingRecord: editingSupplier,
     isSubmitting,
     formData,
+    errors,
     setFormField,
     handleCreate: baseHandleCreate,
     handleEdit,
@@ -73,6 +75,7 @@ const Suppliers = () => {
     handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, suppliersData, {
     idField: 'supplierId',
+    schema: supplierSchema,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] });
       toast.success(
@@ -394,6 +397,7 @@ const Suppliers = () => {
         isViewMode={isViewMode}
         editingRecord={editingSupplier}
         formData={formData}
+        errors={errors}
         setFormField={setFormField}
       />
 

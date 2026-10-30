@@ -13,6 +13,7 @@ const SupplierFormDialog = ({
   isViewMode,
   editingRecord,
   formData,
+  errors = {},
   setFormField,
 }) => {
   return (
@@ -43,6 +44,7 @@ const SupplierFormDialog = ({
               label="Supplier Name"
               value={formData.supplierName || ''}
               onChange={(e) => setFormField('supplierName')(e.target.value)}
+              error={errors?.supplierName || ''}
               disabled={isViewMode}
               required
             />
@@ -52,6 +54,7 @@ const SupplierFormDialog = ({
               label="Contact Person"
               value={formData.contactPerson || ''}
               onChange={(e) => setFormField('contactPerson')(e.target.value)}
+              error={errors?.contactPerson || ''}
               disabled={isViewMode}
             />
           </Grid>
@@ -68,6 +71,7 @@ const SupplierFormDialog = ({
               label="Phone Number"
               value={formData.phoneNumber || ''}
               onChange={(e) => setFormField('phoneNumber')(e.target.value)}
+              error={errors?.phoneNumber || ''}
               disabled={isViewMode}
             />
           </Grid>
@@ -77,6 +81,7 @@ const SupplierFormDialog = ({
               type="email"
               value={formData.email || ''}
               onChange={(e) => setFormField('email')(e.target.value)}
+              error={errors?.email || ''}
               disabled={isViewMode}
             />
           </Grid>
@@ -85,6 +90,7 @@ const SupplierFormDialog = ({
               label="Address"
               value={formData.address || ''}
               onChange={(e) => setFormField('address')(e.target.value)}
+              error={errors?.address || ''}
               disabled={isViewMode}
               multiline
               rows={2}

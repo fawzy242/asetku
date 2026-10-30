@@ -1,6 +1,6 @@
 // src/components/molecules/ConfirmDialog/ConfirmDialog.jsx
 import React, { useCallback, createContext, useContext } from 'react';
-import { alertUtils } from '../../../lib/sweetAlert';
+import { alertUtils, toastr } from '../../../lib/sweetAlert';
 
 const ConfirmContext = createContext(null);
 
@@ -29,6 +29,8 @@ export const ConfirmDialogProvider = ({ children }) => {
 };
 
 class ConfirmDialog {
+  static toast = toastr;
+
   static show(options = {}) {
     return alertUtils.confirm(options);
   }

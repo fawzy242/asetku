@@ -21,6 +21,7 @@ export const handleApiError = (error, options = {}) => {
     data: null,
     shouldShowToast: true,
     retryAfter: null,
+    fieldErrors: null,
   };
 
   if (isCanceledError(error)) {
@@ -37,8 +38,10 @@ export const handleApiError = (error, options = {}) => {
     return result;
   }
 
-  if (error.response?.status === 404 && 
-      error.config?.url?.includes('/User/profile-photo')) {
+  if (
+    error.response?.status === 404 &&
+    error.config?.url?.includes('/User/profile-photo')
+  ) {
     result.handled = true;
     result.message = '';
     result.shouldShowToast = false;
@@ -58,6 +61,7 @@ export const handleApiError = (error, options = {}) => {
 
   let errorMessage = 'An unexpected error occurred';
   let errorData = null;
+  let fieldErrors = null;
 
   if (data) {
     if (data.message) errorMessage = data.message;
@@ -65,10 +69,14 @@ export const handleApiError = (error, options = {}) => {
       errorMessage = data.errors.join('\n');
     }
     if (data.data) errorData = data.data;
+    if (data.fieldErrors && typeof data.fieldErrors === 'object' && !Array.isArray(data.fieldErrors)) {
+      fieldErrors = data.fieldErrors;
+    }
   }
 
   result.message = errorMessage;
   result.data = errorData;
+  result.fieldErrors = fieldErrors;
   result.handled = true;
 
   switch (status) {

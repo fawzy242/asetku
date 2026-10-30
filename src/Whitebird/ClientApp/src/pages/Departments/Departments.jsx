@@ -21,6 +21,7 @@ import { useGridData } from '../../hooks/useGridData';
 import { useCrudFormBase } from '../../hooks/useCrudFormBase';
 import { getDepartmentColumns } from './columns';
 import DepartmentFormDialog from './components/DepartmentFormDialog';
+import { departmentSchema } from './schema';
 import './Departments.scss';
 
 const departmentsData = new DepartmentsData();
@@ -64,6 +65,7 @@ const Departments = () => {
     editingRecord: editingDepartment,
     isSubmitting,
     formData,
+    errors,
     setFormField,
     handleCreate: baseHandleCreate,
     handleEdit,
@@ -71,6 +73,7 @@ const Departments = () => {
     handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, departmentsData, {
     idField: 'departmentId',
+    schema: departmentSchema,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reference', 'departments'] });
       toast.success(
@@ -392,6 +395,7 @@ const Departments = () => {
         isViewMode={isViewMode}
         editingRecord={editingDepartment}
         formData={formData}
+        errors={errors}
         setFormField={setFormField}
       />
 

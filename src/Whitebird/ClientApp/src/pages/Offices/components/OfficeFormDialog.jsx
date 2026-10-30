@@ -14,6 +14,7 @@ const OfficeFormDialog = ({
   isViewMode,
   editingRecord,
   formData,
+  errors = {},
   setFormField,
   officeTypeOptions,
   parentOfficeOptions,
@@ -42,6 +43,7 @@ const OfficeFormDialog = ({
               label="Office Name"
               value={formData.officeName || ''}
               onChange={(e) => setFormField('officeName')(e.target.value)}
+              error={errors?.officeName || ''}
               disabled={isViewMode}
               required
             />
@@ -51,8 +53,9 @@ const OfficeFormDialog = ({
               label="Office Code"
               value={formData.officeCode || ''}
               onChange={(e) => setFormField('officeCode')(e.target.value)}
+              error={errors?.officeCode || ''}
               disabled={isViewMode}
-              placeholder="Optional"
+              placeholder="Optional (max 50 chars)"
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -60,6 +63,7 @@ const OfficeFormDialog = ({
               label="Office Type"
               value={formData.officeType || ''}
               onChange={(e) => setFormField('officeType')(e.target.value)}
+              error={errors?.officeType || ''}
               options={officeTypeOptions}
               disabled={isViewMode}
             />
@@ -71,6 +75,7 @@ const OfficeFormDialog = ({
               onChange={(e) =>
                 setFormField('parentOfficeId')(e.target.value || null)
               }
+              error={errors?.parentOfficeId || ''}
               options={parentOfficeOptions}
               disabled={isViewMode}
             />
@@ -85,6 +90,7 @@ const OfficeFormDialog = ({
               label="City"
               value={formData.city || ''}
               onChange={(e) => setFormField('city')(e.target.value)}
+              error={errors?.city || ''}
               disabled={isViewMode}
             />
           </Grid>
@@ -93,6 +99,7 @@ const OfficeFormDialog = ({
               label="Phone"
               value={formData.phone || ''}
               onChange={(e) => setFormField('phone')(e.target.value)}
+              error={errors?.phone || ''}
               disabled={isViewMode}
             />
           </Grid>
@@ -101,6 +108,7 @@ const OfficeFormDialog = ({
               label="Address"
               value={formData.address || ''}
               onChange={(e) => setFormField('address')(e.target.value)}
+              error={errors?.address || ''}
               disabled={isViewMode}
               multiline
               rows={2}

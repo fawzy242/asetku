@@ -1,3 +1,4 @@
+// src/core/services/BaseData.js
 import { downloadBlob } from '../utils/file.utils';
 import { isCanceledError } from '../utils/error.utils';
 
@@ -115,12 +116,19 @@ class BaseData {
 
       if (result.data?.isSuccess !== undefined) {
         if (!result.data.isSuccess) {
+          const errorMsg =
+            result.data.errors?.join('\n') ||
+            result.data.message ||
+            'Failed to create';
           return {
             success: false,
-            errors: result.data.errors || [
-              result.data.message || 'Failed to create',
-            ],
+            error: errorMsg,
+            errors: result.data.errors || [result.data.message || 'Failed to create'],
             errorType: result.data.errorType,
+            fieldErrors:
+              result.data.fieldErrors && typeof result.data.fieldErrors === 'object'
+                ? result.data.fieldErrors
+                : null,
           };
         }
         return { success: true, data: result.data.data };
@@ -134,6 +142,10 @@ class BaseData {
       return {
         success: false,
         error: error.userMessage || error.message || 'Failed to create',
+        fieldErrors:
+          error.fieldErrors && typeof error.fieldErrors === 'object'
+            ? error.fieldErrors
+            : null,
       };
     }
   }
@@ -144,12 +156,19 @@ class BaseData {
 
       if (result.data?.isSuccess !== undefined) {
         if (!result.data.isSuccess) {
+          const errorMsg =
+            result.data.errors?.join('\n') ||
+            result.data.message ||
+            'Failed to update';
           return {
             success: false,
-            errors: result.data.errors || [
-              result.data.message || 'Failed to update',
-            ],
+            error: errorMsg,
+            errors: result.data.errors || [result.data.message || 'Failed to update'],
             errorType: result.data.errorType,
+            fieldErrors:
+              result.data.fieldErrors && typeof result.data.fieldErrors === 'object'
+                ? result.data.fieldErrors
+                : null,
           };
         }
         return { success: true, data: result.data.data };
@@ -163,6 +182,10 @@ class BaseData {
       return {
         success: false,
         error: error.userMessage || error.message || 'Failed to update',
+        fieldErrors:
+          error.fieldErrors && typeof error.fieldErrors === 'object'
+            ? error.fieldErrors
+            : null,
       };
     }
   }

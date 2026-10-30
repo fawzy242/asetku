@@ -14,6 +14,7 @@ const CategoryFormDialog = ({
   isViewMode,
   editingRecord,
   formData,
+  errors = {},
   setFormField,
   parentCategoryOptions,
 }) => {
@@ -45,6 +46,7 @@ const CategoryFormDialog = ({
               label="Category Name"
               value={formData.categoryName || ''}
               onChange={(e) => setFormField('categoryName')(e.target.value)}
+              error={errors?.categoryName || ''}
               disabled={isViewMode}
               required
             />
@@ -54,6 +56,7 @@ const CategoryFormDialog = ({
               label="Description"
               value={formData.description || ''}
               onChange={(e) => setFormField('description')(e.target.value)}
+              error={errors?.description || ''}
               disabled={isViewMode}
               multiline
               rows={2}
@@ -66,6 +69,7 @@ const CategoryFormDialog = ({
               onChange={(e) =>
                 setFormField('parentCategoryId')(e.target.value || null)
               }
+              error={errors?.parentCategoryId || ''}
               options={parentCategoryOptions}
               disabled={isViewMode}
             />

@@ -13,6 +13,7 @@ const RoleFormDialog = ({
   isViewMode,
   editingRecord,
   formData,
+  errors = {},
   setFormField,
 }) => {
   return (
@@ -39,6 +40,7 @@ const RoleFormDialog = ({
               label="Role Code"
               value={formData.roleCode || ''}
               onChange={(e) => setFormField('roleCode')(e.target.value)}
+              error={errors?.roleCode || ''}
               disabled={isViewMode}
               placeholder="Optional (max 50 chars)"
             />
@@ -48,6 +50,7 @@ const RoleFormDialog = ({
               label="Role Name"
               value={formData.roleName || ''}
               onChange={(e) => setFormField('roleName')(e.target.value)}
+              error={errors?.roleName || ''}
               disabled={isViewMode}
               required
             />
@@ -57,6 +60,7 @@ const RoleFormDialog = ({
               label="Description"
               value={formData.description || ''}
               onChange={(e) => setFormField('description')(e.target.value)}
+              error={errors?.description || ''}
               disabled={isViewMode}
               multiline
               rows={2}

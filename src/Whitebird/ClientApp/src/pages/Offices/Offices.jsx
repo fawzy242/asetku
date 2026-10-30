@@ -23,6 +23,7 @@ import { useCrudFormBase } from '../../hooks/useCrudFormBase';
 import { useOptions } from '../../hooks/useOptions';
 import { getOfficeColumns } from './columns';
 import OfficeFormDialog from './components/OfficeFormDialog';
+import { officeSchema } from './schema';
 import './Offices.scss';
 
 const officesData = new OfficesData();
@@ -71,6 +72,7 @@ const Offices = () => {
     editingRecord: editingOffice,
     isSubmitting,
     formData,
+    errors,
     setFormField,
     handleCreate: baseHandleCreate,
     handleEdit,
@@ -78,6 +80,7 @@ const Offices = () => {
     handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, officesData, {
     idField: 'officeId',
+    schema: officeSchema,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reference', 'offices'] });
       toast.success(
@@ -405,6 +408,7 @@ const Offices = () => {
         isViewMode={isViewMode}
         editingRecord={editingOffice}
         formData={formData}
+        errors={errors}
         setFormField={setFormField}
         officeTypeOptions={officeTypeOptions}
         parentOfficeOptions={parentOfficeOptions}

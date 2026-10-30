@@ -1,3 +1,4 @@
+// src/hooks/useGridActions.js
 import React, { useState, useCallback, useMemo } from 'react';
 import { IconButton } from '@mui/material';
 import {
@@ -9,6 +10,8 @@ import {
   FiX,
   FiRotateCcw,
   FiTool,
+  FiUserMinus,
+  FiShield,
 } from 'react-icons/fi';
 
 export const ACTION_TYPES = {
@@ -21,6 +24,8 @@ export const ACTION_TYPES = {
   POST_MAINTENANCE: 'postMaintenance',
   COMPLETE: 'complete',
   UNCOMPLETE: 'uncomplete',
+  REPLACE_ROLES: 'replaceRoles',
+  UNASSIGN: 'unassign',
 };
 
 export const getActionConfig = (type) => {
@@ -34,6 +39,8 @@ export const getActionConfig = (type) => {
     [ACTION_TYPES.POST_MAINTENANCE]: { icon: FiTool, label: 'Post Maintenance', color: 'info' },
     [ACTION_TYPES.COMPLETE]: { icon: FiCheck, label: 'Complete', color: 'success' },
     [ACTION_TYPES.UNCOMPLETE]: { icon: FiRotateCcw, label: 'Uncomplete', color: 'warning' },
+    [ACTION_TYPES.REPLACE_ROLES]: { icon: FiShield, label: 'Manage Roles', color: 'primary' },
+    [ACTION_TYPES.UNASSIGN]: { icon: FiUserMinus, label: 'Remove Role', color: 'error' },
   };
   return configs[type] || configs[ACTION_TYPES.VIEW];
 };
@@ -126,8 +133,7 @@ export const useGridActions = ({
         visibleActions.push(ACTION_TYPES.VIEW);
       }
     } else {
-      visibleActions =
-        actions.length > 0 ? actions : defaultActions;
+      visibleActions = actions.length > 0 ? actions : defaultActions;
       if (!visibleActions.includes(ACTION_TYPES.VIEW)) {
         visibleActions = [ACTION_TYPES.VIEW, ...visibleActions];
       }

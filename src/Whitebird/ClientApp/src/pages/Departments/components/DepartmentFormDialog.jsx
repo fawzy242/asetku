@@ -13,6 +13,7 @@ const DepartmentFormDialog = ({
   isViewMode,
   editingRecord,
   formData,
+  errors = {},
   setFormField,
 }) => {
   return (
@@ -43,6 +44,7 @@ const DepartmentFormDialog = ({
               label="Department Code"
               value={formData.departmentCode || ''}
               onChange={(e) => setFormField('departmentCode')(e.target.value)}
+              error={errors?.departmentCode || ''}
               disabled={isViewMode}
               placeholder="Optional (max 100 chars)"
             />
@@ -52,6 +54,7 @@ const DepartmentFormDialog = ({
               label="Department Name"
               value={formData.departmentName || ''}
               onChange={(e) => setFormField('departmentName')(e.target.value)}
+              error={errors?.departmentName || ''}
               disabled={isViewMode}
               required
             />
@@ -61,6 +64,7 @@ const DepartmentFormDialog = ({
               label="Description"
               value={formData.description || ''}
               onChange={(e) => setFormField('description')(e.target.value)}
+              error={errors?.description || ''}
               disabled={isViewMode}
               multiline
               rows={2}

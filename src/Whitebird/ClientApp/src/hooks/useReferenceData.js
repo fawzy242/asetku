@@ -10,6 +10,7 @@ import {
   transactionApi,
   rolesApi,
 } from '../core/api/api';
+import { useIsAdmin } from './useIsAdmin';
 
 const CACHE_KEYS = {
   CATEGORIES: ['reference', 'categories'],
@@ -80,12 +81,14 @@ const fetchAssets = async () => {
   try {
     const res = await assetApi.getGrid({ page: 1, pageSize: 500 });
     const data = res.data?.data?.data || res.data?.data || res.data || [];
-    return Array.isArray(data) ? data.map((a) => ({
-      value: a.assetId,
-      label: `${a.assetCode} - ${a.assetName}`,
-      assetCode: a.assetCode,
-      assetName: a.assetName,
-    })) : [];
+    return Array.isArray(data)
+      ? data.map((a) => ({
+          value: a.assetId,
+          label: `${a.assetCode} - ${a.assetName}`,
+          assetCode: a.assetCode,
+          assetName: a.assetName,
+        }))
+      : [];
   } catch (error) {
     console.error('Failed to fetch assets:', error);
     return [];
@@ -169,6 +172,7 @@ const fetchRoles = async () => {
 // ============================================================
 export const useReferenceData = () => {
   const queryClient = useQueryClient();
+  const isAdmin = useIsAdmin();
 
   const results = useQueries({
     queries: [
@@ -217,6 +221,9 @@ export const useReferenceData = () => {
         queryKey: CACHE_KEYS.ROLES,
         queryFn: fetchRoles,
         staleTime: CACHE_STALE_TIME,
+        // /api/Roles/* requires ADMIN or Administrator (backend change log §4.10).
+        // Non-admin sessions must not fire this request.
+        enabled: isAdmin,
       },
     ],
   });

@@ -21,6 +21,7 @@ import { useGridData } from '../../hooks/useGridData';
 import { useCrudFormBase } from '../../hooks/useCrudFormBase';
 import { getRoleColumns } from './columns';
 import RoleFormDialog from './components/RoleFormDialog';
+import { roleSchema } from './schema';
 import './Roles.scss';
 
 const rolesData = new RolesData();
@@ -64,6 +65,7 @@ const Roles = () => {
     editingRecord: editingRole,
     isSubmitting,
     formData,
+    errors,
     setFormField,
     handleCreate: baseHandleCreate,
     handleEdit,
@@ -71,8 +73,10 @@ const Roles = () => {
     handleSubmit: crudHandleSubmit,
   } = useCrudFormBase(INITIAL_FORM_DATA, rolesData, {
     idField: 'roleId',
+    schema: roleSchema,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
+      queryClient.invalidateQueries({ queryKey: ['reference', 'roles'] });
       toast.success(
         editingRole
           ? 'Role updated successfully'
@@ -165,6 +169,7 @@ const Roles = () => {
       if (r.success && isMountedRef.current) {
         toast.success('Role deleted successfully');
         queryClient.invalidateQueries({ queryKey: ['roles'] });
+        queryClient.invalidateQueries({ queryKey: ['reference', 'roles'] });
         reload();
         clearSelection();
       }
@@ -199,6 +204,7 @@ const Roles = () => {
 
       clearSelection();
       queryClient.invalidateQueries({ queryKey: ['roles'] });
+      queryClient.invalidateQueries({ queryKey: ['reference', 'roles'] });
       reload();
     },
     [reload, queryClient, toast, confirm, clearSelection]
@@ -219,6 +225,7 @@ const Roles = () => {
         toast.success(`${count} role(s) ${actionText}d successfully`);
         clearSelection();
         queryClient.invalidateQueries({ queryKey: ['roles'] });
+        queryClient.invalidateQueries({ queryKey: ['reference', 'roles'] });
         reload();
       }
     },
@@ -392,6 +399,7 @@ const Roles = () => {
         isViewMode={isViewMode}
         editingRecord={editingRole}
         formData={formData}
+        errors={errors}
         setFormField={setFormField}
       />
 
