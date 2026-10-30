@@ -69,7 +69,7 @@ public class ScheduleMaintenanceController : ControllerBase
     // ============================================================
 
     [HttpGet("grid")]
-    public async Task<IActionResult> GetGridData([FromQuery] ScheduleGridRequest request)
+    public async Task<IActionResult> GetGridData([FromQuery] ScheduleMaintenanceGridRequest request)
         => this.HandleResult(await _service.GetGridDataAsync(request));
 
     // ============================================================

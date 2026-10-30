@@ -167,7 +167,7 @@ public class ScheduleHandoverReps : IScheduleHandoverReps
     // PAGINATION
     // ============================================================
 
-    public async Task<PaginatedResult<ScheduleHandoverListView>> GetPagedListAsync(ScheduleGridRequest request)
+    public async Task<PaginatedResult<ScheduleHandoverListView>> GetPagedListAsync(ScheduleHandoverGridRequest request)
     {
         var conditions = new List<string>();
         var parameters = new DynamicParameters();

@@ -1,4 +1,4 @@
-import { supplierApi } from '../api/supplier.api';
+import { supplierApi } from '../api/api';
 import BaseData from './BaseData';
 
 class SuppliersData extends BaseData {

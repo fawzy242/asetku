@@ -22,15 +22,27 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
     // ============================================================
     // LOOKUP
     // ============================================================
+    //
+    // P3-4: extended to include Position, EmploymentStatus, JoinDate and
+    // ResignDate so GetSummaryAsync no longer issues four separate queries for
+    // those fields. The extra columns are additive; existing callers of
+    // GetEmployeeDataAsync (EmployeeSummaryService.GetEmployeeDataAsync) see a
+    // superset of the previous shape.
 
     public async Task<EmployeeSummaryGetDataDto?> GetEmployeeDataAsync(int employeeId)
     {
         const string sql = @"
             SELECT 
                 e.EmployeeId, e.EmployeeCode, e.FullName, 
-                d.DepartmentName, e.IsActive
+                d.DepartmentName, e.IsActive,
+                mdPos.MasterDataName AS PositionName,
+                mdStatus.MasterDataName AS EmploymentStatusName,
+                e.JoinDate,
+                e.ResignDate
             FROM Employee e
             LEFT JOIN Department d ON e.DepartmentId = d.DepartmentId AND d.IsActive = 1
+            LEFT JOIN MasterData mdPos ON e.Position = mdPos.ReferenceCode AND mdPos.ReferenceName = 'Position' AND mdPos.IsActive = 1
+            LEFT JOIN MasterData mdStatus ON e.EmploymentStatus = mdStatus.ReferenceCode AND mdStatus.ReferenceName = 'EmployeeStatus' AND mdStatus.IsActive = 1
             WHERE e.EmployeeId = @EmployeeId";
 
         return await _context.QueryFirstOrDefaultAsync<EmployeeSummaryGetDataDto>(sql, new { EmployeeId = employeeId });
@@ -39,6 +51,10 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
     // ============================================================
     // COMPLETE SUMMARY — FIX: Hapus ORDER BY yang tidak valid
     // ============================================================
+    //
+    // P3-4: PositionName / EmploymentStatusName / JoinDate / ResignDate are now
+    // read from the enriched GetEmployeeDataAsync result — the four sequential
+    // helper methods that used to serve them have been removed.
 
     public async Task<EmployeeSummaryView?> GetSummaryAsync(int employeeId)
     {
@@ -58,10 +74,10 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
             EmployeeCode = employee.EmployeeCode,
             FullName = employee.FullName,
             DepartmentName = employee.DepartmentName,
-            PositionName = await GetPositionNameAsync(employeeId),
-            EmploymentStatusName = await GetEmploymentStatusNameAsync(employeeId),
-            JoinDate = await GetJoinDateAsync(employeeId),
-            ResignDate = await GetResignDateAsync(employeeId),
+            PositionName = employee.PositionName,
+            EmploymentStatusName = employee.EmploymentStatusName,
+            JoinDate = employee.JoinDate,
+            ResignDate = employee.ResignDate,
             IsActive = employee.IsActive,
             PhotoProfileUrl = photoProfile?.FileUrl,
             Attachments = attachments.ToList(),
@@ -70,38 +86,6 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
             AssetsHistory = assetsHistory.Data.ToList(),
             TransactionHistory = transactionHistory.Data.ToList()
         };
-    }
-
-    private async Task<string?> GetPositionNameAsync(int employeeId)
-    {
-        const string sql = @"
-            SELECT md.MasterDataName 
-            FROM Employee e
-            LEFT JOIN MasterData md ON e.Position = md.ReferenceCode AND md.ReferenceName = 'Position' AND md.IsActive = 1
-            WHERE e.EmployeeId = @EmployeeId";
-        return await _context.ExecuteScalarAsync<string?>(sql, new { EmployeeId = employeeId });
-    }
-
-    private async Task<string?> GetEmploymentStatusNameAsync(int employeeId)
-    {
-        const string sql = @"
-            SELECT md.MasterDataName 
-            FROM Employee e
-            LEFT JOIN MasterData md ON e.EmploymentStatus = md.ReferenceCode AND md.ReferenceName = 'EmployeeStatus' AND md.IsActive = 1
-            WHERE e.EmployeeId = @EmployeeId";
-        return await _context.ExecuteScalarAsync<string?>(sql, new { EmployeeId = employeeId });
-    }
-
-    private async Task<DateTime?> GetJoinDateAsync(int employeeId)
-    {
-        const string sql = "SELECT JoinDate FROM Employee WHERE EmployeeId = @EmployeeId";
-        return await _context.ExecuteScalarAsync<DateTime?>(sql, new { EmployeeId = employeeId });
-    }
-
-    private async Task<DateTime?> GetResignDateAsync(int employeeId)
-    {
-        const string sql = "SELECT ResignDate FROM Employee WHERE EmployeeId = @EmployeeId";
-        return await _context.ExecuteScalarAsync<DateTime?>(sql, new { EmployeeId = employeeId });
     }
 
     // ============================================================
@@ -567,11 +551,17 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
     {
         // Employee photo resolves to the Employee menu's own photo endpoint
         // (GET /api/Employee/{id}/photo).
+        //
+        // P0-2 FIX: This query previously referenced the non-existent table
+        // "EmployeePhotoAttachment". The actual table created by migration
+        // 20260713205151_CreateTableEmployeePhotoProfileAttachment is
+        // "EmployeePhotoProfileAttachment" and is the one used by EmployeeReps
+        // (GetPhotoProfileByEmployeeIdAsync) and by EmployeeService.
         const string sql = @"
             SELECT TOP 1
                 fa.FileAttachmentId, fa.FileName, fa.OriginalFileName, fa.FileCategory, fa.IsPrimary,
                 '/api/Employee/' + CAST(eppa.EmployeeId AS VARCHAR) + '/photo' as FileUrl
-            FROM EmployeePhotoAttachment eppa
+            FROM EmployeePhotoProfileAttachment eppa
             INNER JOIN FileAttachment fa ON eppa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE eppa.EmployeeId = @EmployeeId AND eppa.IsActive = 1
             ORDER BY fa.IsPrimary DESC, fa.CreatedDate DESC";

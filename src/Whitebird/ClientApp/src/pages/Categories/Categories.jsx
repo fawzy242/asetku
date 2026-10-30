@@ -1,6 +1,6 @@
 // src/pages/Categories/Categories.jsx
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Grid, Box } from '@mui/material';
+import { Box } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import { FiCheckSquare, FiPlus, FiTrash2 } from 'react-icons/fi';
 import { CategoriesData } from '../../core/services';
@@ -8,17 +8,12 @@ import PageHeader from '../../components/atoms/PageHeader';
 import BulkActionBar from '../../components/atoms/BulkActionBar';
 import RefreshButton from '../../components/atoms/RefreshButton';
 import Button from '../../components/atoms/Button/Button';
-import StatusChip from '../../components/atoms/StatusChip/StatusChip';
 import Spinner from '../../components/atoms/Spinner/Spinner';
 import Tabs from '../../components/molecules/Tabs/Tabs';
 import SearchToolbar from '../../components/molecules/SearchToolbar/SearchToolbar';
 import DataTable from '../../components/molecules/DataTable/DataTable';
-import CrudModal from '../../components/molecules/CrudModal/CrudModal';
 import BulkActivateModal from '../../components/molecules/BulkActivateModal/BulkActivateModal';
 import ActionMenu from '../../components/molecules/ActionMenu';
-import FormSection from '../../components/atoms/FormSection/FormSection';
-import Input from '../../components/atoms/Input/Input';
-import Select from '../../components/atoms/Select/Select';
 import { ACTION_TYPES, useGridActions } from '../../hooks/useGridActions';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
@@ -26,6 +21,8 @@ import { useGridData } from '../../hooks/useGridData';
 import { useReferenceData } from '../../hooks/useReferenceData';
 import { useCrudFormBase } from '../../hooks/useCrudFormBase';
 import { useOptions } from '../../hooks/useOptions';
+import { getCategoryColumns } from './columns';
+import CategoryFormDialog from './components/CategoryFormDialog';
 import './Categories.scss';
 
 const categoriesData = new CategoriesData();
@@ -294,28 +291,7 @@ const Categories = () => {
   });
 
   const columns = useMemo(
-    () => [
-      { field: 'categoryName', headerName: 'Name', flex: 1, minWidth: 200 },
-      { field: 'description', headerName: 'Description', flex: 1, minWidth: 200 },
-      { field: 'parentCategoryName', headerName: 'Parent', width: 180 },
-      {
-        field: 'childCount',
-        headerName: 'Subcategories',
-        width: 130,
-        sortable: false,
-      },
-      {
-        field: 'isActive',
-        headerName: 'Status',
-        width: 110,
-        sortable: false,
-        renderCell: (p) => {
-          const status = p.value ? 'Active' : 'Inactive';
-          return <StatusChip status={status} />;
-        },
-      },
-      actionColumn,
-    ],
+    () => getCategoryColumns(actionColumn),
     [actionColumn]
   );
 
@@ -418,61 +394,17 @@ const Categories = () => {
         onAction={handleActionClick}
       />
 
-      <CrudModal
+      <CategoryFormDialog
         isOpen={showModal}
         onClose={handleClose}
-        title={
-          isViewMode
-            ? 'View Category'
-            : editingCategory
-              ? 'Edit Category'
-              : 'Add Category'
-        }
         onSubmit={isViewMode ? () => {} : crudHandleSubmit}
         isSubmitting={isSubmitting}
-        submitText={isViewMode ? 'Close' : editingCategory ? 'Update' : 'Create'}
-        cancelText={isViewMode ? 'Close' : 'Cancel'}
-        disableSubmit={isViewMode}
-        size="md"
-      >
-        <FormSection
-          title="Basic Information"
-          description="Category name and description"
-        >
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <Input
-                label="Category Name"
-                value={formData.categoryName || ''}
-                onChange={(e) => setFormField('categoryName')(e.target.value)}
-                disabled={isViewMode}
-                required
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Input
-                label="Description"
-                value={formData.description || ''}
-                onChange={(e) => setFormField('description')(e.target.value)}
-                disabled={isViewMode}
-                multiline
-                rows={2}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Select
-                label="Parent Category"
-                value={formData.parentCategoryId || ''}
-                onChange={(e) =>
-                  setFormField('parentCategoryId')(e.target.value || null)
-                }
-                options={parentCategoryOptions}
-                disabled={isViewMode}
-              />
-            </Grid>
-          </Grid>
-        </FormSection>
-      </CrudModal>
+        isViewMode={isViewMode}
+        editingRecord={editingCategory}
+        formData={formData}
+        setFormField={setFormField}
+        parentCategoryOptions={parentCategoryOptions}
+      />
 
       <BulkActivateModal
         isOpen={showBulkActivateModal}

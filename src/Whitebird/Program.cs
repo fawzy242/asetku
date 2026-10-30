@@ -98,8 +98,11 @@ builder.Logging.AddDebug();
 var app = builder.Build();
 
 // ========== CONFIGURATION VALIDATION ==========
+// P2-2 (Option A): pass app.Environment.EnvironmentName (a plain string) so
+// ConfigurationValidator can fail-closed in Production without requiring
+// Whitebird.Infra to reference Microsoft.AspNetCore.Hosting.Abstractions.
 var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
-if (!ConfigurationValidator.Validate(app.Configuration, startupLogger))
+if (!ConfigurationValidator.Validate(app.Configuration, app.Environment.EnvironmentName, startupLogger))
 {
     throw new InvalidOperationException("Application configuration is invalid. See logs for details.");
 }

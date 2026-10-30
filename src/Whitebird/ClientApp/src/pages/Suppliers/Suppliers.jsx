@@ -1,6 +1,6 @@
 // src/pages/Suppliers/Suppliers.jsx
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Grid, Box } from '@mui/material';
+import { Box } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import { FiCheckSquare, FiPlus, FiTrash2 } from 'react-icons/fi';
 import { SuppliersData } from '../../core/services';
@@ -8,21 +8,19 @@ import PageHeader from '../../components/atoms/PageHeader';
 import BulkActionBar from '../../components/atoms/BulkActionBar';
 import RefreshButton from '../../components/atoms/RefreshButton';
 import Button from '../../components/atoms/Button/Button';
-import StatusChip from '../../components/atoms/StatusChip/StatusChip';
 import Spinner from '../../components/atoms/Spinner/Spinner';
 import Tabs from '../../components/molecules/Tabs/Tabs';
 import SearchToolbar from '../../components/molecules/SearchToolbar/SearchToolbar';
 import DataTable from '../../components/molecules/DataTable/DataTable';
-import CrudModal from '../../components/molecules/CrudModal/CrudModal';
 import BulkActivateModal from '../../components/molecules/BulkActivateModal/BulkActivateModal';
 import ActionMenu from '../../components/molecules/ActionMenu';
-import FormSection from '../../components/atoms/FormSection/FormSection';
-import Input from '../../components/atoms/Input/Input';
 import { ACTION_TYPES, useGridActions } from '../../hooks/useGridActions';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
 import { useGridData } from '../../hooks/useGridData';
 import { useCrudFormBase } from '../../hooks/useCrudFormBase';
+import { getSupplierColumns } from './columns';
+import SupplierFormDialog from './components/SupplierFormDialog';
 import './Suppliers.scss';
 
 const suppliersData = new SuppliersData();
@@ -285,24 +283,7 @@ const Suppliers = () => {
   });
 
   const columns = useMemo(
-    () => [
-      { field: 'supplierName', headerName: 'Name', flex: 1, minWidth: 180 },
-      { field: 'contactPerson', headerName: 'Contact', width: 160 },
-      { field: 'phoneNumber', headerName: 'Phone', width: 140 },
-      { field: 'email', headerName: 'Email', width: 200 },
-      { field: 'assetCount', headerName: 'Assets', width: 90, sortable: false },
-      {
-        field: 'isActive',
-        headerName: 'Status',
-        width: 110,
-        sortable: false,
-        renderCell: (p) => {
-          const status = p?.value ? 'Active' : 'Inactive';
-          return <StatusChip status={status} />;
-        },
-      },
-      actionColumn,
-    ],
+    () => getSupplierColumns(actionColumn),
     [actionColumn]
   );
 
@@ -405,83 +386,16 @@ const Suppliers = () => {
         onAction={handleActionClick}
       />
 
-      <CrudModal
+      <SupplierFormDialog
         isOpen={showModal}
         onClose={handleClose}
-        title={
-          isViewMode
-            ? 'View Supplier'
-            : editingSupplier
-              ? 'Edit Supplier'
-              : 'Add Supplier'
-        }
         onSubmit={isViewMode ? () => {} : crudHandleSubmit}
         isSubmitting={isSubmitting}
-        submitText={isViewMode ? 'Close' : editingSupplier ? 'Update' : 'Create'}
-        cancelText={isViewMode ? 'Close' : 'Cancel'}
-        disableSubmit={isViewMode}
-        size="lg"
-      >
-        <FormSection
-          title="Basic Information"
-          description="Supplier name and contact person"
-        >
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <Input
-                label="Supplier Name"
-                value={formData.supplierName || ''}
-                onChange={(e) => setFormField('supplierName')(e.target.value)}
-                disabled={isViewMode}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Input
-                label="Contact Person"
-                value={formData.contactPerson || ''}
-                onChange={(e) => setFormField('contactPerson')(e.target.value)}
-                disabled={isViewMode}
-              />
-            </Grid>
-          </Grid>
-        </FormSection>
-
-        <FormSection
-          title="Contact Information"
-          description="Phone, email, and address"
-        >
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <Input
-                label="Phone Number"
-                value={formData.phoneNumber || ''}
-                onChange={(e) => setFormField('phoneNumber')(e.target.value)}
-                disabled={isViewMode}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Input
-                label="Email"
-                type="email"
-                value={formData.email || ''}
-                onChange={(e) => setFormField('email')(e.target.value)}
-                disabled={isViewMode}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Input
-                label="Address"
-                value={formData.address || ''}
-                onChange={(e) => setFormField('address')(e.target.value)}
-                disabled={isViewMode}
-                multiline
-                rows={2}
-              />
-            </Grid>
-          </Grid>
-        </FormSection>
-      </CrudModal>
+        isViewMode={isViewMode}
+        editingRecord={editingSupplier}
+        formData={formData}
+        setFormField={setFormField}
+      />
 
       <BulkActivateModal
         isOpen={showBulkActivateModal}

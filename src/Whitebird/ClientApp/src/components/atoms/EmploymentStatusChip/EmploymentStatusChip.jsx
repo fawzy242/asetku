@@ -1,12 +1,12 @@
 import React from 'react';
 import { Chip } from '@mui/material';
-import { getEmploymentStatusStyles } from '../../../core/constants/employmentStatuses';
+import { getEmploymentStatusStyles } from '../../../core/constants/globalStatuses';
 import './EmploymentStatusChip.scss';
 
 /**
  * Centralized Employment Status Chip component
- * Uses getEmploymentStatusStyles from employmentStatuses.js
- * 
+ * Uses getEmploymentStatusStyles from globalStatuses.js
+ *
  * @param {Object} props
  * @param {string} props.status - Employment status text
  * @param {string} props.size - Chip size (small, medium)
@@ -15,11 +15,11 @@ import './EmploymentStatusChip.scss';
 const EmploymentStatusChip = ({ status, size = 'small', className = '' }) => {
   const displayStatus = status || 'Unknown';
   const styles = getEmploymentStatusStyles(displayStatus);
-  
+
   return (
-    <Chip 
-      label={displayStatus} 
-      size={size} 
+    <Chip
+      label={displayStatus}
+      size={size}
       className={`employment-status-chip ${className}`}
       sx={{
         bgcolor: styles.bg,
@@ -30,7 +30,7 @@ const EmploymentStatusChip = ({ status, size = 'small', className = '' }) => {
         borderRadius: '16px',
         '& .MuiChip-label': {
           px: size === 'small' ? 1.5 : 2,
-        }
+        },
       }}
     />
   );

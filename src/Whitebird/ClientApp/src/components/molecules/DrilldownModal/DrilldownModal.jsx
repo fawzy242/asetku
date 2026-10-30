@@ -5,7 +5,7 @@ import Modal from '../Modal/Modal';
 import DataTable from '../DataTable/DataTable';
 import Spinner from '../../atoms/Spinner/Spinner';
 import apiService from '../../../core/services/api.service';
-import { getStatusChipStyles } from '../../../core/constants/statusColors';
+import { getStatusChipStyles } from '../../../core/constants/globalStatuses';
 import { formatCurrency } from '../../../core/utils/number.utils';
 
 const DrilldownModal = ({
@@ -79,10 +79,7 @@ const DrilldownModal = ({
       let items = [];
       let total = 0;
 
-      if (
-        responseData?.data?.data &&
-        Array.isArray(responseData.data.data)
-      ) {
+      if (responseData?.data?.data && Array.isArray(responseData.data.data)) {
         items = responseData.data.data;
         total = responseData.data.totalCount || items.length;
       } else if (responseData?.data && Array.isArray(responseData.data)) {
@@ -91,10 +88,7 @@ const DrilldownModal = ({
       } else if (Array.isArray(responseData)) {
         items = responseData;
         total = items.length;
-      } else if (
-        responseData?.data?.items &&
-        Array.isArray(responseData.data.items)
-      ) {
+      } else if (responseData?.data?.items && Array.isArray(responseData.data.items)) {
         items = responseData.data.items;
         total = responseData.data.totalCount || items.length;
       } else {

@@ -29,7 +29,7 @@ import { useSweetAlert } from '../../hooks/useSweetAlert';
 import { useGridData } from '../../hooks/useGridData';
 import { useReferenceData } from '../../hooks/useReferenceData';
 import { useOptions } from '../../hooks/useOptions';
-import { getScheduleColumns } from '../../core/constants/columns';
+import { getScheduleColumns } from './columns';
 import './ScheduleHandover.scss';
 
 const scheduleData = new ScheduleHandoverData();
@@ -409,7 +409,7 @@ const ScheduleHandover = () => {
   });
 
   const columns = useMemo(
-    () => getScheduleColumns(actionColumn, 'handover'),
+    () => getScheduleColumns(actionColumn),
     [actionColumn]
   );
 

@@ -8,16 +8,15 @@ namespace Whitebird.Domain.Features.AssetTransaction;
 /// </summary>
 public class AssetTransactionGridRequest : GridRequestBase
 {
-    public int Page { get; set; } = 1;
-    public int PageSize { get; set; } = 10;
-    public string? Search { get; set; }
+    // Page / PageSize / Search / SortBy / SortDescending are inherited from
+    // GridRequestBase. Re-declaring them caused CS0108 shadowing warnings and
+    // risked future confusion — a base-typed accessor would have read the base
+    // values instead of the derived ones.
     public DateTime? DateFrom { get; set; }
     public DateTime? DateTo { get; set; }
     public int? EmployeeId { get; set; }
     public int? AssetId { get; set; }
     public int? TransactionType { get; set; }
-    public string? SortBy { get; set; }
-    public bool SortDescending { get; set; } = true;
 
     // ============================================================
     // Status filter for grid
@@ -138,39 +137,7 @@ public class AssetTransactionCreateViewModel
 
     public int? FromAssetTransactionId { get; set; }
 
-    // FIX: Added missing field from AssetTransactionEntity
     public int? MaintenanceEmployeeId { get; set; }
-}
-
-public class AssetTransactionUpdateViewModel
-{
-    [Required(ErrorMessage = "AssetId is required")]
-    [Range(1, int.MaxValue, ErrorMessage = "AssetId must be greater than 0")]
-    public int AssetId { get; set; }
-
-    [Required(ErrorMessage = "TransactionType is required")]
-    public int TransactionType { get; set; }
-
-    public int? EmployeeId { get; set; }
-    public int? OfficeId { get; set; }
-
-    [Required(ErrorMessage = "TransactionDate is required")]
-    public DateTime TransactionDate { get; set; }
-
-    public DateTime? ExpectedLoanReturnDate { get; set; }
-
-    [StringLength(500, ErrorMessage = "Notes cannot exceed 500 characters")]
-    public string? Notes { get; set; }
-
-    public int? Condition { get; set; }
-
-    public bool? Approved { get; set; }
-    public string? ApprovedBy { get; set; }
-    public bool? Completed { get; set; }
-    public string? CompletedBy { get; set; }
-
-    public int? MaintenanceType { get; set; }
-    public decimal? MaintenanceCost { get; set; }
 }
 
 public class BulkApprovalRequest

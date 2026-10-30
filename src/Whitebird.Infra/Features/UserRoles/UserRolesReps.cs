@@ -131,6 +131,9 @@ public class UserRolesReps : IUserRolesReps
         return await _context.ExecuteScalarAsync<int>(sql, new { UserId = userId, RoleId = roleId }) > 0;
     }
 
+    // NOTE (P4-5): GetActiveUserCountForRoleAsync was removed — it had no callers
+    // and duplicated IRolesReps.GetUserCountAsync.
+
     // ============================================================
     // WRITES
     // ============================================================

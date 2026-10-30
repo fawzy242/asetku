@@ -1,4 +1,4 @@
-import { officeApi } from '../api/office.api';
+import { officeApi } from '../api/api';
 import BaseData from './BaseData';
 
 class OfficesData extends BaseData {

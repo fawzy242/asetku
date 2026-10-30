@@ -1,4 +1,4 @@
-import { departmentApi } from '../api/department.api';
+import { departmentApi } from '../api/api';
 import BaseData from './BaseData';
 
 class DepartmentsData extends BaseData {

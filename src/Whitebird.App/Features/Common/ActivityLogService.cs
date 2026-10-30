@@ -66,27 +66,11 @@ public class ActivityLogService : BaseService, IActivityLogService
         await LogAsync(referenceTable, referenceId, "ERROR", description, createdBy);
     }
 
-    public async Task LogAsyncSafe(string referenceTable, int referenceId, string activityType, string description, string? createdBy = null)
-    {
-        try
-        {
-            var log = new CreateActivityLogDto
-            {
-                ReferenceTable = referenceTable,
-                ReferenceId = referenceId,
-                ActivityType = activityType,
-                Description = description,
-                CreatedBy = createdBy ?? "System"
-            };
-
-            await _activityLogReps.InsertAsync(log);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to insert activity log (safe mode) for {Table}.{Id}",
-                referenceTable, referenceId);
-        }
-    }
+    // P4-1: kept as a public interface member for callers that opted into the
+    // "safe" naming, but it is now a one-line delegation to LogAsync — the two
+    // bodies were previously identical.
+    public Task LogAsyncSafe(string referenceTable, int referenceId, string activityType, string description, string? createdBy = null)
+        => LogAsync(referenceTable, referenceId, activityType, description, createdBy);
 
     public async Task<ServiceResult<IEnumerable<ActivityLogListViewModel>>> GetByReferenceAsync(string referenceTable, int referenceId)
     {

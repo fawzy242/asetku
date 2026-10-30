@@ -12,6 +12,14 @@ public class EmployeeSummaryGetDataDto
     public string FullName { get; set; } = string.Empty;
     public string? DepartmentName { get; set; }
     public bool IsActive { get; set; }
+
+    // P3-4: additional fields folded into the primary employee lookup query so
+    // GetSummaryAsync no longer needs four extra round-trips. These values are
+    // populated by the JOINed SQL in GetEmployeeDataAsync.
+    public string? PositionName { get; set; }
+    public string? EmploymentStatusName { get; set; }
+    public DateTime? JoinDate { get; set; }
+    public DateTime? ResignDate { get; set; }
 }
 
 /// <summary>

@@ -2,19 +2,8 @@
 import React from 'react';
 import { FiActivity } from 'react-icons/fi';
 import { formatDateTime } from '../../../core/utils/date.utils';
+import { TRANSACTION_TYPE_COLORS } from '../constants';
 import './AssetTimeline.scss';
-
-const TRANSACTION_TYPE_COLORS = {
-  HANDOVER: '#3b82f6',
-  TRANSFER: '#8b5cf6',
-  LOAN: '#f59e0b',
-  RETURN: '#10b981',
-  LOAN_RETURN: '#34d399',
-  MAINTENANCE: '#f97316',
-  POST_MAINTENANCE: '#14b8a6',
-  DISPOSAL: '#ef4444',
-  OPERATIONAL_OFFICE: '#6366f1',
-};
 
 const getColor = (activityType) => {
   const key = (activityType || '').toUpperCase();

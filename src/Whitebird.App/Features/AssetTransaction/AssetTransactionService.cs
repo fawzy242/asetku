@@ -137,48 +137,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         }, "create transaction");
     }
 
-    public async Task<ServiceResult<AssetTransactionDetailView>> UpdateAsync(int id, AssetTransactionUpdateViewModel model)
-    {
-        var validation = await ValidateTransactionReferencesAsync(
-            model.AssetId, model.TransactionType, model.EmployeeId, model.OfficeId,
-            model.Condition, model.MaintenanceType, model.TransactionDate, model.ExpectedLoanReturnDate);
-        if (validation != null) return validation;
-
-        return await ExecuteWithTransactionAsync(async () =>
-        {
-            var existing = await _transactionReps.GetByIdRawAsync(id);
-            if (existing == null) return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
-
-            if (existing.Approved != null)
-                return ServiceResult<AssetTransactionDetailView>.BadRequest("Cannot update approved/rejected transaction");
-
-            existing.AssetId = model.AssetId;
-            existing.TransactionType = model.TransactionType;
-            existing.EmployeeId = model.EmployeeId;
-            existing.OfficeId = model.OfficeId;
-            existing.TransactionDate = model.TransactionDate;
-            existing.ExpectedLoanReturnDate = model.ExpectedLoanReturnDate;
-            existing.Notes = model.Notes;
-            existing.Condition = model.Condition;
-            existing.MaintenanceType = model.MaintenanceType;
-            existing.MaintenanceCost = model.MaintenanceCost;
-            existing.ModifiedDate = DateTime.Now;
-            existing.ModifiedBy = _currentUserService.GetDisplayName();
-
-            await _transactionReps.UpdateAsync(existing);
-            await ReevaluateCompletedAsync(id);
-
-            var updated = await _transactionReps.GetDetailByIdAsync(id);
-
-            await _activityLogService.LogUpdateAsync(
-                TableNames.AssetTransaction, id,
-                $"Transaction updated: Type {model.TransactionType}",
-                _currentUserService.GetDisplayName());
-
-            return ServiceResult<AssetTransactionDetailView>.Success(updated!, "Transaction updated successfully");
-        }, "update transaction");
-    }
-
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -190,8 +148,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             if (paired != null)
                 return ServiceResult.BadRequest("Cannot delete transaction that has a paired transaction");
 
-            // H9: FK dependency checks — a hard delete on AssetTransaction fires
-            // every inbound FK, so verify them all before touching the parent row.
             var attachmentCount = await _transactionReps.GetAttachmentCountAsync(id);
             if (attachmentCount > 0)
                 return ServiceResult.BadRequest(
@@ -266,6 +222,27 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         {
             var existing = await _transactionReps.GetByIdRawAsync(id);
             if (existing == null) return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
+
+            // H11 (Finding 1): refuse to edit an approved/rejected transaction.
+            // Matches the historic UpdateAsync guard and preserves the invariant
+            // that an approval decision reflects the state of the record at the
+            // time it was approved. To change an approved/rejected transaction,
+            // un-approve it via BulkPending first, edit, then re-approve via
+            // BulkApproved or the approval endpoint.
+            if (existing.Approved != null)
+                return ServiceResult<AssetTransactionDetailView>.BadRequest(
+                    "Cannot update an approved/rejected transaction. Un-approve it via BulkPending, then edit and re-approve.");
+
+            // H11 (Finding 2): refuse to deactivate a transaction that has a
+            // paired child. Same rule already enforced by SoftDeleteAsync and
+            // DeleteAsync. Deactivating a paired source would orphan the child.
+            if (existing.IsActive && !model.IsActive)
+            {
+                var paired = await _transactionReps.GetPairedTransactionAsync(id);
+                if (paired != null)
+                    return ServiceResult<AssetTransactionDetailView>.BadRequest(
+                        "Cannot deactivate a transaction that has a paired transaction.");
+            }
 
             existing.AssetId = model.AssetId;
             existing.TransactionType = model.TransactionType;
@@ -370,6 +347,19 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         {
             var existing = await _transactionReps.GetByIdRawAsync(id);
             if (existing == null) return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
+
+            // H11 (Finding 2): refuse to deactivate a transaction that has a
+            // paired child. Same rule as SoftDeleteAsync / DeleteAsync. This
+            // endpoint intentionally allows edits on approved transactions
+            // because it is the workflow surface for uploading approval
+            // documents and for re-approving after BulkPending.
+            if (existing.IsActive && !model.IsActive)
+            {
+                var paired = await _transactionReps.GetPairedTransactionAsync(id);
+                if (paired != null)
+                    return ServiceResult<AssetTransactionDetailView>.BadRequest(
+                        "Cannot deactivate a transaction that has a paired transaction.");
+            }
 
             existing.AssetId = model.AssetId;
             existing.TransactionType = model.TransactionType;

@@ -29,7 +29,7 @@ import { useSweetAlert } from '../../hooks/useSweetAlert';
 import { useGridData } from '../../hooks/useGridData';
 import { useReferenceData } from '../../hooks/useReferenceData';
 import { useOptions } from '../../hooks/useOptions';
-import { getScheduleColumns } from '../../core/constants/columns';
+import { getScheduleColumns } from './columns';
 import './ScheduleMaintenance.scss';
 
 const scheduleData = new ScheduleMaintenanceData();
@@ -420,7 +420,7 @@ const ScheduleMaintenance = () => {
   });
 
   const columns = useMemo(
-    () => getScheduleColumns(actionColumn, 'maintenance'),
+    () => getScheduleColumns(actionColumn),
     [actionColumn]
   );
 

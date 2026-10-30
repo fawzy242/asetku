@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   transactionSchema,
   getTransactionDefaultValues,
-} from '../../schemas/transactionSchema';
+} from './schema';
 import { formatDate } from '../../core/utils/date.utils';
 import { AssetTransactionsData } from '../../core/services';
 import Spinner from '../../components/atoms/Spinner/Spinner';
@@ -38,7 +38,7 @@ import {
   getMonitoringColumns,
   getManagementColumns,
   getManagementReturnColumns,
-} from '../../core/constants/columns';
+} from './columns';
 import PrimaryTransactionsGrid from './components/PrimaryTransactionsGrid';
 import SecondaryTransactionsGrid from './components/SecondaryTransactionsGrid';
 import TransactionDialogs from './components/TransactionDialogs';
@@ -115,9 +115,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     maintenanceTypes,
   } = useReferenceData();
 
-  // ============================================================
-  // BULK SELECTION (unchanged)
-  // ============================================================
   const {
     selectedRowIds: primarySelected,
     selectionCount: primaryCount,
@@ -136,9 +133,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     getSelectedIds: getSecondaryIds,
   } = useBulkSelection({ idField: 'assetTransactionId' });
 
-  // ============================================================
-  // REACT HOOK FORM
-  // ============================================================
   const {
     register,
     handleSubmit: handleFormSubmit,
@@ -160,9 +154,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     [setValue]
   );
 
-  // ============================================================
-  // FILTERS
-  // ============================================================
   const buildManagementFilters = useCallback(() => {
     const filters = {};
     if (activeSubTabManagement === 'pending') filters.status = 'pending';
@@ -174,9 +165,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     return filters;
   }, [activeSubTabManagement, searchTerm, dateFilterStart, dateFilterEnd]);
 
-  // ============================================================
-  // DATA FETCHING
-  // ============================================================
   const fetchMonitoringData1 = useCallback(
     async (params) => {
       const filters = {};
@@ -355,9 +343,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     fetchManagementReturnData
   );
 
-  // ============================================================
-  // PAIRED TRANSACTION OPTIONS (unchanged)
-  // ============================================================
   useEffect(() => {
     const type = parseInt(formData.transactionType);
     if (formData.assetId && TRANSACTION_TYPES_REQUIRING_PAIR.includes(type)) {
@@ -393,9 +378,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     }
   }, [formData.transactionType, formData.assetId, setFormField]);
 
-  // ============================================================
-  // EFFECTS
-  // ============================================================
   useEffect(() => {
     isMountedRef.current = true;
     clearPrimary();
@@ -421,9 +403,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     reloadManagementReturn,
   ]);
 
-  // ============================================================
-  // RECORD LOADING — shared by Edit and View
-  // ============================================================
   const loadRecordForModal = useCallback(
     async (record) => {
       const recordId = record?.assetTransactionId;
@@ -464,9 +443,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     [setValue, toast]
   );
 
-  // ============================================================
-  // CREATE / EDIT / VIEW / CLOSE
-  // ============================================================
   const handleCreate = useCallback(() => {
     reset(getTransactionDefaultValues());
     setEditingTransaction(null);
@@ -596,9 +572,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     ]
   );
 
-  // ============================================================
-  // HANDLERS
-  // ============================================================
   const handleSearch = useCallback(
     (search) => {
       setSearchTerm(search);
@@ -696,9 +669,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     ]
   );
 
-  // ============================================================
-  // BULK ACTIONS
-  // ============================================================
   const handleBulkApprove = useCallback(
     async (ids, gridType = 'primary') => {
       if (!ids || ids.length === 0) {
@@ -806,9 +776,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     ]
   );
 
-  // ============================================================
-  // SHORTCUT HANDLERS
-  // ============================================================
   const handleReturnShortcut = useCallback((tx) => {
     setSelectedTransaction(tx);
     setReturnData({
@@ -968,9 +935,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     fetchAttachments();
   }, [currentTransactionId]);
 
-  // ============================================================
-  // MONITORING GRID ACTIONS
-  // ============================================================
   const getMonitoringActions = useCallback(
     (row) => {
       const actions = [];
@@ -989,8 +953,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
           actions.push('complete');
         }
       }
-      // Note: on the 'complete' sub-tab, only VIEW is offered (no uncomplete
-      // shortcut is defined by the existing business rules).
 
       return actions;
     },
@@ -1044,9 +1006,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     ]
   );
 
-  // ============================================================
-  // MANAGEMENT GRID ACTIONS
-  // ============================================================
   const getManagementActions = useCallback((row) => {
     const isPending = row.approved === null;
     const isApproved = row.approved === true;
@@ -1130,9 +1089,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     ]
   );
 
-  // ============================================================
-  // MANAGEMENT RETURN GRID ACTIONS
-  // ============================================================
   const getManagementReturnActions = useCallback((row) => {
     const isPending = row.approved === null;
     const actions = [ACTION_TYPES.VIEW];
@@ -1184,9 +1140,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     ]
   );
 
-  // ============================================================
-  // ACTION COLUMNS + MENUS
-  // ============================================================
   const monitoringGridActions = useGridActions({
     actions: [ACTION_TYPES.VIEW, ACTION_TYPES.EDIT, ACTION_TYPES.DELETE],
     onAction: handleMonitoringAction,
@@ -1208,9 +1161,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     rowIdField: 'assetTransactionId',
   });
 
-  // ============================================================
-  // COLUMNS
-  // ============================================================
   const monitoringColumns1 = useMemo(
     () => getMonitoringColumns(monitoringGridActions.actionColumn, activeSubTab1),
     [activeSubTab1, monitoringGridActions.actionColumn]
@@ -1236,9 +1186,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     [managementReturnGridActions.actionColumn]
   );
 
-  // ============================================================
-  // OPTIONS
-  // ============================================================
   const employeeOptions = useOptions(employees, 'Select Employee');
   const officeOptions = useOptions(offices, 'Select Office');
   const conditionOptions = useOptions(conditions, 'Select Condition');
@@ -1254,9 +1201,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     ];
   }, [refAssets]);
 
-  // ============================================================
-  // COMPUTED
-  // ============================================================
   const isMonitoring = activeMainTab === 'monitoring';
   const isManagement = activeMainTab === 'management';
   const showEmployee = TRANSACTION_TYPES_REQUIRING_EMPLOYEE.includes(
@@ -1277,9 +1221,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     activeSubTabManagement === 'approved';
   const showFileUploads = isEditMode && currentTransactionId;
 
-  // ============================================================
-  // BULK BUTTONS
-  // ============================================================
   const renderBulkActions = (ids, gridType) => {
     if (!ids || ids.length === 0) return [];
 
@@ -1342,9 +1283,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     </>
   );
 
-  // ============================================================
-  // RENDER
-  // ============================================================
   if (managementLoading && !managementData.length && isManagement) {
     return (
       <div className="page-loading">
@@ -1373,7 +1311,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
 
       {isMonitoring && (
         <>
-          {/* GRID 1 - Uncomplete & Complete */}
           <div className="transactions-menu__grid-section">
             <Tabs
               tabs={MONITORING_SUB_TABS_1}
@@ -1503,7 +1440,6 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
         </>
       )}
 
-      {/* Action menus — one per grid instance. Only the open one shows a popup. */}
       <ActionMenu
         anchorEl={monitoringGridActions.menuAnchorEl}
         open={monitoringGridActions.menuOpen}
@@ -1583,7 +1519,7 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
         isImporting={isImporting}
         importResult={importResult}
         title="Import Transactions"
-        description="Upload Excel file. Transactions will be imported as PENDING."
+        description="Upload an .xlsx file. Transactions will be imported as PENDING."
       />
     </div>
   );

@@ -167,7 +167,7 @@ public class ScheduleReturnReps : IScheduleReturnReps
     // PAGINATION
     // ============================================================
 
-    public async Task<PaginatedResult<ScheduleReturnListView>> GetPagedListAsync(ScheduleGridRequest request)
+    public async Task<PaginatedResult<ScheduleReturnListView>> GetPagedListAsync(ScheduleReturnGridRequest request)
     {
         var conditions = new List<string>();
         var parameters = new DynamicParameters();

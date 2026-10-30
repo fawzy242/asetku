@@ -1,21 +1,21 @@
-import React, { memo } from 'react';
+// src/components/atoms/Input/DatePickerInput.jsx
+import React, { memo, forwardRef } from 'react';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
-import { TextField } from '@mui/material';
 
-const DatePickerInput = memo(({ 
-  label, 
-  value, 
-  onChange, 
-  required = false, 
+const DatePickerInput = memo(forwardRef(({
+  label,
+  value,
+  onChange,
+  required = false,
   disabled = false,
   helperText = '',
   error = '',
   sx = {},
-  ...rest 
-}) => {
+  ...rest
+}, ref) => {
   const dayjsValue = value ? dayjs(value) : null;
   const hasValue = value !== null && value !== undefined && value !== '';
 
@@ -38,14 +38,13 @@ const DatePickerInput = memo(({
         disabled={disabled}
         slotProps={{
           textField: {
+            inputRef: ref,
             required: required,
             error: finalError,
             helperText: finalHelperText,
             fullWidth: true,
             size: 'small',
             variant: 'outlined',
-            // FIX: Always set shrink to true when value exists
-            // This fixes the autofill issue where label doesn't float up
             InputLabelProps: {
               shrink: hasValue || true,
             },
@@ -61,7 +60,7 @@ const DatePickerInput = memo(({
       />
     </LocalizationProvider>
   );
-});
+}));
 
 DatePickerInput.displayName = "DatePickerInput";
 export default DatePickerInput;

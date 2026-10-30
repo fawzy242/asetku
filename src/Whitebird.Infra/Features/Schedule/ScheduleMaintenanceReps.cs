@@ -172,7 +172,7 @@ public class ScheduleMaintenanceReps : IScheduleMaintenanceReps
     // PAGINATION
     // ============================================================
 
-    public async Task<PaginatedResult<ScheduleMaintenanceListView>> GetPagedListAsync(ScheduleGridRequest request)
+    public async Task<PaginatedResult<ScheduleMaintenanceListView>> GetPagedListAsync(ScheduleMaintenanceGridRequest request)
     {
         var conditions = new List<string>();
         var parameters = new DynamicParameters();

@@ -1,4 +1,4 @@
-import { dashboardApi } from '../api/dashboard.api';
+import { dashboardApi } from '../api/api';
 import BaseData from './BaseData';
 
 class DashboardData extends BaseData {
@@ -32,7 +32,7 @@ class DashboardData extends BaseData {
         if (result.status === 'fulfilled' && result.value?.data) {
           const data = result.value.data;
           if (data.isSuccess !== undefined) {
-            return data.isSuccess ? (data.data || fallback) : fallback;
+            return data.isSuccess ? data.data || fallback : fallback;
           }
           return data || fallback;
         }

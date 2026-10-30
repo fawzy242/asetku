@@ -11,9 +11,9 @@ namespace Whitebird.App.Features.Schedule;
 /// Only Handover-specific custom operations are declared here.
 /// </summary>
 public interface IScheduleHandoverService :
-    ICommonService<ScheduleHandoverView, ScheduleHandoverListView, ScheduleGridRequest, ScheduleHandoverCreateDto, ScheduleHandoverUpdateDto>
+    ICommonService<ScheduleHandoverView, ScheduleHandoverListView, ScheduleHandoverGridRequest, ScheduleHandoverCreateDto, ScheduleHandoverUpdateDto>
 {
     Task<ServiceResult<IEnumerable<ScheduleHandoverListView>>> GetByAssetIdAsync(int assetId);
     Task<ServiceResult<IEnumerable<ScheduleHandoverListView>>> GetByEmployeeIdAsync(int employeeId);
-    Task<ServiceResult<ScheduleGenerateResultDto>> GenerateAsync(ScheduleHandoverGenerateDto dto);
+    Task<ServiceResult<ScheduleHandoverGenerateResultDto>> GenerateAsync(ScheduleHandoverGenerateDto dto);
 }

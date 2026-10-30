@@ -19,7 +19,7 @@ namespace Whitebird.App.Features.Schedule;
 /// here so the custom workflow is explicit.
 /// </summary>
 public class ScheduleHandoverService
-    : CommonService<ScheduleHandoverEntity, ScheduleHandoverView, ScheduleHandoverListView, ScheduleGridRequest, ScheduleHandoverCreateDto, ScheduleHandoverUpdateDto>,
+    : CommonService<ScheduleHandoverEntity, ScheduleHandoverView, ScheduleHandoverListView, ScheduleHandoverGridRequest, ScheduleHandoverCreateDto, ScheduleHandoverUpdateDto>,
       IScheduleHandoverService
 {
     private readonly IScheduleHandoverReps _scheduleReps;
@@ -54,7 +54,7 @@ public class ScheduleHandoverService
     protected override async Task<IEnumerable<ScheduleHandoverListView>> LoadAllAsync() =>
         await _scheduleReps.GetAllListViewAsync();
 
-    protected override async Task<PaginatedResult<ScheduleHandoverListView>> LoadPageAsync(ScheduleGridRequest request) =>
+    protected override async Task<PaginatedResult<ScheduleHandoverListView>> LoadPageAsync(ScheduleHandoverGridRequest request) =>
         await _scheduleReps.GetPagedListAsync(request);
 
     protected override void MapCreate(ScheduleHandoverCreateDto model, ScheduleHandoverEntity entity) => model.Adapt(entity);
@@ -131,22 +131,22 @@ public class ScheduleHandoverService
     // CUSTOM: GENERATE
     // ============================================================
 
-    public async Task<ServiceResult<ScheduleGenerateResultDto>> GenerateAsync(ScheduleHandoverGenerateDto dto)
+    public async Task<ServiceResult<ScheduleHandoverGenerateResultDto>> GenerateAsync(ScheduleHandoverGenerateDto dto)
     {
         if (dto.DateFrom > dto.DateTo)
-            return ServiceResult<ScheduleGenerateResultDto>.BadRequest("DateFrom must be less than or equal to DateTo");
+            return ServiceResult<ScheduleHandoverGenerateResultDto>.BadRequest("DateFrom must be less than or equal to DateTo");
 
         var asset = await _assetService.GetByIdAsync(dto.AssetId);
         if (!asset.IsSuccess || asset.Data == null)
-            return ServiceResult<ScheduleGenerateResultDto>.BadRequest($"Asset with id {dto.AssetId} not found");
+            return ServiceResult<ScheduleHandoverGenerateResultDto>.BadRequest($"Asset with id {dto.AssetId} not found");
 
         var employee = await _employeeService.GetByIdAsync(dto.EmployeeId);
         if (!employee.IsSuccess || employee.Data == null)
-            return ServiceResult<ScheduleGenerateResultDto>.BadRequest($"Employee with id {dto.EmployeeId} not found");
+            return ServiceResult<ScheduleHandoverGenerateResultDto>.BadRequest($"Employee with id {dto.EmployeeId} not found");
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var result = new ScheduleGenerateResultDto();
+            var result = new ScheduleHandoverGenerateResultDto();
             var existingDates = await _scheduleReps.GetExistingDatesAsync(dto.DateFrom, dto.DateTo, dto.AssetId);
             var existingDateSet = new HashSet<DateTime>(existingDates.Select(d => d.Date));
 
@@ -183,7 +183,7 @@ public class ScheduleHandoverService
                 CurrentUserService.GetDisplayName());
 
             result.Message = $"{result.TotalGenerated} schedule(s) generated, {result.TotalSkipped} skipped (already exist)";
-            return ServiceResult<ScheduleGenerateResultDto>.Success(result, result.Message);
+            return ServiceResult<ScheduleHandoverGenerateResultDto>.Success(result, result.Message);
         }, "generate schedule handover");
     }
 }

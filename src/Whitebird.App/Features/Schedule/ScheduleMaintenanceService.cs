@@ -18,7 +18,7 @@ namespace Whitebird.App.Features.Schedule;
 /// Maintenance-specific operations remain here.
 /// </summary>
 public class ScheduleMaintenanceService
-    : CommonService<ScheduleMaintenanceEntity, ScheduleMaintenanceView, ScheduleMaintenanceListView, ScheduleGridRequest, ScheduleMaintenanceCreateDto, ScheduleMaintenanceUpdateDto>,
+    : CommonService<ScheduleMaintenanceEntity, ScheduleMaintenanceView, ScheduleMaintenanceListView, ScheduleMaintenanceGridRequest, ScheduleMaintenanceCreateDto, ScheduleMaintenanceUpdateDto>,
       IScheduleMaintenanceService
 {
     private readonly IScheduleMaintenanceReps _scheduleReps;
@@ -53,7 +53,7 @@ public class ScheduleMaintenanceService
     protected override async Task<IEnumerable<ScheduleMaintenanceListView>> LoadAllAsync() =>
         await _scheduleReps.GetAllListViewAsync();
 
-    protected override async Task<PaginatedResult<ScheduleMaintenanceListView>> LoadPageAsync(ScheduleGridRequest request) =>
+    protected override async Task<PaginatedResult<ScheduleMaintenanceListView>> LoadPageAsync(ScheduleMaintenanceGridRequest request) =>
         await _scheduleReps.GetPagedListAsync(request);
 
     protected override void MapCreate(ScheduleMaintenanceCreateDto model, ScheduleMaintenanceEntity entity) => model.Adapt(entity);
@@ -130,22 +130,22 @@ public class ScheduleMaintenanceService
     // CUSTOM: GENERATE
     // ============================================================
 
-    public async Task<ServiceResult<ScheduleGenerateResultDto>> GenerateAsync(ScheduleMaintenanceGenerateDto dto)
+    public async Task<ServiceResult<ScheduleMaintenanceGenerateResultDto>> GenerateAsync(ScheduleMaintenanceGenerateDto dto)
     {
         if (dto.DateFrom > dto.DateTo)
-            return ServiceResult<ScheduleGenerateResultDto>.BadRequest("DateFrom must be less than or equal to DateTo");
+            return ServiceResult<ScheduleMaintenanceGenerateResultDto>.BadRequest("DateFrom must be less than or equal to DateTo");
 
         var asset = await _assetService.GetByIdAsync(dto.AssetId);
         if (!asset.IsSuccess || asset.Data == null)
-            return ServiceResult<ScheduleGenerateResultDto>.BadRequest($"Asset with id {dto.AssetId} not found");
+            return ServiceResult<ScheduleMaintenanceGenerateResultDto>.BadRequest($"Asset with id {dto.AssetId} not found");
 
         var type = await _masterDataService.GetValueAsync("MaintenanceType", dto.MaintenanceType);
         if (!type.IsSuccess || type.Data == null)
-            return ServiceResult<ScheduleGenerateResultDto>.BadRequest($"Invalid MaintenanceType: {dto.MaintenanceType}");
+            return ServiceResult<ScheduleMaintenanceGenerateResultDto>.BadRequest($"Invalid MaintenanceType: {dto.MaintenanceType}");
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var result = new ScheduleGenerateResultDto();
+            var result = new ScheduleMaintenanceGenerateResultDto();
             var existingDates = await _scheduleReps.GetExistingDatesAsync(dto.DateFrom, dto.DateTo, dto.AssetId);
             var existingDateSet = new HashSet<DateTime>(existingDates.Select(d => d.Date));
 
@@ -182,7 +182,7 @@ public class ScheduleMaintenanceService
                 CurrentUserService.GetDisplayName());
 
             result.Message = $"{result.TotalGenerated} schedule(s) generated, {result.TotalSkipped} skipped (already exist)";
-            return ServiceResult<ScheduleGenerateResultDto>.Success(result, result.Message);
+            return ServiceResult<ScheduleMaintenanceGenerateResultDto>.Success(result, result.Message);
         }, "generate schedule maintenance");
     }
 }

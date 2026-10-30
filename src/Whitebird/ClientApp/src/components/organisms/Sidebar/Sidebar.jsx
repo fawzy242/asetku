@@ -1,20 +1,22 @@
 // src/components/organisms/Sidebar/Sidebar.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   FiHome, FiBox, FiRefreshCw, FiUsers, FiFolder, FiBarChart2,
   FiChevronDown, FiChevronLeft, FiGrid, FiTruck, FiMapPin,
   FiMenu, FiCrosshair, FiUserCheck, FiBriefcase, FiDatabase,
   FiCalendar, FiArrowRight, FiArrowLeft, FiTool,
-  FiActivity, FiSettings // Ikon untuk sub-menu transaction
+  FiActivity, FiSettings,
+  FiShield, FiKey, FiUserPlus,
 } from 'react-icons/fi';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useIsAdmin } from '../../../hooks/useIsAdmin';
 import './Sidebar.scss';
 
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: FiHome, path: '/dashboard' },
   { id: 'assets', label: 'Assets', icon: FiBox, path: '/assets' },
   // ============================================================
-  // TRANSACTIONS — Sekarang parent dengan child
+  // TRANSACTIONS — parent with child
   // ============================================================
   {
     id: 'transactions',
@@ -59,6 +61,20 @@ const menuItems = [
     ]
   },
   { id: 'reports', label: 'Reports', icon: FiBarChart2, path: '/reports' },
+  // ============================================================
+  // ADMINISTRATION — admin-only, filtered at render time
+  // ============================================================
+  {
+    id: 'administration',
+    label: 'Administration',
+    icon: FiShield,
+    path: null,
+    adminOnly: true,
+    children: [
+      { id: 'roles', label: 'Roles', icon: FiKey, path: '/roles' },
+      { id: 'user-roles', label: 'User Roles', icon: FiUserPlus, path: '/user-roles' },
+    ]
+  },
 ];
 
 const Sidebar = ({ collapsed = false, onToggle }) => {
@@ -69,6 +85,14 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const activePath = location.pathname;
+  const isAdmin = useIsAdmin();
+
+  // Filter admin-only groups for non-admin users. Every other item is
+  // rendered unconditionally — matches prior behavior exactly.
+  const visibleMenuItems = useMemo(
+    () => menuItems.filter((item) => (item.adminOnly ? isAdmin : true)),
+    [isAdmin]
+  );
 
   useEffect(() => {
     const checkMobile = () => {
@@ -192,7 +216,7 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
         </div>
         <nav className="sidebar__nav">
           <ul className="sidebar__menu">
-            {menuItems.map(item => renderItem(item))}
+            {visibleMenuItems.map(item => renderItem(item))}
           </ul>
         </nav>
         <div className="sidebar__footer">

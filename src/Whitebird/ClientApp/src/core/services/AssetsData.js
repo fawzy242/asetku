@@ -1,4 +1,4 @@
-import { assetApi } from '../api/asset.api';
+import { assetApi } from '../api/api';
 import BaseData from './BaseData';
 import { fileToBase64 } from '../utils/file.utils';
 

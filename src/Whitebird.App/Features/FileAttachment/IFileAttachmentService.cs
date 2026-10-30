@@ -58,7 +58,10 @@ public interface IFileAttachmentService
     Task<ServiceResult<FileAttachmentResponseDto>> UpdateAsync(int id, FileAttachmentUpdateViewModel model);
 
     /// <summary>
-    /// Soft-deletes a file attachment (IsActive = 0). Physical file is retained.
+    /// Soft-deletes a file attachment's metadata (IsActive = 0) and removes the
+    /// physical file from storage. Physical-delete failures are logged as
+    /// warnings and do not roll back the metadata change. Idempotent when the
+    /// file is already absent from disk.
     /// </summary>
     Task<ServiceResult> DeleteAsync(int id);
 

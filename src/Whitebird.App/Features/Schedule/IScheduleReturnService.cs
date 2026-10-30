@@ -11,9 +11,9 @@ namespace Whitebird.App.Features.Schedule;
 /// Only Return-specific custom operations are declared here.
 /// </summary>
 public interface IScheduleReturnService :
-    ICommonService<ScheduleReturnView, ScheduleReturnListView, ScheduleGridRequest, ScheduleReturnCreateDto, ScheduleReturnUpdateDto>
+    ICommonService<ScheduleReturnView, ScheduleReturnListView, ScheduleReturnGridRequest, ScheduleReturnCreateDto, ScheduleReturnUpdateDto>
 {
     Task<ServiceResult<IEnumerable<ScheduleReturnListView>>> GetByAssetIdAsync(int assetId);
     Task<ServiceResult<IEnumerable<ScheduleReturnListView>>> GetByEmployeeIdAsync(int employeeId);
-    Task<ServiceResult<ScheduleGenerateResultDto>> GenerateAsync(ScheduleReturnGenerateDto dto);
+    Task<ServiceResult<ScheduleReturnGenerateResultDto>> GenerateAsync(ScheduleReturnGenerateDto dto);
 }

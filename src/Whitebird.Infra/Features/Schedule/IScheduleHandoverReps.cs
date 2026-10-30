@@ -36,5 +36,5 @@ public interface IScheduleHandoverReps
     // PAGINATION
     // ============================================================
 
-    Task<PaginatedResult<ScheduleHandoverListView>> GetPagedListAsync(ScheduleGridRequest request);
+    Task<PaginatedResult<ScheduleHandoverListView>> GetPagedListAsync(ScheduleHandoverGridRequest request);
 }

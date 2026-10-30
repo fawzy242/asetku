@@ -131,16 +131,13 @@ public class ReportsController : ControllerBase
     // ============================================================
     // PRIVATE HELPERS
     // ============================================================
+    //
+    // P4-6: ReportsService.IsValidFormat only accepts "excel" (the PDF path
+    // would throw in ExportService.ExportPdfAsync and is unreachable at runtime).
+    // The PDF branches that used to exist here have been removed.
 
-    private string GetFileExtension(string format)
-    {
-        return format.ToLower() == "pdf" ? "pdf" : "xlsx";
-    }
+    private static string GetFileExtension(string format) => "xlsx";
 
-    private string GetContentType(string format)
-    {
-        return format.ToLower() == "pdf"
-            ? "application/pdf"
-            : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-    }
+    private static string GetContentType(string format)
+        => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 }

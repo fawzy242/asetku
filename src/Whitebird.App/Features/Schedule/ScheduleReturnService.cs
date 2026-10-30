@@ -18,7 +18,7 @@ namespace Whitebird.App.Features.Schedule;
 /// Return-specific operations remain here.
 /// </summary>
 public class ScheduleReturnService
-    : CommonService<ScheduleReturnEntity, ScheduleReturnView, ScheduleReturnListView, ScheduleGridRequest, ScheduleReturnCreateDto, ScheduleReturnUpdateDto>,
+    : CommonService<ScheduleReturnEntity, ScheduleReturnView, ScheduleReturnListView, ScheduleReturnGridRequest, ScheduleReturnCreateDto, ScheduleReturnUpdateDto>,
       IScheduleReturnService
 {
     private readonly IScheduleReturnReps _scheduleReps;
@@ -53,7 +53,7 @@ public class ScheduleReturnService
     protected override async Task<IEnumerable<ScheduleReturnListView>> LoadAllAsync() =>
         await _scheduleReps.GetAllListViewAsync();
 
-    protected override async Task<PaginatedResult<ScheduleReturnListView>> LoadPageAsync(ScheduleGridRequest request) =>
+    protected override async Task<PaginatedResult<ScheduleReturnListView>> LoadPageAsync(ScheduleReturnGridRequest request) =>
         await _scheduleReps.GetPagedListAsync(request);
 
     protected override void MapCreate(ScheduleReturnCreateDto model, ScheduleReturnEntity entity) => model.Adapt(entity);
@@ -130,22 +130,22 @@ public class ScheduleReturnService
     // CUSTOM: GENERATE
     // ============================================================
 
-    public async Task<ServiceResult<ScheduleGenerateResultDto>> GenerateAsync(ScheduleReturnGenerateDto dto)
+    public async Task<ServiceResult<ScheduleReturnGenerateResultDto>> GenerateAsync(ScheduleReturnGenerateDto dto)
     {
         if (dto.DateFrom > dto.DateTo)
-            return ServiceResult<ScheduleGenerateResultDto>.BadRequest("DateFrom must be less than or equal to DateTo");
+            return ServiceResult<ScheduleReturnGenerateResultDto>.BadRequest("DateFrom must be less than or equal to DateTo");
 
         var asset = await _assetService.GetByIdAsync(dto.AssetId);
         if (!asset.IsSuccess || asset.Data == null)
-            return ServiceResult<ScheduleGenerateResultDto>.BadRequest($"Asset with id {dto.AssetId} not found");
+            return ServiceResult<ScheduleReturnGenerateResultDto>.BadRequest($"Asset with id {dto.AssetId} not found");
 
         var employee = await _employeeService.GetByIdAsync(dto.EmployeeId);
         if (!employee.IsSuccess || employee.Data == null)
-            return ServiceResult<ScheduleGenerateResultDto>.BadRequest($"Employee with id {dto.EmployeeId} not found");
+            return ServiceResult<ScheduleReturnGenerateResultDto>.BadRequest($"Employee with id {dto.EmployeeId} not found");
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            var result = new ScheduleGenerateResultDto();
+            var result = new ScheduleReturnGenerateResultDto();
             var existingDates = await _scheduleReps.GetExistingDatesAsync(dto.DateFrom, dto.DateTo, dto.AssetId);
             var existingDateSet = new HashSet<DateTime>(existingDates.Select(d => d.Date));
 
@@ -182,7 +182,7 @@ public class ScheduleReturnService
                 CurrentUserService.GetDisplayName());
 
             result.Message = $"{result.TotalGenerated} schedule(s) generated, {result.TotalSkipped} skipped (already exist)";
-            return ServiceResult<ScheduleGenerateResultDto>.Success(result, result.Message);
+            return ServiceResult<ScheduleReturnGenerateResultDto>.Success(result, result.Message);
         }, "generate schedule return");
     }
 }

@@ -7,6 +7,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
 import ErrorBoundary from './components/atoms/ErrorBoundary/ErrorBoundary';
 import { ConfirmDialogProvider } from './components/molecules/ConfirmDialog/ConfirmDialog';
+import { useIsAdmin } from './hooks/useIsAdmin';
 import './app.scss';
 
 // Layouts
@@ -34,7 +35,10 @@ const Departments = lazy(() => import('./pages/Departments/Departments'));
 const Offices = lazy(() => import('./pages/Offices/Offices'));
 const Reports = lazy(() => import('./pages/Reports/Reports'));
 const Profile = lazy(() => import('./pages/Profile/Profile'));
+const Roles = lazy(() => import('./pages/Roles/Roles'));
+const UserRoles = lazy(() => import('./pages/UserRoles/UserRoles'));
 const NotFound = lazy(() => import('./pages/NotFound/NotFound'));
+const Forbidden = lazy(() => import('./pages/Forbidden/Forbidden'));
 
 // Schedule menus
 const ScheduleHandover = lazy(() => import('./pages/ScheduleHandover/ScheduleHandover'));
@@ -68,6 +72,12 @@ const PublicRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
   if (loading) return <PageLoader />;
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+  return children;
+};
+
+const AdminRoute = ({ children }) => {
+  const isAdmin = useIsAdmin();
+  if (!isAdmin) return <Navigate to="/403" replace />;
   return children;
 };
 
@@ -119,6 +129,22 @@ const AppRoutes = () => (
       <Route path="reports" element={<LazyPage><Reports /></LazyPage>} />
       <Route path="profile" element={<LazyPage><Profile /></LazyPage>} />
       <Route
+        path="roles"
+        element={
+          <AdminRoute>
+            <LazyPage><Roles /></LazyPage>
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="user-roles"
+        element={
+          <AdminRoute>
+            <LazyPage><UserRoles /></LazyPage>
+          </AdminRoute>
+        }
+      />
+      <Route
         path="schedule-handover"
         element={<LazyPage><ScheduleHandover /></LazyPage>}
       />
@@ -131,6 +157,7 @@ const AppRoutes = () => (
         element={<LazyPage><ScheduleMaintenance /></LazyPage>}
       />
     </Route>
+    <Route path="/403" element={<LazyPage><Forbidden /></LazyPage>} />
     <Route path="/404" element={<LazyPage><NotFound /></LazyPage>} />
     <Route path="*" element={<Navigate to="/404" replace />} />
   </Routes>

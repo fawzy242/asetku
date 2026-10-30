@@ -1,3 +1,4 @@
+// src/core/services/api.service.js
 import axios from 'axios';
 import { API_CONFIG } from '../constants/appConstants';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -68,6 +69,7 @@ class ApiService {
           userMessage: handledError.message,
           status: handledError.status,
           apiData: handledError.data,
+          retryAfter: handledError.retryAfter ?? null,
         });
       }
     );

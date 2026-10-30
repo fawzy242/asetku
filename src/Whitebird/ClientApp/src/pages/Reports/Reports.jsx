@@ -1,13 +1,6 @@
 // src/pages/Reports/Reports.jsx
 import React, { useState, useCallback } from 'react';
-import {
-  FiDownload,
-  FiFileText,
-  FiBox,
-  FiUsers,
-  FiTool,
-  FiTrendingUp,
-} from 'react-icons/fi';
+import { FiDownload } from 'react-icons/fi';
 import { Grid, Typography } from '@mui/material';
 import { ReportsData } from '../../core/services';
 import Card from '../../components/atoms/Card/Card';
@@ -18,75 +11,15 @@ import Spinner from '../../components/atoms/Spinner/Spinner';
 import { useReferenceData } from '../../hooks/useReferenceData';
 import { useOptions } from '../../hooks/useOptions';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
+import {
+  REPORT_TYPES,
+  REPORT_OPTIONS,
+  INVENTORY_STATUS_OPTIONS,
+  TRANSACTION_TYPE_OPTIONS,
+} from './constants';
 import './Reports.scss';
 
 const reportsData = new ReportsData();
-
-const REPORT_TYPES = [
-  {
-    id: 'transactions',
-    label: 'Transaction Report',
-    icon: FiFileText, // component reference (not <FiFileText />)
-    description: 'Export asset transaction history',
-    hasDateRange: true,
-    hasTransactionTypeFilter: true,
-  },
-  {
-    id: 'inventory',
-    label: 'Inventory Report',
-    icon: FiBox,
-    description: 'Export current asset inventory',
-    hasStatusFilter: true,
-    hasCategoryFilter: true,
-    hasSupplierFilter: true,
-  },
-  {
-    id: 'employee',
-    label: 'Employee Asset Report',
-    icon: FiUsers,
-    description: 'Export assets assigned to employees',
-    hasEmployeeFilter: true,
-  },
-  {
-    id: 'maintenance',
-    label: 'Maintenance Report',
-    icon: FiTool,
-    description: 'Export maintenance history',
-    hasDateRange: true,
-  },
-  {
-    id: 'financial',
-    label: 'Financial Report',
-    icon: FiTrendingUp,
-    description: 'Export asset financial summary',
-    hasDateRange: true,
-  },
-];
-
-const INVENTORY_STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
-  { value: 'Available', label: 'Available' },
-  { value: 'Assigned', label: 'Assigned' },
-  { value: 'Damaged', label: 'Damaged' },
-];
-
-const TRANSACTION_TYPE_OPTIONS = [
-  { value: '', label: 'All Types' },
-  { value: 'HANDOVER', label: 'HANDOVER' },
-  { value: 'TRANSFER', label: 'TRANSFER' },
-  { value: 'LOAN', label: 'LOAN' },
-  { value: 'RETURN', label: 'RETURN' },
-  { value: 'LOAN_RETURN', label: 'LOAN_RETURN' },
-  { value: 'MAINTENANCE', label: 'MAINTENANCE' },
-  { value: 'POST_MAINTENANCE', label: 'POST_MAINTENANCE' },
-  { value: 'DISPOSAL', label: 'DISPOSAL' },
-  { value: 'OPERATIONAL_OFFICE', label: 'OPERATIONAL_OFFICE' },
-];
-
-const REPORT_OPTIONS = REPORT_TYPES.map((r) => ({
-  value: r.id,
-  label: r.label,
-}));
 
 const Reports = () => {
   const [selectedReport, setSelectedReport] = useState('transactions');

@@ -1,12 +1,12 @@
 import React from 'react';
 import { Chip } from '@mui/material';
-import { getStatusChipStyles } from '../../../core/constants/statusColors';
+import { getStatusChipStyles } from '../../../core/constants/globalStatuses';
 import './StatusChip.scss';
 
 /**
  * Centralized Status Chip component
- * Uses getStatusChipStyles from statusColors.js
- * 
+ * Uses getStatusChipStyles from globalStatuses.js
+ *
  * @param {Object} props
  * @param {string} props.status - Status text
  * @param {string} props.size - Chip size (small, medium)
@@ -15,11 +15,11 @@ import './StatusChip.scss';
 const StatusChip = ({ status, size = 'small', className = '' }) => {
   const displayStatus = status || 'Available';
   const styles = getStatusChipStyles(displayStatus);
-  
+
   return (
-    <Chip 
-      label={displayStatus} 
-      size={size} 
+    <Chip
+      label={displayStatus}
+      size={size}
       className={`status-chip ${className}`}
       sx={styles}
     />

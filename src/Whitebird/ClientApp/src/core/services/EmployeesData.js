@@ -1,4 +1,4 @@
-import { employeeApi } from '../api/employee.api';
+import { employeeApi } from '../api/api';
 import BaseData from './BaseData';
 import { fileToBase64 } from '../utils/file.utils';
 

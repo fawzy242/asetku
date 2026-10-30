@@ -13,6 +13,15 @@ import Modal from '../Modal/Modal';
 import Button from '../../atoms/Button/Button';
 import './ImportModal.scss';
 
+const ALLOWED_EXTENSION = '.xlsx';
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+
+const isValidImportFile = (file) => {
+  if (!file || !file.name) return false;
+  const ext = `.${file.name.split('.').pop()?.toLowerCase()}`;
+  return ext === ALLOWED_EXTENSION;
+};
+
 const ImportModal = ({
   isOpen,
   onClose,
@@ -21,10 +30,29 @@ const ImportModal = ({
   isImporting = false,
   importResult = null,
   title = 'Import Data',
-  description = 'Upload Excel or TXT file with data. Data will be imported as INACTIVE and need activation.',
+  description = 'Upload an .xlsx file with data. Data will be imported as INACTIVE and need activation.',
 }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
+  const [fileError, setFileError] = useState('');
+
+  const applyFile = useCallback((file) => {
+    if (!file) return;
+    if (!isValidImportFile(file)) {
+      setFileError(
+        `"${file.name}" is not a valid file. Only .xlsx files are accepted.`
+      );
+      setSelectedFile(null);
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setFileError('File is larger than 10MB.');
+      setSelectedFile(null);
+      return;
+    }
+    setFileError('');
+    setSelectedFile(file);
+  }, []);
 
   const handleDrag = useCallback((e) => {
     e.preventDefault();
@@ -36,30 +64,45 @@ const ImportModal = ({
     }
   }, []);
 
-  const handleDrop = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
+  const handleDrop = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragActive(false);
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setSelectedFile(e.dataTransfer.files[0]);
-    }
-  }, []);
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        applyFile(e.dataTransfer.files[0]);
+      }
+    },
+    [applyFile]
+  );
 
-  const handleFileChange = useCallback((e) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-    }
+  const handleFileChange = useCallback(
+    (e) => {
+      if (e.target.files && e.target.files[0]) {
+        applyFile(e.target.files[0]);
+      }
+      // Reset so the same file can be selected again.
+      e.target.value = '';
+    },
+    [applyFile]
+  );
+
+  const handleClearFile = useCallback(() => {
+    setSelectedFile(null);
+    setFileError('');
   }, []);
 
   const handleImport = useCallback(async () => {
     if (!selectedFile) return;
     await onImport(selectedFile);
     setSelectedFile(null);
+    setFileError('');
   }, [selectedFile, onImport]);
 
   const handleClose = useCallback(() => {
     setSelectedFile(null);
+    setFileError('');
     setDragActive(false);
     onClose();
   }, [onClose]);
@@ -100,14 +143,14 @@ const ImportModal = ({
                 <span className="import-modal__dropzone-link">browse</span>
               </p>
               <p className="import-modal__dropzone-hint">
-                Supports .xlsx, .xls, .csv, .txt (max 10MB)
+                Supports .xlsx only (max 10MB)
               </p>
               <input
                 type="file"
                 id="import-file-input"
                 className="import-modal__file-input"
                 onChange={handleFileChange}
-                accept=".xlsx,.xls,.csv,.txt"
+                accept=".xlsx"
               />
               <label
                 htmlFor="import-file-input"
@@ -116,6 +159,25 @@ const ImportModal = ({
                 Select File
               </label>
             </div>
+
+            {fileError && (
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  mt: 2,
+                  p: 1.5,
+                  borderRadius: 1,
+                  bgcolor: 'rgba(239, 68, 68, 0.1)',
+                  color: 'var(--error)',
+                  fontSize: 13,
+                }}
+              >
+                <FiAlertCircle size={16} />
+                <span>{fileError}</span>
+              </Box>
+            )}
 
             {selectedFile && (
               <div className="import-modal__selected-file">
@@ -128,7 +190,8 @@ const ImportModal = ({
                 </span>
                 <button
                   className="import-modal__selected-file-remove"
-                  onClick={() => setSelectedFile(null)}
+                  onClick={handleClearFile}
+                  type="button"
                 >
                   <FiX size={16} />
                 </button>

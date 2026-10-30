@@ -1,5 +1,4 @@
-import { homeApi } from '../api/home.api';
-import { userApi } from '../api/user.api';
+import { homeApi, userApi } from '../api/api';
 import BaseData from './BaseData';
 
 class HomeData extends BaseData {
@@ -19,26 +18,29 @@ class HomeData extends BaseData {
   async search(keyword) {
     try {
       const result = await this.api.search(keyword);
-      
+
       if (result.data?.isSuccess !== undefined) {
         if (!result.data.isSuccess) {
-          return { 
-            success: false, 
-            error: result.data.errors?.join('\n') || result.data.message || 'Search failed',
+          return {
+            success: false,
+            error:
+              result.data.errors?.join('\n') ||
+              result.data.message ||
+              'Search failed',
             errorType: result.data.errorType,
           };
         }
         return { success: true, data: result.data.data };
       }
-      
+
       return { success: true, data: result.data };
     } catch (error) {
       if (this.isCanceledError(error)) {
         return { success: false, error: 'canceled', isCanceled: true };
       }
-      return { 
-        success: false, 
-        error: error.userMessage || error.message || 'Search failed' 
+      return {
+        success: false,
+        error: error.userMessage || error.message || 'Search failed',
       };
     }
   }
@@ -57,9 +59,9 @@ class HomeData extends BaseData {
       if (error.response?.status === 404) {
         return { success: false, error: 'not found', isNotFound: true };
       }
-      return { 
-        success: false, 
-        error: error.message || 'Failed to load photo' 
+      return {
+        success: false,
+        error: error.message || 'Failed to load photo',
       };
     }
   }

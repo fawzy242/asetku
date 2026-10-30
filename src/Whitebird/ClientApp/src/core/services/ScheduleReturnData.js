@@ -1,4 +1,4 @@
-import { scheduleReturnApi } from '../api/schedule.api';
+import { scheduleReturnApi } from '../api/api';
 import BaseData from './BaseData';
 
 class ScheduleReturnData extends BaseData {
@@ -14,18 +14,18 @@ class ScheduleReturnData extends BaseData {
   async generate(data) {
     try {
       const result = await this.api.generate(data);
-      
+
       if (result.data?.isSuccess !== undefined) {
         if (!result.data.isSuccess) {
-          return { 
-            success: false, 
+          return {
+            success: false,
             error: result.data.errors?.join('\n') || result.data.message || 'Failed to generate',
             errorType: result.data.errorType,
           };
         }
         return { success: true, data: result.data.data };
       }
-      
+
       return { success: true, data: result.data };
     } catch (error) {
       if (this.isCanceledError(error)) {

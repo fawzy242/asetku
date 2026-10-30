@@ -65,7 +65,12 @@ public class DatabaseConnectionFactory : IDatabaseConnectionFactory
         }
         if (_settings.ConnectionLifetimeSeconds > 0)
         {
-            builder.ConnectionLifetime = _settings.ConnectionLifetimeSeconds;
+            // FIX: SqlConnectionStringBuilder exposes LoadBalanceTimeout (seconds)
+            // — it is the pool-level "Connection Lifetime" / "Load Balance Timeout"
+            // keyword. The previous property name ConnectionLifetime does not exist
+            // on Microsoft.Data.SqlClient's SqlConnectionStringBuilder and caused
+            // CS1061. No behavior change: same value, same intent, correct property.
+            builder.LoadBalanceTimeout = _settings.ConnectionLifetimeSeconds;
         }
 
         return new SqlConnection(builder.ConnectionString);

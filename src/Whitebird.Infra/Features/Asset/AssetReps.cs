@@ -11,15 +11,6 @@ public class AssetReps : IAssetReps
 {
     private readonly DapperContext _context;
 
-    private static readonly HashSet<string> _allowedSortColumns = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "AssetId", "AssetCode", "AssetName", "CategoryId", "SupplierId",
-        "Brand", "Model", "SerialNumber", "Imei", "Hostname", "IpAddress", "MacAddress",
-        "PurchaseDate", "PurchasePrice", "InvoiceNumber",
-        "WarrantyPeriod", "WarrantyExpiryDate", "AssetConditionPurchase",
-        "Notes", "IsActive", "CreatedDate", "CreatedBy", "ModifiedDate", "ModifiedBy"
-    };
-
     public AssetReps(DapperContext context)
     {
         _context = context;
@@ -237,12 +228,18 @@ public class AssetReps : IAssetReps
     }
 
     // ============================================================
-    // PAGINATION
+    // PAGINATION (P3-1 — GridQueryBuilder)
     // ============================================================
+    //
+    // Parameters needed by the status CASE-mapping in the SELECT clause and by
+    // the status-filter conditions are bound once up front. All simple filters
+    // (IsActive, CategoryId, SupplierId) and the search + paging + order by
+    // go through GridQueryBuilder so this repository matches every other one.
+    //
+    // Sort column: if SortBy is unqualified ("AssetCode"), we prefix it with
+    // "a." so the query resolves unambiguously against the aliased table.
 
-    public async Task<PaginatedResult<AssetListView>> GetPagedListAsync(
-        int page, int pageSize, string? search = null, string? sortBy = null,
-        bool sortDescending = false, Dictionary<string, object>? filters = null)
+    public async Task<PaginatedResult<AssetListView>> GetPagedListAsync(AssetGridRequest request)
     {
         var conditions = new List<string>();
         var parameters = new DynamicParameters();
@@ -259,22 +256,13 @@ public class AssetReps : IAssetReps
         parameters.Add("@MaintenanceType", maintenanceType);
         parameters.Add("@DisposalType", disposalType);
 
-        var effectiveFilters = filters != null
-            ? new Dictionary<string, object>(filters)
-            : new Dictionary<string, object>();
-
-        if (effectiveFilters.ContainsKey("isActive") && effectiveFilters["isActive"] is bool isActive)
+        // Status filter — business-specific EXISTS/NOT EXISTS logic
+        if (!string.IsNullOrWhiteSpace(request.Status))
         {
-            conditions.Add($"a.IsActive = {(isActive ? 1 : 0)}");
-            effectiveFilters.Remove("isActive");
-        }
-
-        if (effectiveFilters.ContainsKey("status") && effectiveFilters["status"] is string status)
-        {
-            switch (status)
+            switch (request.Status)
             {
                 case "Available":
-                    conditions.Add($@"a.IsActive = 1 AND NOT EXISTS (
+                    conditions.Add(@"a.IsActive = 1 AND NOT EXISTS (
                         SELECT 1 FROM AssetTransaction at 
                         WHERE at.AssetId = a.AssetId 
                           AND at.Approved = 1 
@@ -283,7 +271,7 @@ public class AssetReps : IAssetReps
                           AND at.TransactionType IN (@HandoverType,@TransferType,@LoanType,@MaintenanceType))");
                     break;
                 case "Assigned":
-                    conditions.Add($@"a.IsActive = 1 AND EXISTS (
+                    conditions.Add(@"a.IsActive = 1 AND EXISTS (
                         SELECT 1 FROM AssetTransaction at 
                         WHERE at.AssetId = a.AssetId 
                           AND at.Approved = 1 
@@ -292,7 +280,7 @@ public class AssetReps : IAssetReps
                           AND at.TransactionType IN (@HandoverType,@TransferType))");
                     break;
                 case "On Loan":
-                    conditions.Add($@"a.IsActive = 1 AND EXISTS (
+                    conditions.Add(@"a.IsActive = 1 AND EXISTS (
                         SELECT 1 FROM AssetTransaction at 
                         WHERE at.AssetId = a.AssetId 
                           AND at.Approved = 1 
@@ -301,7 +289,7 @@ public class AssetReps : IAssetReps
                           AND at.TransactionType = @LoanType)");
                     break;
                 case "In Maintenance":
-                    conditions.Add($@"a.IsActive = 1 AND EXISTS (
+                    conditions.Add(@"a.IsActive = 1 AND EXISTS (
                         SELECT 1 FROM AssetTransaction at 
                         WHERE at.AssetId = a.AssetId 
                           AND at.Approved = 1 
@@ -310,7 +298,7 @@ public class AssetReps : IAssetReps
                           AND at.TransactionType = @MaintenanceType)");
                     break;
                 case "Damaged":
-                    conditions.Add($@"EXISTS (
+                    conditions.Add(@"EXISTS (
                         SELECT 1 FROM AssetTransaction at 
                         WHERE at.AssetId = a.AssetId 
                           AND at.Approved = 1 
@@ -324,34 +312,34 @@ public class AssetReps : IAssetReps
                     conditions.Add("a.IsActive = 0");
                     break;
             }
-            effectiveFilters.Remove("status");
         }
 
-        if (!string.IsNullOrWhiteSpace(search))
+        // Simple filters via GridQueryBuilder (consistent with every other repo)
+        GridQueryBuilder.AddEqualsFilter(conditions, parameters, "a.IsActive", request.IsActive);
+        GridQueryBuilder.AddEqualsFilter(conditions, parameters, "a.CategoryId", request.CategoryId);
+        GridQueryBuilder.AddEqualsFilter(conditions, parameters, "a.SupplierId", request.SupplierId);
+
+        // Search via GridQueryBuilder
+        if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            conditions.Add(@"(a.AssetCode LIKE @Search OR a.AssetName LIKE @Search OR a.SerialNumber LIKE @Search OR a.Brand LIKE @Search OR a.Model LIKE @Search)");
-            parameters.Add("@Search", $"%{search}%");
+            var searchColumns = new[] { "a.AssetCode", "a.AssetName", "a.SerialNumber", "a.Brand", "a.Model" };
+            GridQueryBuilder.AddSearchCondition(conditions, parameters, request.Search, searchColumns);
         }
 
-        foreach (var filter in effectiveFilters.Where(f => f.Value != null && !string.IsNullOrEmpty(f.Value.ToString())))
+        var whereClause = GridQueryBuilder.BuildWhereClause(conditions, parameters);
+
+        // Sort column: qualify with "a." if unqualified
+        var sortBy = request.SortBy;
+        if (!string.IsNullOrEmpty(sortBy) && !sortBy.Contains('.'))
         {
-            conditions.Add($"a.{filter.Key} = @{filter.Key}");
-            parameters.Add($"@{filter.Key}", filter.Value);
+            sortBy = $"a.{sortBy}";
         }
+        var orderBy = GridQueryBuilder.BuildOrderByClause(sortBy, request.SortDescending, "a.AssetCode", false);
 
-        var whereClause = conditions.Any() ? $"WHERE {string.Join(" AND ", conditions)}" : "";
-
-        var actualSort = !string.IsNullOrEmpty(sortBy) && _allowedSortColumns.Contains(sortBy)
-            ? sortBy
-            : "AssetCode";
-        var orderBy = $"ORDER BY a.{actualSort} {(sortDescending ? "DESC" : "ASC")}";
+        var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
         var countSql = $"SELECT COUNT(*) FROM Asset a {whereClause}";
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
-
-        var offset = (page - 1) * pageSize;
-        parameters.Add("@Offset", offset);
-        parameters.Add("@PageSize", pageSize);
 
         var selectClause = @"
             SELECT 
@@ -392,7 +380,7 @@ public class AssetReps : IAssetReps
             {fromClause}
             {whereClause}
             {orderBy}
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+            {pagination}";
 
         var data = await _context.QueryAsync<AssetListView>(dataSql, parameters);
 
@@ -400,9 +388,9 @@ public class AssetReps : IAssetReps
         {
             Data = data.ToList(),
             TotalCount = totalCount,
-            PageNumber = page,
-            PageSize = pageSize,
-            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            PageNumber = request.Page,
+            PageSize = request.PageSize,
+            TotalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize)
         };
     }
 

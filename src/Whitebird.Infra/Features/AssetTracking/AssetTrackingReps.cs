@@ -234,6 +234,17 @@ public class AssetTrackingReps : IAssetTrackingReps
     // ============================================================
     // SCHEDULE STATS
     // ============================================================
+    //
+    // P0-3 FIX: The "maintenance" branch previously referenced a
+    // non-existent EmployeeId column on ScheduleMaintenance. ScheduleMaintenance
+    // has no employee column (per migration CreateTableScheduleMaintenance).
+    // Employee-related SQL (join + FullName projection) is now only emitted
+    // for handover and return. For maintenance, EmployeeName is returned as
+    // NULL so the DTO shape is preserved.
+    //
+    // P3-2: Schedule type is read from request.ScheduleType first. If null,
+    // falls back to request.Search for backward compatibility with clients
+    // that used the legacy "search" selector.
 
     public async Task<PaginatedResult<AssetTrackingScheduleStatsDto>> GetScheduleStatsAsync(AssetTrackingGridRequest request)
     {
@@ -248,9 +259,13 @@ public class AssetTrackingReps : IAssetTrackingReps
             request.SortDescending = true;
         }
 
-        string tableName, idColumn, employeeColumn, typeColumn, statusColumn;
+        // P3-2: prefer dedicated ScheduleType; fall back to Search for legacy clients.
+        var scheduleType = (request.ScheduleType ?? request.Search)?.ToLower();
 
-        switch (request.Search?.ToLower())
+        string tableName, idColumn, typeColumn, statusColumn;
+        string? employeeColumn;
+
+        switch (scheduleType)
         {
             case "handover":
                 tableName = "ScheduleHandover";
@@ -269,7 +284,8 @@ public class AssetTrackingReps : IAssetTrackingReps
             case "maintenance":
                 tableName = "ScheduleMaintenance";
                 idColumn = "ScheduleMaintenanceId";
-                employeeColumn = "EmployeeId";
+                // ScheduleMaintenance has no EmployeeId column.
+                employeeColumn = null;
                 typeColumn = "'Maintenance'";
                 statusColumn = "CASE WHEN MaintenanceAssetTransactionId IS NOT NULL THEN 'Completed' ELSE 'Pending' END";
                 break;
@@ -284,11 +300,19 @@ public class AssetTrackingReps : IAssetTrackingReps
         var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "s.ScheduleDate", true);
         var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
+        var employeeJoin = employeeColumn != null
+            ? $"LEFT JOIN Employee e ON s.{employeeColumn} = e.EmployeeId"
+            : string.Empty;
+
+        var employeeSelect = employeeColumn != null
+            ? "e.FullName as EmployeeName,"
+            : "CAST(NULL AS NVARCHAR(100)) as EmployeeName,";
+
         var countSql = $@"
             SELECT COUNT(*)
             FROM {tableName} s
             LEFT JOIN Asset a ON s.AssetId = a.AssetId
-            LEFT JOIN Employee e ON s.{employeeColumn} = e.EmployeeId
+            {employeeJoin}
             {whereClause}";
         var totalCount = await _context.ExecuteScalarAsync<int>(countSql, parameters);
 
@@ -298,7 +322,7 @@ public class AssetTrackingReps : IAssetTrackingReps
                 s.ScheduleDate,
                 a.AssetCode,
                 a.AssetName,
-                e.FullName as EmployeeName,
+                {employeeSelect}
                 {statusColumn} as Status,
                 {typeColumn} as Type,
                 s.{idColumn} as RelatedTransactionId,
@@ -307,7 +331,7 @@ public class AssetTrackingReps : IAssetTrackingReps
         var fromClause = $@"
             FROM {tableName} s
             LEFT JOIN Asset a ON s.AssetId = a.AssetId
-            LEFT JOIN Employee e ON s.{employeeColumn} = e.EmployeeId";
+            {employeeJoin}";
 
         var dataSql = $@"
             {selectClause}

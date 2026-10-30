@@ -36,5 +36,5 @@ public interface IScheduleMaintenanceReps
     // PAGINATION
     // ============================================================
 
-    Task<PaginatedResult<ScheduleMaintenanceListView>> GetPagedListAsync(ScheduleGridRequest request);
+    Task<PaginatedResult<ScheduleMaintenanceListView>> GetPagedListAsync(ScheduleMaintenanceGridRequest request);
 }

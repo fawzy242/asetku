@@ -2,43 +2,35 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Grid, Box, Avatar, Typography, IconButton } from '@mui/material';
+import { Box } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  FiCamera,
-  FiX,
   FiUpload,
   FiCheckSquare,
   FiPlus,
   FiTrash2,
 } from 'react-icons/fi';
 import { AssetsData } from '../../core/services';
-import { assetSchema, getAssetDefaultValues } from '../../schemas/assetSchema';
-import { getFieldErrorProps } from '../../core/utils/validation.utils';
+import { assetSchema, getAssetDefaultValues } from './schema';
 import PageHeader from '../../components/atoms/PageHeader';
 import BulkActionBar from '../../components/atoms/BulkActionBar';
 import RefreshButton from '../../components/atoms/RefreshButton';
 import Button from '../../components/atoms/Button/Button';
-import FormSection from '../../components/atoms/FormSection/FormSection';
-import Input from '../../components/atoms/Input/Input';
 import Select from '../../components/atoms/Select/Select';
-import DatePickerInput from '../../components/atoms/Input/DatePickerInput';
-import NumberInput from '../../components/atoms/Input/NumberInput';
 import Tabs from '../../components/molecules/Tabs/Tabs';
 import SearchToolbar from '../../components/molecules/SearchToolbar/SearchToolbar';
 import DataTable from '../../components/molecules/DataTable/DataTable';
-import CrudModal from '../../components/molecules/CrudModal/CrudModal';
 import ImportModal from '../../components/molecules/ImportModal/ImportModal';
 import BulkActivateModal from '../../components/molecules/BulkActivateModal/BulkActivateModal';
 import ActionMenu from '../../components/molecules/ActionMenu';
-import FileUploader from '../../components/molecules/FileUploader/FileUploader';
 import { ACTION_TYPES, useGridActions } from '../../hooks/useGridActions';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
 import { useGridData } from '../../hooks/useGridData';
 import { useReferenceData } from '../../hooks/useReferenceData';
 import { useOptions } from '../../hooks/useOptions';
-import { getAssetColumns } from '../../core/constants/columns';
+import { getAssetColumns } from './columns';
+import AssetFormDialog from './components/AssetFormDialog';
 import './Assets.scss';
 
 const assetsData = new AssetsData();
@@ -108,7 +100,6 @@ const Assets = () => {
 
   const { categories, suppliers, assetConditionPurchases } = useReferenceData();
 
-  // Bulk selection is used only by the CRUD grid.
   const {
     selectedRowIds,
     selectionCount,
@@ -241,12 +232,10 @@ const Assets = () => {
     };
   }, []);
 
-  // Status grid: reset page when tab/search changes
   useEffect(() => {
     setStatusPage(1);
   }, [statusTab, statusSearch, setStatusPage]);
 
-  // CRUD grid: reset page + clear selection when tab/search/filters change
   useEffect(() => {
     setCrudPage(1);
     clearSelection();
@@ -327,7 +316,7 @@ const Assets = () => {
   }, []);
 
   // ============================================================
-  // SHARED CRUD OPERATIONS (open modal, fetch, submit)
+  // SHARED CRUD OPERATIONS
   // ============================================================
   const handleCreate = useCallback(() => {
     reset(getAssetDefaultValues());
@@ -385,7 +374,6 @@ const Assets = () => {
     [setValue, toast]
   );
 
-  // Shared by both grids: row click opens the read-only view modal.
   const handleView = useCallback(
     (row) => {
       setIsViewMode(true);
@@ -661,9 +649,6 @@ const Assets = () => {
     fetchAttachments();
   }, [currentAssetId]);
 
-  // ============================================================
-  // GRID ACTIONS (CRUD grid only)
-  // ============================================================
   const handleGridAction = useCallback(
     (actionType, row) => {
       if (actionType === ACTION_TYPES.VIEW) {
@@ -704,24 +689,16 @@ const Assets = () => {
     rowIdField: 'assetId',
   });
 
-  // ============================================================
-  // COLUMNS
-  // ============================================================
-  // Status grid: same fields as the CRUD grid, minus the actions column.
   const statusColumns = useMemo(() => {
     const cols = getAssetColumns(null);
     return cols.filter((c) => c && c.field !== 'actions');
   }, []);
 
-  // CRUD grid: includes the actions column.
   const crudColumns = useMemo(
     () => getAssetColumns(actionColumn),
     [actionColumn]
   );
 
-  // ============================================================
-  // BULK ACTIONS (CRUD grid only)
-  // ============================================================
   const bulkActivateValue = crudTab === 'active' ? false : true;
   const showActivateToggle = crudTab === 'active' || crudTab === 'inactive';
 
@@ -753,12 +730,6 @@ const Assets = () => {
     : 'Deactivate Assets';
   const bulkDescription = `This action will ${bulkActivateValue ? 'activate' : 'deactivate'} the selected assets.`;
 
-  // ============================================================
-  // RENDER
-  // ============================================================
-  const showFileUploads = isEditMode && currentAssetId && !isViewMode;
-  const showPhotoSection = isEditMode && currentAssetId;
-
   return (
     <div className="assets-menu">
       <PageHeader
@@ -766,9 +737,6 @@ const Assets = () => {
         description="Manage inventory assets and their lifecycle"
       />
 
-      {/* ============================================================ */}
-      {/* SECTION 1 — Asset Status (view-only)                          */}
-      {/* ============================================================ */}
       <section className="assets-menu__section">
         <header className="assets-menu__section-header">
           <h2 className="assets-menu__section-title">Asset Status</h2>
@@ -813,9 +781,6 @@ const Assets = () => {
         </Box>
       </section>
 
-      {/* ============================================================ */}
-      {/* SECTION 2 — Asset Management (standard CRUD)                  */}
-      {/* ============================================================ */}
       <section className="assets-menu__section">
         <header className="assets-menu__section-header">
           <h2 className="assets-menu__section-title">Asset Management</h2>
@@ -910,9 +875,6 @@ const Assets = () => {
         </Box>
       </section>
 
-      {/* ============================================================ */}
-      {/* ACTION MENU (CRUD grid only)                                  */}
-      {/* ============================================================ */}
       <ActionMenu
         anchorEl={menuAnchorEl}
         open={menuOpen}
@@ -922,365 +884,31 @@ const Assets = () => {
         onAction={handleActionClick}
       />
 
-      {/* ============================================================ */}
-      {/* SHARED CRUD MODAL                                             */}
-      {/* ============================================================ */}
-      <CrudModal
+      <AssetFormDialog
         isOpen={showModal}
         onClose={handleClose}
-        title={
-          isViewMode ? 'View Asset' : editingAsset ? 'Edit Asset' : 'Add Asset'
-        }
         onSubmit={isViewMode ? () => {} : handleFormSubmit(onSubmit)}
         isSubmitting={isSubmitting}
-        submitText={isViewMode ? 'Close' : editingAsset ? 'Update' : 'Create'}
-        cancelText={isViewMode ? 'Close' : 'Cancel'}
-        disableSubmit={isViewMode}
-        size="xl"
-      >
-        {showPhotoSection && (
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-              mb: 3,
-              pb: 3,
-              borderBottom: '1px solid var(--border)',
-            }}
-          >
-            <Box sx={{ position: 'relative' }}>
-              <Avatar
-                src={photoPreview || editingAsset?.photoProfileUrl || undefined}
-                sx={{
-                  width: 100,
-                  height: 100,
-                  bgcolor: 'var(--primary)',
-                  fontSize: 40,
-                  fontWeight: 600,
-                  border: '3px solid var(--border)',
-                }}
-              >
-                {!photoPreview &&
-                  !editingAsset?.photoProfileUrl &&
-                  (formData.assetName?.charAt(0) || 'A')}
-              </Avatar>
-              {!isViewMode && (
-                <Box sx={{ position: 'absolute', bottom: -4, right: -4 }}>
-                  <label
-                    htmlFor="asset-photo-upload"
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <IconButton
-                      component="span"
-                      size="small"
-                      sx={{
-                        bgcolor: 'var(--primary)',
-                        color: 'white',
-                        '&:hover': { bgcolor: 'var(--primary-hover)' },
-                        width: 32,
-                        height: 32,
-                      }}
-                    >
-                      <FiCamera size={16} />
-                    </IconButton>
-                    <input
-                      id="asset-photo-upload"
-                      type="file"
-                      accept="image/jpeg,image/png,image/gif,image/webp"
-                      style={{ display: 'none' }}
-                      onChange={handlePhotoChange}
-                    />
-                  </label>
-                  {photoPreview && (
-                    <IconButton
-                      size="small"
-                      onClick={handleRemovePhoto}
-                      sx={{
-                        position: 'absolute',
-                        top: -8,
-                        right: -8,
-                        bgcolor: 'var(--error)',
-                        color: 'white',
-                        '&:hover': { bgcolor: 'var(--error-dark)' },
-                        width: 24,
-                        height: 24,
-                      }}
-                    >
-                      <FiX size={14} />
-                    </IconButton>
-                  )}
-                </Box>
-              )}
-            </Box>
-            <Box>
-              <Typography variant="subtitle1" fontWeight={600}>
-                {isViewMode ? 'Photo' : 'Update Photo'}
-              </Typography>
-              {!isViewMode && (
-                <Typography variant="caption" color="text.secondary">
-                  Click the camera icon to upload or change photo. Max 5MB.
-                </Typography>
-              )}
-            </Box>
-          </Box>
-        )}
-
-        <FormSection
-          title="Basic Information"
-          description="Asset code, name, and category"
-        >
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <Input
-                label="Asset Code"
-                {...register('assetCode')}
-                value={formData.assetCode || ''}
-                onChange={(e) => setFormField('assetCode')(e.target.value)}
-                {...getFieldErrorProps(formErrors, 'assetCode')}
-                disabled={isViewMode}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Input
-                label="Asset Name"
-                {...register('assetName')}
-                value={formData.assetName || ''}
-                onChange={(e) => setFormField('assetName')(e.target.value)}
-                {...getFieldErrorProps(formErrors, 'assetName')}
-                disabled={isViewMode}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Select
-                label="Category"
-                {...register('categoryId')}
-                value={formData.categoryId || ''}
-                onChange={(e) => setFormField('categoryId')(e.target.value)}
-                options={categoryFormOptions}
-                {...getFieldErrorProps(formErrors, 'categoryId')}
-                disabled={isViewMode}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Select
-                label="Supplier"
-                {...register('supplierId')}
-                value={formData.supplierId || ''}
-                onChange={(e) => setFormField('supplierId')(e.target.value)}
-                options={supplierFormOptions}
-                {...getFieldErrorProps(formErrors, 'supplierId')}
-                disabled={isViewMode}
-              />
-            </Grid>
-          </Grid>
-        </FormSection>
-
-        <FormSection
-          title="Technical Details"
-          description="Brand, model, serial numbers, and network information"
-        >
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <Input
-                label="Brand"
-                {...register('brand')}
-                value={formData.brand || ''}
-                onChange={(e) => setFormField('brand')(e.target.value)}
-                {...getFieldErrorProps(formErrors, 'brand')}
-                disabled={isViewMode}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Input
-                label="Model"
-                {...register('model')}
-                value={formData.model || ''}
-                onChange={(e) => setFormField('model')(e.target.value)}
-                {...getFieldErrorProps(formErrors, 'model')}
-                disabled={isViewMode}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Input
-                label="Serial Number"
-                {...register('serialNumber')}
-                value={formData.serialNumber || ''}
-                onChange={(e) => setFormField('serialNumber')(e.target.value)}
-                {...getFieldErrorProps(formErrors, 'serialNumber')}
-                disabled={isViewMode}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Input
-                label="IMEI"
-                {...register('imei')}
-                value={formData.imei || ''}
-                onChange={(e) => setFormField('imei')(e.target.value)}
-                {...getFieldErrorProps(formErrors, 'imei')}
-                disabled={isViewMode}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Input
-                label="MAC Address"
-                {...register('macAddress')}
-                value={formData.macAddress || ''}
-                onChange={(e) => setFormField('macAddress')(e.target.value)}
-                {...getFieldErrorProps(formErrors, 'macAddress')}
-                disabled={isViewMode}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Input
-                label="Hostname"
-                {...register('hostname')}
-                value={formData.hostname || ''}
-                onChange={(e) => setFormField('hostname')(e.target.value)}
-                {...getFieldErrorProps(formErrors, 'hostname')}
-                disabled={isViewMode}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Input
-                label="IP Address"
-                {...register('ipAddress')}
-                value={formData.ipAddress || ''}
-                onChange={(e) => setFormField('ipAddress')(e.target.value)}
-                {...getFieldErrorProps(formErrors, 'ipAddress')}
-                disabled={isViewMode}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Input
-                label="Invoice Number"
-                {...register('invoiceNumber')}
-                value={formData.invoiceNumber || ''}
-                onChange={(e) => setFormField('invoiceNumber')(e.target.value)}
-                {...getFieldErrorProps(formErrors, 'invoiceNumber')}
-                disabled={isViewMode}
-              />
-            </Grid>
-          </Grid>
-        </FormSection>
-
-        <FormSection
-          title="Purchase Information"
-          description="Purchase date, price, warranty, and condition"
-        >
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
-              <DatePickerInput
-                label="Purchase Date"
-                {...register('purchaseDate')}
-                value={formData.purchaseDate || ''}
-                onChange={(e) => setFormField('purchaseDate')(e.target.value)}
-                {...getFieldErrorProps(formErrors, 'purchaseDate')}
-                disabled={isViewMode}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <NumberInput
-                label="Purchase Price"
-                {...register('purchasePrice')}
-                value={formData.purchasePrice}
-                onChange={(e) => setFormField('purchasePrice')(e.target.value)}
-                prefix="Rp "
-                thousandSeparator
-                decimalScale={0}
-                {...getFieldErrorProps(formErrors, 'purchasePrice')}
-                disabled={isViewMode}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <NumberInput
-                label="Warranty (Months)"
-                {...register('warrantyPeriod')}
-                value={formData.warrantyPeriod}
-                onChange={(e) => setFormField('warrantyPeriod')(e.target.value)}
-                suffix=" months"
-                decimalScale={0}
-                min={0}
-                {...getFieldErrorProps(formErrors, 'warrantyPeriod')}
-                disabled={isViewMode}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Select
-                label="Purchase Condition"
-                {...register('assetConditionPurchase')}
-                value={formData.assetConditionPurchase || ''}
-                onChange={(e) =>
-                  setFormField('assetConditionPurchase')(e.target.value)
-                }
-                options={conditionPurchaseOptions}
-                {...getFieldErrorProps(formErrors, 'assetConditionPurchase')}
-                disabled={isViewMode}
-              />
-            </Grid>
-          </Grid>
-        </FormSection>
-
-        <FormSection
-          title="Notes & Attachments"
-          description="Additional information and file attachments"
-        >
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <Input
-                label="Notes"
-                {...register('notes')}
-                value={formData.notes || ''}
-                onChange={(e) => setFormField('notes')(e.target.value)}
-                multiline
-                rows={3}
-                {...getFieldErrorProps(formErrors, 'notes')}
-                disabled={isViewMode}
-              />
-            </Grid>
-
-            {showFileUploads && (
-              <Grid item xs={12}>
-                <FileUploader
-                  referenceType="Asset"
-                  referenceId={currentAssetId}
-                  entityType="asset"
-                  isAttachment={true}
-                  existingFiles={[...existingAttachments, ...attachmentFiles]}
-                  onFilesChange={handleFilesChange}
-                  onUploadComplete={handleUploadComplete}
-                  onFileDeleted={handleFileDeleted}
-                />
-              </Grid>
-            )}
-
-            {isViewMode && existingAttachments.length > 0 && (
-              <Grid item xs={12}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Attachments ({existingAttachments.length})
-                </Typography>
-                {existingAttachments.map((att, idx) => (
-                  <div
-                    key={att.fileAttachmentId || idx}
-                    style={{ padding: '4px 0' }}
-                  >
-                    <a
-                      href={att.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {att.originalFileName || att.fileName || 'File'}
-                    </a>
-                  </div>
-                ))}
-              </Grid>
-            )}
-          </Grid>
-        </FormSection>
-      </CrudModal>
+        isViewMode={isViewMode}
+        isEditMode={isEditMode}
+        editingAsset={editingAsset}
+        currentAssetId={currentAssetId}
+        formData={formData}
+        setFormField={setFormField}
+        register={register}
+        formErrors={formErrors}
+        photoPreview={photoPreview}
+        handlePhotoChange={handlePhotoChange}
+        handleRemovePhoto={handleRemovePhoto}
+        attachmentFiles={attachmentFiles}
+        existingAttachments={existingAttachments}
+        handleFilesChange={handleFilesChange}
+        handleUploadComplete={handleUploadComplete}
+        handleFileDeleted={handleFileDeleted}
+        categoryFormOptions={categoryFormOptions}
+        supplierFormOptions={supplierFormOptions}
+        conditionPurchaseOptions={conditionPurchaseOptions}
+      />
 
       <ImportModal
         isOpen={showImportModal}
@@ -1293,7 +921,7 @@ const Assets = () => {
         isImporting={isImporting}
         importResult={importResult}
         title="Import Assets"
-        description="Upload Excel file with asset data. Assets will be imported as ACTIVE."
+        description="Upload an .xlsx file with asset data. Assets will be imported as ACTIVE."
       />
 
       <BulkActivateModal

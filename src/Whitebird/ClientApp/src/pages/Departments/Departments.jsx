@@ -1,6 +1,6 @@
 // src/pages/Departments/Departments.jsx
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Grid, Box } from '@mui/material';
+import { Box } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import { FiCheckSquare, FiPlus, FiTrash2 } from 'react-icons/fi';
 import { DepartmentsData } from '../../core/services';
@@ -8,21 +8,19 @@ import PageHeader from '../../components/atoms/PageHeader';
 import BulkActionBar from '../../components/atoms/BulkActionBar';
 import RefreshButton from '../../components/atoms/RefreshButton';
 import Button from '../../components/atoms/Button/Button';
-import StatusChip from '../../components/atoms/StatusChip/StatusChip';
 import Spinner from '../../components/atoms/Spinner/Spinner';
 import Tabs from '../../components/molecules/Tabs/Tabs';
 import SearchToolbar from '../../components/molecules/SearchToolbar/SearchToolbar';
 import DataTable from '../../components/molecules/DataTable/DataTable';
-import CrudModal from '../../components/molecules/CrudModal/CrudModal';
 import BulkActivateModal from '../../components/molecules/BulkActivateModal/BulkActivateModal';
 import ActionMenu from '../../components/molecules/ActionMenu';
-import FormSection from '../../components/atoms/FormSection/FormSection';
-import Input from '../../components/atoms/Input/Input';
 import { ACTION_TYPES, useGridActions } from '../../hooks/useGridActions';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
 import { useGridData } from '../../hooks/useGridData';
 import { useCrudFormBase } from '../../hooks/useCrudFormBase';
+import { getDepartmentColumns } from './columns';
+import DepartmentFormDialog from './components/DepartmentFormDialog';
 import './Departments.scss';
 
 const departmentsData = new DepartmentsData();
@@ -283,28 +281,7 @@ const Departments = () => {
   });
 
   const columns = useMemo(
-    () => [
-      { field: 'departmentCode', headerName: 'Code', width: 150 },
-      { field: 'departmentName', headerName: 'Name', flex: 1, minWidth: 200 },
-      { field: 'description', headerName: 'Description', flex: 1, minWidth: 200 },
-      {
-        field: 'employeeCount',
-        headerName: 'Employees',
-        width: 130,
-        sortable: false,
-      },
-      {
-        field: 'isActive',
-        headerName: 'Status',
-        width: 110,
-        sortable: false,
-        renderCell: (p) => {
-          const status = p.value ? 'Active' : 'Inactive';
-          return <StatusChip status={status} />;
-        },
-      },
-      actionColumn,
-    ],
+    () => getDepartmentColumns(actionColumn),
     [actionColumn]
   );
 
@@ -407,59 +384,16 @@ const Departments = () => {
         onAction={handleActionClick}
       />
 
-      <CrudModal
+      <DepartmentFormDialog
         isOpen={showModal}
         onClose={handleClose}
-        title={
-          isViewMode
-            ? 'View Department'
-            : editingDepartment
-              ? 'Edit Department'
-              : 'Add Department'
-        }
         onSubmit={isViewMode ? () => {} : crudHandleSubmit}
         isSubmitting={isSubmitting}
-        submitText={isViewMode ? 'Close' : editingDepartment ? 'Update' : 'Create'}
-        cancelText={isViewMode ? 'Close' : 'Cancel'}
-        disableSubmit={isViewMode}
-        size="md"
-      >
-        <FormSection
-          title="Basic Information"
-          description="Department code and name"
-        >
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <Input
-                label="Department Code"
-                value={formData.departmentCode || ''}
-                onChange={(e) => setFormField('departmentCode')(e.target.value)}
-                disabled={isViewMode}
-                placeholder="Optional (max 100 chars)"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Input
-                label="Department Name"
-                value={formData.departmentName || ''}
-                onChange={(e) => setFormField('departmentName')(e.target.value)}
-                disabled={isViewMode}
-                required
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Input
-                label="Description"
-                value={formData.description || ''}
-                onChange={(e) => setFormField('description')(e.target.value)}
-                disabled={isViewMode}
-                multiline
-                rows={2}
-              />
-            </Grid>
-          </Grid>
-        </FormSection>
-      </CrudModal>
+        isViewMode={isViewMode}
+        editingRecord={editingDepartment}
+        formData={formData}
+        setFormField={setFormField}
+      />
 
       <BulkActivateModal
         isOpen={showBulkActivateModal}

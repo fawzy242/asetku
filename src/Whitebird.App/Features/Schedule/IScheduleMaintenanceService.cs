@@ -11,9 +11,9 @@ namespace Whitebird.App.Features.Schedule;
 /// Only Maintenance-specific custom operations are declared here.
 /// </summary>
 public interface IScheduleMaintenanceService :
-    ICommonService<ScheduleMaintenanceView, ScheduleMaintenanceListView, ScheduleGridRequest, ScheduleMaintenanceCreateDto, ScheduleMaintenanceUpdateDto>
+    ICommonService<ScheduleMaintenanceView, ScheduleMaintenanceListView, ScheduleMaintenanceGridRequest, ScheduleMaintenanceCreateDto, ScheduleMaintenanceUpdateDto>
 {
     Task<ServiceResult<IEnumerable<ScheduleMaintenanceListView>>> GetByAssetIdAsync(int assetId);
     Task<ServiceResult<IEnumerable<ScheduleMaintenanceListView>>> GetByMaintenanceTypeAsync(int maintenanceType);
-    Task<ServiceResult<ScheduleGenerateResultDto>> GenerateAsync(ScheduleMaintenanceGenerateDto dto);
+    Task<ServiceResult<ScheduleMaintenanceGenerateResultDto>> GenerateAsync(ScheduleMaintenanceGenerateDto dto);
 }

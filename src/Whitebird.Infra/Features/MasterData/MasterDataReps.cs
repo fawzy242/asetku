@@ -58,10 +58,5 @@ public class MasterDataReps : IMasterDataReps
         return await _context.ExecuteScalarAsync<int>(sql, new { ReferenceName = referenceName, Code = code }) > 0;
     }
 
-    /// <inheritdoc />
-    public async Task<IEnumerable<string>> GetDistinctReferenceNamesAsync()
-    {
-        const string sql = "SELECT DISTINCT ReferenceName FROM MasterData WHERE IsActive = 1 ORDER BY ReferenceName";
-        return await _context.QueryAsync<string>(sql);
-    }
+    // NOTE (P4-4): GetDistinctReferenceNamesAsync was removed — it had no callers.
 }

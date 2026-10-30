@@ -146,9 +146,9 @@ public class EmployeeService : BaseService, IEmployeeService
         if (await _employeeReps.IsEmployeeCodeExistsAsync(model.EmployeeCode, id))
             return ServiceResult<EmployeeDetailView>.Conflict($"Employee code '{model.EmployeeCode}' already exists");
 
-        if (!string.IsNullOrWhiteSpace(model.Email) &&
-            !System.Text.RegularExpressions.Regex.IsMatch(model.Email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
-            return ServiceResult<EmployeeDetailView>.BadRequest($"Invalid email format: {model.Email}");
+        // P4-9: email format is enforced by [EmailAddress] on EmployeeUpdateFormDto
+        // via ControllerHelper.HandleModelState before this service is reached.
+        // The previous manual regex block was redundant and has been removed.
 
         if (model.DepartmentId.HasValue && model.DepartmentId.Value > 0)
         {

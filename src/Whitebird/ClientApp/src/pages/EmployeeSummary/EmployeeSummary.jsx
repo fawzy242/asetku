@@ -4,27 +4,12 @@ import {
   FiSearch,
   FiUser,
   FiBox,
-  FiDollarSign,
   FiCalendar,
-  FiMail,
-  FiPhone,
-  FiBriefcase,
   FiRefreshCw,
-  FiAlertTriangle,
-  FiLayers,
   FiTool,
   FiPieChart,
 } from 'react-icons/fi';
-import {
-  Grid,
-  Box,
-  Typography,
-  Avatar,
-  Chip,
-  Paper,
-  IconButton,
-  Tooltip,
-} from '@mui/material';
+import { Grid, Box, Typography, IconButton, Tooltip } from '@mui/material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { EmployeeSummaryData } from '../../core/services';
@@ -32,118 +17,16 @@ import DataTable from '../../components/molecules/DataTable/DataTable';
 import Card from '../../components/atoms/Card/Card';
 import Select from '../../components/atoms/Select/Select';
 import Spinner from '../../components/atoms/Spinner/Spinner';
-import Skeleton from '../../components/atoms/Skeleton/Skeleton';
-import StatusChip from '../../components/atoms/StatusChip/StatusChip';
 import InfoRow from '../../components/molecules/InfoRow/InfoRow';
 import { useOptions } from '../../hooks/useOptions';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
-import { formatDate, formatDateTime } from '../../core/utils/date.utils';
-import { formatCurrency } from '../../core/utils/number.utils';
+import { formatDateTime } from '../../core/utils/date.utils';
+import { assetColumns, historyColumns } from './columns';
+import EmployeeSummaryProfileCard from './components/EmployeeSummaryProfileCard';
+import EmployeeSummaryStatsGrid from './components/EmployeeSummaryStatsGrid';
 import './EmployeeSummary.scss';
 
 const summaryData = new EmployeeSummaryData();
-
-const assetColumns = [
-  { field: 'assetCode', headerName: 'Asset Code', width: 130 },
-  { field: 'assetName', headerName: 'Asset Name', flex: 1, minWidth: 180 },
-  { field: 'categoryName', headerName: 'Category', width: 150 },
-  {
-    field: 'status',
-    headerName: 'Status',
-    width: 140,
-    renderCell: (p) => <StatusChip status={p?.value || '-'} />,
-  },
-  { field: 'associationType', headerName: 'Type', width: 110 },
-  {
-    field: 'sinceDate',
-    headerName: 'Since',
-    width: 120,
-    renderCell: (params) => {
-      const value = params?.row?.sinceDate || params?.value;
-      if (!value) return <span className="u-text-muted">-</span>;
-      return <span>{formatDate(value)}</span>;
-    },
-  },
-  {
-    field: 'expectedReturnDate',
-    headerName: 'Expected Return',
-    width: 130,
-    renderCell: (params) => {
-      const value = params?.row?.expectedReturnDate || params?.value;
-      if (!value) return <span className="u-text-muted">-</span>;
-      return <span>{formatDate(value)}</span>;
-    },
-  },
-  {
-    field: 'isOverdue',
-    headerName: 'Overdue',
-    width: 90,
-    renderCell: (p) =>
-      p?.value ? (
-        <Chip label="Yes" size="small" className="employee-summary__chip-overdue" />
-      ) : (
-        <Chip label="No" size="small" className="employee-summary__chip-ontime" />
-      ),
-  },
-  { field: 'conditionName', headerName: 'Condition', width: 100 },
-];
-
-const historyColumns = [
-  {
-    field: 'transactionDate',
-    headerName: 'Date',
-    width: 180,
-    renderCell: (params) => {
-      const value = params?.row?.transactionDate || params?.value;
-      if (!value) return <span className="u-text-muted">-</span>;
-      return <span>{formatDateTime(value)}</span>;
-    },
-  },
-  {
-    field: 'transactionTypeName',
-    headerName: 'Type',
-    width: 150,
-    renderCell: (params) => {
-      const row = params?.row || {};
-      const value =
-        row.transactionTypeName || row.typeName || row.transactionType || '-';
-      return <span>{value}</span>;
-    },
-  },
-  { field: 'assetCode', headerName: 'Asset', width: 130 },
-  { field: 'assetName', headerName: 'Asset Name', flex: 1, minWidth: 180 },
-  {
-    field: 'employeeName',
-    headerName: 'Employee',
-    width: 150,
-    renderCell: (params) => {
-      const row = params?.row || {};
-      return <span>{row.employeeName || row.employee || '-'}</span>;
-    },
-  },
-  {
-    field: 'conditionAfterName',
-    headerName: 'Condition',
-    width: 100,
-    renderCell: (params) => {
-      const row = params?.row || {};
-      return (
-        <span>
-          {row.conditionAfterName || row.conditionAfter || row.condition || '-'}
-        </span>
-      );
-    },
-  },
-  {
-    field: 'notes',
-    headerName: 'Notes',
-    width: 200,
-    renderCell: (params) => {
-      const row = params?.row || {};
-      return <span>{row.notes || row.note || '-'}</span>;
-    },
-  },
-];
 
 const EmployeeSummary = () => {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
@@ -321,166 +204,15 @@ const EmployeeSummary = () => {
         {selectedEmployeeId && !loadingData && employeeDetail && (
           <>
             <Grid item xs={12}>
-              <Card className="employee-summary__profile-card">
-                <Grid container spacing={3} alignItems="center">
-                  <Grid item>
-                    <Avatar className="employee-summary__profile-avatar">
-                      {employeeDetail?.fullName?.charAt(0) || '?'}
-                    </Avatar>
-                  </Grid>
-                  <Grid item xs>
-                    <Typography
-                      variant="h5"
-                      fontWeight={700}
-                      className="employee-summary__profile-name"
-                    >
-                      {employeeDetail?.fullName || '-'}
-                    </Typography>
-                    <div className="employee-summary__profile-tags">
-                      <Chip
-                        icon={<FiBriefcase />}
-                        label={employeeDetail?.employeeCode || '-'}
-                        size="small"
-                        variant="outlined"
-                      />
-                      <Chip
-                        icon={<FiBriefcase />}
-                        label={employeeDetail?.positionName || '-'}
-                        size="small"
-                        variant="outlined"
-                      />
-                      <Chip
-                        icon={<FiBriefcase />}
-                        label={employeeDetail?.departmentName || '-'}
-                        size="small"
-                        variant="outlined"
-                      />
-                      <Chip
-                        icon={<FiMail />}
-                        label={employeeDetail?.email || '-'}
-                        size="small"
-                        variant="outlined"
-                      />
-                      <Chip
-                        icon={<FiPhone />}
-                        label={employeeDetail?.phoneNumber || '-'}
-                        size="small"
-                        variant="outlined"
-                      />
-                      <StatusChip status={employeeDetail?.employmentStatusName} />
-                    </div>
-                  </Grid>
-                  <Grid item>
-                    <InfoRow
-                      icon={FiCalendar}
-                      label="Join Date"
-                      value={formatDate(employeeDetail?.joinDate)}
-                    />
-                    {employeeDetail?.resignDate && (
-                      <InfoRow
-                        icon={FiCalendar}
-                        label="Resign Date"
-                        value={formatDate(employeeDetail?.resignDate)}
-                      />
-                    )}
-                  </Grid>
-                </Grid>
-              </Card>
+              <EmployeeSummaryProfileCard employeeDetail={employeeDetail} />
             </Grid>
 
-            <Grid item xs={12}>
-              <Grid container spacing={2}>
-                <Grid item xs={6} sm={4} md={2}>
-                  <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiBox
-                      size={28}
-                      className="employee-summary__stat-icon employee-summary__stat-icon--red"
-                    />
-                    <Typography variant="h4" fontWeight={700}>
-                      {assetSummary?.currentlyHeldAssets || currentAssets.length}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Total Assets
-                    </Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} sm={4} md={2}>
-                  <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiLayers
-                      size={28}
-                      className="employee-summary__stat-icon employee-summary__stat-icon--purple"
-                    />
-                    <Typography variant="h4" fontWeight={700}>
-                      {assetSummary?.assetsOnLoan || 0}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      On Loan
-                    </Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} sm={4} md={2}>
-                  <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiTool
-                      size={28}
-                      className="employee-summary__stat-icon employee-summary__stat-icon--yellow"
-                    />
-                    <Typography variant="h4" fontWeight={700}>
-                      {assetSummary?.assetsInMaintenance || 0}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      In Maintenance
-                    </Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} sm={4} md={2}>
-                  <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiDollarSign
-                      size={28}
-                      className="employee-summary__stat-icon employee-summary__stat-icon--green"
-                    />
-                    <Typography variant="h4" fontWeight={700}>
-                      {formatCurrency(totalAssetValue)}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Total Value
-                    </Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} sm={4} md={2}>
-                  <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiRefreshCw
-                      size={28}
-                      className="employee-summary__stat-icon employee-summary__stat-icon--blue"
-                    />
-                    <Typography variant="h4" fontWeight={700}>
-                      {assetSummary?.returnedAssets ||
-                        assetHistory.filter(
-                          (t) =>
-                            t.transactionTypeName === 'RETURN' ||
-                            t.transactionTypeName === 'LOAN_RETURN'
-                        ).length}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Returns
-                    </Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} sm={4} md={2}>
-                  <Paper elevation={0} className="employee-summary__stat-card">
-                    <FiAlertTriangle
-                      size={28}
-                      className="employee-summary__stat-icon employee-summary__stat-icon--red"
-                    />
-                    <Typography variant="h4" fontWeight={700}>
-                      {assetSummary?.damagedReturns || 0}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Damaged
-                    </Typography>
-                  </Paper>
-                </Grid>
-              </Grid>
-            </Grid>
+            <EmployeeSummaryStatsGrid
+              assetSummary={assetSummary}
+              currentAssets={currentAssets}
+              assetHistory={assetHistory}
+              totalAssetValue={totalAssetValue}
+            />
 
             <Grid item xs={12} md={6}>
               <Card

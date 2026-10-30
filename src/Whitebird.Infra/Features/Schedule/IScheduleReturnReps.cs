@@ -36,5 +36,5 @@ public interface IScheduleReturnReps
     // PAGINATION
     // ============================================================
 
-    Task<PaginatedResult<ScheduleReturnListView>> GetPagedListAsync(ScheduleGridRequest request);
+    Task<PaginatedResult<ScheduleReturnListView>> GetPagedListAsync(ScheduleReturnGridRequest request);
 }

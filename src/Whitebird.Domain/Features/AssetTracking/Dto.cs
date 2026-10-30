@@ -23,6 +23,15 @@ public class AssetTrackingGridRequest : GridRequestBase
     /// Asset ID (required, passed in path)
     /// </summary>
     public int AssetId { get; set; }
+
+    /// <summary>
+    /// P3-2: explicit schedule-type selector for the schedule-stats endpoint.
+    /// Supported values (case-insensitive): "handover", "return", "maintenance".
+    /// Falls back to <see cref="GridRequestBase.Search"/> for backward
+    /// compatibility when this is null — existing clients that used the query
+    /// parameter "search" as a type selector continue to work unchanged.
+    /// </summary>
+    public string? ScheduleType { get; set; }
 }
 
 /// <summary>

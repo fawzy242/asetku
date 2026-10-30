@@ -7,7 +7,19 @@ export default defineConfig(({ mode }) => {
   const isDev = mode === "development";
   const isProd = mode === "production";
 
+  // Default backend URL for the dev proxy. Can be overridden in .env via
+  // VITE_BACKEND_URL if the backend runs elsewhere.
   const backendUrl = env.VITE_BACKEND_URL || "https://localhost:5001";
+
+  // Version: base value from .env, "-dev" suffix only in development.
+  const baseVersion = env.VITE_APP_VERSION || "1.0.0";
+  const appVersion = isDev ? `${baseVersion}-dev` : baseVersion;
+
+  // Debug logs: always ON in development, always OFF in production.
+  // Overriding import.meta.env.VITE_ENABLE_DEBUG_LOGS via define means the
+  // frontend can keep reading it from import.meta.env without any code
+  // change — the value is injected at build time.
+  const enableDebugLogs = isDev;
 
   return {
     plugins: [react()],
@@ -54,7 +66,16 @@ export default defineConfig(({ mode }) => {
     preview: { port: 4173, strictPort: true },
 
     define: {
-      __APP_VERSION__: JSON.stringify(env.VITE_APP_VERSION || "1.0.0"),
+      // Version injected as a compile-time global
+      __APP_VERSION__: JSON.stringify(appVersion),
+
+      // Debug flag: injected via define so frontend code reading
+      // `import.meta.env.VITE_ENABLE_DEBUG_LOGS` gets the mode-derived
+      // value without any source changes.
+      "import.meta.env.VITE_ENABLE_DEBUG_LOGS": JSON.stringify(enableDebugLogs ? "true" : "false"),
+
+      // Consistent mirror as a global for any new code
+      __DEBUG_LOGS__: JSON.stringify(enableDebugLogs),
     },
 
     optimizeDeps: {

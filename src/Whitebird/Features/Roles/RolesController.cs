@@ -10,7 +10,11 @@ namespace Whitebird.Features.Roles;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
-[Authorize]
+// P2-3: role CRUD is restricted to administrator-level users. The claim value
+// emitted by SessionAuthenticationHandler is RoleName (e.g. "Administrator");
+// RoleCode ("ADMIN") is accepted as well for forward compatibility. Add other
+// role codes here if additional privileged roles are introduced.
+[Authorize(Roles = "ADMIN,Administrator")]
 public class RolesController : ControllerBase
 {
     private readonly IRolesService _rolesService;

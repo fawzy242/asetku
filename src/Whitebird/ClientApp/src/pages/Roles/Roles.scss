@@ -1,0 +1,7 @@
+// src/pages/Roles/Roles.scss
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.roles-menu {
+    color: var(--text-primary);
+}

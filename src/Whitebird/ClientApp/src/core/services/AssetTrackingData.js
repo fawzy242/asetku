@@ -1,5 +1,4 @@
-import { assetTrackingApi } from '../api/assetTracking.api';
-import { assetApi } from '../api/asset.api';
+import { assetTrackingApi, assetApi } from '../api/api';
 import BaseData from './BaseData';
 
 class AssetTrackingData extends BaseData {
@@ -10,7 +9,7 @@ class AssetTrackingData extends BaseData {
 
   async fetchAssets() {
     try {
-      const r = await assetApi.getGrid({ page: 1, pageSize: 1000 });
+      const r = await assetApi.getGrid({ page: 1, pageSize: 500 });
       const data = r.data?.data?.data || r.data?.data || r.data || [];
       return { success: true, data: Array.isArray(data) ? data : [] };
     } catch (error) {

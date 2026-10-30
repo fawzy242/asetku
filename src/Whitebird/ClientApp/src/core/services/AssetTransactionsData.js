@@ -1,4 +1,4 @@
-import { transactionApi } from '../api/transaction.api';
+import { transactionApi } from '../api/api';
 import BaseData from './BaseData';
 import { fileToBase64 } from '../utils/file.utils';
 

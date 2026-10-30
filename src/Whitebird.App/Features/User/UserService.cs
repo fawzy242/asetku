@@ -4,23 +4,25 @@ using Whitebird.App.Features.Auth;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.FileAttachment;
 using Whitebird.Domain.Features.Common;
-using Whitebird.Domain.Features.FileAttachment;
 using Whitebird.Domain.Features.Users;
 using Whitebird.Infra.Features.Auth;
-using Whitebird.Infra.Features.FileAttachment;
 using Whitebird.Infra.Features.User;
 
 namespace Whitebird.App.Features.User;
 
 /// <summary>
-/// Service implementation for User business logic (Profile Management)
+/// Service implementation for User business logic (Profile Management).
+///
+/// Profile photo operations are routed through the internal
+/// <see cref="IFileAttachmentService"/>, matching the pattern used by
+/// Asset, Employee, and AssetTransaction. The service is the shared
+/// file-storage primitive; it is not exposed as its own API module.
 /// </summary>
 public class UserService : BaseService, IUserService
 {
     private readonly IUserReps _userReps;
     private readonly IAuthReps _authReps;
-    private readonly IFileAttachmentReps _fileAttachmentReps;
-    private readonly IStorageService _storageService;
+    private readonly IFileAttachmentService _fileAttachmentService;
     private readonly IActivityLogService _activityLogService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IHttpContextAccessor _httpContextAccessor;
@@ -28,8 +30,7 @@ public class UserService : BaseService, IUserService
     public UserService(
         IUserReps userReps,
         IAuthReps authReps,
-        IFileAttachmentReps fileAttachmentReps,
-        IStorageService storageService,
+        IFileAttachmentService fileAttachmentService,
         IActivityLogService activityLogService,
         ICurrentUserService currentUserService,
         IHttpContextAccessor httpContextAccessor,
@@ -37,8 +38,7 @@ public class UserService : BaseService, IUserService
     {
         _userReps = userReps;
         _authReps = authReps;
-        _fileAttachmentReps = fileAttachmentReps;
-        _storageService = storageService;
+        _fileAttachmentService = fileAttachmentService;
         _activityLogService = activityLogService;
         _currentUserService = currentUserService;
         _httpContextAccessor = httpContextAccessor;
@@ -206,41 +206,44 @@ public class UserService : BaseService, IUserService
 
         return await ExecuteWithTransactionAsync(async () =>
         {
+            // Replace any existing photo. Metadata soft-delete + (Batch 3) physical
+            // file removal is handled by IFileAttachmentService.DeleteAsync.
             var existingPhoto = await _userReps.GetPhotoProfileByUserIdAsync(userId);
             if (existingPhoto != null)
             {
                 await _userReps.DeletePhotoProfileByUserIdAsync(userId);
-                await _fileAttachmentReps.DeleteAsync(existingPhoto.FileAttachmentId);
+                await _fileAttachmentService.DeleteAsync(existingPhoto.FileAttachmentId);
             }
 
-            var extension = Path.GetExtension(file!.FileName).ToLowerInvariant();
-            var subDirectory = Path.Combine("Users", userId.ToString(), "Profile");
-            var savedPath = await _storageService.SaveFileAsync(file, subDirectory);
+            // Read the uploaded stream into bytes for the shared upload path.
+            using var stream = file!.OpenReadStream();
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            var bytes = ms.ToArray();
 
-            var fileAttachmentEntity = new FileAttachmentEntity
+            // Upload through the shared internal file-attachment service. This is
+            // the same primitive used by Asset/Employee/AssetTransaction; it
+            // performs the storage-layer defence-in-depth extension/size check and
+            // builds a FileUrl pointing at /api/User/profile-photo.
+            var uploadResult = await _fileAttachmentService.UploadBytesAsync(
+                referenceTable: "UserPhotoProfile",
+                referenceId: userId,
+                originalFileName: file.FileName,
+                bytes: bytes,
+                fileCategory: "ProfilePhoto",
+                description: $"Profile photo for user {user.Username}",
+                isPrimary: true);
+
+            if (!uploadResult.IsSuccess || uploadResult.Data == null)
             {
-                FileCategory = "ProfilePhoto",
-                FileName = Path.GetFileName(savedPath),
-                OriginalFileName = file.FileName,
-                FileExtension = extension,
-                FileMimeType = _storageService.GetMimeType(file.FileName),
-                FilePath = savedPath,
-                FileSize = file.Length,
-                FileHash = _storageService.ComputeFileHash(file),
-                Description = $"Profile photo for user {user.Username}",
-                VersionNumber = 1,
-                IsPrimary = true,
-                IsActive = true,
-                CreatedDate = DateTime.Now,
-                CreatedBy = _currentUserService.GetDisplayName()
-            };
+                return ServiceResult<string>.Failure(uploadResult.Errors);
+            }
 
-            var fileAttachmentId = await _fileAttachmentReps.InsertAsync(fileAttachmentEntity);
-
+            // Link the stored file to the user via the join table.
             var photoProfileEntity = new UsersPhotoProfileAttachmentEntity
             {
                 UserId = userId,
-                FileAttachmentId = fileAttachmentId,
+                FileAttachmentId = uploadResult.Data.FileAttachmentId,
                 IsActive = true,
                 CreatedDate = DateTime.Now,
                 CreatedBy = _currentUserService.GetDisplayName()
@@ -252,16 +255,14 @@ public class UserService : BaseService, IUserService
             user.ModifiedBy = _currentUserService.GetDisplayName();
             await _userReps.UpdateUserAsync(user);
 
-            var request = _httpContextAccessor.HttpContext?.Request;
-            var photoUrl = request != null ? $"{request.Scheme}://{request.Host}/api/User/profile-photo" : null;
-
             await _activityLogService.LogUpdateAsync(
                 TableNames.Users,
                 userId,
                 $"Profile photo uploaded for user '{user.Username}'",
                 _currentUserService.GetDisplayName());
 
-            return ServiceResult<string>.Success(photoUrl ?? string.Empty, "Profile photo uploaded successfully");
+            var photoUrl = uploadResult.Data.FileUrl ?? string.Empty;
+            return ServiceResult<string>.Success(photoUrl, "Profile photo uploaded successfully");
         }, "upload profile photo");
     }
 
@@ -281,20 +282,8 @@ public class UserService : BaseService, IUserService
                 return ServiceResult<FileContentDto>.NotFound("Profile photo not found");
             }
 
-            var fileEntity = await _fileAttachmentReps.GetByIdAsync(photoProfile.FileAttachmentId);
-            if (fileEntity == null)
-            {
-                return ServiceResult<FileContentDto>.NotFound("Profile photo not found");
-            }
-
-            var fileBytes = await _storageService.ReadFileAsync(fileEntity.FilePath);
-
-            return ServiceResult<FileContentDto>.Success(new FileContentDto
-            {
-                Bytes = fileBytes,
-                ContentType = _storageService.GetMimeType(fileEntity.OriginalFileName),
-                FileName = fileEntity.OriginalFileName
-            });
+            // Shared primitive: returns bytes + content-type + file-name in one call.
+            return await _fileAttachmentService.DownloadAsync(photoProfile.FileAttachmentId);
         }, "get profile photo");
     }
 
@@ -315,7 +304,7 @@ public class UserService : BaseService, IUserService
             }
 
             await _userReps.DeletePhotoProfileByUserIdAsync(userId);
-            await _fileAttachmentReps.DeleteAsync(photoProfile.FileAttachmentId);
+            await _fileAttachmentService.DeleteAsync(photoProfile.FileAttachmentId);
 
             user.ModifiedDate = DateTime.Now;
             user.ModifiedBy = _currentUserService.GetDisplayName();

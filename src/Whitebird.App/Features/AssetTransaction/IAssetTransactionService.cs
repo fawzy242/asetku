@@ -1,11 +1,8 @@
 using Whitebird.App.Features.Common;
 using Whitebird.Domain.Features.AssetTransaction;
-using Whitebird.Domain.Features.Department;
 using Whitebird.Domain.Features.Employee;
 using Whitebird.Domain.Features.MasterData;
 using Whitebird.Domain.Features.Common;
-using Whitebird.Domain.Features.Office;
-using Whitebird.Domain.Features.Supplier;
 using Whitebird.Infra.Features.Common;
 
 namespace Whitebird.App.Features.AssetTransaction;
@@ -22,19 +19,34 @@ public interface IAssetTransactionService
     Task<ServiceResult<AssetTransactionDetailView>> GetByIdAsync(int id);
     Task<ServiceResult<IEnumerable<AssetTransactionListView>>> GetAllAsync();
     Task<ServiceResult<AssetTransactionDetailView>> CreateAsync(AssetTransactionCreateViewModel model);
-    Task<ServiceResult<AssetTransactionDetailView>> UpdateAsync(int id, AssetTransactionUpdateViewModel model);
     Task<ServiceResult> DeleteAsync(int id);
     Task<ServiceResult> SoftDeleteAsync(int id);
 
     // ============================================================
     // UPDATE WITH ATTACHMENTS
     // ============================================================
+    //
+    // NOTE (P4-3): The former UpdateAsync(int, AssetTransactionUpdateViewModel)
+    // declaration was removed — it was never called by any controller. The two
+    // active update entry points below are the only supported ones.
 
     /// <summary>
     /// Update transaction with attachments (base64) - for standard grid data.
     /// Approval / completion flags are NOT accepted from this DTO; they are
     /// managed exclusively through the dedicated endpoints (BulkApproved/
     /// BulkPending/BulkRejected/Complete/Uncomplete/document-action).
+    ///
+    /// The backend refuses to edit a transaction whose Approved flag is
+    /// already set (either true or false). To change an approved/rejected
+    /// transaction, un-approve it first via BulkPending, edit, then re-approve
+    /// via BulkApproved or the approval endpoint. This preserves the invariant
+    /// that an approval decision reflects the state of the record at the time
+    /// it was approved.
+    ///
+    /// The backend also refuses to transition IsActive from true to false when
+    /// the transaction has a paired child. The same rule is already enforced by
+    /// SoftDeleteAsync and DeleteAsync.
+    ///
     /// After the update, the backend re-evaluates the transaction Completed state.
     /// </summary>
     Task<ServiceResult<AssetTransactionDetailView>> UpdateWithAttachmentsAsync(int id, AssetTransactionUpdateFormDto model);
@@ -43,6 +55,13 @@ public interface IAssetTransactionService
     /// Update transaction approval with attachments (base64) - for pending approval grid data.
     /// Accepts Approved / ApprovedBy (approval-flow endpoint), but NOT Completed /
     /// CompletedBy — completion is derived from the document state.
+    ///
+    /// Unlike the standard update endpoint, this one does not block edits on
+    /// transactions that are already approved, because it is the workflow
+    /// surface for uploading approval documents and for re-approving after
+    /// BulkPending. It does, however, refuse to transition IsActive from true to
+    /// false when the transaction has a paired child — same rule as SoftDeleteAsync.
+    ///
     /// After the update, the backend re-evaluates the transaction Completed state.
     /// </summary>
     Task<ServiceResult<AssetTransactionDetailView>> UpdateApprovalWithAttachmentsAsync(int id, AssetTransactionUpdateApprovalFormDto model);

@@ -46,10 +46,12 @@ public interface IAssetReps
     // ============================================================
     // PAGINATION
     // ============================================================
+    //
+    // P3-1: Signature aligned with every other feature repository — takes the
+    // request object directly and uses GridQueryBuilder internally, replacing
+    // the ad-hoc filter dictionary the previous overload accepted.
 
-    Task<PaginatedResult<AssetListView>> GetPagedListAsync(
-        int page, int pageSize, string? search = null, string? sortBy = null,
-        bool sortDescending = false, Dictionary<string, object>? filters = null);
+    Task<PaginatedResult<AssetListView>> GetPagedListAsync(AssetGridRequest request);
 
     // ============================================================
     // DROPDOWN

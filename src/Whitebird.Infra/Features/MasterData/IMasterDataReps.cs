@@ -12,5 +12,8 @@ public interface IMasterDataReps
     Task<IEnumerable<MasterDataEntity>> GetByReferenceNameAsync(string referenceName);
     Task<MasterDataEntity?> GetByReferenceNameAndCodeAsync(string referenceName, int code);
     Task<bool> IsExistsAsync(string referenceName, int code);
-    Task<IEnumerable<string>> GetDistinctReferenceNamesAsync();
+
+    // NOTE (P4-4): GetDistinctReferenceNamesAsync was removed — it had no callers.
+    // If distinct reference names are ever needed, prefer exposing it through
+    // MasterDataService, not directly from the repository.
 }

@@ -1,6 +1,6 @@
 // src/pages/Offices/Offices.jsx
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Grid, Box } from '@mui/material';
+import { Box } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import { FiCheckSquare, FiPlus, FiTrash2 } from 'react-icons/fi';
 import { OfficesData } from '../../core/services';
@@ -8,17 +8,12 @@ import PageHeader from '../../components/atoms/PageHeader';
 import BulkActionBar from '../../components/atoms/BulkActionBar';
 import RefreshButton from '../../components/atoms/RefreshButton';
 import Button from '../../components/atoms/Button/Button';
-import StatusChip from '../../components/atoms/StatusChip/StatusChip';
 import Spinner from '../../components/atoms/Spinner/Spinner';
 import Tabs from '../../components/molecules/Tabs/Tabs';
 import SearchToolbar from '../../components/molecules/SearchToolbar/SearchToolbar';
 import DataTable from '../../components/molecules/DataTable/DataTable';
-import CrudModal from '../../components/molecules/CrudModal/CrudModal';
 import BulkActivateModal from '../../components/molecules/BulkActivateModal/BulkActivateModal';
 import ActionMenu from '../../components/molecules/ActionMenu';
-import FormSection from '../../components/atoms/FormSection/FormSection';
-import Input from '../../components/atoms/Input/Input';
-import Select from '../../components/atoms/Select/Select';
 import { ACTION_TYPES, useGridActions } from '../../hooks/useGridActions';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
@@ -26,6 +21,8 @@ import { useGridData } from '../../hooks/useGridData';
 import { useReferenceData } from '../../hooks/useReferenceData';
 import { useCrudFormBase } from '../../hooks/useCrudFormBase';
 import { useOptions } from '../../hooks/useOptions';
+import { getOfficeColumns } from './columns';
+import OfficeFormDialog from './components/OfficeFormDialog';
 import './Offices.scss';
 
 const officesData = new OfficesData();
@@ -299,30 +296,7 @@ const Offices = () => {
   });
 
   const columns = useMemo(
-    () => [
-      { field: 'officeCode', headerName: 'Code', width: 120 },
-      { field: 'officeName', headerName: 'Name', flex: 1, minWidth: 180 },
-      { field: 'officeTypeName', headerName: 'Type', width: 130 },
-      { field: 'city', headerName: 'City', width: 140 },
-      { field: 'parentOfficeName', headerName: 'Parent', width: 170 },
-      {
-        field: 'childCount',
-        headerName: 'Sub-offices',
-        width: 130,
-        sortable: false,
-      },
-      {
-        field: 'isActive',
-        headerName: 'Status',
-        width: 110,
-        sortable: false,
-        renderCell: (p) => {
-          const status = p.value ? 'Active' : 'Inactive';
-          return <StatusChip status={status} />;
-        },
-      },
-      actionColumn,
-    ],
+    () => getOfficeColumns(actionColumn),
     [actionColumn]
   );
 
@@ -423,96 +397,18 @@ const Offices = () => {
         onAction={handleActionClick}
       />
 
-      <CrudModal
+      <OfficeFormDialog
         isOpen={showModal}
         onClose={handleClose}
-        title={
-          isViewMode ? 'View Office' : editingOffice ? 'Edit Office' : 'Add Office'
-        }
         onSubmit={isViewMode ? () => {} : crudHandleSubmit}
         isSubmitting={isSubmitting}
-        submitText={isViewMode ? 'Close' : editingOffice ? 'Update' : 'Create'}
-        cancelText={isViewMode ? 'Close' : 'Cancel'}
-        disableSubmit={isViewMode}
-        size="lg"
-      >
-        <FormSection
-          title="Basic Information"
-          description="Office name, code, and type"
-        >
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <Input
-                label="Office Name"
-                value={formData.officeName || ''}
-                onChange={(e) => setFormField('officeName')(e.target.value)}
-                disabled={isViewMode}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Input
-                label="Office Code"
-                value={formData.officeCode || ''}
-                onChange={(e) => setFormField('officeCode')(e.target.value)}
-                disabled={isViewMode}
-                placeholder="Optional"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Select
-                label="Office Type"
-                value={formData.officeType || ''}
-                onChange={(e) => setFormField('officeType')(e.target.value)}
-                options={officeTypeOptions}
-                disabled={isViewMode}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Select
-                label="Parent Office"
-                value={formData.parentOfficeId || ''}
-                onChange={(e) =>
-                  setFormField('parentOfficeId')(e.target.value || null)
-                }
-                options={parentOfficeOptions}
-                disabled={isViewMode}
-              />
-            </Grid>
-          </Grid>
-        </FormSection>
-
-        <FormSection title="Location Details" description="City, address, and phone">
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <Input
-                label="City"
-                value={formData.city || ''}
-                onChange={(e) => setFormField('city')(e.target.value)}
-                disabled={isViewMode}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Input
-                label="Phone"
-                value={formData.phone || ''}
-                onChange={(e) => setFormField('phone')(e.target.value)}
-                disabled={isViewMode}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Input
-                label="Address"
-                value={formData.address || ''}
-                onChange={(e) => setFormField('address')(e.target.value)}
-                disabled={isViewMode}
-                multiline
-                rows={2}
-              />
-            </Grid>
-          </Grid>
-        </FormSection>
-      </CrudModal>
+        isViewMode={isViewMode}
+        editingRecord={editingOffice}
+        formData={formData}
+        setFormField={setFormField}
+        officeTypeOptions={officeTypeOptions}
+        parentOfficeOptions={parentOfficeOptions}
+      />
 
       <BulkActivateModal
         isOpen={showBulkActivateModal}

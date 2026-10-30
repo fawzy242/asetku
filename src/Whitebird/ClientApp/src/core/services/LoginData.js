@@ -1,4 +1,4 @@
-import { authApi } from '../api/auth.api';
+import { authApi } from '../api/api';
 import BaseData from './BaseData';
 
 class LoginData extends BaseData {

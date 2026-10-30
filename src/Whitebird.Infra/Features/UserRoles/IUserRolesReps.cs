@@ -16,9 +16,12 @@ public interface IUserRolesReps
     // ============================================================
     // VALIDATION HELPERS
     // ============================================================
+    //
+    // NOTE (P4-5): GetActiveUserCountForRoleAsync was removed — it had no callers
+    // and duplicated IRolesReps.GetUserCountAsync. Use IRolesReps for role-level
+    // user counts.
 
     Task<bool> HasActiveAssignmentAsync(int userId, int roleId);
-    Task<int> GetActiveUserCountForRoleAsync(int roleId);
 
     // ============================================================
     // WRITES

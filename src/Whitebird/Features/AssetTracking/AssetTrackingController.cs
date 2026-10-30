@@ -61,6 +61,11 @@ public class AssetTrackingController : ControllerBase
     // ID only in the route received 0 rows silently. The route is now bound
     // into the request before delegation, matching GetTrackingDetail /
     // GetTimeline / GetTransactionTypeStats / GetPhoto / GetAttachments.
+    //
+    // P3-2: The schedule type is supplied via the "scheduleType" query parameter
+    // (supported values: "handover", "return", "maintenance"). For backward
+    // compatibility, the legacy "search" query parameter continues to work as
+    // a fallback selector; new clients should use "scheduleType".
 
     [HttpGet("{assetId:int}/schedule-stats")]
     public async Task<IActionResult> GetScheduleStats(int assetId, [FromQuery] AssetTrackingGridRequest request)

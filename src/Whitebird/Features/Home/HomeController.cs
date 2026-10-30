@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Whitebird.App.Features.Common;
 using Whitebird.App.Features.Home;
 using Whitebird.Features.Common;
 
@@ -30,17 +29,5 @@ public class HomeController : ControllerBase
     /// <returns>Search results</returns>
     [HttpGet("search")]
     public async Task<IActionResult> Search([FromQuery] string keyword)
-    {
-        if (string.IsNullOrWhiteSpace(keyword))
-        {
-            return BadRequest(ServiceResult<object>.BadRequest("Keyword is required"));
-        }
-
-        if (keyword.Length < 2)
-        {
-            return BadRequest(ServiceResult<object>.BadRequest("Keyword must be at least 2 characters"));
-        }
-
-        return this.HandleResult(await _homeService.SearchAsync(keyword));
-    }
+        => this.HandleResult(await _homeService.SearchAsync(keyword));
 }

@@ -1,15 +1,15 @@
 // src/hooks/useReferenceData.js
 import { useQueries, useQueryClient } from '@tanstack/react-query';
-// FIX: Path yang benar - API modules sudah di-split
-import { 
-  categoryApi, 
-  supplierApi, 
-  employeeApi, 
-  departmentApi, 
-  officeApi, 
-  assetApi, 
-  transactionApi 
-} from '../core/api';
+import {
+  categoryApi,
+  supplierApi,
+  employeeApi,
+  departmentApi,
+  officeApi,
+  assetApi,
+  transactionApi,
+  rolesApi,
+} from '../core/api/api';
 
 const CACHE_KEYS = {
   CATEGORIES: ['reference', 'categories'],
@@ -25,6 +25,7 @@ const CACHE_KEYS = {
   OFFICE_TYPES: ['reference', 'officeTypes'],
   MAINTENANCE_TYPES: ['reference', 'maintenanceTypes'],
   ASSET_CONDITION_PURCHASES: ['reference', 'assetConditionPurchases'],
+  ROLES: ['reference', 'roles'],
 };
 
 const CACHE_STALE_TIME = 5 * 60 * 1000;
@@ -77,7 +78,7 @@ const fetchOffices = async () => {
 
 const fetchAssets = async () => {
   try {
-    const res = await assetApi.getGrid({ page: 1, pageSize: 1000 });
+    const res = await assetApi.getGrid({ page: 1, pageSize: 500 });
     const data = res.data?.data?.data || res.data?.data || res.data || [];
     return Array.isArray(data) ? data.map((a) => ({
       value: a.assetId,
@@ -155,6 +156,14 @@ const fetchAssetConditionPurchases = async () => {
   ];
 };
 
+const fetchRoles = async () => {
+  const res = await rolesApi.dropdown();
+  return (res.data?.data || []).map((r) => ({
+    value: r.roleId,
+    label: r.roleName,
+  }));
+};
+
 // ============================================================
 // MAIN HOOK
 // ============================================================
@@ -204,6 +213,11 @@ export const useReferenceData = () => {
         queryFn: fetchAssetConditionPurchases,
         staleTime: MASTER_DATA_STALE_TIME,
       },
+      {
+        queryKey: CACHE_KEYS.ROLES,
+        queryFn: fetchRoles,
+        staleTime: CACHE_STALE_TIME,
+      },
     ],
   });
 
@@ -221,6 +235,7 @@ export const useReferenceData = () => {
     officeTypes,
     maintenanceTypes,
     assetConditionPurchases,
+    roles,
   ] = results;
 
   const isLoading = results.some((r) => r.isLoading);
@@ -239,6 +254,8 @@ export const useReferenceData = () => {
     queryClient.invalidateQueries({ queryKey: CACHE_KEYS.OFFICES });
   const invalidateAssets = () =>
     queryClient.invalidateQueries({ queryKey: CACHE_KEYS.ASSETS });
+  const invalidateRoles = () =>
+    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.ROLES });
   const invalidateMasterData = () => {
     queryClient.invalidateQueries({ queryKey: ['reference', 'transactionTypes'] });
     queryClient.invalidateQueries({ queryKey: ['reference', 'conditions'] });
@@ -263,6 +280,7 @@ export const useReferenceData = () => {
     officeTypes: officeTypes.data || [],
     maintenanceTypes: maintenanceTypes.data || [],
     assetConditionPurchases: assetConditionPurchases.data || [],
+    roles: roles.data || [],
     isLoading,
     isError,
     invalidateAll,
@@ -272,6 +290,7 @@ export const useReferenceData = () => {
     invalidateDepartments,
     invalidateOffices,
     invalidateAssets,
+    invalidateRoles,
     invalidateMasterData,
   };
 };

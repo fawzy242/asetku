@@ -118,11 +118,10 @@ public class EmployeeController : ControllerBase
     // IMPORT
     // ============================================================
     //
-    // Pre-H7 this endpoint accepted any upload and let EPPlus throw on a
-    // non-Excel file, producing a 400 with the raw EPPlus exception text
-    // (information disclosure + inconsistent UX versus the Asset and
-    // AssetTransaction import endpoints). The extension guard below matches
-    // the pattern used in AssetController.Import and
+    // P1-1 FIX: EPPlus reads only the OpenXML .xlsx format. The previous
+    // "(.xlsx or .xls)" gate never matched reality — a valid .xls file reached
+    // ExcelPackage and threw, exposing the raw exception to the client. The
+    // gate is narrowed to .xlsx only, matching AssetController.Import and
     // AssetTransactionController.Import.
 
     [HttpPost("import")]
@@ -132,9 +131,9 @@ public class EmployeeController : ControllerBase
             return BadRequest("No file provided");
 
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (extension != ".xlsx" && extension != ".xls")
+        if (extension != ".xlsx")
         {
-            return BadRequest("Unsupported file format. Please upload Excel file (.xlsx or .xls).");
+            return BadRequest("Unsupported file format. Please upload an Excel Workbook (.xlsx).");
         }
 
         using var stream = file.OpenReadStream();

@@ -1,5 +1,4 @@
-import { employeeSummaryApi } from '../api/employeeSummary.api';
-import { employeeApi } from '../api/employee.api';
+import { employeeSummaryApi, employeeApi } from '../api/api';
 import BaseData from './BaseData';
 
 class EmployeeSummaryData extends BaseData {

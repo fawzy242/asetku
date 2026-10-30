@@ -28,6 +28,12 @@ namespace Whitebird.App.Features.FileAttachment;
 ///   check that accepts any extension from either allow-list (asset-attachment
 ///   OR profile-photo). The previous version hardcoded the asset-attachment list
 ///   and wrongly rejected .webp profile photos.
+///
+/// P2-1: DeleteAsync now removes the physical file after metadata soft-delete
+/// succeeds. Physical-delete failures are logged as warnings and do not roll
+/// back the metadata change. StorageService.DeleteFileAsync is idempotent, so
+/// missing files are a no-op. Every menu-level cascade (Asset/Employee/User/
+/// AssetTransaction) already delegates to this method, so no caller changes.
 /// </summary>
 public class FileAttachmentService : BaseService, IFileAttachmentService
 {
@@ -263,6 +269,20 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         }, "update file attachment");
     }
 
+    /// <summary>
+    /// Soft-deletes the attachment metadata and removes the physical file.
+    ///
+    /// Sequence:
+    ///   1. Load the row (to know FilePath and OriginalFileName for logging).
+    ///   2. Soft-delete metadata via <see cref="IFileAttachmentReps.DeleteAsync"/>.
+    ///   3. If metadata update succeeded, remove the physical file via
+    ///      <see cref="IStorageService.DeleteFileAsync"/>.
+    ///
+    /// Physical-file deletion failures are logged as warnings and do not roll back
+    /// the metadata change. StorageService.DeleteFileAsync is idempotent (no-op
+    /// when the file is already absent); the only failure mode is a filesystem
+    /// permission / IO error, which surfaces as a warning for operator follow-up.
+    /// </summary>
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -277,6 +297,22 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
 
             if (result > 0)
             {
+                // P2-1: remove the physical file now that metadata is soft-deleted.
+                // Failure here is non-fatal; the metadata row is already inactive,
+                // so a rollback would leave the system less consistent than a
+                // warning-logged orphan file.
+                try
+                {
+                    await _storageService.DeleteFileAsync(existing.FilePath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "Failed to delete physical file '{FilePath}' for FileAttachment {FileAttachmentId}. " +
+                        "Metadata has been soft-deleted; the file may remain on disk.",
+                        existing.FilePath, id);
+                }
+
                 await _activityLogService.LogDeleteAsync(
                     "FileAttachment",
                     id,
@@ -444,6 +480,8 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
             "EmployeePhotoProfile" => $"{baseUrl}/api/Employee/{referenceId}/photo",
             "AssetTransaction" => $"{baseUrl}/api/AssetTransaction/{referenceId}/attachments/{fileAttachmentId}/download",
             "AssetTransactionApprove" => $"{baseUrl}/api/AssetTransaction/{referenceId}/approve-attachments/{fileAttachmentId}/download",
+            // P1-2: user profile photo URL resolves to the User menu's own photo endpoint.
+            "UserPhotoProfile" => $"{baseUrl}/api/User/profile-photo",
             _ => null
         };
     }

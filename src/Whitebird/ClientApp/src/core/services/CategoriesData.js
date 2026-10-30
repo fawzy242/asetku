@@ -1,4 +1,4 @@
-import { categoryApi } from '../api/category.api';
+import { categoryApi } from '../api/api';
 import BaseData from './BaseData';
 
 class CategoriesData extends BaseData {

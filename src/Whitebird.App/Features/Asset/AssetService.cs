@@ -419,22 +419,14 @@ public class AssetService : BaseService, IAssetService
     }
 
     // ============================================================
-    // GRID
+    // GRID (P3-1 — request passed straight through)
     // ============================================================
 
     public async Task<ServiceResult<PaginatedResult<AssetListView>>> GetGridDataAsync(AssetGridRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
         {
-            var filters = new Dictionary<string, object>();
-            if (!string.IsNullOrEmpty(request.Status)) filters["status"] = request.Status;
-            if (request.CategoryId.HasValue) filters["categoryId"] = request.CategoryId.Value;
-            if (request.SupplierId.HasValue) filters["supplierId"] = request.SupplierId.Value;
-            if (request.IsActive.HasValue) filters["isActive"] = request.IsActive.Value;
-
-            var result = await _assetReps.GetPagedListAsync(
-                request.Page, request.PageSize, request.Search, request.SortBy, request.SortDescending, filters);
-
+            var result = await _assetReps.GetPagedListAsync(request);
             return ServiceResult<PaginatedResult<AssetListView>>.Success(result);
         }, "get asset grid data");
     }

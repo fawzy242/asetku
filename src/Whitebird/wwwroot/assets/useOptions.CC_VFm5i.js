@@ -1,0 +1,1 @@
+import{r as t}from"./utils-vendor.H9aHdec8.js";const v=(n,p="Select...",r="value",s="label",o=null)=>t.useMemo(()=>{const c=[{value:"",label:p}];return!n||!Array.isArray(n)||n.forEach(u=>{const f=u[r]!==void 0?u[r]:u.value;let e=u[s]!==void 0?u[s]:u.label;o&&typeof o=="function"&&(e=o(u)),c.push({value:f,label:e})}),c},[n,p,r,s,o]);export{v as u};
