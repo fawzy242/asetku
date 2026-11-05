@@ -1,0 +1,62 @@
+Nama: Fawzy Imam Hamdani Gunamukti
+
+Secara dasar, Quality Assurance (QA) dan Quality Control (QC) seringkali dipertukarkan dalam praktik, padahal mereka punya fokus berbeda. QA berorientasi proses dan preventif; sedangkan QC lebih ke produk dan detektif. QA mencoba meningkatkan dan menstandarisasi proses supaya perangkat lunak dibangun dengan cara yang benar sejak awal—menjaga “doing the right things.” Tujuannya? Mencegah bug muncul, bukan hanya mencarinya setelah terjadi. QC, di sisi lain, memeriksa produk akhir atau deliverable untuk memastikan sudah memenuhi standar dan kebutuhan pengguna—“verifying the product is built right.” Jadi QC bersifat reaktif terhadap hasil kerja.
+
+Contoh nyata di industri: Dari pengalaman saya sebagai developer, QA terlihat lewat penetapan coding standards (misalnya, penggunaan linter seperti ESLint di pipeline CI/CD), alur kerja Pull Request (PR) dan Code Review wajib, serta metodologi Agile dengan Definition of Done (DoD) yang jelas. QA memastikan ada guardrails di lingkungan pengembangan sehingga developer tidak mudah memasukkan kode cacat ke basis kode utama.
+
+Contoh lain: QC diwujudkan lewat aktivitas Software Testing yang dilakukan oleh QA Engineer atau developer itu sendiri. Misalnya, eksekusi Automated Regression Testing menggunakan Selenium atau Playwright setiap kali ada commit, User Acceptance Testing (UAT) oleh product owner, atau pelaporan bug di Jira ketika ditemukan perilaku yang tidak sesuai dengan acceptance criteria.
+
+Kegagalan proyek karena menumpuk bug di tahap akhir (fase testing atau release) adalah gejala klasik dari penerapan mentalitas Waterfall pada siklus pengembangan yang seharusnya iteratif, atau lemahnya budaya continuous feedback.
+
+Evaluasi dari sudut pandang SQA:
+
+Dari kacamata SQA, ini jelas merupakan kegagalan dalam kontrol proses. Jika bug baru ditemukan di tahap akhir, biaya perbaikannya (Cost of Quality) akan jadi sangat mahal. Ini mengindikasikan beberapa masalah utama:
+
+Pertama, tidak ada Shift-Left Testing. Aktivitas testing dan quality check tidak dilakukan sejak fase requirement dan design. Developer cenderung hanya fokus menulis kode, dan tester baru dilibatkan di akhir. Kedua, ketiadaan Automated Testing membuat proses regresi dilakukan secara manual. Ini tidak efisien dan rawan kelalaian (human error), yang menyebabkan bug lama muncul kembali. Ketiga, adanya Silo Mentality. Terjadi ketidakselarasan antara developer dan tester. Developer merasa tugasnya selesai setelah kode di-push, tanpa memverifikasi melalui unit test yang komprehensif.
+
+Solusinya? Implementasi Shift-Left Testing dan TDD. Kita perlu mendorong developer untuk menulis unit test (Test-Driven Development) sebelum atau bersamaan dengan menulis kode fungsional. Ini sejalan dengan prinsip Test Pyramid, di mana mayoritas pengujian adalah unit test yang cepat dan murah. Selain itu, bangun CI/CD Pipeline yang kuat. Setiap commit harus memicu pipeline otomatis yang menjalankan linter, static analysis (seperti SonarQube), dan automated test. Jika gagal, kode tidak boleh di-merge. Terakhir, Kolaborasi Tiga Arah (Three Amigos). Libatkan QA/Testers dalam sesi perencanaan (Sprint Planning) bersama Product Owner dan Developer untuk mendefinisikan Acceptance Criteria yang testable sejak awal, sehingga ekspektasi kualitas jelas.
+
+Sebuah SQA Plan berfungsi sebagai peta jalan untuk memastikan kualitas produk. Untuk sistem informasi akademik (yang melibatkan data sensitif mahasiswa, nilai, dan transaksi keuangan), fokus utama harus pada Keamanan (Security), Integritas Data, dan Performa.
+
+Berikut kerangka SQA Plan yang menurut saya aplikatif:
+
+Tujuan dan Ruang Lingkup (Objectives & Scope)
+Menjamin sistem akademik bebas dari celah keamanan kritis (SQL Injection, XSS). Memastikan waktu respons sistem di bawah 2 detik pada saat periode KRS (puncak trafik). Cakupannya meliputi Modul Login, KRS, Input Nilai, dan Portal Pembayaran.
+
+Standar dan Metrik Kualitas (Quality Standards & Metrics)
+Defect Density: Maksimal 1 bug kritis per 1000 baris kode. Code Coverage: Minimal 80% untuk unit testing pada business logic. Uptime: 99.9% selama masa aktif akademik.
+- Unit Testing: Menggunakan Jest/PHPUnit untuk validasi logika kalkulasi IPK dan validasi input.
+- Integration Testing: Menguji integrasi API sistem akademik dengan payment gateway.
+- Performance & Load Testing: Menggunakan JMeter untuk simulasi 5000 mahasiswa mengakses KRS secara bersamaan.
+- Security Testing: Penetration testing untuk modul autentikasi (OAuth/JWT) dan otorisasi peran (RBAC).
+- UAT (User Acceptance Testing): Dilakukan oleh perwakilan staf akademik dan mahasiswa.
+
+Alat dan Lingkungan (Tools & Environment)
+Issue Tracking: Jira atau Trello. CI/CD: GitLab CI atau Jenkins (otomatisasi eksekusi test saat deploy ke staging environment).
+
+Peran dan Tanggung Jawab (Roles & Responsibilities)
+QA Lead: Menyusun strategi tes dan mengelola lingkungan staging. Developers: Menulis unit test dan memperbaiki bug. Security Engineer: Melakukan vulnerability assessment.
+
+Di lingkungan startup yang menggunakan Agile, QA tidak boleh diposisikan sebagai "polisi" di akhir sprint. Sebaliknya, mereka harus menjadi bagian inheren dari tim yang bersifat cross-functional. Sebagai QA Lead, strategi saya adalah mengintegrasikan kualitas ke dalam ritme sprint.
+
+Test Estimation: Saya akan memastikan setiap user story memiliki Acceptance Criteria yang jelas dan terukur. Tim QA akan mengestimasi effort untuk menulis automation test atau melakukan manual exploratory testing. Definition of Done (DoD): Kualitas harus didefinisikan dalam DoD. Contoh DoD: "Sebuah story dianggap selesai jika sudah melalui code review, lulus unit test dengan coverage >80%, dan lulus smoke test di staging."
+
+Daily stand-up bukan hanya tentang progress koding, tetapi juga tentang hambatan kualitas. Sebagai QA Lead, saya akan mendorong developer untuk melaporkan status testing mereka, bukan hanya status coding. Pertanyaan kuncinya: "Apakah ada blocker pada environment testing?", "Apakah automated test ada yang gagal di pipeline hari ini?", atau "Apakah ada bug baru yang berpotensi menunda release?"
+
+Continuous Testing: Di startup, kecepatan adalah kunci. Saya akan mengedepankan otomatisasi regression test dan API testing. QA tidak lagi menunggu build final, tetapi menguji fitur segera setelah di-deploy ke staging (Continuous Deployment). Exploratory Testing: Alokasikan waktu di akhir sprint untuk tester melakukan exploratory testing guna menemukan edge cases yang tidak terdeteksi oleh otomatisasi, memastikan pengalaman pengguna (UX) tetap mulus.
+
+Skenario: Pengembangan fitur "Checkout dan Pembayaran" pada aplikasi mobile e-commerce. Fitur ini memiliki risiko bisnis dan teknis yang sangat tinggi (kebocoran data, kegagalan transaksi). Ketiga teknik ini harus dijalankan secara berlapis (layered approach).
+
+1. Code Review (Fase Development - Quality Assurance)
+Setelah developer menyelesaikan logika integrasi dengan API pembayaran, mereka membuat Pull Request (PR). Peer developer atau Senior Engineer melakukan Code Review dengan fokus pada: penanganan error (bagaimana jika koneksi putus saat transaksi?), keamanan (apakah token disimpan dengan aman di local storage?), dan kepatuhan terhadap coding standard. Tujuannya sederhana: mencegah bug logis dan celah keamanan masuk ke basis kode.
+
+2. Unit Test (Fase CI Pipeline - Quality Control)
+Setelah PR di-merge, pipeline CI/CD berjalan. Developer telah menulis Unit Test untuk fungsi-fungsi terisolasi, seperti fungsi kalkulasi ongkos kirim, validasi format kartu kredit, atau parsing response JSON dari payment gateway. Tujuannya adalah memastikan blok bangunan terkecil dari fitur bekerja dengan benar secara matematis dan logis tanpa harus menjalankan aplikasi secara utuh. Jika unit test gagal, build dihentikan.
+
+3. Risk-Based Testing (Fase QA/Staging - Quality Control)
+Fitur lolos unit test dan di-deploy ke staging. Karena sumber daya waktu terbatas, QA tidak menguji seluruh aplikasi secara buta. Kita menerapkan Risk-Based Testing.
+- Identifikasi Risiko: Risiko tertinggi ada pada transaksi finansial dan keamanan data.
+- High Risk (Wajib Ekstensif): Pengujian end-to-end menggunakan akun sandbox (misal: Stripe/Midtrans). Menguji skenario gagal bayar, timeout jaringan, dan double charge. Dilakukan secara otomatis (Appium) dan manual.
+- Low Risk (Smoke Test): Pengujian UI/UX ringan pada halaman ringkasan pesanan.
+Tujuannya adalah memfokuskan upaya testing pada area yang jika gagal akan memberikan dampak kerugian finansial dan reputasi terbesar bagi perusahaan.
+See less ↑

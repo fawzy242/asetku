@@ -1,3 +1,5 @@
+using Whitebird.Domain.Features.FileAttachment;
+
 namespace Whitebird.Domain.Features.Asset;
 
 /// <summary>
@@ -80,24 +82,30 @@ public class AssetDetailView
     // ============================================================
     // Photo Profile & Attachments
     // ============================================================
+    /// <summary>
+    /// Relative URL to the Asset photo endpoint
+    /// (e.g. "/api/Asset/1/photo"). Null when no active photo exists.
+    /// Populated by AssetService via FileResourceUrlResolver — never
+    /// constructed here.
+    /// </summary>
     public string? PhotoProfileUrl { get; set; }
+
+    /// <summary>
+    /// Asset attachments. Each entry's DownloadUrl is populated by
+    /// AssetService via FileResourceUrlResolver.
+    /// </summary>
     public List<AssetAttachmentViewDto> Attachments { get; set; } = new();
 }
 
 /// <summary>
-/// DTO for asset attachment in detail view
+/// DTO for asset attachment in detail view.
+/// Inherits the standardized FileResourceDto shape (FileName,
+/// OriginalFileName, FileCategory, ContentType, FileSize, IsPrimary, Order,
+/// DownloadUrl, CreatedDate, and the temporary FileUrl alias).
 /// </summary>
-public class AssetAttachmentViewDto
+public class AssetAttachmentViewDto : FileResourceDto
 {
     public int AssetAttachmentId { get; set; }
-    public int FileAttachmentId { get; set; }
-    public string FileName { get; set; } = string.Empty;
-    public string OriginalFileName { get; set; } = string.Empty;
-    public string? FileUrl { get; set; }
-    public string? FileCategory { get; set; }
-    public bool IsPrimary { get; set; }
-    public int Order { get; set; }
-    public DateTime CreatedDate { get; set; }
 }
 
 /// <summary>

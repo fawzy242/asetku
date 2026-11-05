@@ -47,10 +47,6 @@ public class EmployeeSummaryController : ControllerBase
     // ============================================================
     // CURRENT HOLDING — route employeeId is the source of truth
     // ============================================================
-    //
-    // Pre-H7 the {employeeId:int} route parameter was declared but ignored; the
-    // service read request.EmployeeId from the querystring. Route-only clients
-    // received 0 rows. The route is now bound into the request before delegation.
 
     [HttpGet("{employeeId:int}/current-holding")]
     public async Task<IActionResult> GetCurrentHolding(int employeeId, [FromQuery] EmployeeSummaryGridRequest request)
@@ -116,6 +112,7 @@ public class EmployeeSummaryController : ControllerBase
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
 
+        Response.Headers["Cache-Control"] = "private, max-age=60, must-revalidate";
         return File(result.Data.Bytes, result.Data.ContentType);
     }
 

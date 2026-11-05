@@ -70,12 +70,6 @@ public class AssetController : ControllerBase
     // ============================================================
     // IMPORT
     // ============================================================
-    //
-    // H9: EPPlus reads only the OpenXML .xlsx format. It has never supported
-    // the legacy BIFF8 .xls binary format, so the previous "(.xlsx or .xls)"
-    // promise never matched reality — a valid .xls file reached ExcelPackage
-    // and threw, exposing the raw exception to the client. Narrowing the gate
-    // to .xlsx makes the promise truthful.
 
     [HttpPost("import")]
     public async Task<IActionResult> Import(IFormFile file)
@@ -151,6 +145,9 @@ public class AssetController : ControllerBase
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
 
+        // Private caching: asset photos are business data. Short TTL so a
+        // replacement photo shows up within a minute; must-revalidate after.
+        Response.Headers["Cache-Control"] = "private, max-age=60, must-revalidate";
         return File(result.Data.Bytes, result.Data.ContentType);
     }
 
@@ -200,6 +197,8 @@ public class AssetController : ControllerBase
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
 
+        // Private caching: attachments may contain sensitive documents.
+        Response.Headers["Cache-Control"] = "private, max-age=3600, must-revalidate";
         return File(result.Data.Bytes, result.Data.ContentType, result.Data.FileName);
     }
 }

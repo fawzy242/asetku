@@ -8,7 +8,12 @@ using Whitebird.Infra.Features.Common;
 namespace Whitebird.Infra.Features.EmployeeSummary;
 
 /// <summary>
-/// Repository implementation for Employee Summary operations using Dapper
+/// Repository implementation for Employee Summary operations using Dapper.
+///
+/// URL contract: this repository returns metadata only. URL construction
+/// (photo profile, attachment downloads) is the Application layer's
+/// responsibility — see <c>EmployeeSummaryService.GetSummaryAsync</c> which
+/// uses <c>FileResourceUrlResolver</c> after this call returns.
 /// </summary>
 public class EmployeeSummaryReps : IEmployeeSummaryReps
 {
@@ -49,12 +54,11 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
     }
 
     // ============================================================
-    // COMPLETE SUMMARY — FIX: Hapus ORDER BY yang tidak valid
+    // COMPLETE SUMMARY
     // ============================================================
     //
-    // P3-4: PositionName / EmploymentStatusName / JoinDate / ResignDate are now
-    // read from the enriched GetEmployeeDataAsync result — the four sequential
-    // helper methods that used to serve them have been removed.
+    // URL fields (PhotoProfileUrl, each attachment's DownloadUrl) are left
+    // null here; the Application layer enriches them via FileResourceUrlResolver.
 
     public async Task<EmployeeSummaryView?> GetSummaryAsync(int employeeId)
     {
@@ -66,7 +70,6 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
         var assetsHistory = await GetAssetsHistoryAsync(new EmployeeSummaryGridRequest { EmployeeId = employeeId, Page = 1, PageSize = 100 });
         var transactionHistory = await GetTransactionHistoryAsync(new EmployeeSummaryGridRequest { EmployeeId = employeeId, Page = 1, PageSize = 100 });
         var attachments = await GetAttachmentsByEmployeeIdAsync(employeeId);
-        var photoProfile = await GetPhotoProfileByEmployeeIdAsync(employeeId);
 
         return new EmployeeSummaryView
         {
@@ -79,7 +82,8 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
             JoinDate = employee.JoinDate,
             ResignDate = employee.ResignDate,
             IsActive = employee.IsActive,
-            PhotoProfileUrl = photoProfile?.FileUrl,
+            // Enriched by EmployeeSummaryService.GetSummaryAsync.
+            PhotoProfileUrl = null,
             Attachments = attachments.ToList(),
             Stats = stats,
             CurrentHolding = currentHolding.Data.ToList(),
@@ -529,38 +533,49 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
     // ============================================================
     // ATTACHMENTS
     // ============================================================
+    //
+    // Metadata only. URLs are enriched by EmployeeSummaryService.GetSummaryAsync
+    // via FileResourceUrlResolver. The EmployeeSummary menu reuses the Employee
+    // menu's attachment download endpoint.
 
     public async Task<IEnumerable<EmployeeSummaryAttachmentDto>> GetAttachmentsByEmployeeIdAsync(int employeeId)
     {
-        // EmployeeSummary is a read-only view over the Employee resource. Attachment
-        // URLs resolve to the Employee menu's own download endpoint — FileAttachment
-        // has no HTTP surface of its own.
         const string sql = @"
             SELECT 
-                fa.FileAttachmentId, fa.FileName, fa.OriginalFileName, fa.FileCategory, fa.IsPrimary,
-                '/api/Employee/' + CAST(ea.EmployeeId AS VARCHAR) + '/attachments/' + CAST(fa.FileAttachmentId AS VARCHAR) + '/download' as FileUrl
+                fa.FileAttachmentId,
+                fa.FileName,
+                fa.OriginalFileName,
+                fa.FileCategory,
+                fa.FileMimeType as ContentType,
+                fa.FileSize,
+                fa.IsPrimary,
+                ea.[Order]
             FROM EmployeeAttachment ea
             INNER JOIN FileAttachment fa ON ea.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE ea.EmployeeId = @EmployeeId AND ea.IsActive = 1
-            ORDER BY ea.Order ASC, fa.CreatedDate DESC";
+            ORDER BY ea.[Order] ASC, fa.CreatedDate DESC";
 
         return await _context.QueryAsync<EmployeeSummaryAttachmentDto>(sql, new { EmployeeId = employeeId });
     }
 
+    /// <summary>
+    /// Returns the metadata of the employee's active photo profile (if any).
+    /// URL is not populated here — the Application layer resolves it via
+    /// <c>FileResourceUrlResolver.ResolvePhotoUrl(FileOwner.EmployeePhotoProfile, employeeId)</c>.
+    /// </summary>
     public async Task<EmployeeSummaryAttachmentDto?> GetPhotoProfileByEmployeeIdAsync(int employeeId)
     {
-        // Employee photo resolves to the Employee menu's own photo endpoint
-        // (GET /api/Employee/{id}/photo).
-        //
-        // P0-2 FIX: This query previously referenced the non-existent table
-        // "EmployeePhotoAttachment". The actual table created by migration
-        // 20260713205151_CreateTableEmployeePhotoProfileAttachment is
-        // "EmployeePhotoProfileAttachment" and is the one used by EmployeeReps
-        // (GetPhotoProfileByEmployeeIdAsync) and by EmployeeService.
+        // P0-2 FIX (retained): table name is EmployeePhotoProfileAttachment
+        // (per migration 20260713205151_CreateTableEmployeePhotoProfileAttachment).
         const string sql = @"
             SELECT TOP 1
-                fa.FileAttachmentId, fa.FileName, fa.OriginalFileName, fa.FileCategory, fa.IsPrimary,
-                '/api/Employee/' + CAST(eppa.EmployeeId AS VARCHAR) + '/photo' as FileUrl
+                fa.FileAttachmentId,
+                fa.FileName,
+                fa.OriginalFileName,
+                fa.FileCategory,
+                fa.FileMimeType as ContentType,
+                fa.FileSize,
+                fa.IsPrimary
             FROM EmployeePhotoProfileAttachment eppa
             INNER JOIN FileAttachment fa ON eppa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE eppa.EmployeeId = @EmployeeId AND eppa.IsActive = 1

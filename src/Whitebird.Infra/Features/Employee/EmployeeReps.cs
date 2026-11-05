@@ -71,6 +71,12 @@ public class EmployeeReps : IEmployeeReps
     // GET METHODS - return View
     // ============================================================
 
+    /// <summary>
+    /// Returns employee metadata and attachment list. URL construction (photo
+    /// profile, attachment downloads) is the Application layer's responsibility
+    /// — see <c>EmployeeService.GetByIdAsync</c> which uses
+    /// <c>FileResourceUrlResolver</c> after this call returns.
+    /// </summary>
     public async Task<EmployeeDetailView?> GetDetailByIdAsync(int employeeId)
     {
         const string sql = @"
@@ -91,43 +97,28 @@ public class EmployeeReps : IEmployeeReps
         WHERE e.EmployeeId = @EmployeeId";
 
         var result = await _context.QueryFirstOrDefaultAsync<EmployeeDetailView>(sql, new { EmployeeId = employeeId });
+        if (result == null) return null;
 
-        if (result != null)
-        {
-            var photoSql = @"
-            SELECT TOP 1
-                fa.FileAttachmentId,
-                '/api/Employee/' + CAST(eppa.EmployeeId AS VARCHAR) + '/photo' as FileUrl
-            FROM EmployeePhotoProfileAttachment eppa
-            INNER JOIN FileAttachment fa ON eppa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
-            WHERE eppa.EmployeeId = @EmployeeId AND eppa.IsActive = 1
-            ORDER BY fa.IsPrimary DESC, fa.CreatedDate DESC";
+        // Attachments metadata only — no URL column.
+        const string attSql = @"
+        SELECT 
+            ea.EmployeeAttachmentId,
+            ea.FileAttachmentId,
+            fa.FileName,
+            fa.OriginalFileName,
+            fa.FileCategory,
+            fa.FileMimeType as ContentType,
+            fa.FileSize,
+            fa.IsPrimary,
+            ea.[Order],
+            ea.CreatedDate
+        FROM EmployeeAttachment ea
+        INNER JOIN FileAttachment fa ON ea.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
+        WHERE ea.EmployeeId = @EmployeeId AND ea.IsActive = 1
+        ORDER BY ea.[Order] ASC, fa.CreatedDate DESC";
 
-            var photo = await _context.QueryFirstOrDefaultAsync<dynamic>(photoSql, new { EmployeeId = employeeId });
-            if (photo != null)
-            {
-                result.PhotoProfileUrl = photo.FileUrl;
-            }
-
-            var attSql = @"
-            SELECT 
-                ea.EmployeeAttachmentId,
-                ea.FileAttachmentId,
-                fa.FileName,
-                fa.OriginalFileName,
-                fa.FileCategory,
-                fa.IsPrimary,
-                ea.[Order],
-                ea.CreatedDate,
-                '/api/Employee/' + CAST(ea.EmployeeId AS VARCHAR) + '/attachments/' + CAST(fa.FileAttachmentId AS VARCHAR) + '/download' as FileUrl
-            FROM EmployeeAttachment ea
-            INNER JOIN FileAttachment fa ON ea.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
-            WHERE ea.EmployeeId = @EmployeeId AND ea.IsActive = 1
-            ORDER BY ea.[Order] ASC, fa.CreatedDate DESC";
-
-            var attachments = await _context.QueryAsync<EmployeeAttachmentViewDto>(attSql, new { EmployeeId = employeeId });
-            result.Attachments = attachments.ToList();
-        }
+        var attachments = await _context.QueryAsync<EmployeeAttachmentViewDto>(attSql, new { EmployeeId = employeeId });
+        result.Attachments = attachments.ToList();
 
         return result;
     }

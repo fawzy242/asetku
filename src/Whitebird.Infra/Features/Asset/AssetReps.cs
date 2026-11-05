@@ -44,8 +44,6 @@ public class AssetReps : IAssetReps
     // ============================================================
     // HARD-DELETE FK GUARDS
     // ============================================================
-    // No IsActive filter on any of these: FKs fire for any dependent row
-    // regardless of whether the row has been soft-deleted.
 
     public async Task<int> GetAssetTransactionCountAsync(int assetId)
     {
@@ -75,6 +73,12 @@ public class AssetReps : IAssetReps
     // GET METHODS - return View
     // ============================================================
 
+    /// <summary>
+    /// Returns asset metadata and attachment list. URL construction (photo
+    /// profile, attachment downloads) is the Application layer's responsibility
+    /// — see <c>AssetService.GetByIdAsync</c> which uses
+    /// <c>FileResourceUrlResolver</c> after this call returns.
+    /// </summary>
     public async Task<AssetDetailView?> GetDetailByIdAsync(int assetId)
     {
         const string sql = @"
@@ -96,43 +100,28 @@ public class AssetReps : IAssetReps
         WHERE a.AssetId = @AssetId";
 
         var result = await _context.QueryFirstOrDefaultAsync<AssetDetailView>(sql, new { AssetId = assetId });
+        if (result == null) return null;
 
-        if (result != null)
-        {
-            var photoSql = @"
-            SELECT TOP 1
-                fa.FileAttachmentId,
-                '/api/Asset/' + CAST(appa.AssetId AS VARCHAR) + '/photo' as FileUrl
-            FROM AssetPhotoProfileAttachment appa
-            INNER JOIN FileAttachment fa ON appa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
-            WHERE appa.AssetId = @AssetId AND appa.IsActive = 1
-            ORDER BY fa.IsPrimary DESC, fa.CreatedDate DESC";
+        // Attachments metadata only — no URL column.
+        const string attSql = @"
+        SELECT 
+            aa.AssetAttachmentId,
+            aa.FileAttachmentId,
+            fa.FileName,
+            fa.OriginalFileName,
+            fa.FileCategory,
+            fa.FileMimeType as ContentType,
+            fa.FileSize,
+            fa.IsPrimary,
+            aa.[Order],
+            aa.CreatedDate
+        FROM AssetAttachment aa
+        INNER JOIN FileAttachment fa ON aa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
+        WHERE aa.AssetId = @AssetId AND aa.IsActive = 1
+        ORDER BY aa.[Order] ASC, fa.CreatedDate DESC";
 
-            var photo = await _context.QueryFirstOrDefaultAsync<dynamic>(photoSql, new { AssetId = assetId });
-            if (photo != null)
-            {
-                result.PhotoProfileUrl = photo.FileUrl;
-            }
-
-            var attSql = @"
-            SELECT 
-                aa.AssetAttachmentId,
-                aa.FileAttachmentId,
-                fa.FileName,
-                fa.OriginalFileName,
-                fa.FileCategory,
-                fa.IsPrimary,
-                aa.[Order],
-                aa.CreatedDate,
-                '/api/Asset/' + CAST(aa.AssetId AS VARCHAR) + '/attachments/' + CAST(fa.FileAttachmentId AS VARCHAR) + '/download' as FileUrl
-            FROM AssetAttachment aa
-            INNER JOIN FileAttachment fa ON aa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
-            WHERE aa.AssetId = @AssetId AND aa.IsActive = 1
-            ORDER BY aa.[Order] ASC, fa.CreatedDate DESC";
-
-            var attachments = await _context.QueryAsync<AssetAttachmentViewDto>(attSql, new { AssetId = assetId });
-            result.Attachments = attachments.ToList();
-        }
+        var attachments = await _context.QueryAsync<AssetAttachmentViewDto>(attSql, new { AssetId = assetId });
+        result.Attachments = attachments.ToList();
 
         return result;
     }
@@ -228,16 +217,8 @@ public class AssetReps : IAssetReps
     }
 
     // ============================================================
-    // PAGINATION (P3-1 — GridQueryBuilder)
+    // PAGINATION
     // ============================================================
-    //
-    // Parameters needed by the status CASE-mapping in the SELECT clause and by
-    // the status-filter conditions are bound once up front. All simple filters
-    // (IsActive, CategoryId, SupplierId) and the search + paging + order by
-    // go through GridQueryBuilder so this repository matches every other one.
-    //
-    // Sort column: if SortBy is unqualified ("AssetCode"), we prefix it with
-    // "a." so the query resolves unambiguously against the aliased table.
 
     public async Task<PaginatedResult<AssetListView>> GetPagedListAsync(AssetGridRequest request)
     {
@@ -256,7 +237,6 @@ public class AssetReps : IAssetReps
         parameters.Add("@MaintenanceType", maintenanceType);
         parameters.Add("@DisposalType", disposalType);
 
-        // Status filter — business-specific EXISTS/NOT EXISTS logic
         if (!string.IsNullOrWhiteSpace(request.Status))
         {
             switch (request.Status)
@@ -314,12 +294,10 @@ public class AssetReps : IAssetReps
             }
         }
 
-        // Simple filters via GridQueryBuilder (consistent with every other repo)
         GridQueryBuilder.AddEqualsFilter(conditions, parameters, "a.IsActive", request.IsActive);
         GridQueryBuilder.AddEqualsFilter(conditions, parameters, "a.CategoryId", request.CategoryId);
         GridQueryBuilder.AddEqualsFilter(conditions, parameters, "a.SupplierId", request.SupplierId);
 
-        // Search via GridQueryBuilder
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var searchColumns = new[] { "a.AssetCode", "a.AssetName", "a.SerialNumber", "a.Brand", "a.Model" };
@@ -328,7 +306,6 @@ public class AssetReps : IAssetReps
 
         var whereClause = GridQueryBuilder.BuildWhereClause(conditions, parameters);
 
-        // Sort column: qualify with "a." if unqualified
         var sortBy = request.SortBy;
         if (!string.IsNullOrEmpty(sortBy) && !sortBy.Contains('.'))
         {

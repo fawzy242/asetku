@@ -16,6 +16,17 @@ using Whitebird.Infra.Features.Employee;
 
 namespace Whitebird.App.Features.Employee;
 
+/// <summary>
+/// Service implementation for Employee business logic.
+///
+/// URL contract:
+///   * <c>EmployeeDetailView.PhotoProfileUrl</c> is a RELATIVE URL produced by
+///     <see cref="FileResourceUrlResolver"/>; it is null when no active photo
+///     exists.
+///   * Each attachment's <c>DownloadUrl</c> is a relative URL produced by
+///     <see cref="FileResourceUrlResolver"/>.
+///   * Photo bytes are streamed via the shared <see cref="IFileAttachmentService.DownloadAsync"/>.
+/// </summary>
 public class EmployeeService : BaseService, IEmployeeService
 {
     private readonly ICommonReps _repository;
@@ -23,7 +34,6 @@ public class EmployeeService : BaseService, IEmployeeService
     private readonly IOfficeService _officeService;
     private readonly IDepartmentService _departmentService;
     private readonly IMasterDataService _masterDataService;
-    private readonly IStorageService _storageService;
     private readonly IFileAttachmentService _fileAttachmentService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
@@ -34,7 +44,6 @@ public class EmployeeService : BaseService, IEmployeeService
         IOfficeService officeService,
         IDepartmentService departmentService,
         IMasterDataService masterDataService,
-        IStorageService storageService,
         IFileAttachmentService fileAttachmentService,
         ICurrentUserService currentUserService,
         IActivityLogService activityLogService,
@@ -45,7 +54,6 @@ public class EmployeeService : BaseService, IEmployeeService
         _officeService = officeService;
         _departmentService = departmentService;
         _masterDataService = masterDataService;
-        _storageService = storageService;
         _fileAttachmentService = fileAttachmentService;
         _currentUserService = currentUserService;
         _activityLogService = activityLogService;
@@ -62,6 +70,19 @@ public class EmployeeService : BaseService, IEmployeeService
             var employee = await _employeeReps.GetDetailByIdAsync(id);
             if (employee == null)
                 return ServiceResult<EmployeeDetailView>.NotFound($"Employee with id {id} not found");
+
+            // Enrich relative URLs — repositories return metadata only.
+            var photoProfile = await _employeeReps.GetPhotoProfileByEmployeeIdAsync(id);
+            employee.PhotoProfileUrl = photoProfile != null
+                ? FileResourceUrlResolver.ResolvePhotoUrl(FileOwner.EmployeePhotoProfile, id)
+                : null;
+
+            foreach (var att in employee.Attachments)
+            {
+                att.DownloadUrl = FileResourceUrlResolver.ResolveDownloadUrl(
+                    FileOwner.Employee, id, att.FileAttachmentId);
+            }
+
             return ServiceResult<EmployeeDetailView>.Success(employee);
         }, "get employee by id");
     }
@@ -145,10 +166,6 @@ public class EmployeeService : BaseService, IEmployeeService
 
         if (await _employeeReps.IsEmployeeCodeExistsAsync(model.EmployeeCode, id))
             return ServiceResult<EmployeeDetailView>.Conflict($"Employee code '{model.EmployeeCode}' already exists");
-
-        // P4-9: email format is enforced by [EmailAddress] on EmployeeUpdateFormDto
-        // via ControllerHelper.HandleModelState before this service is reached.
-        // The previous manual regex block was redundant and has been removed.
 
         if (model.DepartmentId.HasValue && model.DepartmentId.Value > 0)
         {
@@ -255,12 +272,6 @@ public class EmployeeService : BaseService, IEmployeeService
     // DELETE
     // ============================================================
 
-    /// <summary>
-    /// Determines whether the employee can be hard-deleted. Blocks on
-    /// AssetTransaction and ScheduleHandover/Return dependents (business records).
-    /// Attachments / photo profile are cascaded by
-    /// <see cref="CascadeDeleteDependentsAsync"/>.
-    /// </summary>
     private async Task<string?> GetDeleteBlockReasonAsync(int id)
     {
         var transactionCount = await _employeeReps.GetAssetTransactionCountAsync(id);
@@ -278,11 +289,6 @@ public class EmployeeService : BaseService, IEmployeeService
         return null;
     }
 
-    /// <summary>
-    /// Hard-deletes the employee's dependent attachment rows (join rows only;
-    /// FileAttachment metadata is soft-deleted first, matching the pattern used
-    /// in UpdateAsync). Runs inside the caller's transaction.
-    /// </summary>
     private async Task CascadeDeleteDependentsAsync(int id)
     {
         var attachments = await _employeeReps.GetAttachmentsByEmployeeIdAsync(id);
@@ -507,19 +513,10 @@ public class EmployeeService : BaseService, IEmployeeService
             var photo = await _employeeReps.GetPhotoProfileByEmployeeIdAsync(employeeId);
             if (photo == null) return ServiceResult<FileContentDto>.NotFound("Profile photo not found");
 
-            var fileResult = await _fileAttachmentService.GetByIdAsync(photo.FileAttachmentId);
-            if (!fileResult.IsSuccess || fileResult.Data == null)
-                return ServiceResult<FileContentDto>.NotFound("Profile photo file not found");
-
-            var fileBytes = await _storageService.ReadFileAsync(fileResult.Data.FilePath);
-            var contentType = _storageService.GetMimeType(fileResult.Data.OriginalFileName);
-
-            return ServiceResult<FileContentDto>.Success(new FileContentDto
-            {
-                Bytes = fileBytes,
-                ContentType = contentType,
-                FileName = fileResult.Data.OriginalFileName
-            });
+            // Shared primitive: resolves bytes, contentType (FileMimeType with
+            // extension fallback), and fileName in one call. Returns NotFound if
+            // the physical file is missing on disk.
+            return await _fileAttachmentService.DownloadAsync(photo.FileAttachmentId);
         }, "get employee photo");
     }
 
@@ -567,7 +564,9 @@ public class EmployeeService : BaseService, IEmployeeService
             await _activityLogService.LogUpdateAsync(TableNames.Employee, employeeId,
                 "Profile photo uploaded", _currentUserService.GetDisplayName());
 
-            return ServiceResult<string>.Success(uploadResult.Data.FileUrl ?? string.Empty, "Profile photo uploaded successfully");
+            return ServiceResult<string>.Success(
+                uploadResult.Data.DownloadUrl ?? string.Empty,
+                "Profile photo uploaded successfully");
         }, "upload employee photo");
     }
 
@@ -602,6 +601,13 @@ public class EmployeeService : BaseService, IEmployeeService
             var detail = await _employeeReps.GetDetailByIdAsync(employeeId);
             if (detail == null)
                 return ServiceResult<IEnumerable<EmployeeAttachmentViewDto>>.NotFound($"Employee with id {employeeId} not found");
+
+            foreach (var att in detail.Attachments)
+            {
+                att.DownloadUrl = FileResourceUrlResolver.ResolveDownloadUrl(
+                    FileOwner.Employee, employeeId, att.FileAttachmentId);
+            }
+
             return ServiceResult<IEnumerable<EmployeeAttachmentViewDto>>.Success(detail.Attachments);
         }, "get employee attachments");
     }
@@ -652,10 +658,12 @@ public class EmployeeService : BaseService, IEmployeeService
                 FileAttachmentId = uploadResult.Data.FileAttachmentId,
                 FileName = uploadResult.Data.FileName,
                 OriginalFileName = uploadResult.Data.OriginalFileName,
-                FileUrl = uploadResult.Data.FileUrl,
                 FileCategory = uploadResult.Data.FileCategory,
+                ContentType = uploadResult.Data.ContentType,
+                FileSize = uploadResult.Data.FileSize,
                 IsPrimary = false,
                 Order = model.Order,
+                DownloadUrl = uploadResult.Data.DownloadUrl,
                 CreatedDate = DateTime.Now
             }, "Attachment uploaded successfully");
         }, "upload employee attachment");

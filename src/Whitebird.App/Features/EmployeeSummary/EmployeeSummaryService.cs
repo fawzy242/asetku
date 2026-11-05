@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Common;
 using Whitebird.App.Features.Employee;
+using Whitebird.App.Features.FileAttachment;
 using Whitebird.Domain.Features.Employee;
 using Whitebird.Domain.Features.EmployeeSummary;
 using Whitebird.Domain.Features.Common;
@@ -10,7 +11,15 @@ using Whitebird.Infra.Features.Common;
 namespace Whitebird.App.Features.EmployeeSummary;
 
 /// <summary>
-/// Service implementation for Employee Summary business logic
+/// Service implementation for Employee Summary business logic.
+///
+/// URL contract:
+///   * <c>EmployeeSummaryView.PhotoProfileUrl</c> and each attachment's
+///     <c>DownloadUrl</c> are relative URLs produced by
+///     <see cref="FileResourceUrlResolver"/>.
+///   * Photo and attachment retrieval is delegated to
+///     <see cref="IEmployeeService"/>, so this menu shares the Employee menu's
+///     own endpoints (no duplicated routes).
 /// </summary>
 public class EmployeeSummaryService : BaseService, IEmployeeSummaryService
 {
@@ -56,6 +65,19 @@ public class EmployeeSummaryService : BaseService, IEmployeeSummaryService
             {
                 return ServiceResult<EmployeeSummaryView>.NotFound($"Employee with id {employeeId} not found");
             }
+
+            // Enrich relative URLs — repositories return metadata only.
+            var photoProfile = await _employeeSummaryReps.GetPhotoProfileByEmployeeIdAsync(employeeId);
+            result.PhotoProfileUrl = photoProfile != null
+                ? FileResourceUrlResolver.ResolvePhotoUrl(FileOwner.EmployeePhotoProfile, employeeId)
+                : null;
+
+            foreach (var att in result.Attachments)
+            {
+                att.DownloadUrl = FileResourceUrlResolver.ResolveDownloadUrl(
+                    FileOwner.Employee, employeeId, att.FileAttachmentId);
+            }
+
             return ServiceResult<EmployeeSummaryView>.Success(result);
         }, "get employee summary");
     }

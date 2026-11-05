@@ -1,3 +1,5 @@
+using Whitebird.Domain.Features.FileAttachment;
+
 namespace Whitebird.Domain.Features.EmployeeSummary;
 
 /// <summary>
@@ -17,6 +19,11 @@ public class EmployeeSummaryView
     public bool IsActive { get; set; }
 
     // Photo Profile
+    /// <summary>
+    /// Relative URL to the Employee photo endpoint
+    /// (e.g. "/api/Employee/1/photo"). Null when no active photo exists.
+    /// Populated by EmployeeSummaryService via FileResourceUrlResolver.
+    /// </summary>
     public string? PhotoProfileUrl { get; set; }
 
     // Attachments
@@ -36,14 +43,10 @@ public class EmployeeSummaryView
 }
 
 /// <summary>
-/// Attachment DTO for employee summary
+/// Attachment DTO for employee summary.
+/// Inherits the standardized FileResourceDto shape; DownloadUrl is populated
+/// by EmployeeSummaryService via FileResourceUrlResolver.
 /// </summary>
-public class EmployeeSummaryAttachmentDto
+public class EmployeeSummaryAttachmentDto : FileResourceDto
 {
-    public int FileAttachmentId { get; set; }
-    public string FileName { get; set; } = string.Empty;
-    public string OriginalFileName { get; set; } = string.Empty;
-    public string? FileUrl { get; set; }
-    public string? FileCategory { get; set; }
-    public bool IsPrimary { get; set; }
 }

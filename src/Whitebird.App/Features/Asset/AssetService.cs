@@ -13,6 +13,16 @@ using Whitebird.Infra.Features.Supplier;
 
 namespace Whitebird.App.Features.Asset;
 
+/// <summary>
+/// Service implementation for Asset business logic.
+///
+/// URL contract:
+///   * <c>AssetDetailView.PhotoProfileUrl</c> is a RELATIVE URL produced by
+///     <see cref="FileResourceUrlResolver"/>; null when no active photo exists.
+///   * Each attachment's <c>DownloadUrl</c> is a relative URL produced by
+///     <see cref="FileResourceUrlResolver"/>.
+///   * Photo bytes are streamed via the shared <see cref="IFileAttachmentService.DownloadAsync"/>.
+/// </summary>
 public class AssetService : BaseService, IAssetService
 {
     private readonly ICommonReps _repository;
@@ -22,7 +32,6 @@ public class AssetService : BaseService, IAssetService
     private readonly IMasterDataService _masterDataService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
-    private readonly IStorageService _storageService;
     private readonly IFileAttachmentService _fileAttachmentService;
 
     public AssetService(
@@ -33,7 +42,6 @@ public class AssetService : BaseService, IAssetService
         IMasterDataService masterDataService,
         ICurrentUserService currentUserService,
         IActivityLogService activityLogService,
-        IStorageService storageService,
         IFileAttachmentService fileAttachmentService,
         ILogger<AssetService> logger) : base(logger)
     {
@@ -44,7 +52,6 @@ public class AssetService : BaseService, IAssetService
         _masterDataService = masterDataService;
         _currentUserService = currentUserService;
         _activityLogService = activityLogService;
-        _storageService = storageService;
         _fileAttachmentService = fileAttachmentService;
     }
 
@@ -60,6 +67,7 @@ public class AssetService : BaseService, IAssetService
             if (asset == null)
                 return ServiceResult<AssetDetailView>.NotFound($"Asset with id {id} not found");
 
+            // Software Installation (existing behavior, unchanged)
             var software = await _assetReps.GetSoftwareInstallationByAssetIdAsync(id);
             if (software != null)
             {
@@ -85,6 +93,18 @@ public class AssetService : BaseService, IAssetService
                     var dbms = await _masterDataService.GetValueAsync("DBMS", software.DBMS.Value);
                     if (dbms.IsSuccess) asset.SoftwareInstallation.DBMSName = dbms.Data;
                 }
+            }
+
+            // Enrich relative URLs — repositories return metadata only.
+            var photoProfile = await _assetReps.GetPhotoProfileByAssetIdAsync(id);
+            asset.PhotoProfileUrl = photoProfile != null
+                ? FileResourceUrlResolver.ResolvePhotoUrl(FileOwner.AssetPhotoProfile, id)
+                : null;
+
+            foreach (var att in asset.Attachments)
+            {
+                att.DownloadUrl = FileResourceUrlResolver.ResolveDownloadUrl(
+                    FileOwner.Asset, id, att.FileAttachmentId);
             }
 
             return ServiceResult<AssetDetailView>.Success(asset);
@@ -302,12 +322,6 @@ public class AssetService : BaseService, IAssetService
     // DELETE
     // ============================================================
 
-    /// <summary>
-    /// Determines whether the asset can be hard-deleted. Blocks on
-    /// AssetTransaction and Schedule* dependents (business records).
-    /// Attachments / photo profile / software installation are cascaded
-    /// automatically by <see cref="CascadeDeleteDependentsAsync"/>.
-    /// </summary>
     private async Task<string?> GetDeleteBlockReasonAsync(int id)
     {
         var transactionCount = await _assetReps.GetAssetTransactionCountAsync(id);
@@ -329,16 +343,8 @@ public class AssetService : BaseService, IAssetService
         return null;
     }
 
-    /// <summary>
-    /// Hard-deletes the asset's dependent rows that are otherwise inaccessible
-    /// via the API (attachments, photo profile, software installation).
-    /// FileAttachment metadata is soft-deleted first (matching the pattern used
-    /// during UpdateAsync attachment removal), then the join row is hard-deleted
-    /// so the FK on the asset is cleared. Runs inside the caller's transaction.
-    /// </summary>
     private async Task CascadeDeleteDependentsAsync(int id)
     {
-        // Asset attachments
         var attachments = await _assetReps.GetAttachmentsByAssetIdAsync(id);
         foreach (var att in attachments)
         {
@@ -346,7 +352,6 @@ public class AssetService : BaseService, IAssetService
             await _repository.DeleteAsync<AssetAttachmentEntity>(att.AssetAttachmentId);
         }
 
-        // Asset photo profile (0 or 1)
         var photo = await _assetReps.GetPhotoProfileByAssetIdAsync(id);
         if (photo != null)
         {
@@ -354,7 +359,6 @@ public class AssetService : BaseService, IAssetService
             await _repository.DeleteAsync<AssetPhotoProfileAttachmentEntity>(photo.AssetPhotoProfileAttachmentId);
         }
 
-        // Software installation (0 or 1 due to UNIQUE(AssetId))
         var software = await _assetReps.GetSoftwareInstallationByAssetIdAsync(id);
         if (software != null)
         {
@@ -419,7 +423,7 @@ public class AssetService : BaseService, IAssetService
     }
 
     // ============================================================
-    // GRID (P3-1 — request passed straight through)
+    // GRID
     // ============================================================
 
     public async Task<ServiceResult<PaginatedResult<AssetListView>>> GetGridDataAsync(AssetGridRequest request)
@@ -546,19 +550,10 @@ public class AssetService : BaseService, IAssetService
             var photo = await _assetReps.GetPhotoProfileByAssetIdAsync(assetId);
             if (photo == null) return ServiceResult<FileContentDto>.NotFound("Profile photo not found");
 
-            var fileResult = await _fileAttachmentService.GetByIdAsync(photo.FileAttachmentId);
-            if (!fileResult.IsSuccess || fileResult.Data == null)
-                return ServiceResult<FileContentDto>.NotFound("Profile photo file not found");
-
-            var fileBytes = await _storageService.ReadFileAsync(fileResult.Data.FilePath);
-            var contentType = _storageService.GetMimeType(fileResult.Data.OriginalFileName);
-
-            return ServiceResult<FileContentDto>.Success(new FileContentDto
-            {
-                Bytes = fileBytes,
-                ContentType = contentType,
-                FileName = fileResult.Data.OriginalFileName
-            });
+            // Shared primitive: resolves bytes, contentType (FileMimeType with
+            // extension fallback), and fileName in one call. Returns NotFound if
+            // the physical file is missing on disk.
+            return await _fileAttachmentService.DownloadAsync(photo.FileAttachmentId);
         }, "get asset photo");
     }
 
@@ -606,7 +601,9 @@ public class AssetService : BaseService, IAssetService
             await _activityLogService.LogUpdateAsync(TableNames.Asset, assetId,
                 "Profile photo uploaded", _currentUserService.GetDisplayName());
 
-            return ServiceResult<string>.Success(uploadResult.Data.FileUrl ?? string.Empty, "Profile photo uploaded successfully");
+            return ServiceResult<string>.Success(
+                uploadResult.Data.DownloadUrl ?? string.Empty,
+                "Profile photo uploaded successfully");
         }, "upload asset photo");
     }
 
@@ -641,6 +638,13 @@ public class AssetService : BaseService, IAssetService
             var detail = await _assetReps.GetDetailByIdAsync(assetId);
             if (detail == null)
                 return ServiceResult<IEnumerable<AssetAttachmentViewDto>>.NotFound($"Asset with id {assetId} not found");
+
+            foreach (var att in detail.Attachments)
+            {
+                att.DownloadUrl = FileResourceUrlResolver.ResolveDownloadUrl(
+                    FileOwner.Asset, assetId, att.FileAttachmentId);
+            }
+
             return ServiceResult<IEnumerable<AssetAttachmentViewDto>>.Success(detail.Attachments);
         }, "get asset attachments");
     }
@@ -691,10 +695,12 @@ public class AssetService : BaseService, IAssetService
                 FileAttachmentId = uploadResult.Data.FileAttachmentId,
                 FileName = uploadResult.Data.FileName,
                 OriginalFileName = uploadResult.Data.OriginalFileName,
-                FileUrl = uploadResult.Data.FileUrl,
                 FileCategory = uploadResult.Data.FileCategory,
+                ContentType = uploadResult.Data.ContentType,
+                FileSize = uploadResult.Data.FileSize,
                 IsPrimary = false,
                 Order = model.Order,
+                DownloadUrl = uploadResult.Data.DownloadUrl,
                 CreatedDate = DateTime.Now
             }, "Attachment uploaded successfully");
         }, "upload asset attachment");

@@ -376,8 +376,6 @@ public class AssetTransactionController : ControllerBase
     // ============================================================
     // IMPORT
     // ============================================================
-    //
-    // H9: EPPlus only reads .xlsx. Narrowing the gate to .xlsx to match reality.
 
     [HttpPost("import")]
     public async Task<IActionResult> Import(IFormFile file)
@@ -425,6 +423,8 @@ public class AssetTransactionController : ControllerBase
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
 
+        // Private caching: attachments may contain sensitive documents.
+        Response.Headers["Cache-Control"] = "private, max-age=3600, must-revalidate";
         return File(result.Data.Bytes, result.Data.ContentType, result.Data.FileName);
     }
 
@@ -435,6 +435,7 @@ public class AssetTransactionController : ControllerBase
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
 
+        Response.Headers["Cache-Control"] = "private, max-age=3600, must-revalidate";
         return File(result.Data.Bytes, result.Data.ContentType, result.Data.FileName);
     }
 

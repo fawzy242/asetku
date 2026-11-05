@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Common;
+using Whitebird.App.Features.FileAttachment;
 using Whitebird.Domain.Features.Common;
 using Whitebird.Infra.Features.Auth;
 using Whitebird.Infra.Features.User;
@@ -8,7 +9,12 @@ using Whitebird.Infra.Features.User;
 namespace Whitebird.App.Features.Auth;
 
 /// <summary>
-/// Service implementation for Authentication business logic
+/// Service implementation for Authentication business logic.
+///
+/// URL contract:
+///   * <c>LoginResponse.User.ProfilePhotoUrl</c> is a RELATIVE URL produced by
+///     <see cref="FileResourceUrlResolver"/>; it is null when the user has no
+///     active photo profile record. Same rule as <c>UserService.BuildUserDtoAsync</c>.
 /// </summary>
 public class AuthService : BaseService, IAuthService
 {
@@ -41,7 +47,8 @@ public class AuthService : BaseService, IAuthService
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
-                await _activityLogService.LogAsync("User", 0, "LOGIN_FAILED", $"Failed login attempt for username: {request.Username}", "System");
+                await _activityLogService.LogAsync("User", 0, "LOGIN_FAILED",
+                    $"Failed login attempt for username: {request.Username}", "System");
                 return ServiceResult<LoginResponse>.Failure("Invalid username or password");
             }
 
@@ -66,10 +73,18 @@ public class AuthService : BaseService, IAuthService
 
             await _authReps.UpdateLastLoginAsync(user.UserId);
 
-            await _activityLogService.LogAsync("User", user.UserId, "LOGIN", $"User '{user.Username}' logged in successfully", user.Username);
+            await _activityLogService.LogAsync("User", user.UserId, "LOGIN",
+                $"User '{user.Username}' logged in successfully", user.Username);
 
             // Users has no RoleId column; role comes from UserRoles/Roles via the repo.
             var (roleId, roleName) = await _userReps.GetUserRoleAsync(user.UserId);
+
+            // Profile photo exists only when an active UsersPhotoProfileAttachment
+            // row is present. URL is RELATIVE; frontend prepends base URL.
+            var photoProfile = await _userReps.GetPhotoProfileByUserIdAsync(user.UserId);
+            var profilePhotoUrl = photoProfile != null
+                ? FileResourceUrlResolver.ResolvePhotoUrl(FileOwner.UserPhotoProfile, user.UserId)
+                : null;
 
             var response = new LoginResponse
             {
@@ -83,7 +98,7 @@ public class AuthService : BaseService, IAuthService
                     RoleId = roleId,
                     RoleName = roleName,
                     Username = user.Username,
-                    ProfilePhotoUrl = null
+                    ProfilePhotoUrl = profilePhotoUrl
                 }
             };
 
@@ -119,9 +134,7 @@ public class AuthService : BaseService, IAuthService
 
             // Cryptographic RNG. The token is a bearer credential (valid 1 hour) and
             // must not be produced by System.Random. Range [100000, 1000000) →
-            // every 6-digit numeric string is reachable. Format unchanged: 6 digits,
-            // fits Users.ResetToken NVARCHAR(255), consumed verbatim by the email
-            // template and by ResetPasswordWithTokenAsync.
+            // every 6-digit numeric string is reachable.
             var resetToken = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
             var resetTokenExpiry = DateTime.Now.AddHours(1);
 
@@ -133,13 +146,13 @@ public class AuthService : BaseService, IAuthService
 
             await _emailService.SendPasswordResetEmailAsync(user.Email, resetToken, user.FullName);
 
-            await _activityLogService.LogAsync("User", user.UserId, "FORGOT_PASSWORD", $"Password reset requested for user '{user.Username}'", user.Username);
+            await _activityLogService.LogAsync("User", user.UserId, "FORGOT_PASSWORD",
+                $"Password reset requested for user '{user.Username}'", user.Username);
 
             return ServiceResult.Success("Password reset email sent");
         }, "forgot password");
     }
 
-    // FIXED: Properly implement ResetPasswordAsync using userId from session
     public async Task<ServiceResult> ResetPasswordAsync(int userId, ResetPasswordRequest request)
     {
         return await ExecuteSafelyAsync(async () =>
@@ -160,7 +173,8 @@ public class AuthService : BaseService, IAuthService
 
             if (updated)
             {
-                await _activityLogService.LogAsync("User", userId, "PASSWORD_CHANGE", $"Password changed for user '{user.Username}'", user.Username);
+                await _activityLogService.LogAsync("User", userId, "PASSWORD_CHANGE",
+                    $"Password changed for user '{user.Username}'", user.Username);
                 return ServiceResult.Success("Password changed successfully");
             }
 
@@ -187,7 +201,8 @@ public class AuthService : BaseService, IAuthService
 
             await _authReps.ClearResetTokenAsync(user.UserId);
 
-            await _activityLogService.LogAsync("User", user.UserId, "PASSWORD_RESET", $"Password reset with token for user '{user.Username}'", user.Username);
+            await _activityLogService.LogAsync("User", user.UserId, "PASSWORD_RESET",
+                $"Password reset with token for user '{user.Username}'", user.Username);
 
             return ServiceResult.Success("Password reset successfully");
         }, "reset password with token");

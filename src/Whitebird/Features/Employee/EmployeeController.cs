@@ -118,10 +118,8 @@ public class EmployeeController : ControllerBase
     // IMPORT
     // ============================================================
     //
-    // P1-1 FIX: EPPlus reads only the OpenXML .xlsx format. The previous
-    // "(.xlsx or .xls)" gate never matched reality — a valid .xls file reached
-    // ExcelPackage and threw, exposing the raw exception to the client. The
-    // gate is narrowed to .xlsx only, matching AssetController.Import and
+    // P1-1: EPPlus reads only the OpenXML .xlsx format. The .xls gate is
+    // narrowed to .xlsx, matching AssetController.Import and
     // AssetTransactionController.Import.
 
     [HttpPost("import")]
@@ -162,6 +160,10 @@ public class EmployeeController : ControllerBase
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
 
+        // Private caching: employee photos are personal data. Short TTL so
+        // a replacement photo shows up within a minute; must-revalidate to
+        // force revalidation after expiry.
+        Response.Headers["Cache-Control"] = "private, max-age=60, must-revalidate";
         return File(result.Data.Bytes, result.Data.ContentType);
     }
 
@@ -211,6 +213,9 @@ public class EmployeeController : ControllerBase
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
 
+        // Private caching: attachments may contain sensitive documents.
+        // Cached only in the user's browser; 1 hour TTL with revalidation.
+        Response.Headers["Cache-Control"] = "private, max-age=3600, must-revalidate";
         return File(result.Data.Bytes, result.Data.ContentType, result.Data.FileName);
     }
 }

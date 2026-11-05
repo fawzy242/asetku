@@ -1,3 +1,5 @@
+using Whitebird.Domain.Features.FileAttachment;
+
 namespace Whitebird.Domain.Features.AssetTracking;
 
 /// <summary>
@@ -35,6 +37,11 @@ public class AssetTrackingView
     public int TotalTransactions { get; set; }
 
     // Photo Profile
+    /// <summary>
+    /// Relative URL to the Asset photo endpoint (e.g. "/api/Asset/1/photo").
+    /// Null when no active photo exists. Populated by AssetTrackingService
+    /// via FileResourceUrlResolver.
+    /// </summary>
     public string? PhotoProfileUrl { get; set; }
 
     // Attachments
@@ -66,16 +73,12 @@ public class AssetTrackingSoftwareInstallationDto
 }
 
 /// <summary>
-/// DTO for attachment in asset tracking
+/// DTO for attachment in asset tracking.
+/// Inherits the standardized FileResourceDto shape; DownloadUrl is populated
+/// by AssetTrackingService via FileResourceUrlResolver.
 /// </summary>
-public class AssetTrackingAttachmentDto
+public class AssetTrackingAttachmentDto : FileResourceDto
 {
-    public int FileAttachmentId { get; set; }
-    public string FileName { get; set; } = string.Empty;
-    public string OriginalFileName { get; set; } = string.Empty;
-    public string? FileUrl { get; set; }
-    public string? FileCategory { get; set; }
-    public bool IsPrimary { get; set; }
 }
 
 /// <summary>
@@ -110,6 +113,10 @@ public class AssetStatsView
     public DateTime? WarrantyExpiryDate { get; set; }
 
     // Photo Profile
+    /// <summary>
+    /// Relative URL to the Asset photo endpoint (e.g. "/api/Asset/1/photo").
+    /// Null when no active photo exists. Populated by AssetTrackingService.
+    /// </summary>
     public string? PhotoProfileUrl { get; set; }
 
     // Attachments

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Whitebird.App.Features.Asset;
 using Whitebird.App.Features.Common;
+using Whitebird.App.Features.FileAttachment;
 using Whitebird.Domain.Features.Asset;
 using Whitebird.Domain.Features.AssetTracking;
 using Whitebird.Domain.Features.Common;
@@ -10,7 +11,15 @@ using Whitebird.Infra.Features.Common;
 namespace Whitebird.App.Features.AssetTracking;
 
 /// <summary>
-/// Service implementation for Asset Tracking business logic
+/// Service implementation for Asset Tracking business logic.
+///
+/// URL contract:
+///   * <c>AssetTrackingView.PhotoProfileUrl</c> and each attachment's
+///     <c>DownloadUrl</c> are relative URLs produced by
+///     <see cref="FileResourceUrlResolver"/>.
+///   * <c>AssetStatsView</c> uses the same rule.
+///   * Photo and attachment endpoints are delegated to <see cref="IAssetService"/>;
+///     this menu reuses the Asset menu's own routes (no duplicated endpoints).
 /// </summary>
 public class AssetTrackingService : BaseService, IAssetTrackingService
 {
@@ -56,6 +65,19 @@ public class AssetTrackingService : BaseService, IAssetTrackingService
             {
                 return ServiceResult<AssetTrackingView>.NotFound($"Asset with id {assetId} not found");
             }
+
+            // Enrich relative URLs — repository returns metadata only.
+            var photoProfile = await _assetTrackingReps.GetPhotoProfileByAssetIdAsync(assetId);
+            result.PhotoProfileUrl = photoProfile != null
+                ? FileResourceUrlResolver.ResolvePhotoUrl(FileOwner.AssetPhotoProfile, assetId)
+                : null;
+
+            foreach (var att in result.Attachments)
+            {
+                att.DownloadUrl = FileResourceUrlResolver.ResolveDownloadUrl(
+                    FileOwner.Asset, assetId, att.FileAttachmentId);
+            }
+
             return ServiceResult<AssetTrackingView>.Success(result);
         }, "get tracking detail");
     }
@@ -75,10 +97,18 @@ public class AssetTrackingService : BaseService, IAssetTrackingService
             }
 
             result.Attachments = (await _assetTrackingReps.GetAttachmentsByAssetIdAsync(assetId)).ToList();
+            foreach (var att in result.Attachments)
+            {
+                att.DownloadUrl = FileResourceUrlResolver.ResolveDownloadUrl(
+                    FileOwner.Asset, assetId, att.FileAttachmentId);
+            }
+
             result.SoftwareInstallation = await _assetTrackingReps.GetSoftwareInstallationByAssetIdAsync(assetId);
 
             var photoProfile = await _assetTrackingReps.GetPhotoProfileByAssetIdAsync(assetId);
-            result.PhotoProfileUrl = photoProfile?.FileUrl;
+            result.PhotoProfileUrl = photoProfile != null
+                ? FileResourceUrlResolver.ResolvePhotoUrl(FileOwner.AssetPhotoProfile, assetId)
+                : null;
 
             return ServiceResult<AssetStatsView>.Success(result);
         }, "get asset stats");

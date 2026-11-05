@@ -15,25 +15,25 @@ namespace Whitebird.App.Features.FileAttachment;
 /// AssetTransaction, User) exposes its own upload / download / delete
 /// endpoints and delegates to this service internally. Consequently:
 ///
-///   * DownloadAsync returns bytes + content type + file name so callers can
-///     stream the file through their own controller endpoint.
-///   * FileUrl in FileAttachmentResponseDto always resolves to the owning
-///     menu's download endpoint (see BuildFileUrl).
+///   * <see cref="DownloadAsync"/> returns bytes + content type + file name so
+///     callers can stream the file through their own controller endpoint.
+///   * URLs in <see cref="FileAttachmentResponseDto"/> are RELATIVE and
+///     resolve to the owning menu's endpoint (see <see cref="BuildFileUrl"/>).
+///     The frontend prepends its configured backend base URL.
 ///
-/// Storage-layer extension validation (H6 fix):
+/// Storage-layer extension validation (defence in depth):
 ///   This service is the shared storage primitive for BOTH profile photos and
 ///   menu attachments. Callers validate the correct profile-specific rules
-///   (FileUploadValidator.ValidateProfilePhoto / ValidateAssetAttachment) at
-///   the boundary before reaching here. The service performs a defence-in-depth
-///   check that accepts any extension from either allow-list (asset-attachment
-///   OR profile-photo). The previous version hardcoded the asset-attachment list
-///   and wrongly rejected .webp profile photos.
+///   (<c>FileUploadValidator.ValidateProfilePhoto</c> /
+///   <c>ValidateAssetAttachment</c>) at the boundary before reaching here.
+///   The service performs a defence-in-depth check against the union of both
+///   allow-lists (asset-attachment OR profile-photo).
 ///
-/// P2-1: DeleteAsync now removes the physical file after metadata soft-delete
-/// succeeds. Physical-delete failures are logged as warnings and do not roll
-/// back the metadata change. StorageService.DeleteFileAsync is idempotent, so
-/// missing files are a no-op. Every menu-level cascade (Asset/Employee/User/
-/// AssetTransaction) already delegates to this method, so no caller changes.
+/// Physical file cleanup:
+///   <see cref="DeleteAsync"/> removes the physical file after metadata
+///   soft-delete succeeds. Physical-delete failures are logged as warnings and
+///   do not roll back the metadata change. <c>StorageService.DeleteFileAsync</c>
+///   is idempotent, so missing files are a no-op.
 /// </summary>
 public class FileAttachmentService : BaseService, IFileAttachmentService
 {
@@ -41,7 +41,6 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
     private readonly IStorageService _storageService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IActivityLogService _activityLogService;
-    private readonly IHttpContextAccessor _httpContextAccessor;
 
     // Union of the two allow-lists, computed once per process. Kept as a static
     // readonly field so the rejection message construction is allocation-free on
@@ -54,14 +53,12 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         IStorageService storageService,
         ICurrentUserService currentUserService,
         IActivityLogService activityLogService,
-        IHttpContextAccessor httpContextAccessor,
         ILogger<FileAttachmentService> logger) : base(logger)
     {
         _fileAttachmentReps = fileAttachmentReps;
         _storageService = storageService;
         _currentUserService = currentUserService;
         _activityLogService = activityLogService;
-        _httpContextAccessor = httpContextAccessor;
     }
 
     // ============================================================
@@ -86,7 +83,8 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
     // UPLOAD
     // ============================================================
 
-    public async Task<ServiceResult<FileAttachmentResponseDto>> UploadAsync(string referenceTable, int referenceId, FileAttachmentUploadDto model)
+    public async Task<ServiceResult<FileAttachmentResponseDto>> UploadAsync(
+        string referenceTable, int referenceId, FileAttachmentUploadDto model)
     {
         if (model.File == null || model.File.Length == 0)
         {
@@ -102,7 +100,8 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
 
         if (model.File.Length > FileSizeConstants.MaxAssetAttachmentBytes)
         {
-            return ServiceResult<FileAttachmentResponseDto>.BadRequest($"File size exceeds {FileSizeConstants.MaxAssetAttachmentMB}MB limit");
+            return ServiceResult<FileAttachmentResponseDto>.BadRequest(
+                $"File size exceeds {FileSizeConstants.MaxAssetAttachmentMB}MB limit");
         }
 
         return await ExecuteWithTransactionAsync(async () =>
@@ -177,7 +176,8 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         }, "upload file bytes");
     }
 
-    public async Task<ServiceResult<List<FileAttachmentResponseDto>>> UploadMultipleAsync(string referenceTable, int referenceId, FileAttachmentMultipleUploadViewModel model)
+    public async Task<ServiceResult<List<FileAttachmentResponseDto>>> UploadMultipleAsync(
+        string referenceTable, int referenceId, FileAttachmentMultipleUploadViewModel model)
     {
         if (model.Files == null || model.Files.Count == 0)
         {
@@ -244,19 +244,22 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
                 return ServiceResult<FileAttachmentResponseDto>.Failure("Failed to update attachment metadata");
             }
 
-            // No reference context here (no referenceTable / referenceId), so we cannot
-            // build a valid per-menu download URL. FileUrl / PreviewUrl are left null;
-            // callers should resolve URLs via the owning menu's endpoint.
+            // No reference context here (no referenceTable / referenceId), so no
+            // valid per-menu download URL can be built. DownloadUrl / PreviewUrl
+            // are left null; callers should resolve URLs via FileResourceUrlResolver.
             var response = new FileAttachmentResponseDto
             {
                 FileAttachmentId = existing.FileAttachmentId,
                 FileName = existing.FileName,
                 OriginalFileName = existing.OriginalFileName,
-                FileUrl = null,
-                PreviewUrl = null,
-                FileSize = existing.FileSize,
                 FileCategory = existing.FileCategory,
-                IsPrimary = existing.IsPrimary
+                ContentType = existing.FileMimeType,
+                FileSize = existing.FileSize,
+                IsPrimary = existing.IsPrimary,
+                Order = 0,
+                DownloadUrl = null,
+                CreatedDate = existing.CreatedDate,
+                PreviewUrl = null
             };
 
             await _activityLogService.LogUpdateAsync(
@@ -269,20 +272,6 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         }, "update file attachment");
     }
 
-    /// <summary>
-    /// Soft-deletes the attachment metadata and removes the physical file.
-    ///
-    /// Sequence:
-    ///   1. Load the row (to know FilePath and OriginalFileName for logging).
-    ///   2. Soft-delete metadata via <see cref="IFileAttachmentReps.DeleteAsync"/>.
-    ///   3. If metadata update succeeded, remove the physical file via
-    ///      <see cref="IStorageService.DeleteFileAsync"/>.
-    ///
-    /// Physical-file deletion failures are logged as warnings and do not roll back
-    /// the metadata change. StorageService.DeleteFileAsync is idempotent (no-op
-    /// when the file is already absent); the only failure mode is a filesystem
-    /// permission / IO error, which surfaces as a warning for operator follow-up.
-    /// </summary>
     public async Task<ServiceResult> DeleteAsync(int id)
     {
         return await ExecuteWithTransactionAsync(async () =>
@@ -297,10 +286,6 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
 
             if (result > 0)
             {
-                // P2-1: remove the physical file now that metadata is soft-deleted.
-                // Failure here is non-fatal; the metadata row is already inactive,
-                // so a rollback would leave the system less consistent than a
-                // warning-logged orphan file.
                 try
                 {
                     await _storageService.DeleteFileAsync(existing.FilePath);
@@ -340,7 +325,18 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
                 return ServiceResult<FileContentDto>.NotFound($"Attachment with id {id} not found");
             }
 
-            var fileBytes = await _storageService.ReadFileAsync(attachment.FilePath);
+            byte[] fileBytes;
+            try
+            {
+                fileBytes = await _storageService.ReadFileAsync(attachment.FilePath);
+            }
+            catch (FileNotFoundException)
+            {
+                // Database metadata exists but the physical file is gone —
+                // surface as a clean 404 instead of a 500/400 with a raw path.
+                return ServiceResult<FileContentDto>.NotFound(
+                    $"Physical file for attachment {id} is missing on disk");
+            }
 
             var contentType = !string.IsNullOrEmpty(attachment.FileMimeType)
                 ? attachment.FileMimeType
@@ -353,17 +349,6 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
                 FileName = attachment.OriginalFileName
             });
         }, "download file");
-    }
-
-    public Task<ServiceResult<string>> GetFileUrlAsync(int id)
-    {
-        // URLs are context-dependent: the correct download route is owned by the
-        // menu the file belongs to. This context-blind overload cannot produce
-        // a valid URL under the current architecture.
-        return Task.FromResult(ServiceResult<string>.NotFound(
-            "File URLs are resolved through the owning menu's download endpoint. " +
-            "Use the FileUrl returned by the upload response, or construct the " +
-            "owning menu's endpoint (e.g. /api/Asset/{assetId}/attachments/{fileAttachmentId}/download)."));
     }
 
     public async Task<ServiceResult<bool>> IsImageFileAsync(int id)
@@ -382,15 +367,14 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
     }
 
     // ============================================================
-    // EXTENSION HELPERS (H6 fix)
+    // EXTENSION HELPERS
     // ============================================================
 
     /// <summary>
     /// Union of the asset-attachment and profile-photo allow-lists. The storage
     /// layer is a shared primitive; callers validate the flow-specific rule
     /// upstream (FileUploadValidator), and this service accepts any extension
-    /// that either list permits. Previously this hardcoded the asset-attachment
-    /// list and wrongly rejected .webp profile photos.
+    /// that either list permits.
     /// </summary>
     private static string[] BuildAllowedUploadExtensions()
     {
@@ -442,19 +426,24 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
 
         var id = await _fileAttachmentReps.InsertAsync(entity);
 
-        var fileUrl = BuildFileUrl(referenceTable, referenceId, id);
-        var previewUrl = fileUrl != null && _storageService.IsImageFile(originalFileName) ? fileUrl : null;
+        var downloadUrl = BuildFileUrl(referenceTable, referenceId, id);
+        var previewUrl = downloadUrl != null && _storageService.IsImageFile(originalFileName)
+            ? downloadUrl
+            : null;
 
         var response = new FileAttachmentResponseDto
         {
             FileAttachmentId = id,
             FileName = entity.FileName,
             OriginalFileName = entity.OriginalFileName,
-            FileUrl = fileUrl,
-            PreviewUrl = previewUrl,
-            FileSize = entity.FileSize,
             FileCategory = entity.FileCategory,
-            IsPrimary = entity.IsPrimary
+            ContentType = entity.FileMimeType,
+            FileSize = entity.FileSize,
+            IsPrimary = entity.IsPrimary,
+            Order = 0,
+            DownloadUrl = downloadUrl,
+            CreatedDate = entity.CreatedDate,
+            PreviewUrl = previewUrl
         };
 
         await _activityLogService.LogCreateAsync(
@@ -466,22 +455,29 @@ public class FileAttachmentService : BaseService, IFileAttachmentService
         return ServiceResult<FileAttachmentResponseDto>.Success(response, "File uploaded successfully");
     }
 
-    private string? BuildFileUrl(string referenceTable, int referenceId, int fileAttachmentId)
+    /// <summary>
+    /// Resolves the relative URL for a stored file, given the reference table
+    /// key used by callers. All URLs are produced by
+    /// <see cref="FileResourceUrlResolver"/> — no scheme/host/port is ever used.
+    /// </summary>
+    private static string? BuildFileUrl(string referenceTable, int referenceId, int fileAttachmentId)
     {
-        var request = _httpContextAccessor.HttpContext?.Request;
-        if (request == null) return null;
-        var baseUrl = $"{request.Scheme}://{request.Host}";
-
         return referenceTable switch
         {
-            "Asset" => $"{baseUrl}/api/Asset/{referenceId}/attachments/{fileAttachmentId}/download",
-            "AssetPhotoProfile" => $"{baseUrl}/api/Asset/{referenceId}/photo",
-            "Employee" => $"{baseUrl}/api/Employee/{referenceId}/attachments/{fileAttachmentId}/download",
-            "EmployeePhotoProfile" => $"{baseUrl}/api/Employee/{referenceId}/photo",
-            "AssetTransaction" => $"{baseUrl}/api/AssetTransaction/{referenceId}/attachments/{fileAttachmentId}/download",
-            "AssetTransactionApprove" => $"{baseUrl}/api/AssetTransaction/{referenceId}/approve-attachments/{fileAttachmentId}/download",
-            // P1-2: user profile photo URL resolves to the User menu's own photo endpoint.
-            "UserPhotoProfile" => $"{baseUrl}/api/User/profile-photo",
+            "Asset" =>
+                FileResourceUrlResolver.ResolveDownloadUrl(FileOwner.Asset, referenceId, fileAttachmentId),
+            "AssetPhotoProfile" =>
+                FileResourceUrlResolver.ResolvePhotoUrl(FileOwner.AssetPhotoProfile, referenceId),
+            "Employee" =>
+                FileResourceUrlResolver.ResolveDownloadUrl(FileOwner.Employee, referenceId, fileAttachmentId),
+            "EmployeePhotoProfile" =>
+                FileResourceUrlResolver.ResolvePhotoUrl(FileOwner.EmployeePhotoProfile, referenceId),
+            "AssetTransaction" =>
+                FileResourceUrlResolver.ResolveDownloadUrl(FileOwner.AssetTransaction, referenceId, fileAttachmentId),
+            "AssetTransactionApprove" =>
+                FileResourceUrlResolver.ResolveDownloadUrl(FileOwner.AssetTransactionApprove, referenceId, fileAttachmentId),
+            "UserPhotoProfile" =>
+                FileResourceUrlResolver.ResolvePhotoUrl(FileOwner.UserPhotoProfile, referenceId),
             _ => null
         };
     }

@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Http;
+using Whitebird.Domain.Features.FileAttachment;
 
 namespace Whitebird.App.Features.FileAttachment;
 
@@ -37,14 +38,22 @@ public class FileAttachmentUpdateViewModel
     public bool IsPrimary { get; set; }
 }
 
-public class FileAttachmentResponseDto
+/// <summary>
+/// Upload response returned by <c>IFileAttachmentService.UploadAsync</c>,
+/// <c>UploadBytesAsync</c>, and <c>UploadMultipleAsync</c>.
+///
+/// Inherits the standardized <see cref="FileResourceDto"/> shape (including
+/// <c>DownloadUrl</c>, <c>ContentType</c>, <c>FileSize</c>, and the temporary
+/// <c>FileUrl</c> alias) and adds <see cref="PreviewUrl"/> for image previews.
+///
+/// URLs are RELATIVE (produced by <see cref="FileResourceUrlResolver"/>); the
+/// frontend prepends its configured backend base URL.
+/// </summary>
+public class FileAttachmentResponseDto : FileResourceDto
 {
-    public int FileAttachmentId { get; set; }
-    public string FileName { get; set; } = default!;
-    public string OriginalFileName { get; set; } = default!;
-    public string? FileUrl { get; set; }
+    /// <summary>
+    /// Preview URL for images (same value as <see cref="FileResourceDto.DownloadUrl"/>
+    /// for image files, null otherwise).
+    /// </summary>
     public string? PreviewUrl { get; set; }
-    public long? FileSize { get; set; }
-    public string? FileCategory { get; set; }
-    public bool IsPrimary { get; set; }
 }

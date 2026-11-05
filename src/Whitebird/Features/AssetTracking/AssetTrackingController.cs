@@ -55,17 +55,6 @@ public class AssetTrackingController : ControllerBase
     // ============================================================
     // SCHEDULE STATS — route assetId is the source of truth
     // ============================================================
-    //
-    // Pre-H7 the {assetId:int} route parameter was declared but ignored; the
-    // service read request.AssetId from the querystring. A client that put the
-    // ID only in the route received 0 rows silently. The route is now bound
-    // into the request before delegation, matching GetTrackingDetail /
-    // GetTimeline / GetTransactionTypeStats / GetPhoto / GetAttachments.
-    //
-    // P3-2: The schedule type is supplied via the "scheduleType" query parameter
-    // (supported values: "handover", "return", "maintenance"). For backward
-    // compatibility, the legacy "search" query parameter continues to work as
-    // a fallback selector; new clients should use "scheduleType".
 
     [HttpGet("{assetId:int}/schedule-stats")]
     public async Task<IActionResult> GetScheduleStats(int assetId, [FromQuery] AssetTrackingGridRequest request)
@@ -85,9 +74,6 @@ public class AssetTrackingController : ControllerBase
     // ============================================================
     // EMPLOYEE HISTORY — route assetId is the source of truth
     // ============================================================
-    //
-    // Same fix as schedule-stats above: the route parameter is bound into the
-    // request so a route-only client no longer receives 0 rows.
 
     [HttpGet("{assetId:int}/employee-history")]
     public async Task<IActionResult> GetEmployeeHistory(int assetId, [FromQuery] AssetTrackingGridRequest request)
@@ -107,6 +93,7 @@ public class AssetTrackingController : ControllerBase
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
 
+        Response.Headers["Cache-Control"] = "private, max-age=60, must-revalidate";
         return File(result.Data.Bytes, result.Data.ContentType);
     }
 

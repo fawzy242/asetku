@@ -120,6 +120,10 @@ public class UserController : ControllerBase
         if (!result.IsSuccess || result.Data == null)
             return this.HandleResult(result);
 
+        // Private caching: user profile photos are personal data. Short TTL
+        // so a replacement photo shows up within a minute; must-revalidate
+        // after expiry. Consistent with Employee / Asset photo endpoints.
+        Response.Headers["Cache-Control"] = "private, max-age=60, must-revalidate";
         return File(result.Data.Bytes, result.Data.ContentType);
     }
 

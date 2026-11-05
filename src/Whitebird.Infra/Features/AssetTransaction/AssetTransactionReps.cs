@@ -8,7 +8,12 @@ using Whitebird.Infra.Features.Common;
 namespace Whitebird.Infra.Features.AssetTransaction;
 
 /// <summary>
-/// Repository implementation for Asset Transaction operations using Dapper
+/// Repository implementation for Asset Transaction operations using Dapper.
+///
+/// URL contract: attachment queries return metadata only. URL construction
+/// (attachment downloads, approve-attachment downloads) is the Application
+/// layer's responsibility — see <c>AssetTransactionService</c> which uses
+/// <c>FileResourceUrlResolver</c> after these calls return.
 /// </summary>
 public class AssetTransactionReps : IAssetTransactionReps
 {
@@ -23,9 +28,6 @@ public class AssetTransactionReps : IAssetTransactionReps
     // SHARED SQL HELPERS
     // ============================================================
 
-    /// <summary>
-    /// Builds a safe ORDER BY clause for asset transaction grids.
-    /// </summary>
     private static string BuildSafeOrderBy(string? requestedSortBy, bool sortDescending)
     {
         const string defaultSort = "t.TransactionDate";
@@ -42,10 +44,6 @@ public class AssetTransactionReps : IAssetTransactionReps
         return $"ORDER BY {sortBy} {(sortDescending ? "DESC" : "ASC")}";
     }
 
-    /// <summary>
-    /// Applies OFFSET / FETCH parameters, clamping PageSize to
-    /// <see cref="GridQueryBuilder.MaxPageSize"/> except the int.MaxValue sentinel.
-    /// </summary>
     private static void AddPaginationParameters(int page, int pageSize, DynamicParameters parameters)
     {
         var effectivePageSize = GridQueryBuilder.ClampPageSize(pageSize);
@@ -55,9 +53,6 @@ public class AssetTransactionReps : IAssetTransactionReps
         parameters.Add("@PageSize", effectivePageSize);
     }
 
-    /// <summary>
-    /// Loads the master list of required approve document types from MasterData.
-    /// </summary>
     private async Task<List<ApproveDocumentTypeMaster>> GetMasterApproveDocumentTypesAsync()
     {
         const string sql = @"
@@ -149,8 +144,11 @@ public class AssetTransactionReps : IAssetTransactionReps
     }
 
     // ============================================================
-    // BATCH ATTACHMENT RETRIEVAL (Fixes N+1 Query)
+    // BATCH ATTACHMENT RETRIEVAL — metadata only
     // ============================================================
+    //
+    // No FileUrl projection. The Application layer enriches DownloadUrl after
+    // this method returns.
 
     private async Task<Dictionary<int, List<AssetTransactionAttachmentView>>> GetAttachmentsForTransactionsAsync(IEnumerable<int> transactionIds)
     {
@@ -168,8 +166,9 @@ public class AssetTransactionReps : IAssetTransactionReps
                 fa.FileName,
                 fa.OriginalFileName,
                 fa.FileCategory,
-                fa.IsPrimary,
-                '/api/AssetTransaction/' + CAST(ata.AssetTransactionId AS VARCHAR) + '/attachments/' + CAST(fa.FileAttachmentId AS VARCHAR) + '/download' as FileUrl
+                fa.FileMimeType as ContentType,
+                fa.FileSize,
+                fa.IsPrimary
             FROM AssetTransactionAttachment ata
             INNER JOIN FileAttachment fa ON ata.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE ata.AssetTransactionId IN @Ids AND ata.IsActive = 1
@@ -198,7 +197,10 @@ public class AssetTransactionReps : IAssetTransactionReps
                 ataa.CreatedBy,
                 fa.FileName,
                 fa.OriginalFileName,
-                '/api/AssetTransaction/' + CAST(ataa.AssetTransactionId AS VARCHAR) + '/approve-attachments/' + CAST(fa.FileAttachmentId AS VARCHAR) + '/download' as FileUrl,
+                fa.FileCategory,
+                fa.FileMimeType as ContentType,
+                fa.FileSize,
+                fa.IsPrimary,
                 md.MasterDataName as DocumentTypeName,
                 CASE WHEN md.ReferenceCode IS NOT NULL THEN 1 ELSE 0 END as IsRequired
             FROM AssetTransactionApproveAttachment ataa
@@ -213,7 +215,7 @@ public class AssetTransactionReps : IAssetTransactionReps
     }
 
     // ============================================================
-    // BATCH PAIR LOOKUP (Fixes N+1 in action-flag calculation)
+    // BATCH PAIR LOOKUP (unchanged)
     // ============================================================
 
     private async Task<Dictionary<int, HashSet<int>>> GetPairedTransactionsAsync(IEnumerable<int> rootIds)
@@ -391,8 +393,14 @@ public class AssetTransactionReps : IAssetTransactionReps
                         FileAttachmentId = a.FileAttachmentId,
                         FileName = a.FileName ?? string.Empty,
                         OriginalFileName = a.OriginalFileName ?? string.Empty,
-                        FileUrl = a.FileUrl,
-                        Order = a.Order
+                        FileCategory = a.FileCategory,
+                        ContentType = a.ContentType,
+                        FileSize = a.FileSize,
+                        IsPrimary = a.IsPrimary,
+                        Order = a.Order,
+                        CreatedDate = a.CreatedDate,
+                        // DownloadUrl enriched by AssetTransactionService.
+                        DownloadUrl = null
                     }).ToList();
                 }
 
@@ -404,12 +412,18 @@ public class AssetTransactionReps : IAssetTransactionReps
                         FileAttachmentId = a.FileAttachmentId,
                         FileName = a.FileName ?? string.Empty,
                         OriginalFileName = a.OriginalFileName ?? string.Empty,
-                        FileUrl = a.FileUrl,
+                        FileCategory = a.FileCategory,
+                        ContentType = a.ContentType,
+                        FileSize = a.FileSize,
+                        IsPrimary = a.IsPrimary,
+                        Order = a.Order,
+                        CreatedDate = a.CreatedDate,
                         DocumentType = a.DocumentType,
                         DocumentTypeName = a.DocumentTypeName,
                         NeedToChange = a.NeedToChange,
                         Approved = a.Approved,
-                        Order = a.Order
+                        // DownloadUrl enriched by AssetTransactionService.
+                        DownloadUrl = null
                     }).ToList();
                 }
 
@@ -432,7 +446,7 @@ public class AssetTransactionReps : IAssetTransactionReps
     }
 
     // ============================================================
-    // ACTION FLAGS (pure in-memory; no DB access)
+    // ACTION FLAGS (unchanged)
     // ============================================================
 
     private static (bool CanEdit, bool CanDelete, bool CanReturn, bool CanPost) CalculateActionFlags(
@@ -486,6 +500,8 @@ public class AssetTransactionReps : IAssetTransactionReps
     // ============================================================
     // GRID - PENDING APPROVAL (Uncompleted)
     // ============================================================
+    //
+    // Checklist mapping is unchanged (no URL fields on ApproveAttachmentStatusDto).
 
     public async Task<PaginatedResult<AssetTransactionPendingApprovalView>> GetGridPendingApprovalAsync(AssetTransactionGridRequest request)
     {
@@ -974,10 +990,8 @@ public class AssetTransactionReps : IAssetTransactionReps
     }
 
     // ============================================================
-    // HARD-DELETE FK DEPENDENCY COUNTS (H9)
+    // HARD-DELETE FK DEPENDENCY COUNTS
     // ============================================================
-    // No IsActive filter: an inactive row still satisfies its FK on
-    // AssetTransaction, so hard-delete must be refused in either case.
 
     public async Task<int> GetAttachmentCountAsync(int transactionId)
     {
@@ -1005,8 +1019,6 @@ public class AssetTransactionReps : IAssetTransactionReps
 
     public async Task<int> GetScheduleMaintenanceCountAsync(int transactionId)
     {
-        // Two FK columns point at AssetTransaction from ScheduleMaintenance:
-        // MaintenanceAssetTransactionId and PostAssetTransactionId.
         const string sql = @"
             SELECT COUNT(*) FROM ScheduleMaintenance 
             WHERE MaintenanceAssetTransactionId = @TransactionId 
@@ -1096,6 +1108,11 @@ public class AssetTransactionReps : IAssetTransactionReps
         return await _context.ExecuteScalarAsync<int>(sql, entity);
     }
 
+    /// <summary>
+    /// Returns attachment metadata for a transaction. DownloadUrl is not
+    /// populated here — <c>AssetTransactionService.GetAttachmentsAsync</c>
+    /// enriches it via FileResourceUrlResolver.
+    /// </summary>
     public async Task<IEnumerable<AssetTransactionAttachmentView>> GetAttachmentsByTransactionIdAsync(int transactionId)
     {
         const string sql = @"
@@ -1103,7 +1120,7 @@ public class AssetTransactionReps : IAssetTransactionReps
                 ata.AssetTransactionAttachmentId, ata.AssetTransactionId, ata.FileAttachmentId,
                 ata.[Order], ata.CreatedDate, ata.CreatedBy,
                 fa.FileName, fa.OriginalFileName, fa.FileCategory, fa.IsPrimary,
-                '/api/AssetTransaction/' + CAST(ata.AssetTransactionId AS VARCHAR) + '/attachments/' + CAST(fa.FileAttachmentId AS VARCHAR) + '/download' as FileUrl
+                fa.FileMimeType as ContentType, fa.FileSize
             FROM AssetTransactionAttachment ata
             INNER JOIN FileAttachment fa ON ata.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE ata.AssetTransactionId = @TransactionId AND ata.IsActive = 1
@@ -1149,6 +1166,11 @@ public class AssetTransactionReps : IAssetTransactionReps
         return await _context.ExecuteScalarAsync<int>(sql, entity);
     }
 
+    /// <summary>
+    /// Returns approve-attachment metadata for a transaction. DownloadUrl is
+    /// not populated here — <c>AssetTransactionService.GetApproveAttachmentsAsync</c>
+    /// enriches it via FileResourceUrlResolver (approve-attachments URL form).
+    /// </summary>
     public async Task<IEnumerable<AssetTransactionApproveAttachmentView>> GetApproveAttachmentsByTransactionIdAsync(int transactionId)
     {
         const string sql = @"
@@ -1156,8 +1178,8 @@ public class AssetTransactionReps : IAssetTransactionReps
                 ataa.AssetTransactionApproveAttachmentId, ataa.AssetTransactionId, ataa.FileAttachmentId,
                 ataa.[Order], ataa.DocumentType, ataa.NeedToChange, ataa.Approved,
                 ataa.CreatedDate, ataa.CreatedBy,
-                fa.FileName, fa.OriginalFileName,
-                '/api/AssetTransaction/' + CAST(ataa.AssetTransactionId AS VARCHAR) + '/approve-attachments/' + CAST(fa.FileAttachmentId AS VARCHAR) + '/download' as FileUrl,
+                fa.FileName, fa.OriginalFileName, fa.FileCategory, fa.IsPrimary,
+                fa.FileMimeType as ContentType, fa.FileSize,
                 md.MasterDataName as DocumentTypeName,
                 CASE WHEN md.ReferenceCode IS NOT NULL THEN 1 ELSE 0 END as IsRequired
             FROM AssetTransactionApproveAttachment ataa

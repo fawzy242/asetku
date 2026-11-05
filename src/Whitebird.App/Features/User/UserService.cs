@@ -13,6 +13,13 @@ namespace Whitebird.App.Features.User;
 /// <summary>
 /// Service implementation for User business logic (Profile Management).
 ///
+/// URL contract:
+///   * <c>UserDto.ProfilePhotoUrl</c> is a RELATIVE URL produced by
+///     <see cref="FileResourceUrlResolver"/>; it is null when the user has no
+///     active photo profile record. The frontend prepends its configured
+///     backend base URL.
+///   * This service never references scheme, host, or port.
+///
 /// Profile photo operations are routed through the internal
 /// <see cref="IFileAttachmentService"/>, matching the pattern used by
 /// Asset, Employee, and AssetTransaction. The service is the shared
@@ -25,7 +32,6 @@ public class UserService : BaseService, IUserService
     private readonly IFileAttachmentService _fileAttachmentService;
     private readonly IActivityLogService _activityLogService;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public UserService(
         IUserReps userReps,
@@ -33,7 +39,6 @@ public class UserService : BaseService, IUserService
         IFileAttachmentService fileAttachmentService,
         IActivityLogService activityLogService,
         ICurrentUserService currentUserService,
-        IHttpContextAccessor httpContextAccessor,
         ILogger<UserService> logger) : base(logger)
     {
         _userReps = userReps;
@@ -41,8 +46,11 @@ public class UserService : BaseService, IUserService
         _fileAttachmentService = fileAttachmentService;
         _activityLogService = activityLogService;
         _currentUserService = currentUserService;
-        _httpContextAccessor = httpContextAccessor;
     }
+
+    // ============================================================
+    // READ
+    // ============================================================
 
     public async Task<ServiceResult<UserDto>> GetUserBySessionTokenAsync(string sessionToken)
     {
@@ -54,23 +62,7 @@ public class UserService : BaseService, IUserService
                 return ServiceResult<UserDto>.NotFound("Invalid or expired session");
             }
 
-            var (roleId, roleName) = await _userReps.GetUserRoleAsync(user.UserId);
-
-            var request = _httpContextAccessor.HttpContext?.Request;
-            var profilePhotoUrl = request != null
-                ? $"{request.Scheme}://{request.Host}/api/User/profile-photo"
-                : null;
-
-            return ServiceResult<UserDto>.Success(new UserDto
-            {
-                UserId = user.UserId,
-                Email = user.Email,
-                FullName = user.FullName,
-                RoleId = roleId,
-                RoleName = roleName,
-                Username = user.Username,
-                ProfilePhotoUrl = profilePhotoUrl
-            });
+            return ServiceResult<UserDto>.Success(await BuildUserDtoAsync(user));
         }, "get user by session token");
     }
 
@@ -84,25 +76,13 @@ public class UserService : BaseService, IUserService
                 return ServiceResult<UserDto>.NotFound("User not found");
             }
 
-            var (roleId, roleName) = await _userReps.GetUserRoleAsync(user.UserId);
-
-            var request = _httpContextAccessor.HttpContext?.Request;
-            var profilePhotoUrl = request != null
-                ? $"{request.Scheme}://{request.Host}/api/User/profile-photo"
-                : null;
-
-            return ServiceResult<UserDto>.Success(new UserDto
-            {
-                UserId = user.UserId,
-                Email = user.Email,
-                FullName = user.FullName,
-                RoleId = roleId,
-                RoleName = roleName,
-                Username = user.Username,
-                ProfilePhotoUrl = profilePhotoUrl
-            });
+            return ServiceResult<UserDto>.Success(await BuildUserDtoAsync(user));
         }, "get user by id");
     }
+
+    // ============================================================
+    // UPDATE PROFILE
+    // ============================================================
 
     public async Task<ServiceResult<UserDto>> UpdateProfileAsync(int userId, UpdateProfileRequest request)
     {
@@ -136,25 +116,15 @@ public class UserService : BaseService, IUserService
                 $"Profile updated: Name '{oldFullName}' -> '{request.FullName}', Email '{oldEmail}' -> '{request.Email}', Phone '{oldPhoneNumber}' -> '{request.PhoneNumber}'",
                 _currentUserService.GetDisplayName());
 
-            var (roleId, roleName) = await _userReps.GetUserRoleAsync(user.UserId);
-
-            var requestContext = _httpContextAccessor.HttpContext?.Request;
-            var profilePhotoUrl = requestContext != null
-                ? $"{requestContext.Scheme}://{requestContext.Host}/api/User/profile-photo"
-                : null;
-
-            return ServiceResult<UserDto>.Success(new UserDto
-            {
-                UserId = user.UserId,
-                Email = user.Email,
-                FullName = user.FullName,
-                RoleId = roleId,
-                RoleName = roleName,
-                Username = user.Username,
-                ProfilePhotoUrl = profilePhotoUrl
-            }, "Profile updated successfully");
+            return ServiceResult<UserDto>.Success(
+                await BuildUserDtoAsync(user),
+                "Profile updated successfully");
         }, "update profile");
     }
+
+    // ============================================================
+    // CHANGE PASSWORD
+    // ============================================================
 
     public async Task<ServiceResult> ChangePasswordAsync(int userId, ChangePasswordRequest request)
     {
@@ -189,6 +159,10 @@ public class UserService : BaseService, IUserService
         }, "change password");
     }
 
+    // ============================================================
+    // PROFILE PHOTO
+    // ============================================================
+
     public async Task<ServiceResult<string>> UploadProfilePhotoAsync(int userId, IFormFile file)
     {
         // Centralised upload validation (extension + size).
@@ -206,8 +180,8 @@ public class UserService : BaseService, IUserService
 
         return await ExecuteWithTransactionAsync(async () =>
         {
-            // Replace any existing photo. Metadata soft-delete + (Batch 3) physical
-            // file removal is handled by IFileAttachmentService.DeleteAsync.
+            // Replace any existing photo. Metadata soft-delete + physical file
+            // removal are handled by IFileAttachmentService.DeleteAsync.
             var existingPhoto = await _userReps.GetPhotoProfileByUserIdAsync(userId);
             if (existingPhoto != null)
             {
@@ -215,16 +189,15 @@ public class UserService : BaseService, IUserService
                 await _fileAttachmentService.DeleteAsync(existingPhoto.FileAttachmentId);
             }
 
-            // Read the uploaded stream into bytes for the shared upload path.
             using var stream = file!.OpenReadStream();
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);
             var bytes = ms.ToArray();
 
-            // Upload through the shared internal file-attachment service. This is
-            // the same primitive used by Asset/Employee/AssetTransaction; it
-            // performs the storage-layer defence-in-depth extension/size check and
-            // builds a FileUrl pointing at /api/User/profile-photo.
+            // Upload through the shared internal file-attachment service. The
+            // FileUrl / DownloadUrl produced by the service for reference table
+            // "UserPhotoProfile" is exactly the User profile-photo endpoint
+            // (see FileResourceUrlResolver).
             var uploadResult = await _fileAttachmentService.UploadBytesAsync(
                 referenceTable: "UserPhotoProfile",
                 referenceId: userId,
@@ -261,7 +234,7 @@ public class UserService : BaseService, IUserService
                 $"Profile photo uploaded for user '{user.Username}'",
                 _currentUserService.GetDisplayName());
 
-            var photoUrl = uploadResult.Data.FileUrl ?? string.Empty;
+            var photoUrl = uploadResult.Data.DownloadUrl ?? string.Empty;
             return ServiceResult<string>.Success(photoUrl, "Profile photo uploaded successfully");
         }, "upload profile photo");
     }
@@ -283,6 +256,7 @@ public class UserService : BaseService, IUserService
             }
 
             // Shared primitive: returns bytes + content-type + file-name in one call.
+            // If the physical file is missing, DownloadAsync already returns NotFound.
             return await _fileAttachmentService.DownloadAsync(photoProfile.FileAttachmentId);
         }, "get profile photo");
     }
@@ -318,5 +292,36 @@ public class UserService : BaseService, IUserService
 
             return ServiceResult.Success("Profile photo deleted successfully");
         }, "delete profile photo");
+    }
+
+    // ============================================================
+    // PRIVATE HELPERS
+    // ============================================================
+
+    /// <summary>
+    /// Builds a <see cref="UserDto"/> from a user entity. Resolves role via
+    /// UserRoles/Roles and profile photo via UsersPhotoProfileAttachment.
+    /// The returned <see cref="UserDto.ProfilePhotoUrl"/> is a RELATIVE URL,
+    /// or null when no active photo exists.
+    /// </summary>
+    private async Task<UserDto> BuildUserDtoAsync(UsersEntity user)
+    {
+        var (roleId, roleName) = await _userReps.GetUserRoleAsync(user.UserId);
+
+        var photoProfile = await _userReps.GetPhotoProfileByUserIdAsync(user.UserId);
+        var profilePhotoUrl = photoProfile != null
+            ? FileResourceUrlResolver.ResolvePhotoUrl(FileOwner.UserPhotoProfile, user.UserId)
+            : null;
+
+        return new UserDto
+        {
+            UserId = user.UserId,
+            Email = user.Email,
+            FullName = user.FullName,
+            RoleId = roleId,
+            RoleName = roleName,
+            Username = user.Username,
+            ProfilePhotoUrl = profilePhotoUrl
+        };
     }
 }

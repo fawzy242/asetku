@@ -8,7 +8,12 @@ using Whitebird.Infra.Features.Common;
 namespace Whitebird.Infra.Features.AssetTracking;
 
 /// <summary>
-/// Repository implementation for Asset Tracking operations using Dapper
+/// Repository implementation for Asset Tracking operations using Dapper.
+///
+/// URL contract: this repository returns metadata only. URL construction
+/// (photo profile, attachment downloads) is the Application layer's
+/// responsibility — see <c>AssetTrackingService</c> which uses
+/// <c>FileResourceUrlResolver</c> after these calls return.
 /// </summary>
 public class AssetTrackingReps : IAssetTrackingReps
 {
@@ -39,6 +44,11 @@ public class AssetTrackingReps : IAssetTrackingReps
     // ============================================================
     // DETAIL TRACKING
     // ============================================================
+    //
+    // PhotoProfileUrl is left null here; AssetTrackingService enriches it
+    // via FileResourceUrlResolver. Attachment metadata returned by
+    // GetAttachmentsByAssetIdAsync is also URL-less; the service enriches
+    // each entry's DownloadUrl.
 
     public async Task<AssetTrackingView?> GetTrackingDetailAsync(int assetId)
     {
@@ -48,7 +58,6 @@ public class AssetTrackingReps : IAssetTrackingReps
         var timeline = await GetTimelineAsync(assetId);
         var software = await GetSoftwareInstallationByAssetIdAsync(assetId);
         var attachments = await GetAttachmentsByAssetIdAsync(assetId);
-        var photoProfile = await GetPhotoProfileByAssetIdAsync(assetId);
         var totalTransactions = await GetTransactionCountAsync(assetId);
 
         return new AssetTrackingView
@@ -72,7 +81,8 @@ public class AssetTrackingReps : IAssetTrackingReps
             PurchasePrice = asset.PurchasePrice,
             WarrantyExpiryDate = asset.WarrantyExpiryDate,
             TotalTransactions = totalTransactions,
-            PhotoProfileUrl = photoProfile?.FileUrl,
+            // Enriched by AssetTrackingService.GetTrackingDetailAsync.
+            PhotoProfileUrl = null,
             Attachments = attachments.ToList(),
             SoftwareInstallation = software,
             Timeline = timeline.ToList()
@@ -86,7 +96,7 @@ public class AssetTrackingReps : IAssetTrackingReps
     }
 
     // ============================================================
-    // STATS HEADER — FIX: Tambahkan EmployeeId, OfficeId, Condition di subquery lt
+    // STATS HEADER
     // ============================================================
 
     public async Task<AssetStatsView?> GetAssetStatsAsync(int assetId)
@@ -197,32 +207,47 @@ public class AssetTrackingReps : IAssetTrackingReps
     // ============================================================
     // ATTACHMENTS
     // ============================================================
+    //
+    // Metadata only. URLs are enriched by AssetTrackingService. The Asset
+    // Tracking menu reuses the Asset menu's attachment download endpoint.
 
     public async Task<IEnumerable<AssetTrackingAttachmentDto>> GetAttachmentsByAssetIdAsync(int assetId)
     {
-        // AssetTracking is a read-only view over the Asset resource. Attachment URLs
-        // resolve to the Asset menu's own download endpoint — FileAttachment has no
-        // HTTP surface of its own.
         const string sql = @"
             SELECT 
-                fa.FileAttachmentId, fa.FileName, fa.OriginalFileName, fa.FileCategory, fa.IsPrimary,
-                '/api/Asset/' + CAST(aa.AssetId AS VARCHAR) + '/attachments/' + CAST(fa.FileAttachmentId AS VARCHAR) + '/download' as FileUrl
+                aa.FileAttachmentId,
+                fa.FileName,
+                fa.OriginalFileName,
+                fa.FileCategory,
+                fa.FileMimeType as ContentType,
+                fa.FileSize,
+                fa.IsPrimary,
+                aa.[Order],
+                aa.CreatedDate
             FROM AssetAttachment aa
             INNER JOIN FileAttachment fa ON aa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE aa.AssetId = @AssetId AND aa.IsActive = 1
-            ORDER BY aa.Order ASC, fa.CreatedDate DESC";
+            ORDER BY aa.[Order] ASC, fa.CreatedDate DESC";
 
         return await _context.QueryAsync<AssetTrackingAttachmentDto>(sql, new { AssetId = assetId });
     }
 
+    /// <summary>
+    /// Returns metadata of the asset's active photo profile (if any). URL is
+    /// not populated here — the Application layer resolves it via
+    /// <c>FileResourceUrlResolver.ResolvePhotoUrl(FileOwner.AssetPhotoProfile, assetId)</c>.
+    /// </summary>
     public async Task<AssetTrackingAttachmentDto?> GetPhotoProfileByAssetIdAsync(int assetId)
     {
-        // Asset photo resolves to the Asset menu's own photo endpoint
-        // (GET /api/Asset/{id}/photo).
         const string sql = @"
             SELECT TOP 1
-                fa.FileAttachmentId, fa.FileName, fa.OriginalFileName, fa.FileCategory, fa.IsPrimary,
-                '/api/Asset/' + CAST(appa.AssetId AS VARCHAR) + '/photo' as FileUrl
+                fa.FileAttachmentId,
+                fa.FileName,
+                fa.OriginalFileName,
+                fa.FileCategory,
+                fa.FileMimeType as ContentType,
+                fa.FileSize,
+                fa.IsPrimary
             FROM AssetPhotoProfileAttachment appa
             INNER JOIN FileAttachment fa ON appa.FileAttachmentId = fa.FileAttachmentId AND fa.IsActive = 1
             WHERE appa.AssetId = @AssetId AND appa.IsActive = 1
@@ -234,17 +259,6 @@ public class AssetTrackingReps : IAssetTrackingReps
     // ============================================================
     // SCHEDULE STATS
     // ============================================================
-    //
-    // P0-3 FIX: The "maintenance" branch previously referenced a
-    // non-existent EmployeeId column on ScheduleMaintenance. ScheduleMaintenance
-    // has no employee column (per migration CreateTableScheduleMaintenance).
-    // Employee-related SQL (join + FullName projection) is now only emitted
-    // for handover and return. For maintenance, EmployeeName is returned as
-    // NULL so the DTO shape is preserved.
-    //
-    // P3-2: Schedule type is read from request.ScheduleType first. If null,
-    // falls back to request.Search for backward compatibility with clients
-    // that used the legacy "search" selector.
 
     public async Task<PaginatedResult<AssetTrackingScheduleStatsDto>> GetScheduleStatsAsync(AssetTrackingGridRequest request)
     {
@@ -259,7 +273,6 @@ public class AssetTrackingReps : IAssetTrackingReps
             request.SortDescending = true;
         }
 
-        // P3-2: prefer dedicated ScheduleType; fall back to Search for legacy clients.
         var scheduleType = (request.ScheduleType ?? request.Search)?.ToLower();
 
         string tableName, idColumn, typeColumn, statusColumn;
@@ -284,7 +297,6 @@ public class AssetTrackingReps : IAssetTrackingReps
             case "maintenance":
                 tableName = "ScheduleMaintenance";
                 idColumn = "ScheduleMaintenanceId";
-                // ScheduleMaintenance has no EmployeeId column.
                 employeeColumn = null;
                 typeColumn = "'Maintenance'";
                 statusColumn = "CASE WHEN MaintenanceAssetTransactionId IS NOT NULL THEN 'Completed' ELSE 'Pending' END";

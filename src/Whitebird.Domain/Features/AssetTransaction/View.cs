@@ -1,3 +1,5 @@
+using Whitebird.Domain.Features.FileAttachment;
+
 namespace Whitebird.Domain.Features.AssetTransaction;
 
 /// <summary>
@@ -56,37 +58,35 @@ public class AssetTransactionListView
 }
 
 /// <summary>
-/// Attachment info for transaction grid
+/// Attachment info for transaction grid.
+/// Inherits the standardized FileResourceDto shape; DownloadUrl is populated
+/// by AssetTransactionService via FileResourceUrlResolver.
 /// </summary>
-public class AssetTransactionAttachmentInfoDto
+public class AssetTransactionAttachmentInfoDto : FileResourceDto
 {
     public int AssetTransactionAttachmentId { get; set; }
-    public int FileAttachmentId { get; set; }
-    public string FileName { get; set; } = string.Empty;
-    public string OriginalFileName { get; set; } = string.Empty;
-    public string? FileUrl { get; set; }
-    public int Order { get; set; }
 }
 
 /// <summary>
-/// Approve attachment info for transaction grid
+/// Approve attachment info for transaction grid.
+/// Inherits the standardized FileResourceDto shape and adds the approve-document
+/// fields. DownloadUrl is populated by AssetTransactionService via
+/// FileResourceUrlResolver (approve-attachments URL form).
 /// </summary>
-public class AssetTransactionApproveAttachmentInfoDto
+public class AssetTransactionApproveAttachmentInfoDto : FileResourceDto
 {
     public int AssetTransactionApproveAttachmentId { get; set; }
-    public int FileAttachmentId { get; set; }
-    public string FileName { get; set; } = string.Empty;
-    public string OriginalFileName { get; set; } = string.Empty;
-    public string? FileUrl { get; set; }
     public int DocumentType { get; set; }
     public string? DocumentTypeName { get; set; }
     public bool NeedToChange { get; set; }
     public bool Approved { get; set; }
-    public int Order { get; set; }
 }
 
 /// <summary>
-/// View model for asset transaction detail (response from GetById)
+/// View model for asset transaction detail (response from GetById).
+/// Detail has no attachment list; attachments are read via the dedicated
+/// <c>/api/AssetTransaction/{id}/attachments</c> and
+/// <c>/approve-attachments</c> endpoints.
 /// </summary>
 public class AssetTransactionDetailView
 {
@@ -138,7 +138,10 @@ public class AssetTransactionDropdownView
 }
 
 /// <summary>
-/// View model for pending approval grid
+/// View model for pending approval grid.
+/// <see cref="Attachments"/> is a checklist of required document types — not a
+/// file-resource list. It therefore uses <see cref="ApproveAttachmentStatusDto"/>
+/// which has no URL fields.
 /// </summary>
 public class AssetTransactionPendingApprovalView
 {
@@ -163,7 +166,7 @@ public class AssetTransactionPendingApprovalView
 }
 
 /// <summary>
-/// DTO for approve attachment status
+/// DTO for approve attachment status (checklist item — not a file resource).
 /// </summary>
 public class ApproveAttachmentStatusDto
 {
@@ -178,40 +181,32 @@ public class ApproveAttachmentStatusDto
 }
 
 /// <summary>
-/// View model for asset transaction attachment
+/// View model for asset transaction attachment (returned by
+/// GET /api/AssetTransaction/{id}/attachments).
+/// Inherits the standardized FileResourceDto shape; DownloadUrl is populated
+/// by AssetTransactionService via FileResourceUrlResolver.
 /// </summary>
-public class AssetTransactionAttachmentView
+public class AssetTransactionAttachmentView : FileResourceDto
 {
     public int AssetTransactionAttachmentId { get; set; }
     public int AssetTransactionId { get; set; }
-    public int FileAttachmentId { get; set; }
-    public int Order { get; set; }
-    public string? FileName { get; set; }
-    public string? OriginalFileName { get; set; }
-    public string? FileUrl { get; set; }
-    public string? FileCategory { get; set; }
-    public bool IsPrimary { get; set; }
-    public DateTime CreatedDate { get; set; }
     public string CreatedBy { get; set; } = "System";
 }
 
 /// <summary>
-/// View model for asset transaction approve attachment
+/// View model for asset transaction approve attachment (returned by
+/// GET /api/AssetTransaction/{id}/approve-attachments).
+/// Inherits the standardized FileResourceDto shape; DownloadUrl is populated
+/// by AssetTransactionService via FileResourceUrlResolver (approve-attachments URL form).
 /// </summary>
-public class AssetTransactionApproveAttachmentView
+public class AssetTransactionApproveAttachmentView : FileResourceDto
 {
     public int AssetTransactionApproveAttachmentId { get; set; }
     public int AssetTransactionId { get; set; }
-    public int FileAttachmentId { get; set; }
-    public int Order { get; set; }
     public int DocumentType { get; set; }
     public string? DocumentTypeName { get; set; }
     public bool IsRequired { get; set; }
     public bool NeedToChange { get; set; }
     public bool Approved { get; set; }
-    public string? FileName { get; set; }
-    public string? OriginalFileName { get; set; }
-    public string? FileUrl { get; set; }
-    public DateTime CreatedDate { get; set; }
     public string CreatedBy { get; set; } = "System";
 }

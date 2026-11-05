@@ -16,7 +16,15 @@ using Whitebird.Infra.Features.Common;
 namespace Whitebird.App.Features.AssetTransaction;
 
 /// <summary>
-/// Service implementation for Asset Transaction business logic
+/// Service implementation for Asset Transaction business logic.
+///
+/// URL contract:
+///   * Attachment DownloadUrl (both transaction and approve-document forms)
+///     is a RELATIVE URL produced by <see cref="FileResourceUrlResolver"/>.
+///   * URLs are enriched here (not in SQL) because the repository returns
+///     metadata only.
+///   * The "pending approval" checklist (ApproveAttachmentStatusDto) is not a
+///     file resource and carries no URL — unchanged.
 /// </summary>
 public class AssetTransactionService : BaseService, IAssetTransactionService
 {
@@ -223,19 +231,10 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             var existing = await _transactionReps.GetByIdRawAsync(id);
             if (existing == null) return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
 
-            // H11 (Finding 1): refuse to edit an approved/rejected transaction.
-            // Matches the historic UpdateAsync guard and preserves the invariant
-            // that an approval decision reflects the state of the record at the
-            // time it was approved. To change an approved/rejected transaction,
-            // un-approve it via BulkPending first, edit, then re-approve via
-            // BulkApproved or the approval endpoint.
             if (existing.Approved != null)
                 return ServiceResult<AssetTransactionDetailView>.BadRequest(
                     "Cannot update an approved/rejected transaction. Un-approve it via BulkPending, then edit and re-approve.");
 
-            // H11 (Finding 2): refuse to deactivate a transaction that has a
-            // paired child. Same rule already enforced by SoftDeleteAsync and
-            // DeleteAsync. Deactivating a paired source would orphan the child.
             if (existing.IsActive && !model.IsActive)
             {
                 var paired = await _transactionReps.GetPairedTransactionAsync(id);
@@ -348,11 +347,6 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             var existing = await _transactionReps.GetByIdRawAsync(id);
             if (existing == null) return ServiceResult<AssetTransactionDetailView>.NotFound($"Transaction with id {id} not found");
 
-            // H11 (Finding 2): refuse to deactivate a transaction that has a
-            // paired child. Same rule as SoftDeleteAsync / DeleteAsync. This
-            // endpoint intentionally allows edits on approved transactions
-            // because it is the workflow surface for uploading approval
-            // documents and for re-approving after BulkPending.
             if (existing.IsActive && !model.IsActive)
             {
                 var paired = await _transactionReps.GetPairedTransactionAsync(id);
@@ -606,6 +600,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         return await ExecuteSafelyAsync(async () =>
         {
             var result = await _transactionReps.GetGridAddAsync(request);
+            EnrichAttachmentsForGrid(result.Data);
             return ServiceResult<PaginatedResult<AssetTransactionListView>>.Success(result);
         }, "get grid add");
     }
@@ -615,6 +610,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         return await ExecuteSafelyAsync(async () =>
         {
             var result = await _transactionReps.GetGridReturnAsync(request);
+            EnrichAttachmentsForGrid(result.Data);
             return ServiceResult<PaginatedResult<AssetTransactionListView>>.Success(result);
         }, "get grid return");
     }
@@ -873,7 +869,14 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             if (transaction == null)
                 return ServiceResult<IEnumerable<AssetTransactionAttachmentView>>.NotFound($"Transaction with id {transactionId} not found");
 
-            var attachments = await _transactionReps.GetAttachmentsByTransactionIdAsync(transactionId);
+            var attachments = (await _transactionReps.GetAttachmentsByTransactionIdAsync(transactionId)).ToList();
+
+            foreach (var att in attachments)
+            {
+                att.DownloadUrl = FileResourceUrlResolver.ResolveDownloadUrl(
+                    FileOwner.AssetTransaction, transactionId, att.FileAttachmentId);
+            }
+
             return ServiceResult<IEnumerable<AssetTransactionAttachmentView>>.Success(attachments);
         }, "get transaction attachments");
     }
@@ -886,7 +889,14 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             if (transaction == null)
                 return ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>.NotFound($"Transaction with id {transactionId} not found");
 
-            var attachments = await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(transactionId);
+            var attachments = (await _transactionReps.GetApproveAttachmentsByTransactionIdAsync(transactionId)).ToList();
+
+            foreach (var att in attachments)
+            {
+                att.DownloadUrl = FileResourceUrlResolver.ResolveDownloadUrl(
+                    FileOwner.AssetTransactionApprove, transactionId, att.FileAttachmentId);
+            }
+
             return ServiceResult<IEnumerable<AssetTransactionApproveAttachmentView>>.Success(attachments);
         }, "get transaction approve attachments");
     }
@@ -1007,6 +1017,28 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     // ============================================================
     // PRIVATE HELPERS
     // ============================================================
+
+    /// <summary>
+    /// Enriches the DownloadUrl on every attachment in a grid page.
+    /// Repositories return metadata only; this is where the relative URL is
+    /// stamped on each entry.
+    /// </summary>
+    private static void EnrichAttachmentsForGrid(IEnumerable<AssetTransactionListView> items)
+    {
+        foreach (var item in items)
+        {
+            foreach (var att in item.Attachments)
+            {
+                att.DownloadUrl = FileResourceUrlResolver.ResolveDownloadUrl(
+                    FileOwner.AssetTransaction, item.AssetTransactionId, att.FileAttachmentId);
+            }
+            foreach (var att in item.ApproveAttachments)
+            {
+                att.DownloadUrl = FileResourceUrlResolver.ResolveDownloadUrl(
+                    FileOwner.AssetTransactionApprove, item.AssetTransactionId, att.FileAttachmentId);
+            }
+        }
+    }
 
     private async Task ReevaluateCompletedAsync(int transactionId)
     {
