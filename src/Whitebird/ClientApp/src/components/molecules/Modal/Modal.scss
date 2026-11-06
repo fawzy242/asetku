@@ -1,3 +1,4 @@
+// src/components/molecules/Modal/Modal.scss
 @use '../../../styles/variables' as *;
 @use '../../../styles/mixins' as *;
 
@@ -18,13 +19,15 @@
 }
 
 .modal {
+    background-color: var(--card-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
     border-radius: $radius-xl;
     box-shadow: $shadow-xl;
     max-height: 90vh;
     display: flex;
     flex-direction: column;
     animation: slideInModal 0.25s ease-out;
-    border: 1px solid;
     width: 100%;
 
     &--sm {
@@ -59,13 +62,14 @@
     &__header {
         @include flex-between;
         padding: $spacing-lg;
-        border-bottom: 1px solid;
+        border-bottom: 1px solid var(--border);
         flex-shrink: 0;
     }
 
     &__title {
         font-size: $font-size-lg;
         font-weight: 600;
+        color: var(--text-primary);
     }
 
     &__close {
@@ -94,7 +98,7 @@
         justify-content: flex-end;
         gap: $spacing-md;
         padding: $spacing-lg;
-        border-top: 1px solid;
+        border-top: 1px solid var(--border);
         flex-shrink: 0;
     }
 }

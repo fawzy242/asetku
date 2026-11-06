@@ -82,7 +82,7 @@ const ScheduleReturn = () => {
     getSelectedIds,
   } = useBulkSelection({ idField: 'scheduleReturnId' });
 
-  const showCheckbox = true;
+  const showCheckbox = activeTab !== 'all';
   const showActivateToggle =
     activeTab === 'active' || activeTab === 'inactive';
 

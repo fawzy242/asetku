@@ -2,48 +2,25 @@
 @use '../../styles/variables' as *;
 @use '../../styles/mixins' as *;
 
+// ============================================================
+// ASSETS MENU
+//
+// After the B4 split into Monitoring + Management, this file
+// only needs grid-box and filter styling. The previous
+// `display: flex; gap: $spacing-xl` wrapper has been removed
+// because it doubled-up with each child's own margin
+// (PageHeader 24px + Tabs 24px + SearchToolbar 24px + gap 32px
+// = 56px per element). The default block layout now matches
+// Categories / Departments / Employees / Suppliers spacing.
+//
+// The `.assets-menu__section*` classes are also removed —
+// they became orphaned when the two `<section>` blocks were
+// flattened into mode-specific renders.
+// ============================================================
 .assets-menu {
     color: var(--text-primary);
-    display: flex;
-    flex-direction: column;
-    gap: $spacing-xl;
 
-    // ============================================================
-    // SECTIONS (Status grid / CRUD grid)
-    // ============================================================
-    &__section {
-        display: flex;
-        flex-direction: column;
-        gap: $spacing-sm;
-    }
-
-    &__section-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: $spacing-md;
-        margin-bottom: $spacing-xs;
-    }
-
-    &__section-title {
-        font-size: $font-size-lg;
-        font-weight: 600;
-        color: var(--text-primary);
-        margin: 0;
-        letter-spacing: -0.2px;
-    }
-
-    &__section-actions {
-        display: flex;
-        align-items: center;
-        gap: $spacing-sm;
-        flex-wrap: wrap;
-    }
-
-    // ============================================================
-    // GRID BOX (shared visual wrapper for both grids)
-    // ============================================================
+    // DataGrid wrapper — subtle card that holds the grid
     &__grid-box {
         background-color: var(--card-bg);
         border-radius: $radius-lg;
@@ -51,12 +28,10 @@
         border: 1px solid var(--border);
         width: 100%;
         min-width: 0;
-        margin-top: $spacing-xs;
+        margin-bottom: $spacing-md;
     }
 
-    // ============================================================
-    // CRUD GRID — Category / Supplier filter row
-    // ============================================================
+    // Category / Supplier filter strip (Management mode only)
     &__filters {
         background-color: var(--surface);
         padding: $spacing-sm $spacing-md;
@@ -67,6 +42,7 @@
         align-items: center;
         gap: $spacing-sm;
         margin-top: $spacing-xs;
+        margin-bottom: $spacing-md;
 
         @include respond-to('sm') {
             padding: $spacing-sm;

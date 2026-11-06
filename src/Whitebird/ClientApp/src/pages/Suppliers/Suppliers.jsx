@@ -58,7 +58,7 @@ const Suppliers = () => {
     getSelectedIds,
   } = useBulkSelection({ idField: 'supplierId' });
 
-  const showCheckbox = true;
+  const showCheckbox = activeTab !== 'all';
   const showActivateToggle =
     activeTab === 'active' || activeTab === 'inactive';
 
@@ -78,6 +78,7 @@ const Suppliers = () => {
     schema: supplierSchema,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] });
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       toast.success(
         editingSupplier
           ? 'Supplier updated successfully'
@@ -170,6 +171,7 @@ const Suppliers = () => {
       if (r.success && isMountedRef.current) {
         toast.success('Supplier deleted successfully');
         queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] });
+        queryClient.invalidateQueries({ queryKey: ['suppliers'] });
         reload();
         clearSelection();
       }
@@ -204,6 +206,7 @@ const Suppliers = () => {
 
       clearSelection();
       queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] });
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       reload();
     },
     [reload, queryClient, toast, confirm, clearSelection]
@@ -224,6 +227,7 @@ const Suppliers = () => {
         toast.success(`${count} supplier(s) ${actionText}d successfully`);
         clearSelection();
         queryClient.invalidateQueries({ queryKey: ['reference', 'suppliers'] });
+        queryClient.invalidateQueries({ queryKey: ['suppliers'] });
         reload();
       }
     },

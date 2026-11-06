@@ -82,7 +82,7 @@ const ScheduleHandover = () => {
     getSelectedIds,
   } = useBulkSelection({ idField: 'scheduleHandoverId' });
 
-  const showCheckbox = true;
+  const showCheckbox = activeTab !== 'all';
   const showActivateToggle =
     activeTab === 'active' || activeTab === 'inactive';
 

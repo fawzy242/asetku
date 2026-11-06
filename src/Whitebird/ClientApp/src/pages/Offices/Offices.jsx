@@ -63,7 +63,7 @@ const Offices = () => {
     getSelectedIds,
   } = useBulkSelection({ idField: 'officeId' });
 
-  const showCheckbox = true;
+  const showCheckbox = activeTab !== 'all';
   const showActivateToggle =
     activeTab === 'active' || activeTab === 'inactive';
 
@@ -83,6 +83,7 @@ const Offices = () => {
     schema: officeSchema,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reference', 'offices'] });
+      queryClient.invalidateQueries({ queryKey: ['offices'] });
       toast.success(
         editingOffice
           ? 'Office updated successfully'
@@ -183,6 +184,7 @@ const Offices = () => {
       if (r.success && isMountedRef.current) {
         toast.success('Office deleted successfully');
         queryClient.invalidateQueries({ queryKey: ['reference', 'offices'] });
+        queryClient.invalidateQueries({ queryKey: ['offices'] });
         reload();
         clearSelection();
       }
@@ -217,6 +219,7 @@ const Offices = () => {
 
       clearSelection();
       queryClient.invalidateQueries({ queryKey: ['reference', 'offices'] });
+      queryClient.invalidateQueries({ queryKey: ['offices'] });
       reload();
     },
     [reload, queryClient, toast, confirm, clearSelection]
@@ -237,6 +240,7 @@ const Offices = () => {
         toast.success(`${count} office(s) ${actionText}d successfully`);
         clearSelection();
         queryClient.invalidateQueries({ queryKey: ['reference', 'offices'] });
+        queryClient.invalidateQueries({ queryKey: ['offices'] });
         reload();
       }
     },

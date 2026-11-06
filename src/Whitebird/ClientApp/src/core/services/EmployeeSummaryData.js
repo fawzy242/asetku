@@ -1,3 +1,4 @@
+// src/core/services/EmployeeSummaryData.js
 import { employeeSummaryApi, employeeApi } from '../api/api';
 import BaseData from './BaseData';
 
@@ -19,7 +20,7 @@ class EmployeeSummaryData extends BaseData {
       return {
         success: false,
         data: [],
-        error: error.userMessage || error.message || 'Failed to load employees'
+        error: error.userMessage || error.message || 'Failed to load employees',
       };
     }
   }
@@ -39,7 +40,7 @@ class EmployeeSummaryData extends BaseData {
       }
       return {
         success: false,
-        error: error.userMessage || error.message || 'Failed to load employee detail'
+        error: error.userMessage || error.message || 'Failed to load employee detail',
       };
     }
   }
@@ -59,7 +60,49 @@ class EmployeeSummaryData extends BaseData {
       }
       return {
         success: false,
-        error: error.userMessage || error.message || 'Failed to load asset summary'
+        error: error.userMessage || error.message || 'Failed to load asset summary',
+      };
+    }
+  }
+
+  async fetchCurrentHolding(id, params) {
+    try {
+      const r = await this.api.getCurrentHolding(id, params);
+      if (r.data?.isSuccess !== undefined) {
+        return r.data.isSuccess
+          ? { success: true, data: r.data.data || { data: [], totalCount: 0 } }
+          : { success: false, error: r.data.message };
+      }
+      return { success: true, data: r.data || { data: [], totalCount: 0 } };
+    } catch (error) {
+      if (this.isCanceledError(error)) {
+        return { success: false, data: { data: [], totalCount: 0 }, error: 'canceled' };
+      }
+      return {
+        success: false,
+        data: { data: [], totalCount: 0 },
+        error: error.userMessage || error.message || 'Failed to load current holding',
+      };
+    }
+  }
+
+  async fetchTransactionHistory(id, params) {
+    try {
+      const r = await this.api.getTransactionHistory(id, params);
+      if (r.data?.isSuccess !== undefined) {
+        return r.data.isSuccess
+          ? { success: true, data: r.data.data || { data: [], totalCount: 0 } }
+          : { success: false, error: r.data.message };
+      }
+      return { success: true, data: r.data || { data: [], totalCount: 0 } };
+    } catch (error) {
+      if (this.isCanceledError(error)) {
+        return { success: false, data: { data: [], totalCount: 0 }, error: 'canceled' };
+      }
+      return {
+        success: false,
+        data: { data: [], totalCount: 0 },
+        error: error.userMessage || error.message || 'Failed to load transaction history',
       };
     }
   }

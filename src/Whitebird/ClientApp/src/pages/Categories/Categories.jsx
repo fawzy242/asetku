@@ -59,7 +59,11 @@ const Categories = () => {
     getSelectedIds,
   } = useBulkSelection({ idField: 'categoryId' });
 
-  const showCheckbox = true;
+  // "All" tab shows a mixed list of active + inactive records. Bulk
+  // selection there would be ambiguous (activate? deactivate? delete?),
+  // so we hide the checkbox column on All. Bulk operations are available
+  // on Active / Inactive tabs where the intent is clear.
+  const showCheckbox = activeTab !== 'all';
   const showActivateToggle =
     activeTab === 'active' || activeTab === 'inactive';
 
@@ -79,6 +83,7 @@ const Categories = () => {
     schema: categorySchema,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reference', 'categories'] });
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
       toast.success(
         editingCategory
           ? 'Category updated successfully'
@@ -178,6 +183,7 @@ const Categories = () => {
       if (r.success && isMountedRef.current) {
         toast.success('Category deleted successfully');
         queryClient.invalidateQueries({ queryKey: ['reference', 'categories'] });
+        queryClient.invalidateQueries({ queryKey: ['categories'] });
         reload();
         clearSelection();
       }
@@ -212,6 +218,7 @@ const Categories = () => {
 
       clearSelection();
       queryClient.invalidateQueries({ queryKey: ['reference', 'categories'] });
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
       reload();
     },
     [reload, queryClient, toast, confirm, clearSelection]
@@ -232,6 +239,7 @@ const Categories = () => {
         toast.success(`${count} categor(y/ies) ${actionText}d successfully`);
         clearSelection();
         queryClient.invalidateQueries({ queryKey: ['reference', 'categories'] });
+        queryClient.invalidateQueries({ queryKey: ['categories'] });
         reload();
       }
     },

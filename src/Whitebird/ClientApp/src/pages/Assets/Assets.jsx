@@ -57,16 +57,6 @@ const STATUS_TO_BACKEND = {
   damaged: 'Damaged',
 };
 
-/**
- * Assets page — dual-mode component.
- *
- *   initialMainTab="monitoring" -> status grid only (read-only, no CRUD)
- *   initialMainTab="management" -> CRUD grid with filters, import, bulk actions
- *
- * Mode is fixed at mount (matching the AssetTransactions pattern). Mode
- * changes happen via route navigation (/assets/monitoring vs
- * /assets/management), not via in-page tabs.
- */
 const Assets = ({ initialMainTab = 'monitoring' }) => {
   const [activeMainTab] = useState(initialMainTab);
   const isMonitoring = activeMainTab === 'monitoring';
@@ -120,9 +110,6 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
     getSelectedIds,
   } = useBulkSelection({ idField: 'assetId' });
 
-  // ============================================================
-  // FORM (shared Add/Edit modal)
-  // ============================================================
   const {
     register,
     handleSubmit: handleFormSubmit,
@@ -145,7 +132,7 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
   );
 
   // ============================================================
-  // STATUS GRID — DATA
+  // STATUS GRID — DATA (only fetches when in monitoring mode)
   // ============================================================
   const buildStatusFilters = useCallback(() => {
     const filters = {};
@@ -182,11 +169,12 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
     reload: reloadStatus,
   } = useGridData(
     ['assets-status', statusTab, statusSearch],
-    fetchStatusGridData
+    fetchStatusGridData,
+    { enabled: isMonitoring }
   );
 
   // ============================================================
-  // CRUD GRID — DATA
+  // CRUD GRID — DATA (only fetches when in management mode)
   // ============================================================
   const buildCrudFilters = useCallback(() => {
     const filters = {};
@@ -225,13 +213,14 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
     reload: reloadCrud,
   } = useGridData(
     ['assets-crud', crudTab, crudSearch, filterCategoryId, filterSupplierId],
-    fetchCrudGridData
+    fetchCrudGridData,
+    { enabled: isManagement }
   );
 
   const reloadBoth = useCallback(() => {
-    reloadStatus();
-    reloadCrud();
-  }, [reloadStatus, reloadCrud]);
+    if (isMonitoring) reloadStatus();
+    if (isManagement) reloadCrud();
+  }, [isMonitoring, isManagement, reloadStatus, reloadCrud]);
 
   // ============================================================
   // EFFECTS
@@ -244,24 +233,24 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
   }, []);
 
   useEffect(() => {
-    setStatusPage(1);
-  }, [statusTab, statusSearch, setStatusPage]);
+    if (isMonitoring) setStatusPage(1);
+  }, [statusTab, statusSearch, isMonitoring, setStatusPage]);
 
   useEffect(() => {
-    setCrudPage(1);
-    clearSelection();
+    if (isManagement) {
+      setCrudPage(1);
+      clearSelection();
+    }
   }, [
     crudTab,
     crudSearch,
     filterCategoryId,
     filterSupplierId,
+    isManagement,
     setCrudPage,
     clearSelection,
   ]);
 
-  // ============================================================
-  // DATA TRANSFORM
-  // ============================================================
   const transformAsset = useCallback(
     (asset) => ({
       ...asset,
@@ -281,9 +270,6 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
     [rawCrudAssets, transformAsset]
   );
 
-  // ============================================================
-  // OPTIONS
-  // ============================================================
   const categoryFilterOptions = useOptions(categories, 'All Categories');
   const supplierFilterOptions = useOptions(suppliers, 'All Suppliers');
   const categoryFormOptions = useOptions(categories, 'Select Category');
@@ -355,9 +341,6 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
     }
   }, [currentAssetId, setValue, queryClient, toast, confirm]);
 
-  // ============================================================
-  // SHARED CRUD OPERATIONS
-  // ============================================================
   const handleCreate = useCallback(() => {
     reset(getAssetDefaultValues());
     setIsEditMode(false);
@@ -390,7 +373,6 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
           const data = result.data;
           const defaults = getAssetDefaultValues();
           Object.keys(defaults).forEach((key) => {
-            // isActive and photoProfileUrl handled explicitly below.
             if (key === 'isActive' || key === 'photoProfileUrl') return;
             if (data[key] !== undefined && data[key] !== null) {
               setValue(key, data[key]);
@@ -490,7 +472,9 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
             queryClient.invalidateQueries({ queryKey: ['file-blob'] });
           }
 
-          queryClient.invalidateQueries({ queryKey: ['assets'] });
+          // Invalidate BOTH grids' parent keys — marks all tab caches stale.
+          queryClient.invalidateQueries({ queryKey: ['assets-status'] });
+          queryClient.invalidateQueries({ queryKey: ['assets-crud'] });
           queryClient.invalidateQueries({ queryKey: ['reference', 'assets'] });
           reloadBoth();
           clearSelection();
@@ -529,9 +513,6 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
     ]
   );
 
-  // ============================================================
-  // STATUS GRID HANDLERS
-  // ============================================================
   const handleStatusSearch = useCallback((search) => {
     setStatusSearch(search);
   }, []);
@@ -545,9 +526,6 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
     reloadStatus();
   }, [reloadStatus]);
 
-  // ============================================================
-  // CRUD GRID HANDLERS
-  // ============================================================
   const handleCrudSearch = useCallback(
     (search) => {
       setCrudSearch(search);
@@ -584,7 +562,8 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
       const r = await assetsData.delete(asset.assetId);
       if (r.success && isMountedRef.current) {
         toast.success('Asset deleted successfully');
-        queryClient.invalidateQueries({ queryKey: ['assets'] });
+        queryClient.invalidateQueries({ queryKey: ['assets-status'] });
+        queryClient.invalidateQueries({ queryKey: ['assets-crud'] });
         queryClient.invalidateQueries({ queryKey: ['reference', 'assets'] });
         reloadBoth();
         clearSelection();
@@ -619,7 +598,8 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
       }
 
       clearSelection();
-      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      queryClient.invalidateQueries({ queryKey: ['assets-status'] });
+      queryClient.invalidateQueries({ queryKey: ['assets-crud'] });
       queryClient.invalidateQueries({ queryKey: ['reference', 'assets'] });
       reloadBoth();
     },
@@ -640,7 +620,8 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
         const count = r.data || ids.length;
         toast.success(`${count} asset(s) ${actionText}d successfully`);
         clearSelection();
-        queryClient.invalidateQueries({ queryKey: ['assets'] });
+        queryClient.invalidateQueries({ queryKey: ['assets-status'] });
+        queryClient.invalidateQueries({ queryKey: ['assets-crud'] });
         queryClient.invalidateQueries({ queryKey: ['reference', 'assets'] });
         reloadBoth();
       }
@@ -664,7 +645,8 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
             `Import completed: ${r.data?.successCount || 0} assets imported`
           );
         }
-        queryClient.invalidateQueries({ queryKey: ['assets'] });
+        queryClient.invalidateQueries({ queryKey: ['assets-status'] });
+        queryClient.invalidateQueries({ queryKey: ['assets-crud'] });
         reloadBoth();
         clearSelection();
       }
@@ -759,6 +741,10 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
     [actionColumn]
   );
 
+  // Hide checkbox on All tab in management mode. Monitoring has no
+  // checkbox column (read-only status view).
+  const showCheckbox = crudTab !== 'all';
+
   const bulkActivateValue = crudTab === 'active' ? false : true;
   const showActivateToggle = crudTab === 'active' || crudTab === 'inactive';
 
@@ -805,27 +791,18 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
       <RefreshButton onClick={handleCrudRefresh} loading={crudLoading} />
       <Button
         variant="outline"
-        size="sm"
         onClick={() => setShowImportModal(true)}
-        startIcon={<FiUpload size={16} />}
+        startIcon={<FiUpload />}
       >
         Import
       </Button>
       <BulkActionBar visible={bulkActions.length > 0} actions={bulkActions} />
-      <Button
-        variant="primary"
-        size="sm"
-        onClick={handleCreate}
-        startIcon={<FiPlus size={16} />}
-      >
+      <Button variant="primary" onClick={handleCreate} startIcon={<FiPlus />}>
         Add Asset
       </Button>
     </>
   );
 
-  // ============================================================
-  // RENDER
-  // ============================================================
   return (
     <div className="assets-menu">
       <PageHeader
@@ -926,7 +903,7 @@ const Assets = ({ initialMainTab = 'monitoring' }) => {
               onPageChange={setCrudPage}
               onPageSizeChange={setCrudPageSize}
               getRowId={(row) => row?.assetId || `row-${Math.random()}`}
-              checkboxSelection={true}
+              checkboxSelection={showCheckbox}
               onRowSelectionModelChange={handleSelectionChange}
               onRowClick={handleView}
               sortModel={crudSortModel}

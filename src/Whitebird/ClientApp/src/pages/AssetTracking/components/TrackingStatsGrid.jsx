@@ -92,7 +92,12 @@ const TrackingStatsGrid = ({ currentAsset, timelineData = [] }) => {
     <Box
       sx={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+        // Force exactly 7 equal columns on desktop to fill the row perfectly.
+        gridTemplateColumns: {
+          xs: 'repeat(2, 1fr)',
+          sm: 'repeat(4, 1fr)',
+          md: 'repeat(7, 1fr)',
+        },
         gap: 2,
       }}
     >
@@ -101,18 +106,42 @@ const TrackingStatsGrid = ({ currentAsset, timelineData = [] }) => {
         return (
           <Paper
             elevation={0}
-            className="asset-tracking__stat-card"
             key={index}
+            sx={{
+              padding: 2,
+              backgroundColor: 'var(--card-bg)',
+              borderRadius: '12px',
+              border: '1px solid var(--border)',
+              transition: 'all 0.15s ease',
+              // Explicitly enforce flex centering here to override Paper's default block display
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              gap: 1,
+              minHeight: 108,
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                borderColor: 'var(--primary)',
+              },
+            }}
           >
-            <Icon
-              size={24}
-              className="asset-tracking__stat-icon"
-              style={{ color: card.color }}
-            />
-            <Typography variant="h5" fontWeight={700}>
+            <Icon size={24} style={{ color: card.color }} />
+            <Typography variant="h5" fontWeight={700} sx={{ color: 'var(--text-primary)' }}>
               {card.value}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography
+              variant="caption"
+              sx={{
+                color: 'var(--text-secondary)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '100%',
+              }}
+            >
               {card.label}
             </Typography>
           </Paper>

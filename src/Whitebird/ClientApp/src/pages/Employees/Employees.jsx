@@ -76,7 +76,8 @@ const Employees = () => {
     getSelectedIds,
   } = useBulkSelection({ idField: 'employeeId' });
 
-  const showCheckbox = true;
+  // Hide checkbox on All tab.
+  const showCheckbox = activeTab !== 'all';
   const showActivateToggle = useMemo(
     () => activeTab === 'Active' || activeTab === 'Inactive',
     [activeTab]
@@ -183,11 +184,6 @@ const Employees = () => {
     setPhotoPreview(null);
   }, []);
 
-  // Delete the *backend* photo (separate from removing a staged file).
-  // Matches User Profile's behavior: confirm → API call → on success,
-  // clear photoProfileUrl from form state (which triggers useFileBlob to
-  // disable and revert the avatar to initials) → invalidate all cached
-  // file blobs → toast.
   const handleDeletePhoto = useCallback(async () => {
     if (!currentEmployeeId) return;
 
@@ -204,10 +200,7 @@ const Employees = () => {
     try {
       const r = await employeesData.deletePhoto(currentEmployeeId);
       if (r.success && isMountedRef.current) {
-        // Clear from form state — avatar falls back to initials immediately.
         setValue('photoProfileUrl', '');
-        // Drop any cached file blobs (this entity's photo, plus anything
-        // else keyed by ['file-blob', ...] — cheap, correct).
         queryClient.invalidateQueries({ queryKey: ['file-blob'] });
         toast.success('Profile photo removed');
       } else if (r.error && r.error !== 'canceled') {
@@ -349,6 +342,7 @@ const Employees = () => {
           queryClient.invalidateQueries({
             queryKey: ['reference', 'employees'],
           });
+          queryClient.invalidateQueries({ queryKey: ['employees'] });
           reload();
           clearSelection();
 
@@ -411,6 +405,7 @@ const Employees = () => {
       if (r.success && isMountedRef.current) {
         toast.success('Employee deleted successfully');
         queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
+        queryClient.invalidateQueries({ queryKey: ['employees'] });
         reload();
         clearSelection();
       }
@@ -445,6 +440,7 @@ const Employees = () => {
 
       clearSelection();
       queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
       reload();
     },
     [reload, queryClient, toast, confirm, clearSelection]
@@ -475,6 +471,7 @@ const Employees = () => {
         toast.success(`${count} employee(s) ${actionText}d successfully`);
         clearSelection();
         queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
+        queryClient.invalidateQueries({ queryKey: ['employees'] });
         reload();
       }
     },
@@ -498,6 +495,7 @@ const Employees = () => {
           );
         }
         queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
+        queryClient.invalidateQueries({ queryKey: ['employees'] });
         reload();
         clearSelection();
       }

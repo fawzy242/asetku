@@ -18,8 +18,6 @@ import { formatDate } from '../../../core/utils/date.utils';
 import { useFileBlob } from '../../../hooks/useFileBlob';
 
 const TrackingProfileCard = ({ currentAsset }) => {
-  // currentAsset.photoProfileUrl is the raw backend path
-  // ("/api/Asset/5/photo") or null. Authenticated fetch via useFileBlob.
   const { blobUrl } = useFileBlob(currentAsset?.photoProfileUrl);
   const showPhoto = Boolean(blobUrl);
 
@@ -34,6 +32,7 @@ const TrackingProfileCard = ({ currentAsset }) => {
             {!showPhoto && <FiBox size={36} />}
           </Avatar>
         </Grid>
+        
         <Grid item xs>
           <Typography
             variant="h5"
@@ -82,6 +81,7 @@ const TrackingProfileCard = ({ currentAsset }) => {
             )}
           </div>
         </Grid>
+
         <Grid item>
           <InfoRow
             icon={FiUser}

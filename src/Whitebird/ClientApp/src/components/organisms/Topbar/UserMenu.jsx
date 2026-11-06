@@ -13,9 +13,7 @@ const UserMenu = ({ user }) => {
   const navigate = useNavigate();
   const { logout } = useAuth();
 
-  // Authenticated blob fetch — cannot use <img src> directly because the
-  // backend requires X-Session-Token. blobUrl is null when no photo exists
-  // (404 resolved as null) or while loading.
+  // Authenticated blob fetch.
   const { blobUrl } = useFileBlob(user?.profilePhotoUrl);
 
   useEffect(() => {
@@ -77,12 +75,7 @@ const UserMenu = ({ user }) => {
           </div>
           <ul className="topbar__user-menu">
             <li>
-              <button
-                onClick={() => {
-                  setShowUserMenu(false);
-                  navigate('/profile');
-                }}
-              >
+              <button onClick={() => { setShowUserMenu(false); navigate('/profile'); }}>
                 <FiUser size={18} /> Profile
               </button>
             </li>

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Grid, Box, Typography } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
-import { ProfileData, UserData } from '../../core/services';
+import { UserData } from '../../core/services'; // <-- Swapped ProfileData for UserData
 import Spinner from '../../components/atoms/Spinner/Spinner';
 import { useSweetAlert } from '../../hooks/useSweetAlert';
 import { isValidEmail } from '../../core/utils/string.utils';
@@ -17,7 +17,6 @@ import ProfileIdentityCard from './components/ProfileIdentityCard';
 import SecurityCard from './components/SecurityCard';
 import './Profile.scss';
 
-const profileData = new ProfileData();
 const userData = new UserData();
 
 const Profile = () => {
@@ -46,24 +45,18 @@ const Profile = () => {
   const loadProfileIdRef = useRef(0);
   const isMountedRef = useRef(true);
 
-  // ============================================================
-  // LOAD PROFILE
-  // ============================================================
   const loadProfile = useCallback(async () => {
     const currentRequestId = ++loadProfileIdRef.current;
-
     if (!isMountedRef.current) return;
     setLoading(true);
 
-    const r = await profileData.fetchProfile();
+    const r = await userData.getMe();
 
     if (currentRequestId !== loadProfileIdRef.current) return;
-
     if (!isMountedRef.current) {
       setLoading(false);
       return;
     }
-
     if (r.isCanceled) {
       setLoading(false);
       return;
@@ -79,18 +72,11 @@ const Profile = () => {
         username: profileDataResult.username || '',
       });
     } else {
-      if (
-        r.error &&
-        r.error !== 'canceled' &&
-        r.error !== 'not found' &&
-        !r.isNotFound
-      ) {
+      if (r.error && r.error !== 'canceled' && r.error !== 'not found' && !r.isNotFound) {
         toast.error(r.error || 'Failed to load profile');
       }
     }
-    if (isMountedRef.current) {
-      setLoading(false);
-    }
+    if (isMountedRef.current) setLoading(false);
   }, [toast]);
 
   useEffect(() => {
@@ -99,16 +85,11 @@ const Profile = () => {
     return () => {
       isMountedRef.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadProfile]);
 
-  // ============================================================
-  // HANDLERS — PHOTO
-  // ============================================================
   const handlePhotoUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
     event.target.value = '';
 
     if (!file.type.startsWith('image/')) {
@@ -138,16 +119,10 @@ const Profile = () => {
         queryClient.invalidateQueries({ queryKey: ['file-blob'] });
         toast.success('Profile photo updated successfully');
       } else {
-        const errorMsg =
-          result.errors?.join('\n') ||
-          result.error ||
-          'Failed to upload photo';
-        toast.error(errorMsg);
+        toast.error(result.errors?.join('\n') || result.error || 'Failed to upload photo');
       }
     } catch (error) {
-      const errorMsg =
-        error.userMessage || error.message || 'Failed to upload photo';
-      toast.error(errorMsg);
+      toast.error(error.userMessage || error.message || 'Failed to upload photo');
     } finally {
       setUploadingPhoto(false);
     }
@@ -174,24 +149,16 @@ const Profile = () => {
         toast.error(result.error || 'Failed to delete photo');
       }
     } catch (error) {
-      const errorMsg =
-        error.userMessage || error.message || 'Failed to delete photo';
-      toast.error(errorMsg);
+      toast.error(error.userMessage || error.message || 'Failed to delete photo');
     }
   };
 
-  // ============================================================
-  // HANDLERS — PROFILE / PASSWORD
-  // ============================================================
   const validatePassword = () => {
     const err = {};
-    if (!passwordData.oldPassword)
-      err.oldPassword = 'Current password is required';
+    if (!passwordData.oldPassword) err.oldPassword = 'Current password is required';
     if (!passwordData.newPassword) err.newPassword = 'New password is required';
-    else if (!isPasswordComplex(passwordData.newPassword))
-      err.newPassword = PASSWORD_COMPLEXITY_MESSAGE;
-    if (passwordData.newPassword !== passwordData.confirmPassword)
-      err.confirmPassword = 'Passwords do not match';
+    else if (!isPasswordComplex(passwordData.newPassword)) err.newPassword = PASSWORD_COMPLEXITY_MESSAGE;
+    if (passwordData.newPassword !== passwordData.confirmPassword) err.confirmPassword = 'Passwords do not match';
     setErrors(err);
     return Object.keys(err).length === 0;
   };
@@ -200,8 +167,7 @@ const Profile = () => {
     const err = {};
     if (!formData.fullName?.trim()) err.fullName = 'Full name is required';
     if (!formData.email?.trim()) err.email = 'Email is required';
-    else if (!isValidEmail(formData.email))
-      err.email = 'Please enter a valid email address';
+    else if (!isValidEmail(formData.email)) err.email = 'Please enter a valid email address';
     setErrors(err);
     return Object.keys(err).length === 0;
   };
@@ -218,11 +184,7 @@ const Profile = () => {
     if (!confirmed) return;
 
     setSaving(true);
-    const r = await profileData.changePassword(
-      passwordData.oldPassword,
-      passwordData.newPassword,
-      passwordData.confirmPassword
-    );
+    const r = await userData.changePassword(passwordData.oldPassword, passwordData.newPassword, passwordData.confirmPassword);
     setSaving(false);
 
     if (r.success) {
@@ -252,24 +214,17 @@ const Profile = () => {
         setProfile((prev) => ({ ...prev, ...formData }));
         const storedUser = getStorage(STORAGE_KEYS.USER);
         if (storedUser) {
-          const updatedUser = { ...storedUser, ...formData };
-          setStorage(STORAGE_KEYS.USER, updatedUser);
+          setStorage(STORAGE_KEYS.USER, { ...storedUser, ...formData });
         }
         toast.success('Profile updated successfully');
         await refreshAuth();
       } else {
         setSaving(false);
-        const errorMsg =
-          result.errors?.join('\n') ||
-          result.error ||
-          'Failed to update profile';
-        toast.error(errorMsg);
+        toast.error(result.errors?.join('\n') || result.error || 'Failed to update profile');
       }
     } catch (error) {
       setSaving(false);
-      const errorMsg =
-        error.userMessage || error.message || 'Failed to update profile';
-      toast.error(errorMsg);
+      toast.error(error.userMessage || error.message || 'Failed to update profile');
     }
   };
 
@@ -290,27 +245,14 @@ const Profile = () => {
     setErrors({});
   };
 
-  if (loading) {
-    return (
-      <div className="profile-loading">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
+  if (loading) return <div className="profile-loading"><Spinner size="lg" /></div>;
 
-  const userInitial =
-    profile?.fullName?.charAt(0) || profile?.username?.charAt(0) || 'U';
+  const userInitial = profile?.fullName?.charAt(0) || profile?.username?.charAt(0) || 'U';
 
   return (
     <div className="profile-menu fade-transition">
-      <div className="page-header">
-        <h1 className="page-title">My Profile</h1>
-      </div>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="body2" color="text.secondary">
-          Manage your account settings and preferences
-        </Typography>
-      </Box>
+      <div className="page-header"><h1 className="page-title">My Profile</h1></div>
+      <Box sx={{ mb: 3 }}><Typography variant="body2" color="text.secondary">Manage your account settings and preferences</Typography></Box>
 
       <Grid container spacing={4}>
         <Grid item xs={12} md={7}>
@@ -330,7 +272,6 @@ const Profile = () => {
             onCancelEdit={handleCancelEdit}
           />
         </Grid>
-
         <Grid item xs={12} md={5}>
           <SecurityCard
             showPasswordForm={showPasswordForm}

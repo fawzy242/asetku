@@ -56,7 +56,7 @@ const Roles = () => {
     getSelectedIds,
   } = useBulkSelection({ idField: 'roleId' });
 
-  const showCheckbox = true;
+  const showCheckbox = activeTab !== 'all';
   const showActivateToggle =
     activeTab === 'active' || activeTab === 'inactive';
 

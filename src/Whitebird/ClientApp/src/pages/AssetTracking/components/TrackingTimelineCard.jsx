@@ -3,9 +3,10 @@ import React, { useState, useMemo } from 'react';
 import { Box, Tabs as MuiTabs, Tab } from '@mui/material';
 import Card from '../../../components/atoms/Card/Card';
 import AssetTimeline from './AssetTimeline';
+import Spinner from '../../../components/atoms/Spinner/Spinner';
 import { historyFilterTabs } from '../constants';
 
-const TrackingTimelineCard = ({ timelineData = [] }) => {
+const TrackingTimelineCard = ({ timelineData = [], loading = false }) => {
   const [historyFilter, setHistoryFilter] = useState('all');
 
   const filteredTimeline = useMemo(() => {
@@ -27,13 +28,7 @@ const TrackingTimelineCard = ({ timelineData = [] }) => {
 
   return (
     <Card title="Timeline" subtitle="Transaction history">
-      <Box
-        sx={{
-          borderBottom: 1,
-          borderColor: 'var(--border)',
-          mb: 2,
-        }}
-      >
+      <Box sx={{ borderBottom: 1, borderColor: 'var(--border)', mb: 2 }}>
         <MuiTabs
           value={historyFilter}
           onChange={(e, v) => setHistoryFilter(v)}
@@ -55,7 +50,13 @@ const TrackingTimelineCard = ({ timelineData = [] }) => {
           ))}
         </MuiTabs>
       </Box>
-      <AssetTimeline items={filteredTimeline} />
+      {loading ? (
+        <Box sx={{ p: 4, display: 'flex', justifyContent: 'center' }}>
+          <Spinner />
+        </Box>
+      ) : (
+        <AssetTimeline items={filteredTimeline} />
+      )}
     </Card>
   );
 };

@@ -105,7 +105,6 @@ export const reportsApi = {
 // ASSET
 // ============================================================
 export const assetApi = {
-  getAll: () => apiService.get('/Asset'),
   getById: (id) => apiService.get(`/Asset/${id}`),
   getGrid: (params) => apiService.get('/Asset/grid', { params }),
   create: (data) => apiService.post('/Asset', data),
@@ -154,7 +153,6 @@ export const assetTrackingApi = {
 // ASSET TRANSACTION
 // ============================================================
 export const transactionApi = {
-  getAll: () => apiService.get('/AssetTransaction'),
   getById: (id) => apiService.get(`/AssetTransaction/${id}`),
   create: (data) => apiService.post('/AssetTransaction', data),
   update: (id, data) => apiService.put(`/AssetTransaction/${id}`, data),
@@ -212,7 +210,6 @@ export const transactionApi = {
 // EMPLOYEE
 // ============================================================
 export const employeeApi = {
-  getAll: () => apiService.get('/Employee'),
   getById: (id) => apiService.get(`/Employee/${id}`),
   getGrid: (params) => apiService.get('/Employee/grid', { params }),
   create: (data) => apiService.post('/Employee', data),
@@ -272,7 +269,6 @@ export const employeeSummaryApi = {
 // CATEGORY
 // ============================================================
 export const categoryApi = {
-  getAll: () => apiService.get('/Category'),
   getById: (id) => apiService.get(`/Category/${id}`),
   getGrid: (params) => apiService.get('/Category/grid', { params }),
   create: (data) => apiService.post('/Category', data),
@@ -289,7 +285,6 @@ export const categoryApi = {
 // DEPARTMENT
 // ============================================================
 export const departmentApi = {
-  getAll: () => apiService.get('/Department'),
   getById: (id) => apiService.get(`/Department/${id}`),
   getGrid: (params) => apiService.get('/Department/grid', { params }),
   create: (data) => apiService.post('/Department', data),
@@ -306,7 +301,6 @@ export const departmentApi = {
 // OFFICE
 // ============================================================
 export const officeApi = {
-  getAll: () => apiService.get('/Office'),
   getById: (id) => apiService.get(`/Office/${id}`),
   getGrid: (params) => apiService.get('/Office/grid', { params }),
   create: (data) => apiService.post('/Office', data),
@@ -323,7 +317,6 @@ export const officeApi = {
 // SUPPLIER
 // ============================================================
 export const supplierApi = {
-  getAll: () => apiService.get('/Supplier'),
   getById: (id) => apiService.get(`/Supplier/${id}`),
   getGrid: (params) => apiService.get('/Supplier/grid', { params }),
   create: (data) => apiService.post('/Supplier', data),
@@ -340,7 +333,6 @@ export const supplierApi = {
 // SCHEDULE HANDOVER
 // ============================================================
 export const scheduleHandoverApi = {
-  getAll: () => apiService.get('/ScheduleHandover'),
   getById: (id) => apiService.get(`/ScheduleHandover/${id}`),
   getGrid: (params) => apiService.get('/ScheduleHandover/grid', { params }),
   create: (data) => apiService.post('/ScheduleHandover', data),
@@ -357,7 +349,6 @@ export const scheduleHandoverApi = {
 // SCHEDULE RETURN
 // ============================================================
 export const scheduleReturnApi = {
-  getAll: () => apiService.get('/ScheduleReturn'),
   getById: (id) => apiService.get(`/ScheduleReturn/${id}`),
   getGrid: (params) => apiService.get('/ScheduleReturn/grid', { params }),
   create: (data) => apiService.post('/ScheduleReturn', data),
@@ -374,7 +365,6 @@ export const scheduleReturnApi = {
 // SCHEDULE MAINTENANCE
 // ============================================================
 export const scheduleMaintenanceApi = {
-  getAll: () => apiService.get('/ScheduleMaintenance'),
   getById: (id) => apiService.get(`/ScheduleMaintenance/${id}`),
   getGrid: (params) => apiService.get('/ScheduleMaintenance/grid', { params }),
   create: (data) => apiService.post('/ScheduleMaintenance', data),
@@ -391,7 +381,6 @@ export const scheduleMaintenanceApi = {
 // ROLES
 // ============================================================
 export const rolesApi = {
-  getAll: () => apiService.get('/Roles'),
   getById: (id) => apiService.get(`/Roles/${id}`),
   getGrid: (params) => apiService.get('/Roles/grid', { params }),
   create: (data) => apiService.post('/Roles', data),

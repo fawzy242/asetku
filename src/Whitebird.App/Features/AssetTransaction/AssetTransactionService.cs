@@ -25,6 +25,13 @@ namespace Whitebird.App.Features.AssetTransaction;
 ///     metadata only.
 ///   * The "pending approval" checklist (ApproveAttachmentStatusDto) is not a
 ///     file resource and carries no URL — unchanged.
+///
+/// Optional-ID convention:
+///   The frontend sends 0 for an unset optional FK (unfilled office dropdown
+///   on a HANDOVER, etc.). IDENTITY(1,1) means 0 is never a valid id. All
+///   optional FK validation guards treat 0 as "not provided", and all writes
+///   normalize 0 → null so the FK columns never receive an invalid value.
+///   Same convention already used by AssetService (SupplierId > 0).
 /// </summary>
 public class AssetTransactionService : BaseService, IAssetTransactionService
 {
@@ -119,6 +126,16 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
             entity.CreatedDate = DateTime.Now;
             entity.CreatedBy = _currentUserService.GetDisplayName();
             entity.AssetTransactionCode = GenerateTransactionCode(model.TransactionType);
+
+            // Normalize 0 → null for optional FK / master-data fields, so an
+            // unset dropdown (sent as 0 by the frontend) does not trip an FK
+            // constraint or write a semantically invalid 0.
+            entity.OfficeId = NormalizeOptionalId(entity.OfficeId);
+            entity.EmployeeId = NormalizeOptionalId(entity.EmployeeId);
+            entity.MaintenanceEmployeeId = NormalizeOptionalId(entity.MaintenanceEmployeeId);
+            entity.MaintenanceType = NormalizeOptionalId(entity.MaintenanceType);
+            entity.Condition = NormalizeOptionalId(entity.Condition);
+            entity.FromAssetTransactionId = NormalizeOptionalId(entity.FromAssetTransactionId);
 
             var id = await _transactionReps.InsertAsync(entity);
 
@@ -245,13 +262,13 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
             existing.AssetId = model.AssetId;
             existing.TransactionType = model.TransactionType;
-            existing.EmployeeId = model.EmployeeId;
-            existing.OfficeId = model.OfficeId;
+            existing.EmployeeId = NormalizeOptionalId(model.EmployeeId);
+            existing.OfficeId = NormalizeOptionalId(model.OfficeId);
             existing.TransactionDate = model.TransactionDate;
             existing.ExpectedLoanReturnDate = model.ExpectedLoanReturnDate;
             existing.Notes = model.Notes;
-            existing.Condition = model.Condition;
-            existing.MaintenanceType = model.MaintenanceType;
+            existing.Condition = NormalizeOptionalId(model.Condition);
+            existing.MaintenanceType = NormalizeOptionalId(model.MaintenanceType);
             existing.MaintenanceCost = model.MaintenanceCost;
             existing.IsActive = model.IsActive;
             existing.ModifiedDate = DateTime.Now;
@@ -357,13 +374,13 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
             existing.AssetId = model.AssetId;
             existing.TransactionType = model.TransactionType;
-            existing.EmployeeId = model.EmployeeId;
-            existing.OfficeId = model.OfficeId;
+            existing.EmployeeId = NormalizeOptionalId(model.EmployeeId);
+            existing.OfficeId = NormalizeOptionalId(model.OfficeId);
             existing.TransactionDate = model.TransactionDate;
             existing.ExpectedLoanReturnDate = model.ExpectedLoanReturnDate;
             existing.Notes = model.Notes;
-            existing.Condition = model.Condition;
-            existing.MaintenanceType = model.MaintenanceType;
+            existing.Condition = NormalizeOptionalId(model.Condition);
+            existing.MaintenanceType = NormalizeOptionalId(model.MaintenanceType);
             existing.MaintenanceCost = model.MaintenanceCost;
             existing.IsActive = model.IsActive;
             existing.Approved = model.Approved;
@@ -700,7 +717,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 EmployeeId = source.EmployeeId,
                 TransactionDate = model.ActualReturnDate,
                 Notes = model.Notes,
-                Condition = model.Condition,
+                Condition = NormalizeOptionalId(model.Condition),
                 FromAssetTransactionId = sourceTransactionId,
                 IsActive = true,
                 CreatedDate = DateTime.Now,
@@ -749,7 +766,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 TransactionType = TransactionTypeConstants.POST_MAINTENANCE,
                 TransactionDate = model.CompletionDate,
                 Notes = model.Notes,
-                Condition = model.Condition,
+                Condition = NormalizeOptionalId(model.Condition),
                 MaintenanceCost = model.MaintenanceCost,
                 MaintenanceType = source.MaintenanceType,
                 FromAssetTransactionId = sourceTransactionId,
@@ -1019,6 +1036,16 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
     // ============================================================
 
     /// <summary>
+    /// Treats 0 (and negative) as "not provided" for optional int id fields.
+    /// Frontends commonly send 0 for an unset dropdown; IDENTITY(1,1) means
+    /// 0 is never a valid id in this schema. Returning null lets FK columns
+    /// receive NULL instead of a value that would fail the constraint.
+    /// Mirrors the pattern used by AssetService (SupplierId.Value > 0).
+    /// </summary>
+    private static int? NormalizeOptionalId(int? value)
+        => value.HasValue && value.Value > 0 ? value : null;
+
+    /// <summary>
     /// Enriches the DownloadUrl on every attachment in a grid page.
     /// Repositories return metadata only; this is where the relative URL is
     /// stamped on each entry.
@@ -1078,6 +1105,12 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         }
     }
 
+    /// <summary>
+    /// Validates reference fields for a transaction. Optional fields with
+    /// value 0 (frontend's "unset" marker for unfilled dropdowns) are treated
+    /// as not provided — 0 is never a valid id in this schema. Required-field
+    /// checks fire only when the field is null OR <= 0.
+    /// </summary>
     private async Task<ServiceResult<AssetTransactionDetailView>?> ValidateTransactionReferencesAsync(
         int assetId,
         int transactionType,
@@ -1100,15 +1133,18 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
         if (!typeName.IsSuccess || typeName.Data == null)
             return ServiceResult<AssetTransactionDetailView>.BadRequest($"Invalid TransactionType: {transactionType}");
 
-        if (transactionType == TransactionTypeConstants.HANDOVER && !employeeId.HasValue)
+        // Required-field checks — 0 is treated as not provided.
+        if (transactionType == TransactionTypeConstants.HANDOVER
+            && (!employeeId.HasValue || employeeId.Value <= 0))
             return ServiceResult<AssetTransactionDetailView>.BadRequest("HANDOVER requires EmployeeId");
 
-        if (transactionType == TransactionTypeConstants.TRANSFER && !employeeId.HasValue)
+        if (transactionType == TransactionTypeConstants.TRANSFER
+            && (!employeeId.HasValue || employeeId.Value <= 0))
             return ServiceResult<AssetTransactionDetailView>.BadRequest("TRANSFER requires EmployeeId (receiver)");
 
         if (transactionType == TransactionTypeConstants.LOAN)
         {
-            if (!employeeId.HasValue)
+            if (!employeeId.HasValue || employeeId.Value <= 0)
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("LOAN requires EmployeeId");
             if (!expectedLoanReturnDate.HasValue)
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("LOAN requires ExpectedLoanReturnDate");
@@ -1116,34 +1152,37 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("ExpectedLoanReturnDate must be after TransactionDate");
         }
 
-        if (transactionType == TransactionTypeConstants.MAINTENANCE && !maintenanceType.HasValue)
+        if (transactionType == TransactionTypeConstants.MAINTENANCE
+            && (!maintenanceType.HasValue || maintenanceType.Value <= 0))
             return ServiceResult<AssetTransactionDetailView>.BadRequest("MAINTENANCE requires MaintenanceType");
 
-        if (transactionType == TransactionTypeConstants.OPERATIONAL_OFFICE && !officeId.HasValue)
+        if (transactionType == TransactionTypeConstants.OPERATIONAL_OFFICE
+            && (!officeId.HasValue || officeId.Value <= 0))
             return ServiceResult<AssetTransactionDetailView>.BadRequest("OPERATIONAL OFFICE requires OfficeId");
 
-        if (employeeId.HasValue)
+        // Value-only lookups — skipped when the field is 0 (not provided).
+        if (employeeId.HasValue && employeeId.Value > 0)
         {
             var employee = await _employeeService.GetByIdAsync(employeeId.Value);
             if (!employee.IsSuccess || employee.Data == null)
                 return ServiceResult<AssetTransactionDetailView>.BadRequest($"Employee with id {employeeId} not found");
         }
 
-        if (officeId.HasValue)
+        if (officeId.HasValue && officeId.Value > 0)
         {
             var office = await _officeService.GetByIdAsync(officeId.Value);
             if (!office.IsSuccess || office.Data == null)
                 return ServiceResult<AssetTransactionDetailView>.BadRequest($"Office with id {officeId} not found");
         }
 
-        if (condition.HasValue)
+        if (condition.HasValue && condition.Value > 0)
         {
             var cond = await _masterDataService.GetValueAsync("AssetCondition", condition.Value);
             if (!cond.IsSuccess || cond.Data == null)
                 return ServiceResult<AssetTransactionDetailView>.BadRequest($"Invalid Condition: {condition}");
         }
 
-        if (maintenanceType.HasValue)
+        if (maintenanceType.HasValue && maintenanceType.Value > 0)
         {
             var mt = await _masterDataService.GetValueAsync("MaintenanceType", maintenanceType.Value);
             if (!mt.IsSuccess || mt.Data == null)
@@ -1168,12 +1207,17 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
 
         if (shared != null) return shared;
 
-        if (model.TransactionType == TransactionTypeConstants.TRANSFER && !model.FromAssetTransactionId.HasValue)
+        // 0 is treated as "not provided" (same convention as the reference
+        // fields). A TRANSFER still requires a real FromAssetTransactionId > 0.
+        var hasFromTransaction = model.FromAssetTransactionId.HasValue
+                                 && model.FromAssetTransactionId.Value > 0;
+
+        if (model.TransactionType == TransactionTypeConstants.TRANSFER && !hasFromTransaction)
             return ServiceResult<AssetTransactionDetailView>.BadRequest("TRANSFER requires FromAssetTransactionId");
 
-        if (model.FromAssetTransactionId.HasValue)
+        if (hasFromTransaction)
         {
-            var source = await _transactionReps.GetByIdRawAsync(model.FromAssetTransactionId.Value);
+            var source = await _transactionReps.GetByIdRawAsync(model.FromAssetTransactionId!.Value);
             if (source == null || source.IsActive == false)
                 return ServiceResult<AssetTransactionDetailView>.NotFound($"Source transaction {model.FromAssetTransactionId} not found");
             if (source.Approved != true)
@@ -1182,7 +1226,7 @@ public class AssetTransactionService : BaseService, IAssetTransactionService
                 return ServiceResult<AssetTransactionDetailView>.BadRequest("Source transaction already has a paired transaction");
         }
 
-        if (!model.FromAssetTransactionId.HasValue)
+        if (!hasFromTransaction)
         {
             var active = await _transactionReps.GetActiveTransactionByAssetIdAsync(model.AssetId);
             if (active != null)

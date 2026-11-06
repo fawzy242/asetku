@@ -56,7 +56,7 @@ const Departments = () => {
     getSelectedIds,
   } = useBulkSelection({ idField: 'departmentId' });
 
-  const showCheckbox = true;
+  const showCheckbox = activeTab !== 'all';
   const showActivateToggle =
     activeTab === 'active' || activeTab === 'inactive';
 
@@ -76,6 +76,7 @@ const Departments = () => {
     schema: departmentSchema,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reference', 'departments'] });
+      queryClient.invalidateQueries({ queryKey: ['departments'] });
       toast.success(
         editingDepartment
           ? 'Department updated successfully'
@@ -168,6 +169,7 @@ const Departments = () => {
       if (r.success && isMountedRef.current) {
         toast.success('Department deleted successfully');
         queryClient.invalidateQueries({ queryKey: ['reference', 'departments'] });
+        queryClient.invalidateQueries({ queryKey: ['departments'] });
         reload();
         clearSelection();
       }
@@ -202,6 +204,7 @@ const Departments = () => {
 
       clearSelection();
       queryClient.invalidateQueries({ queryKey: ['reference', 'departments'] });
+      queryClient.invalidateQueries({ queryKey: ['departments'] });
       reload();
     },
     [reload, queryClient, toast, confirm, clearSelection]
@@ -222,6 +225,7 @@ const Departments = () => {
         toast.success(`${count} department(s) ${actionText}d successfully`);
         clearSelection();
         queryClient.invalidateQueries({ queryKey: ['reference', 'departments'] });
+        queryClient.invalidateQueries({ queryKey: ['departments'] });
         reload();
       }
     },
