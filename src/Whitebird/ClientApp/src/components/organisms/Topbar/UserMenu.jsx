@@ -1,34 +1,22 @@
+// src/components/organisms/Topbar/UserMenu.jsx
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { FiChevronDown, FiUser, FiLogOut } from 'react-icons/fi';
 import { Avatar } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import { UserData } from '../../../core/services';
+import { useFileBlob } from '../../../hooks/useFileBlob';
 import ConfirmDialog from '../../molecules/ConfirmDialog/ConfirmDialog';
-
-const userData = new UserData();
 
 const UserMenu = ({ user }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [profilePhotoUrl, setProfilePhotoUrl] = useState(null);
   const userMenuRef = useRef(null);
   const navigate = useNavigate();
   const { logout } = useAuth();
 
-  const loadProfilePhoto = useCallback(async () => {
-    try {
-      const result = await userData.getPhoto();
-      if (result.success && result.data) {
-        const url = URL.createObjectURL(result.data);
-        setProfilePhotoUrl(url);
-      } else {
-        setProfilePhotoUrl(null);
-      }
-    } catch (error) {
-      console.warn('Failed to load profile photo:', error);
-      setProfilePhotoUrl(null);
-    }
-  }, []);
+  // Authenticated blob fetch — cannot use <img src> directly because the
+  // backend requires X-Session-Token. blobUrl is null when no photo exists
+  // (404 resolved as null) or while loading.
+  const { blobUrl } = useFileBlob(user?.profilePhotoUrl);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -40,24 +28,7 @@ const UserMenu = ({ user }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    if (user?.userId) {
-      loadProfilePhoto();
-    }
-  }, [user?.userId, loadProfilePhoto]);
-
-  // Refresh when Profile page dispatches 'profile-photo-updated'
-  useEffect(() => {
-    const handler = () => {
-      loadProfilePhoto();
-    };
-    window.addEventListener('profile-photo-updated', handler);
-    return () => {
-      window.removeEventListener('profile-photo-updated', handler);
-    };
-  }, [loadProfilePhoto]);
-
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     const confirmed = await ConfirmDialog.show({
       title: 'Logout',
       text: 'Are you sure you want to logout?',
@@ -70,9 +41,10 @@ const UserMenu = ({ user }) => {
       await logout();
       navigate('/login');
     }
-  };
+  }, [logout, navigate]);
 
   const userInitial = user?.fullName?.charAt(0)?.toUpperCase() || 'U';
+  const showPhoto = Boolean(blobUrl);
 
   return (
     <div className="topbar__user" ref={userMenuRef}>
@@ -82,12 +54,8 @@ const UserMenu = ({ user }) => {
         aria-label="User menu"
         aria-expanded={showUserMenu}
       >
-        {profilePhotoUrl ? (
-          <Avatar
-            src={profilePhotoUrl}
-            sx={{ width: 36, height: 36 }}
-            onError={() => setProfilePhotoUrl(null)}
-          />
+        {showPhoto ? (
+          <Avatar src={blobUrl} sx={{ width: 36, height: 36 }} />
         ) : (
           <span className="topbar__user-avatar">{userInitial}</span>
         )}
@@ -97,12 +65,8 @@ const UserMenu = ({ user }) => {
       {showUserMenu && (
         <div className="topbar__user-dropdown">
           <div className="topbar__user-header">
-            {profilePhotoUrl ? (
-              <Avatar
-                src={profilePhotoUrl}
-                sx={{ width: 48, height: 48 }}
-                onError={() => setProfilePhotoUrl(null)}
-              />
+            {showPhoto ? (
+              <Avatar src={blobUrl} sx={{ width: 48, height: 48 }} />
             ) : (
               <span className="topbar__user-avatar--large">{userInitial}</span>
             )}

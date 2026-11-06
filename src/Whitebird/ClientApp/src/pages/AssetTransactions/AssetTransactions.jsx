@@ -67,7 +67,8 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
   const [activeMainTab] = useState(initialMainTab);
   const [activeSubTab1, setActiveSubTab1] = useState('uncomplete');
   const [activeSubTab2, setActiveSubTab2] = useState('active-loans');
-  const [activeSubTabManagement, setActiveSubTabManagement] = useState('approved');
+  const [activeSubTabManagement, setActiveSubTabManagement] =
+    useState('approved');
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilterStart, setDateFilterStart] = useState('');
   const [dateFilterEnd, setDateFilterEnd] = useState('');
@@ -323,7 +324,13 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     setSortModel: setManagementSort,
     reload: reloadManagement,
   } = useGridData(
-    ['management', activeSubTabManagement, searchTerm, dateFilterStart, dateFilterEnd],
+    [
+      'management',
+      activeSubTabManagement,
+      searchTerm,
+      dateFilterStart,
+      dateFilterEnd,
+    ],
     fetchManagementData
   );
 
@@ -339,7 +346,13 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
     setSortModel: setManagementReturnSort,
     reload: reloadManagementReturn,
   } = useGridData(
-    ['management-return', activeSubTabManagement, searchTerm, dateFilterStart, dateFilterEnd],
+    [
+      'management-return',
+      activeSubTabManagement,
+      searchTerm,
+      dateFilterStart,
+      dateFilterEnd,
+    ],
     fetchManagementReturnData
   );
 
@@ -417,12 +430,22 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
           const data = result.data;
           const defaults = getTransactionDefaultValues();
           Object.keys(defaults).forEach((key) => {
+            // Handled explicitly below — required for correct boolean coercion.
+            if (key === 'isActive') return;
             if (data[key] !== undefined && data[key] !== null) {
               setValue(key, data[key]);
             } else {
               setValue(key, '');
             }
           });
+
+          // B66 fix: preserve the record's actual active state on edit.
+          setValue(
+            'isActive',
+            data.isActive === true ||
+              data.isActive === 'true' ||
+              data.isActive === 1
+          );
 
           if (data.attachments && Array.isArray(data.attachments)) {
             setExistingAttachments(data.attachments);
@@ -804,7 +827,9 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
       selectedTransaction.assetTransactionId,
       {
         actualReturnDate: returnData.actualReturnDate,
-        condition: returnData.condition ? parseInt(returnData.condition, 10) : null,
+        condition: returnData.condition
+          ? parseInt(returnData.condition, 10)
+          : null,
         notes: returnData.notes,
       }
     );
@@ -876,7 +901,9 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
       if (r.success && isMountedRef.current) {
         setImportResult(r.data);
         if (r.data.errorCount === 0) {
-          toast.success(`Import completed: ${r.data.successCount} transactions`);
+          toast.success(
+            `Import completed: ${r.data.successCount} transactions`
+          );
         } else {
           toast.warning(
             `Import completed: ${r.data.successCount} success, ${r.data.errorCount} errors`
@@ -1162,18 +1189,23 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
   });
 
   const monitoringColumns1 = useMemo(
-    () => getMonitoringColumns(monitoringGridActions.actionColumn, activeSubTab1),
+    () =>
+      getMonitoringColumns(monitoringGridActions.actionColumn, activeSubTab1),
     [activeSubTab1, monitoringGridActions.actionColumn]
   );
 
   const monitoringColumns2 = useMemo(
-    () => getMonitoringColumns(monitoringGridActions.actionColumn, activeSubTab2),
+    () =>
+      getMonitoringColumns(monitoringGridActions.actionColumn, activeSubTab2),
     [activeSubTab2, monitoringGridActions.actionColumn]
   );
 
   const managementColumns = useMemo(
     () =>
-      getManagementColumns(baseTransactionColumns, managementGridActions.actionColumn),
+      getManagementColumns(
+        baseTransactionColumns,
+        managementGridActions.actionColumn
+      ),
     [managementGridActions.actionColumn]
   );
 
@@ -1329,7 +1361,9 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
               onSortModelChange={setMonitoringSort1}
               columns={monitoringColumns1}
               checkboxSelection={false}
-              getRowId={(row) => row?.assetTransactionId || `mon1-${Math.random()}`}
+              getRowId={(row) =>
+                row?.assetTransactionId || `mon1-${Math.random()}`
+              }
               onRowClick={handleView}
             />
           </div>
@@ -1352,7 +1386,9 @@ const AssetTransactions = ({ initialMainTab = 'monitoring' }) => {
               onSortModelChange={setMonitoringSort2}
               columns={monitoringColumns2}
               checkboxSelection={false}
-              getRowId={(row) => row?.assetTransactionId || `mon2-${Math.random()}`}
+              getRowId={(row) =>
+                row?.assetTransactionId || `mon2-${Math.random()}`
+              }
               onRowClick={handleView}
             />
           </div>

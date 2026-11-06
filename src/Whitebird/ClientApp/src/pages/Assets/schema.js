@@ -39,6 +39,9 @@ export const assetSchema = z.object({
   supplierId: numberField(false),
   assetConditionPurchase: numberField(false, 1, 2),
   purchaseDate: dateField(),
+  // Read-only display field for the backend-resolved photo URL.
+  // Never sent to the backend (AssetsData.buildSubmitData ignores it).
+  photoProfileUrl: z.string().nullable().optional(),
 });
 
 export const getAssetDefaultValues = () => ({
@@ -59,6 +62,7 @@ export const getAssetDefaultValues = () => ({
   warrantyPeriod: '',
   assetConditionPurchase: '',
   notes: '',
+  photoProfileUrl: '',
 });
 
 export default assetSchema;

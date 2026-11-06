@@ -6,14 +6,26 @@ import Card from '../../../components/atoms/Card/Card';
 import StatusChip from '../../../components/atoms/StatusChip/StatusChip';
 import InfoRow from '../../../components/molecules/InfoRow/InfoRow';
 import { formatDate } from '../../../core/utils/date.utils';
+import { useFileBlob } from '../../../hooks/useFileBlob';
 
 const EmployeeSummaryProfileCard = ({ employeeDetail }) => {
+  // employeeDetail.photoProfileUrl is the raw backend path
+  // ("/api/Employee/5/photo") or null. Authenticated fetch via useFileBlob
+  // returns a renderable blob URL, or null when no photo exists / while
+  // loading / on fetch error — in which case the initials fallback renders.
+  const { blobUrl } = useFileBlob(employeeDetail?.photoProfileUrl);
+  const showPhoto = Boolean(blobUrl);
+  const initials = employeeDetail?.fullName?.charAt(0) || '?';
+
   return (
     <Card className="employee-summary__profile-card">
       <Grid container spacing={3} alignItems="center">
         <Grid item>
-          <Avatar className="employee-summary__profile-avatar">
-            {employeeDetail?.fullName?.charAt(0) || '?'}
+          <Avatar
+            className="employee-summary__profile-avatar"
+            src={showPhoto ? blobUrl : undefined}
+          >
+            {!showPhoto && initials}
           </Avatar>
         </Grid>
         <Grid item xs>

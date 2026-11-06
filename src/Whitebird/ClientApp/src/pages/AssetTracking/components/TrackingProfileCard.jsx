@@ -15,14 +15,23 @@ import Card from '../../../components/atoms/Card/Card';
 import StatusChip from '../../../components/atoms/StatusChip/StatusChip';
 import InfoRow from '../../../components/molecules/InfoRow/InfoRow';
 import { formatDate } from '../../../core/utils/date.utils';
+import { useFileBlob } from '../../../hooks/useFileBlob';
 
 const TrackingProfileCard = ({ currentAsset }) => {
+  // currentAsset.photoProfileUrl is the raw backend path
+  // ("/api/Asset/5/photo") or null. Authenticated fetch via useFileBlob.
+  const { blobUrl } = useFileBlob(currentAsset?.photoProfileUrl);
+  const showPhoto = Boolean(blobUrl);
+
   return (
     <Card className="asset-tracking__profile-card">
       <Grid container spacing={3} alignItems="center">
         <Grid item>
-          <Avatar className="asset-tracking__profile-avatar">
-            <FiBox size={36} />
+          <Avatar
+            className="asset-tracking__profile-avatar"
+            src={showPhoto ? blobUrl : undefined}
+          >
+            {!showPhoto && <FiBox size={36} />}
           </Avatar>
         </Grid>
         <Grid item xs>
@@ -31,21 +40,21 @@ const TrackingProfileCard = ({ currentAsset }) => {
             fontWeight={700}
             className="asset-tracking__profile-name"
           >
-            {currentAsset.assetName || '-'}
+            {currentAsset?.assetName || '-'}
           </Typography>
           <div className="asset-tracking__profile-tags">
             <Chip
-              label={`Code: ${currentAsset.assetCode || '-'}`}
+              label={`Code: ${currentAsset?.assetCode || '-'}`}
               size="small"
               variant="outlined"
             />
             <Chip
-              label={`Category: ${currentAsset.categoryName || '-'}`}
+              label={`Category: ${currentAsset?.categoryName || '-'}`}
               size="small"
               variant="outlined"
             />
-            <StatusChip status={currentAsset.currentStatus || 'Available'} />
-            {currentAsset.isOnLoan && (
+            <StatusChip status={currentAsset?.currentStatus || 'Available'} />
+            {currentAsset?.isOnLoan && (
               <Chip
                 icon={<FiClock />}
                 label="On Loan"
@@ -54,7 +63,7 @@ const TrackingProfileCard = ({ currentAsset }) => {
                 variant="outlined"
               />
             )}
-            {currentAsset.isInMaintenance && (
+            {currentAsset?.isInMaintenance && (
               <Chip
                 icon={<FiActivity />}
                 label="In Maintenance"
@@ -63,7 +72,7 @@ const TrackingProfileCard = ({ currentAsset }) => {
                 variant="outlined"
               />
             )}
-            {currentAsset.isOverdue && (
+            {currentAsset?.isOverdue && (
               <Chip
                 icon={<FiAlertTriangle />}
                 label="Overdue"
@@ -77,19 +86,19 @@ const TrackingProfileCard = ({ currentAsset }) => {
           <InfoRow
             icon={FiUser}
             label="Holder"
-            value={currentAsset.currentHolderName || '-'}
+            value={currentAsset?.currentHolderName || '-'}
           />
           <InfoRow
             icon={FiMapPin}
             label="Location"
-            value={currentAsset.currentLocation || '-'}
+            value={currentAsset?.currentLocation || '-'}
           />
           <InfoRow
             icon={FiActivity}
             label="Condition"
-            value={currentAsset.conditionName || '-'}
+            value={currentAsset?.conditionName || '-'}
           />
-          {currentAsset.loanDueDate && (
+          {currentAsset?.loanDueDate && (
             <InfoRow
               icon={FiCalendar}
               label="Due Date"
@@ -100,7 +109,7 @@ const TrackingProfileCard = ({ currentAsset }) => {
           <InfoRow
             icon={FiRefreshCw}
             label="Total Transactions"
-            value={currentAsset.totalTransactions || 0}
+            value={currentAsset?.totalTransactions || 0}
           />
         </Grid>
       </Grid>

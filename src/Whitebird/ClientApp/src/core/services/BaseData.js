@@ -301,91 +301,121 @@ class BaseData {
   }
 
   // ============================================================
-  // BULK DELETE — client-side chunked sequence over the existing
-  // single-record delete endpoint. No batch endpoint exists in the
-  // backend contract; this uses only the documented DELETE /{id}.
+  // BULK DELETE — single POST to the documented /{Domain}/bulk-delete
+  // endpoint (Swagger: BulkDeleteRequest { ids: int[] }, minItems: 1).
   //
-  // Requests are chunked at 5 concurrent to stay under the backend
-  // rate limiter. Partial failures are reported explicitly so the
-  // caller can decide between success / warning / error UI.
+  // On success the operation is all-or-nothing from the backend's
+  // perspective; per-record status is not returned by the API. The
+  // return shape below preserves the exact fields that callers rely on
+  // (succeeded / failed / successCount / failCount / total) so no page-
+  // level change is required.
+  //
+  // `partial` is retained for future-proofing (false unless the backend
+  // ever starts returning per-record results).
   // ============================================================
   async bulkDelete(ids) {
     if (!Array.isArray(ids) || ids.length === 0) {
-      return { success: false, error: 'No records selected' };
+      return { success: false, partial: false, error: 'No records selected' };
     }
 
-    const CHUNK_SIZE = 5;
-    const succeeded = [];
-    const failed = [];
-    let canceled = false;
+    // Guard: bulk-delete endpoint is not defined for every domain (e.g.,
+    // UserRoles). Fail fast rather than throw on `undefined is not a
+    // function`.
+    if (typeof this.api.bulkDelete !== 'function') {
+      return {
+        success: false,
+        partial: false,
+        error: `Bulk delete is not supported for ${this._entityName}`,
+      };
+    }
 
-    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
-      if (canceled) break;
+    try {
+      const result = await this.api.bulkDelete({ ids });
 
-      const chunk = ids.slice(i, i + CHUNK_SIZE);
-
-      const results = await Promise.all(
-        chunk.map((id) =>
-          this.api
-            .delete(id)
-            .then((result) => ({ id, ok: true, result }))
-            .catch((error) => ({ id, ok: false, error }))
-        )
-      );
-
-      for (const r of results) {
-        if (!r.ok) {
-          if (this.isCanceledError(r.error)) {
-            canceled = true;
-            failed.push({ id: r.id, error: 'canceled' });
-          } else {
-            failed.push({
-              id: r.id,
-              error:
-                r.error.userMessage || r.error.message || 'Failed to delete',
-            });
-          }
-          continue;
+      // ServiceResult envelope
+      if (result.data?.isSuccess !== undefined) {
+        if (!result.data.isSuccess) {
+          const errorMsg =
+            result.data.errors?.join('\n') ||
+            result.data.message ||
+            'Failed to delete records';
+          return {
+            success: false,
+            partial: false,
+            data: {
+              succeeded: [],
+              failed: ids.map((id) => ({ id, error: errorMsg })),
+              successCount: 0,
+              failCount: ids.length,
+              total: ids.length,
+            },
+            error: errorMsg,
+            errorType: result.data.errorType,
+          };
         }
 
-        const result = r.result;
-        if (result.data?.isSuccess !== undefined) {
-          if (result.data.isSuccess) {
-            succeeded.push(r.id);
-          } else {
-            failed.push({
-              id: r.id,
-              error:
-                result.data.errors?.join('\n') ||
-                result.data.message ||
-                'Failed to delete',
-            });
-          }
-        } else {
-          succeeded.push(r.id);
-        }
+        // Successful delete: the number of affected records may or may not
+        // be in `data.data`. Fall back to `ids.length` (backend accepted
+        // the request → assume all deleted).
+        const count =
+          typeof result.data.data === 'number' ? result.data.data : ids.length;
+        const clampedCount = Math.min(count, ids.length);
+        return {
+          success: true,
+          partial: false,
+          data: {
+            succeeded: ids.slice(0, clampedCount),
+            failed: [],
+            successCount: clampedCount,
+            failCount: ids.length - clampedCount,
+            total: ids.length,
+          },
+        };
       }
+
+      // Legacy envelope (no isSuccess field) — treat 200 as success.
+      return {
+        success: true,
+        partial: false,
+        data: {
+          succeeded: ids.slice(),
+          failed: [],
+          successCount: ids.length,
+          failCount: 0,
+          total: ids.length,
+        },
+      };
+    } catch (error) {
+      if (this.isCanceledError(error)) {
+        return {
+          success: false,
+          partial: false,
+          error: 'canceled',
+          isCanceled: true,
+          data: {
+            succeeded: [],
+            failed: ids.map((id) => ({ id, error: 'canceled' })),
+            successCount: 0,
+            failCount: ids.length,
+            total: ids.length,
+          },
+        };
+      }
+      const errorMsg =
+        error.userMessage || error.message || 'Failed to delete records';
+      return {
+        success: false,
+        partial: false,
+        data: {
+          succeeded: [],
+          failed: ids.map((id) => ({ id, error: errorMsg })),
+          successCount: 0,
+          failCount: ids.length,
+          total: ids.length,
+        },
+        error: errorMsg,
+      };
     }
-
-    const total = ids.length;
-    const successCount = succeeded.length;
-    const failCount = failed.length;
-
-    return {
-      success: failCount === 0,
-      partial: successCount > 0 && failCount > 0,
-      data: {
-        succeeded,
-        failed,
-        successCount,
-        failCount,
-        total,
-      },
-      error:
-        failCount > 0
-          ? `${failCount} of ${total} record(s) failed to delete`
-          : undefined,
-    };
   }
 
   // ============================================================

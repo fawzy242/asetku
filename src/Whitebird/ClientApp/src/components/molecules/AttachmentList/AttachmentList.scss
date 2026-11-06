@@ -1,0 +1,126 @@
+// src/components/molecules/AttachmentList/AttachmentList.scss
+@use '../../../styles/variables' as *;
+@use '../../../styles/mixins' as *;
+
+.attachment-list {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+
+    &__title {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: $spacing-xs;
+    }
+
+    &__items {
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-xs;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+    }
+
+    &__item {
+        display: flex;
+        align-items: center;
+        gap: $spacing-md;
+        padding: $spacing-sm $spacing-md;
+        border: 1px solid var(--border);
+        border-radius: $radius-md;
+        background-color: var(--surface);
+        transition: all $transition-fast;
+
+        &:hover {
+            border-color: var(--primary);
+        }
+    }
+
+    &__icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background-color: var(--card-bg);
+        border-radius: $radius-sm;
+        color: var(--text-secondary);
+        flex-shrink: 0;
+    }
+
+    &__info {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        flex: 1;
+    }
+
+    &__name {
+        font-size: $font-size-sm;
+        font-weight: 500;
+        color: var(--text-primary);
+        @include truncate;
+    }
+
+    &__size {
+        font-size: $font-size-xs;
+        color: var(--text-secondary);
+    }
+
+    &__actions {
+        display: flex;
+        align-items: center;
+        gap: $spacing-xs;
+        flex-shrink: 0;
+    }
+
+    &__action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: $radius-sm;
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+        transition: all $transition-fast;
+        cursor: pointer;
+        text-decoration: none;
+
+        &:hover {
+            background-color: var(--card-bg);
+        }
+
+        &--preview:hover {
+            color: var(--info);
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+
+        &--download:hover {
+            color: var(--success);
+            background-color: rgba(16, 185, 129, 0.1);
+        }
+    }
+}
+
+[data-theme='dark'] {
+    .attachment-list__item {
+        background-color: #1f2937;
+        border-color: #374151;
+
+        &:hover {
+            border-color: #ef4444;
+        }
+    }
+
+    .attachment-list__icon {
+        background-color: #374151;
+        color: #9ca3af;
+    }
+
+    .attachment-list__action:hover {
+        background-color: #374151;
+    }
+}

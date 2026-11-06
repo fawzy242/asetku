@@ -14,9 +14,31 @@ import './Sidebar.scss';
 
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: FiHome, path: '/dashboard' },
-  { id: 'assets', label: 'Assets', icon: FiBox, path: '/assets' },
   // ============================================================
-  // TRANSACTIONS — parent with child
+  // ASSETS — parent with children (Monitoring + Management)
+  // ============================================================
+  {
+    id: 'assets',
+    label: 'Assets',
+    icon: FiBox,
+    path: null,
+    children: [
+      {
+        id: 'assets-monitoring',
+        label: 'Monitoring',
+        icon: FiActivity,
+        path: '/assets/monitoring',
+      },
+      {
+        id: 'assets-management',
+        label: 'Management',
+        icon: FiSettings,
+        path: '/assets/management',
+      },
+    ],
+  },
+  // ============================================================
+  // TRANSACTIONS — parent with children
   // ============================================================
   {
     id: 'transactions',
@@ -24,13 +46,28 @@ const menuItems = [
     icon: FiRefreshCw,
     path: null,
     children: [
-      { id: 'transactions-monitoring', label: 'Monitoring', icon: FiActivity, path: '/transactions/monitoring' },
-      { id: 'transactions-management', label: 'Management', icon: FiSettings, path: '/transactions/management' },
-    ]
+      {
+        id: 'transactions-monitoring',
+        label: 'Monitoring',
+        icon: FiActivity,
+        path: '/transactions/monitoring',
+      },
+      {
+        id: 'transactions-management',
+        label: 'Management',
+        icon: FiSettings,
+        path: '/transactions/management',
+      },
+    ],
   },
   { id: 'tracking', label: 'Asset Tracking', icon: FiCrosshair, path: '/tracking' },
   { id: 'employees', label: 'Employees', icon: FiUsers, path: '/employees' },
-  { id: 'employee-summary', label: 'Employee Summary', icon: FiUserCheck, path: '/employee-summary' },
+  {
+    id: 'employee-summary',
+    label: 'Employee Summary',
+    icon: FiUserCheck,
+    path: '/employee-summary',
+  },
   // ============================================================
   // MASTER DATA
   // ============================================================
@@ -42,9 +79,14 @@ const menuItems = [
     children: [
       { id: 'categories', label: 'Categories', icon: FiGrid, path: '/categories' },
       { id: 'suppliers', label: 'Suppliers', icon: FiTruck, path: '/suppliers' },
-      { id: 'departments', label: 'Departments', icon: FiBriefcase, path: '/departments' },
+      {
+        id: 'departments',
+        label: 'Departments',
+        icon: FiBriefcase,
+        path: '/departments',
+      },
       { id: 'offices', label: 'Offices', icon: FiMapPin, path: '/offices' },
-    ]
+    ],
   },
   // ============================================================
   // SCHEDULE
@@ -55,10 +97,25 @@ const menuItems = [
     icon: FiCalendar,
     path: null,
     children: [
-      { id: 'schedule-handover', label: 'Handover', icon: FiArrowRight, path: '/schedule-handover' },
-      { id: 'schedule-return', label: 'Return', icon: FiArrowLeft, path: '/schedule-return' },
-      { id: 'schedule-maintenance', label: 'Maintenance', icon: FiTool, path: '/schedule-maintenance' },
-    ]
+      {
+        id: 'schedule-handover',
+        label: 'Handover',
+        icon: FiArrowRight,
+        path: '/schedule-handover',
+      },
+      {
+        id: 'schedule-return',
+        label: 'Return',
+        icon: FiArrowLeft,
+        path: '/schedule-return',
+      },
+      {
+        id: 'schedule-maintenance',
+        label: 'Maintenance',
+        icon: FiTool,
+        path: '/schedule-maintenance',
+      },
+    ],
   },
   { id: 'reports', label: 'Reports', icon: FiBarChart2, path: '/reports' },
   // ============================================================
@@ -73,7 +130,7 @@ const menuItems = [
     children: [
       { id: 'roles', label: 'Roles', icon: FiKey, path: '/roles' },
       { id: 'user-roles', label: 'User Roles', icon: FiUserPlus, path: '/user-roles' },
-    ]
+    ],
   },
 ];
 
@@ -87,8 +144,6 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
   const activePath = location.pathname;
   const isAdmin = useIsAdmin();
 
-  // Filter admin-only groups for non-admin users. Every other item is
-  // rendered unconditionally — matches prior behavior exactly.
   const visibleMenuItems = useMemo(
     () => menuItems.filter((item) => (item.adminOnly ? isAdmin : true)),
     [isAdmin]
@@ -106,19 +161,29 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Auto-expand the parent group containing the active route.
   useEffect(() => {
-    menuItems.forEach(item => {
-      if (item.children?.some(child => child.path === activePath)) {
-        setExpandedItems(prev => new Set([...prev, item.id]));
+    menuItems.forEach((item) => {
+      if (item.children?.some((child) => child.path === activePath)) {
+        setExpandedItems((prev) => new Set([...prev, item.id]));
       }
     });
   }, [activePath]);
 
-  const toggleExpand = (id) => setExpandedItems(prev => {
-    const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
-  });
+  // When the sidebar collapses, close ALL submenus so that when it
+  // re-expands, no stale submenu is left open from the previous state.
+  useEffect(() => {
+    if (collapsed) {
+      setExpandedItems(new Set());
+    }
+  }, [collapsed]);
+
+  const toggleExpand = (id) =>
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   const handleToggle = () => {
     if (isMobile) {
@@ -141,7 +206,9 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
   const renderItem = (item, level = 0) => {
     const hasChildren = item.children?.length > 0;
     const isExpanded = expandedItems.has(item.id);
-    const isActive = item.path === activePath || item.children?.some(c => c.path === activePath);
+    const isActive =
+      item.path === activePath ||
+      item.children?.some((c) => c.path === activePath);
     const Icon = item.icon;
 
     return (
@@ -149,7 +216,7 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
         <a
           href={item.path || '#'}
           className={`sidebar__link ${isActive ? 'sidebar__link--active' : ''} ${level > 0 ? 'sidebar__link--child' : ''}`}
-          onClick={e => {
+          onClick={(e) => {
             e.preventDefault();
             if (hasChildren) {
               toggleExpand(item.id);
@@ -175,7 +242,7 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
         </a>
         {hasChildren && isExpanded && !collapsed && (
           <ul className="sidebar__submenu">
-            {item.children.map(c => renderItem(c, level + 1))}
+            {item.children.map((c) => renderItem(c, level + 1))}
           </ul>
         )}
       </li>
@@ -183,17 +250,32 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
   };
 
   const handleLogoClick = () => handleNavigate('/dashboard');
-  const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0';
+  const appVersion =
+    typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0';
 
   return (
     <>
-      <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''} ${isMobile && showMobileOverlay ? 'sidebar--mobile-open' : ''}`} role="navigation" aria-label="Main navigation">
+      <aside
+        className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''} ${isMobile && showMobileOverlay ? 'sidebar--mobile-open' : ''}`}
+        role="navigation"
+        aria-label="Main navigation"
+      >
         <div className="sidebar__header">
           {!collapsed ? (
             <>
-              <div className="sidebar__logo" onClick={handleLogoClick} style={{ cursor: 'pointer' }} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handleLogoClick()} aria-label="Go to dashboard">
+              <div
+                className="sidebar__logo"
+                onClick={handleLogoClick}
+                style={{ cursor: 'pointer' }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && handleLogoClick()}
+                aria-label="Go to dashboard"
+              >
                 {logoError ? (
-                  <div className="sidebar__logo-fallback" aria-hidden="true">A</div>
+                  <div className="sidebar__logo-fallback" aria-hidden="true">
+                    A
+                  </div>
                 ) : (
                   <img
                     src="/logo.png"
@@ -204,19 +286,27 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
                 )}
                 <span className="sidebar__logo-text">AsetKu</span>
               </div>
-              <button className="sidebar__toggle-btn" onClick={handleToggle} aria-label="Collapse sidebar">
+              <button
+                className="sidebar__toggle-btn"
+                onClick={handleToggle}
+                aria-label="Collapse sidebar"
+              >
                 <FiChevronLeft size={20} />
               </button>
             </>
           ) : (
-            <button className="sidebar__toggle-btn sidebar__toggle-btn--expand" onClick={handleToggle} aria-label="Expand sidebar">
+            <button
+              className="sidebar__toggle-btn sidebar__toggle-btn--expand"
+              onClick={handleToggle}
+              aria-label="Expand sidebar"
+            >
               <FiMenu size={22} />
             </button>
           )}
         </div>
         <nav className="sidebar__nav">
           <ul className="sidebar__menu">
-            {visibleMenuItems.map(item => renderItem(item))}
+            {visibleMenuItems.map((item) => renderItem(item))}
           </ul>
         </nav>
         <div className="sidebar__footer">

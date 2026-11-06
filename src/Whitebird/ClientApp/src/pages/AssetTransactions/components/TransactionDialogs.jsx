@@ -8,6 +8,7 @@ import Select from '../../../components/atoms/Select/Select';
 import DatePickerInput from '../../../components/atoms/Input/DatePickerInput';
 import NumberInput from '../../../components/atoms/Input/NumberInput';
 import FileUploader from '../../../components/molecules/FileUploader/FileUploader';
+import AttachmentList from '../../../components/molecules/AttachmentList';
 import ReturnModalContent from '../../../components/molecules/ReturnModalContent/ReturnModalContent';
 import PostMaintenanceModalContent from '../../../components/molecules/PostMaintenanceModalContent/PostMaintenanceModalContent';
 import { TRANSACTION_TYPE_OPTIONS } from '../../../core/constants/transactionTypes';
@@ -81,8 +82,24 @@ const TransactionDialogs = ({
         disableSubmit={isViewMode}
         showCancel={!isViewMode}
       >
-        <FormSection title="Transaction Details" description="Type, asset, and parties">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <FormSection
+          title="Transaction Details"
+          description="Date, type, asset, and parties"
+        >
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '16px',
+            }}
+          >
+            <DatePickerInput
+              label="Transaction Date"
+              value={formData.transactionDate || ''}
+              onChange={(e) => setFormField('transactionDate')(e.target.value)}
+              required
+              disabled={disabled}
+            />
             <Select
               label="Transaction Type"
               value={formData.transactionType || ''}
@@ -153,7 +170,13 @@ const TransactionDialogs = ({
         </FormSection>
 
         <FormSection title="Condition & Maintenance">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '16px',
+            }}
+          >
             <Select
               label="Condition"
               value={formData.condition || ''}
@@ -189,7 +212,9 @@ const TransactionDialogs = ({
         </FormSection>
 
         <FormSection title="Notes & Attachments">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div
+            style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+          >
             <Input
               label="Notes"
               value={formData.notes || ''}
@@ -211,20 +236,7 @@ const TransactionDialogs = ({
               />
             )}
             {isViewMode && existingAttachments.length > 0 && (
-              <div>
-                <p style={{ fontWeight: 600, marginBottom: 8 }}>Attachments:</p>
-                {existingAttachments.map((att, idx) => (
-                  <div key={idx} style={{ padding: '4px 0' }}>
-                    <a
-                      href={att.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {att.originalFileName || att.fileName || 'File'}
-                    </a>
-                  </div>
-                ))}
-              </div>
+              <AttachmentList attachments={existingAttachments} />
             )}
           </div>
         </FormSection>

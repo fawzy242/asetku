@@ -1,5 +1,5 @@
 // src/pages/Dashboard/Dashboard.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -13,6 +13,7 @@ import {
   LineElement,
   Filler,
 } from 'chart.js';
+import { Alert } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { DashboardData } from '../../core/services';
 import Spinner from '../../components/atoms/Spinner/Spinner';
@@ -49,6 +50,7 @@ const Dashboard = () => {
     endpoint: '',
     params: {},
   });
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   // Pagination state persists across tab switches — preserved from the original page.
   const [expiredWarrantyPage, setExpiredWarrantyPage] = useState(1);
@@ -59,17 +61,23 @@ const Dashboard = () => {
   const theme = useUIStore((s) => s.theme);
 
   // ============================================================
-  // DATA — single combined fetch (matches the previous Promise.allSettled
-  // semantics inside DashboardData.fetchDashboardData).
+  // DATA — single combined fetch.
+  // partialFailure + failedSections propagate from DashboardData.
   // ============================================================
-  const { data: dashboardData_ = EMPTY_DASHBOARD, isLoading: loading } = useQuery({
-    queryKey: ['dashboard'],
-    queryFn: async () => {
-      const result = await dashboardData.fetchDashboardData();
-      return result.success ? result.data : EMPTY_DASHBOARD;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: dashboardData_ = EMPTY_DASHBOARD, isLoading: loading } =
+    useQuery({
+      queryKey: ['dashboard'],
+      queryFn: async () => {
+        const result = await dashboardData.fetchDashboardData();
+        const base = result.success ? result.data : EMPTY_DASHBOARD;
+        return {
+          ...base,
+          partialFailure: result.partialFailure || false,
+          failedSections: result.failedSections || [],
+        };
+      },
+      staleTime: 5 * 60 * 1000,
+    });
 
   const {
     stats,
@@ -78,6 +86,8 @@ const Dashboard = () => {
     recentTransactions,
     expiredWarranty,
     scheduleStats,
+    partialFailure = false,
+    failedSections = [],
   } = dashboardData_;
 
   const safeStats = stats || {};
@@ -92,6 +102,23 @@ const Dashboard = () => {
     ? expiredWarranty
     : [];
   const safeScheduleStats = scheduleStats || {};
+
+  // ============================================================
+  // PARTIAL FAILURE BANNER
+  // ============================================================
+  const failedSectionsKey = useMemo(
+    () => failedSections.join('|'),
+    [failedSections]
+  );
+
+  // Reset dismissed state whenever the set of failures changes, so a new
+  // failure (or a fixed-then-broken-again cycle) shows the banner again.
+  useEffect(() => {
+    setBannerDismissed(false);
+  }, [failedSectionsKey]);
+
+  const showBanner = partialFailure && !bannerDismissed;
+  const allFailed = failedSections.length >= 6;
 
   const statCardsConfig = buildStatCardsConfig({
     stats: safeStats,
@@ -125,6 +152,20 @@ const Dashboard = () => {
           Overview of asset management system performance
         </p>
       </div>
+
+      {showBanner && (
+        <Alert
+          severity={allFailed ? 'error' : 'warning'}
+          onClose={() => setBannerDismissed(true)}
+          sx={{ mb: 2 }}
+        >
+          {allFailed
+            ? 'Dashboard data could not be loaded. Please check your connection and refresh the page.'
+            : `Some dashboard data could not be loaded (${failedSections.join(
+                ', '
+              )}). Values for those sections may be incomplete.`}
+        </Alert>
+      )}
 
       <Tabs tabs={DASHBOARD_TABS} activeTab={activeTab} onTabChange={setActiveTab} />
 

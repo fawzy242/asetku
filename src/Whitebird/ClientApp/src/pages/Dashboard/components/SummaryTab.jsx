@@ -1,7 +1,13 @@
 // src/pages/Dashboard/components/SummaryTab.jsx
 import React from 'react';
 import { Box, Typography, Chip } from '@mui/material';
-import { FiAlertTriangle } from 'react-icons/fi';
+import {
+  FiAlertTriangle,
+  FiArrowRight,
+  FiArrowLeft,
+  FiTool,
+  FiClock,
+} from 'react-icons/fi';
 import Card from '../../../components/atoms/Card/Card';
 import DataTable from '../../../components/molecules/DataTable/DataTable';
 import StatCard from '../../../components/molecules/StatCard/StatCard';
@@ -11,6 +17,93 @@ import {
   monthlyStatsColumns,
 } from '../columns';
 
+// ============================================================
+// SCHEDULER OVERVIEW — rendered at the top of the tab
+// ============================================================
+const SchedulerOverview = ({ scheduleStats }) => {
+  const items = [
+    {
+      icon: FiArrowRight,
+      label: 'Total Handover',
+      value: scheduleStats.totalHandover || 0,
+      variant: 'total',
+    },
+    {
+      icon: FiArrowLeft,
+      label: 'Total Return',
+      value: scheduleStats.totalReturn || 0,
+      variant: 'total',
+    },
+    {
+      icon: FiTool,
+      label: 'Total Maintenance',
+      value: scheduleStats.totalMaintenance || 0,
+      variant: 'total',
+    },
+    {
+      icon: FiClock,
+      label: 'Upcoming Handover',
+      value: scheduleStats.upcomingHandover || 0,
+      variant: 'upcoming',
+    },
+    {
+      icon: FiClock,
+      label: 'Upcoming Return',
+      value: scheduleStats.upcomingReturn || 0,
+      variant: 'upcoming',
+    },
+    {
+      icon: FiClock,
+      label: 'Upcoming Maintenance',
+      value: scheduleStats.upcomingMaintenance || 0,
+      variant: 'upcoming',
+    },
+  ];
+
+  return (
+    <div className="dashboard__scheduler-section">
+      <Card
+        title="Scheduler Information"
+        subtitle="Overview of scheduled asset operations"
+        className="dashboard__scheduler-card"
+      >
+        <div className="dashboard__scheduler-grid">
+          {items.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={item.label}
+                className={`dashboard__scheduler-item dashboard__scheduler-item--${item.variant}`}
+              >
+                <div className="dashboard__scheduler-icon">
+                  <Icon size={20} />
+                </div>
+                <div className="dashboard__scheduler-body">
+                  <Typography
+                    variant="caption"
+                    className="dashboard__scheduler-label"
+                  >
+                    {item.label}
+                  </Typography>
+                  <Typography
+                    variant="h6"
+                    className="dashboard__scheduler-value"
+                  >
+                    {item.value}
+                  </Typography>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+// ============================================================
+// SUMMARY TAB
+// ============================================================
 const SummaryTab = ({
   statCardsConfig,
   onCardClick,
@@ -38,8 +131,17 @@ const SummaryTab = ({
     categoryBreakdownPage * 10
   );
 
+  const hasScheduleStats =
+    scheduleStats &&
+    typeof scheduleStats === 'object' &&
+    Object.keys(scheduleStats).length > 0;
+
   return (
     <div className="dashboard__tab-content">
+      {/* 1. Scheduler Information — TOP (prominent) */}
+      {hasScheduleStats && <SchedulerOverview scheduleStats={scheduleStats} />}
+
+      {/* 2. Stats grid */}
       <div className="dashboard__stats">
         {statCardsConfig.map((card) => (
           <StatCard
@@ -55,6 +157,7 @@ const SummaryTab = ({
         ))}
       </div>
 
+      {/* 3. Expired Warranty alert */}
       {expiredWarranty.length > 0 && (
         <div className="dashboard__alert-wrapper">
           <Card className="dashboard__alert-card">
@@ -89,6 +192,7 @@ const SummaryTab = ({
         </div>
       )}
 
+      {/* 4. Summary tables (monthly + category — scheduler removed from here) */}
       <div className="dashboard__summary-tables">
         {monthlyStats.length > 0 && (
           <Card
@@ -127,67 +231,6 @@ const SummaryTab = ({
               paginationMode="client"
               autoHeight={false}
             />
-          </Card>
-        )}
-
-        {scheduleStats && (
-          <Card title="Schedule Statistics" className="dashboard__summary-card">
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                gap: 2,
-              }}
-            >
-              <Box className="dashboard__stat-item">
-                <Typography variant="caption" color="text.secondary">
-                  Total Handover
-                </Typography>
-                <Typography variant="h6" fontWeight={600}>
-                  {scheduleStats.totalHandover || 0}
-                </Typography>
-              </Box>
-              <Box className="dashboard__stat-item">
-                <Typography variant="caption" color="text.secondary">
-                  Total Return
-                </Typography>
-                <Typography variant="h6" fontWeight={600}>
-                  {scheduleStats.totalReturn || 0}
-                </Typography>
-              </Box>
-              <Box className="dashboard__stat-item">
-                <Typography variant="caption" color="text.secondary">
-                  Total Maintenance
-                </Typography>
-                <Typography variant="h6" fontWeight={600}>
-                  {scheduleStats.totalMaintenance || 0}
-                </Typography>
-              </Box>
-              <Box className="dashboard__stat-item">
-                <Typography variant="caption" color="text.secondary">
-                  Upcoming Handover
-                </Typography>
-                <Typography variant="h6" fontWeight={600} color="warning.main">
-                  {scheduleStats.upcomingHandover || 0}
-                </Typography>
-              </Box>
-              <Box className="dashboard__stat-item">
-                <Typography variant="caption" color="text.secondary">
-                  Upcoming Return
-                </Typography>
-                <Typography variant="h6" fontWeight={600} color="warning.main">
-                  {scheduleStats.upcomingReturn || 0}
-                </Typography>
-              </Box>
-              <Box className="dashboard__stat-item">
-                <Typography variant="caption" color="text.secondary">
-                  Upcoming Maintenance
-                </Typography>
-                <Typography variant="h6" fontWeight={600} color="warning.main">
-                  {scheduleStats.upcomingMaintenance || 0}
-                </Typography>
-              </Box>
-            </Box>
           </Card>
         )}
       </div>

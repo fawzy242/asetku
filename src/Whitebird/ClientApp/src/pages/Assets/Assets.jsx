@@ -35,9 +35,6 @@ import './Assets.scss';
 
 const assetsData = new AssetsData();
 
-// ============================================================
-// TABS
-// ============================================================
 const STATUS_TABS = [
   { id: 'available', label: 'Available' },
   { id: 'assigned', label: 'Assigned' },
@@ -52,7 +49,6 @@ const CRUD_TABS = [
   { id: 'inactive', label: 'Inactive' },
 ];
 
-// Status tab id -> backend status string (unchanged from existing mapping)
 const STATUS_TO_BACKEND = {
   available: 'Available',
   assigned: 'Assigned',
@@ -61,9 +57,23 @@ const STATUS_TO_BACKEND = {
   damaged: 'Damaged',
 };
 
-const Assets = () => {
+/**
+ * Assets page — dual-mode component.
+ *
+ *   initialMainTab="monitoring" -> status grid only (read-only, no CRUD)
+ *   initialMainTab="management" -> CRUD grid with filters, import, bulk actions
+ *
+ * Mode is fixed at mount (matching the AssetTransactions pattern). Mode
+ * changes happen via route navigation (/assets/monitoring vs
+ * /assets/management), not via in-page tabs.
+ */
+const Assets = ({ initialMainTab = 'monitoring' }) => {
+  const [activeMainTab] = useState(initialMainTab);
+  const isMonitoring = activeMainTab === 'monitoring';
+  const isManagement = activeMainTab === 'management';
+
   // ============================================================
-  // SHARED MODAL STATE (used by both grids)
+  // SHARED MODAL STATE
   // ============================================================
   const [showModal, setShowModal] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
@@ -77,6 +87,7 @@ const Assets = () => {
 
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [deletingPhoto, setDeletingPhoto] = useState(false);
   const [attachmentFiles, setAttachmentFiles] = useState([]);
   const [existingAttachments, setExistingAttachments] = useState([]);
 
@@ -315,6 +326,35 @@ const Assets = () => {
     setPhotoPreview(null);
   }, []);
 
+  const handleDeletePhoto = useCallback(async () => {
+    if (!currentAssetId) return;
+
+    const confirmed = await confirm({
+      title: 'Delete Profile Photo',
+      text: "Are you sure you want to remove this asset's profile photo?",
+      icon: 'warning',
+      confirmButtonText: 'Yes, Delete',
+      confirmButtonColor: '#ef4444',
+    });
+    if (!confirmed) return;
+
+    setDeletingPhoto(true);
+    try {
+      const r = await assetsData.deletePhoto(currentAssetId);
+      if (r.success && isMountedRef.current) {
+        setValue('photoProfileUrl', '');
+        queryClient.invalidateQueries({ queryKey: ['file-blob'] });
+        toast.success('Profile photo removed');
+      } else if (r.error && r.error !== 'canceled') {
+        toast.error(r.error);
+      }
+    } catch (error) {
+      toast.error(error?.message || 'Failed to delete photo');
+    } finally {
+      if (isMountedRef.current) setDeletingPhoto(false);
+    }
+  }, [currentAssetId, setValue, queryClient, toast, confirm]);
+
   // ============================================================
   // SHARED CRUD OPERATIONS
   // ============================================================
@@ -327,6 +367,7 @@ const Assets = () => {
     setExistingAttachments([]);
     setPhotoFile(null);
     setPhotoPreview(null);
+    setDeletingPhoto(false);
     setEditingAsset(null);
     setShowModal(true);
   }, [reset]);
@@ -340,6 +381,7 @@ const Assets = () => {
       setCurrentAssetId(recordId);
       setPhotoFile(null);
       setPhotoPreview(null);
+      setDeletingPhoto(false);
       setEditingAsset(record);
 
       try {
@@ -348,12 +390,22 @@ const Assets = () => {
           const data = result.data;
           const defaults = getAssetDefaultValues();
           Object.keys(defaults).forEach((key) => {
+            // isActive and photoProfileUrl handled explicitly below.
+            if (key === 'isActive' || key === 'photoProfileUrl') return;
             if (data[key] !== undefined && data[key] !== null) {
               setValue(key, data[key]);
             } else {
               setValue(key, '');
             }
           });
+
+          setValue('photoProfileUrl', data.photoProfileUrl || '');
+          setValue(
+            'isActive',
+            data.isActive === true ||
+              data.isActive === 'true' ||
+              data.isActive === 1
+          );
 
           if (data.attachments && Array.isArray(data.attachments)) {
             setExistingAttachments(data.attachments);
@@ -383,7 +435,7 @@ const Assets = () => {
   );
 
   const handleClose = useCallback(() => {
-    if (!isSubmitting) {
+    if (!isSubmitting && !deletingPhoto) {
       setShowModal(false);
       setIsEditMode(false);
       setIsViewMode(false);
@@ -392,14 +444,17 @@ const Assets = () => {
       reset(getAssetDefaultValues());
       setPhotoFile(null);
       setPhotoPreview(null);
+      setDeletingPhoto(false);
       setAttachmentFiles([]);
       setExistingAttachments([]);
     }
-  }, [isSubmitting, reset]);
+  }, [isSubmitting, deletingPhoto, reset]);
 
   const onSubmit = useCallback(
     async (data) => {
       if (isSubmitting || isViewMode) return;
+
+      const hadPhotoUpload = Boolean(photoFile);
 
       const submitData = {
         ...data,
@@ -430,6 +485,10 @@ const Assets = () => {
           setEditingAsset(null);
           setShowModal(false);
           reset(getAssetDefaultValues());
+
+          if (hadPhotoUpload) {
+            queryClient.invalidateQueries({ queryKey: ['file-blob'] });
+          }
 
           queryClient.invalidateQueries({ queryKey: ['assets'] });
           queryClient.invalidateQueries({ queryKey: ['reference', 'assets'] });
@@ -659,6 +718,7 @@ const Assets = () => {
         setExistingAttachments([]);
         setPhotoFile(null);
         setPhotoPreview(null);
+        setDeletingPhoto(false);
         handleEdit(row);
       } else if (actionType === ACTION_TYPES.DELETE) {
         handleDelete(row);
@@ -730,150 +790,154 @@ const Assets = () => {
     : 'Deactivate Assets';
   const bulkDescription = `This action will ${bulkActivateValue ? 'activate' : 'deactivate'} the selected assets.`;
 
+  // ============================================================
+  // PAGE HEADER (per-mode title, description, actions)
+  // ============================================================
+  const pageTitle = isMonitoring ? 'Asset Monitoring' : 'Asset Management';
+  const pageDescription = isMonitoring
+    ? 'Monitor asset status and current allocations'
+    : 'Manage inventory assets and their lifecycle';
+
+  const headerActions = isMonitoring ? (
+    <RefreshButton onClick={handleStatusRefresh} loading={statusLoading} />
+  ) : (
+    <>
+      <RefreshButton onClick={handleCrudRefresh} loading={crudLoading} />
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setShowImportModal(true)}
+        startIcon={<FiUpload size={16} />}
+      >
+        Import
+      </Button>
+      <BulkActionBar visible={bulkActions.length > 0} actions={bulkActions} />
+      <Button
+        variant="primary"
+        size="sm"
+        onClick={handleCreate}
+        startIcon={<FiPlus size={16} />}
+      >
+        Add Asset
+      </Button>
+    </>
+  );
+
+  // ============================================================
+  // RENDER
+  // ============================================================
   return (
     <div className="assets-menu">
       <PageHeader
-        title="Asset Management"
-        description="Manage inventory assets and their lifecycle"
+        title={pageTitle}
+        description={pageDescription}
+        actions={headerActions}
       />
 
-      <section className="assets-menu__section">
-        <header className="assets-menu__section-header">
-          <h2 className="assets-menu__section-title">Asset Status</h2>
-          <div className="assets-menu__section-actions">
-            <RefreshButton
-              onClick={handleStatusRefresh}
+      {isMonitoring && (
+        <>
+          <Tabs
+            tabs={STATUS_TABS}
+            activeTab={statusTab}
+            onTabChange={handleStatusTabChange}
+          />
+
+          <SearchToolbar
+            onSearch={handleStatusSearch}
+            placeholder="Search assets..."
+          />
+
+          <Box className="assets-menu__grid-box">
+            <DataTable
+              rows={statusAssets}
+              columns={statusColumns}
               loading={statusLoading}
+              pageSize={statusPageSize}
+              page={statusPage}
+              totalRowCount={statusTotalCount}
+              onPageChange={setStatusPage}
+              onPageSizeChange={setStatusPageSize}
+              getRowId={(row) => row?.assetId || `row-${Math.random()}`}
+              checkboxSelection={false}
+              onRowClick={handleView}
+              sortModel={statusSortModel}
+              onSortModelChange={setStatusSortModel}
+              paginationMode="server"
+              sortingMode="server"
+              ariaLabel="Asset status table"
             />
-          </div>
-        </header>
+          </Box>
+        </>
+      )}
 
-        <Tabs
-          tabs={STATUS_TABS}
-          activeTab={statusTab}
-          onTabChange={handleStatusTabChange}
-        />
-
-        <SearchToolbar
-          onSearch={handleStatusSearch}
-          placeholder="Search assets..."
-        />
-
-        <Box className="assets-menu__grid-box">
-          <DataTable
-            rows={statusAssets}
-            columns={statusColumns}
-            loading={statusLoading}
-            pageSize={statusPageSize}
-            page={statusPage}
-            totalRowCount={statusTotalCount}
-            onPageChange={setStatusPage}
-            onPageSizeChange={setStatusPageSize}
-            getRowId={(row) => row?.assetId || `row-${Math.random()}`}
-            checkboxSelection={false}
-            onRowClick={handleView}
-            sortModel={statusSortModel}
-            onSortModelChange={setStatusSortModel}
-            paginationMode="server"
-            sortingMode="server"
-            ariaLabel="Asset status table"
+      {isManagement && (
+        <>
+          <Tabs
+            tabs={CRUD_TABS}
+            activeTab={crudTab}
+            onTabChange={handleCrudTabChange}
           />
-        </Box>
-      </section>
 
-      <section className="assets-menu__section">
-        <header className="assets-menu__section-header">
-          <h2 className="assets-menu__section-title">Asset Management</h2>
-          <div className="assets-menu__section-actions">
-            <RefreshButton onClick={handleCrudRefresh} loading={crudLoading} />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowImportModal(true)}
-              startIcon={<FiUpload size={16} />}
-            >
-              Import
-            </Button>
-            <BulkActionBar
-              visible={bulkActions.length > 0}
-              actions={bulkActions}
+          <SearchToolbar
+            onSearch={handleCrudSearch}
+            placeholder="Search assets..."
+          />
+
+          <Box className="assets-menu__filters">
+            <Select
+              label="Category"
+              value={filterCategoryId}
+              onChange={(e) => setFilterCategoryId(e.target.value)}
+              options={categoryFilterOptions}
+              size="small"
+              className="assets-menu__filter-item"
             />
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleCreate}
-              startIcon={<FiPlus size={16} />}
-            >
-              Add Asset
-            </Button>
-          </div>
-        </header>
+            <Select
+              label="Supplier"
+              value={filterSupplierId}
+              onChange={(e) => setFilterSupplierId(e.target.value)}
+              options={supplierFilterOptions}
+              size="small"
+              className="assets-menu__filter-item"
+            />
+            {(filterCategoryId || filterSupplierId) && (
+              <Button
+                variant="text"
+                size="sm"
+                onClick={() => {
+                  setFilterCategoryId('');
+                  setFilterSupplierId('');
+                }}
+                className="assets-menu__filter-clear"
+              >
+                Clear
+              </Button>
+            )}
+          </Box>
 
-        <Tabs
-          tabs={CRUD_TABS}
-          activeTab={crudTab}
-          onTabChange={handleCrudTabChange}
-        />
-
-        <SearchToolbar
-          onSearch={handleCrudSearch}
-          placeholder="Search assets..."
-        />
-
-        <Box className="assets-menu__filters">
-          <Select
-            label="Category"
-            value={filterCategoryId}
-            onChange={(e) => setFilterCategoryId(e.target.value)}
-            options={categoryFilterOptions}
-            size="small"
-            className="assets-menu__filter-item"
-          />
-          <Select
-            label="Supplier"
-            value={filterSupplierId}
-            onChange={(e) => setFilterSupplierId(e.target.value)}
-            options={supplierFilterOptions}
-            size="small"
-            className="assets-menu__filter-item"
-          />
-          {(filterCategoryId || filterSupplierId) && (
-            <Button
-              variant="text"
-              size="sm"
-              onClick={() => {
-                setFilterCategoryId('');
-                setFilterSupplierId('');
-              }}
-              className="assets-menu__filter-clear"
-            >
-              Clear
-            </Button>
-          )}
-        </Box>
-
-        <Box className="assets-menu__grid-box">
-          <DataTable
-            rows={crudAssets}
-            columns={crudColumns}
-            loading={crudLoading}
-            pageSize={crudPageSize}
-            page={crudPage}
-            totalRowCount={crudTotalCount}
-            onPageChange={setCrudPage}
-            onPageSizeChange={setCrudPageSize}
-            getRowId={(row) => row?.assetId || `row-${Math.random()}`}
-            checkboxSelection={true}
-            onRowSelectionModelChange={handleSelectionChange}
-            onRowClick={handleView}
-            sortModel={crudSortModel}
-            onSortModelChange={setCrudSortModel}
-            paginationMode="server"
-            sortingMode="server"
-            ariaLabel="Assets data table"
-          />
-        </Box>
-      </section>
+          <Box className="assets-menu__grid-box">
+            <DataTable
+              rows={crudAssets}
+              columns={crudColumns}
+              loading={crudLoading}
+              pageSize={crudPageSize}
+              page={crudPage}
+              totalRowCount={crudTotalCount}
+              onPageChange={setCrudPage}
+              onPageSizeChange={setCrudPageSize}
+              getRowId={(row) => row?.assetId || `row-${Math.random()}`}
+              checkboxSelection={true}
+              onRowSelectionModelChange={handleSelectionChange}
+              onRowClick={handleView}
+              sortModel={crudSortModel}
+              onSortModelChange={setCrudSortModel}
+              paginationMode="server"
+              sortingMode="server"
+              ariaLabel="Assets data table"
+            />
+          </Box>
+        </>
+      )}
 
       <ActionMenu
         anchorEl={menuAnchorEl}
@@ -900,6 +964,8 @@ const Assets = () => {
         photoPreview={photoPreview}
         handlePhotoChange={handlePhotoChange}
         handleRemovePhoto={handleRemovePhoto}
+        onDeletePhoto={handleDeletePhoto}
+        deletingPhoto={deletingPhoto}
         attachmentFiles={attachmentFiles}
         existingAttachments={existingAttachments}
         handleFilesChange={handleFilesChange}
@@ -910,19 +976,21 @@ const Assets = () => {
         conditionPurchaseOptions={conditionPurchaseOptions}
       />
 
-      <ImportModal
-        isOpen={showImportModal}
-        onClose={() => {
-          setShowImportModal(false);
-          setImportResult(null);
-        }}
-        onImport={handleImport}
-        onDownloadTemplate={handleDownloadTemplate}
-        isImporting={isImporting}
-        importResult={importResult}
-        title="Import Assets"
-        description="Upload an .xlsx file with asset data. Assets will be imported as ACTIVE."
-      />
+      {isManagement && (
+        <ImportModal
+          isOpen={showImportModal}
+          onClose={() => {
+            setShowImportModal(false);
+            setImportResult(null);
+          }}
+          onImport={handleImport}
+          onDownloadTemplate={handleDownloadTemplate}
+          isImporting={isImporting}
+          importResult={importResult}
+          title="Import Assets"
+          description="Upload an .xlsx file with asset data. Assets will be imported as ACTIVE."
+        />
+      )}
 
       <BulkActivateModal
         isOpen={showBulkActivateModal}

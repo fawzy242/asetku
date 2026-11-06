@@ -1,3 +1,4 @@
+// src/core/services/AssetsData.js
 import { assetApi } from '../api/api';
 import BaseData from './BaseData';
 import { fileToBase64 } from '../utils/file.utils';
@@ -30,6 +31,43 @@ class AssetsData extends BaseData {
       isUpdate: true,
     });
     return super.update(id, submitData);
+  }
+
+  // ============================================================
+  // DELETE PROFILE PHOTO
+  //
+  // Backend: DELETE /api/Asset/{id}/photo
+  // Returns ServiceResult envelope. Removes the file physically and marks
+  // the current FileAttachment row inactive. Idempotent.
+  // ============================================================
+  async deletePhoto(id) {
+    try {
+      const result = await this.api.deletePhoto(id);
+
+      if (result.data?.isSuccess !== undefined) {
+        if (!result.data.isSuccess) {
+          return {
+            success: false,
+            error:
+              result.data.errors?.join('\n') ||
+              result.data.message ||
+              'Failed to delete photo',
+            errorType: result.data.errorType,
+          };
+        }
+        return { success: true };
+      }
+
+      return { success: true };
+    } catch (error) {
+      if (this.isCanceledError(error)) {
+        return { success: false, error: 'canceled', isCanceled: true };
+      }
+      return {
+        success: false,
+        error: error.userMessage || error.message || 'Failed to delete photo',
+      };
+    }
   }
 
   // ============================================================

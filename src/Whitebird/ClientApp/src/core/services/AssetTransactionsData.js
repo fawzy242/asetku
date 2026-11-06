@@ -1,3 +1,4 @@
+// src/core/services/AssetTransactionsData.js
 import { transactionApi } from '../api/api';
 import BaseData from './BaseData';
 import { fileToBase64 } from '../utils/file.utils';
@@ -327,15 +328,44 @@ class AssetTransactionsData extends BaseData {
 
   // ============================================================
   // GET PAIRED OPTIONS
+  //
+  // Returns approved source-type transactions for a given asset that
+  // are not already paired. Used to populate the "Paired Transaction"
+  // dropdown when creating a LOAN_RETURN or POST_MAINTENANCE.
+  //
+  // Server-side filters (Swagger `grid-add` params):
+  //   - assetId          -> scoped to this asset
+  //   - transactionType  -> only LOAN or MAINTENANCE (the "source" type)
+  //   - status: 'approve'-> only approved transactions
+  //
+  // `fromAssetTransactionId === null` is not a server-side filter param;
+  // the small remaining set is filtered client-side.
+  //
+  // Behavior change vs. prior implementation:
+  //   - Before: fetch page 1 (100 rows) of ALL transactions for the asset,
+  //     then filter client-side. Missed pairs beyond row 100.
+  //   - After: server filters reduce the set first, so ~all valid pairs
+  //     are returned even for assets with large transaction histories.
+  //     A 500-row page size is generous headroom for pathological cases.
   // ============================================================
   async getPairedOptions(assetId, sourceType) {
     try {
-      const result = await this.api.getGridAdd({ assetId, page: 1, pageSize: 100 });
+      const result = await this.api.getGridAdd({
+        assetId,
+        transactionType: sourceType,
+        status: 'approve',
+        page: 1,
+        pageSize: 500,
+      });
+
       if (result.data?.isSuccess !== undefined) {
         if (!result.data.isSuccess) {
           return { success: false, data: [], error: result.data.message };
         }
         const allTxns = result.data.data?.data || [];
+        // Defensive client-side re-filter — server filters are trusted but
+        // cheap to re-verify, especially `fromAssetTransactionId` which the
+        // API doesn't support natively.
         const validPairs = allTxns.filter(
           (t) =>
             t.transactionType === sourceType &&
@@ -344,6 +374,8 @@ class AssetTransactionsData extends BaseData {
         );
         return { success: true, data: validPairs };
       }
+
+      // Legacy envelope
       return { success: true, data: result.data?.data || [] };
     } catch (error) {
       if (this.isCanceledError(error)) {

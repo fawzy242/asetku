@@ -26,65 +26,82 @@ const datetimeField = (required = true) => {
   return schema;
 };
 
-export const transactionSchema = z.object({
-  assetId: numberField(true),
-  transactionType: numberField(true),
-  transactionDate: datetimeField(true),
-  employeeId: numberField(),
-  officeId: numberField(),
-  expectedLoanReturnDate: dateField(),
-  condition: numberField(),
-  notes: stringField(),
-  maintenanceType: numberField(),
-  maintenanceCost: numberField(),
-  fromAssetTransactionId: numberField(),
-}).superRefine((data, ctx) => {
-  const type = data.transactionType;
+export const transactionSchema = z
+  .object({
+    assetId: numberField(true),
+    transactionType: numberField(true),
+    transactionDate: datetimeField(true),
+    employeeId: numberField(),
+    officeId: numberField(),
+    expectedLoanReturnDate: dateField(),
+    condition: numberField(),
+    notes: stringField(),
+    maintenanceType: numberField(),
+    maintenanceCost: numberField(),
+    fromAssetTransactionId: numberField(),
+    // Backend requires isActive on update. Defaulted to true for safety;
+    // loadRecordForModal overrides with the fetched record's actual state.
+    isActive: z.boolean().default(true),
+  })
+  .superRefine((data, ctx) => {
+    const type = data.transactionType;
 
-  if (type === TRANSACTION_TYPES.LOAN && !data.expectedLoanReturnDate) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['expectedLoanReturnDate'],
-      message: 'Expected return date is required for LOAN',
-    });
-  }
-
-  if ([TRANSACTION_TYPES.HANDOVER, TRANSACTION_TYPES.TRANSFER, TRANSACTION_TYPES.LOAN].includes(type) && !data.employeeId) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['employeeId'],
-      message: 'Employee is required for this transaction type',
-    });
-  }
-
-  if (type === TRANSACTION_TYPES.OPERATIONAL_OFFICE && !data.officeId) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['officeId'],
-      message: 'Office is required for OPERATIONAL OFFICE',
-    });
-  }
-
-  if ([TRANSACTION_TYPES.LOAN_RETURN, TRANSACTION_TYPES.POST_MAINTENANCE].includes(type) && !data.fromAssetTransactionId) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['fromAssetTransactionId'],
-      message: 'Paired transaction is required',
-    });
-  }
-
-  if (data.expectedLoanReturnDate && data.transactionDate) {
-    const expected = new Date(data.expectedLoanReturnDate);
-    const trans = new Date(data.transactionDate);
-    if (expected <= trans) {
+    if (type === TRANSACTION_TYPES.LOAN && !data.expectedLoanReturnDate) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['expectedLoanReturnDate'],
-        message: 'Expected return date must be after transaction date',
+        message: 'Expected return date is required for LOAN',
       });
     }
-  }
-});
+
+    if (
+      [
+        TRANSACTION_TYPES.HANDOVER,
+        TRANSACTION_TYPES.TRANSFER,
+        TRANSACTION_TYPES.LOAN,
+      ].includes(type) &&
+      !data.employeeId
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['employeeId'],
+        message: 'Employee is required for this transaction type',
+      });
+    }
+
+    if (type === TRANSACTION_TYPES.OPERATIONAL_OFFICE && !data.officeId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['officeId'],
+        message: 'Office is required for OPERATIONAL OFFICE',
+      });
+    }
+
+    if (
+      [TRANSACTION_TYPES.LOAN_RETURN, TRANSACTION_TYPES.POST_MAINTENANCE].includes(
+        type
+      ) &&
+      !data.fromAssetTransactionId
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['fromAssetTransactionId'],
+        message: 'Paired transaction is required',
+      });
+    }
+
+    if (data.expectedLoanReturnDate && data.transactionDate) {
+      const expected = new Date(data.expectedLoanReturnDate);
+      const trans = new Date(data.transactionDate);
+      if (expected <= trans) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['expectedLoanReturnDate'],
+          message: 'Expected return date must be after transaction date',
+        });
+      }
+    }
+  });
 
 export const getTransactionDefaultValues = () => ({
   assetId: '',
@@ -97,7 +114,12 @@ export const getTransactionDefaultValues = () => ({
   maintenanceType: '',
   maintenanceCost: '',
   fromAssetTransactionId: '',
-  transactionDate: new Date().toISOString(),
+  // Transaction Date is required for every transaction type and must be
+  // explicitly chosen by the user on the form. Do NOT auto-populate with
+  // `new Date()` — that silently submits "today" for every new transaction
+  // and prevents the user from back-dating or correcting the value.
+  transactionDate: '',
+  isActive: true,
 });
 
 export default transactionSchema;

@@ -1,6 +1,7 @@
 // src/pages/Profile/Profile.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Grid, Box, Typography } from '@mui/material';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 import { ProfileData, UserData } from '../../core/services';
 import Spinner from '../../components/atoms/Spinner/Spinner';
@@ -26,7 +27,6 @@ const Profile = () => {
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [profilePhotoUrl, setProfilePhotoUrl] = useState(null);
   const [passwordData, setPasswordData] = useState({
     oldPassword: '',
     newPassword: '',
@@ -39,32 +39,16 @@ const Profile = () => {
     username: '',
   });
   const [errors, setErrors] = useState({});
-  const { refreshUser: refreshAuth, user } = useAuth();
+  const { refreshUser: refreshAuth } = useAuth();
   const { toast, confirm } = useSweetAlert();
+  const queryClient = useQueryClient();
 
   const loadProfileIdRef = useRef(0);
   const isMountedRef = useRef(true);
 
   // ============================================================
-  // FUNCTIONS
+  // LOAD PROFILE
   // ============================================================
-  const loadProfilePhoto = useCallback(async () => {
-    if (!isMountedRef.current) return;
-    try {
-      const result = await userData.getPhoto();
-      if (isMountedRef.current && result.success && result.data) {
-        const url = URL.createObjectURL(result.data);
-        setProfilePhotoUrl(url);
-      } else if (isMountedRef.current) {
-        setProfilePhotoUrl(null);
-      }
-    } catch {
-      if (isMountedRef.current) {
-        setProfilePhotoUrl(null);
-      }
-    }
-  }, []);
-
   const loadProfile = useCallback(async () => {
     const currentRequestId = ++loadProfileIdRef.current;
 
@@ -73,9 +57,7 @@ const Profile = () => {
 
     const r = await profileData.fetchProfile();
 
-    if (currentRequestId !== loadProfileIdRef.current) {
-      return;
-    }
+    if (currentRequestId !== loadProfileIdRef.current) return;
 
     if (!isMountedRef.current) {
       setLoading(false);
@@ -96,7 +78,6 @@ const Profile = () => {
         phoneNumber: profileDataResult.phoneNumber || '',
         username: profileDataResult.username || '',
       });
-      loadProfilePhoto();
     } else {
       if (
         r.error &&
@@ -110,11 +91,8 @@ const Profile = () => {
     if (isMountedRef.current) {
       setLoading(false);
     }
-  }, [loadProfilePhoto, toast]);
+  }, [toast]);
 
-  // ============================================================
-  // EFFECT - HANYA DIJALANKAN SEKALI SAAT MOUNT
-  // ============================================================
   useEffect(() => {
     isMountedRef.current = true;
     loadProfile();
@@ -122,10 +100,10 @@ const Profile = () => {
       isMountedRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Hanya dijalankan sekali
+  }, []);
 
   // ============================================================
-  // HANDLERS
+  // HANDLERS — PHOTO
   // ============================================================
   const handlePhotoUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -149,25 +127,21 @@ const Profile = () => {
       confirmButtonText: 'Yes, Upload',
       confirmButtonColor: '#dc2626',
     });
-
     if (!confirmed) return;
 
     setUploadingPhoto(true);
-
     try {
       const result = await userData.uploadPhoto(file);
       if (result.success) {
-        toast.success('Profile photo updated successfully');
-
-        await loadProfilePhoto();
+        await loadProfile();
         await refreshAuth();
-
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('profile-photo-updated'));
-        }, 200);
+        queryClient.invalidateQueries({ queryKey: ['file-blob'] });
+        toast.success('Profile photo updated successfully');
       } else {
         const errorMsg =
-          result.errors?.join('\n') || result.error || 'Failed to upload photo';
+          result.errors?.join('\n') ||
+          result.error ||
+          'Failed to upload photo';
         toast.error(errorMsg);
       }
     } catch (error) {
@@ -187,22 +161,17 @@ const Profile = () => {
       confirmButtonText: 'Yes, Delete',
       confirmButtonColor: '#ef4444',
     });
-
     if (!confirmed) return;
 
     try {
       const result = await userData.deletePhoto();
       if (result.success) {
-        toast.success('Profile photo deleted successfully');
-        setProfilePhotoUrl(null);
+        await loadProfile();
         await refreshAuth();
-
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('profile-photo-updated'));
-        }, 200);
+        queryClient.invalidateQueries({ queryKey: ['file-blob'] });
+        toast.success('Profile photo deleted successfully');
       } else {
-        const errorMsg = result.error || 'Failed to delete photo';
-        toast.error(errorMsg);
+        toast.error(result.error || 'Failed to delete photo');
       }
     } catch (error) {
       const errorMsg =
@@ -211,9 +180,13 @@ const Profile = () => {
     }
   };
 
+  // ============================================================
+  // HANDLERS — PROFILE / PASSWORD
+  // ============================================================
   const validatePassword = () => {
     const err = {};
-    if (!passwordData.oldPassword) err.oldPassword = 'Current password is required';
+    if (!passwordData.oldPassword)
+      err.oldPassword = 'Current password is required';
     if (!passwordData.newPassword) err.newPassword = 'New password is required';
     else if (!isPasswordComplex(passwordData.newPassword))
       err.newPassword = PASSWORD_COMPLEXITY_MESSAGE;
@@ -348,7 +321,7 @@ const Profile = () => {
             formData={formData}
             setFormData={setFormData}
             errors={errors}
-            profilePhotoUrl={profilePhotoUrl}
+            profilePhotoUrl={profile?.profilePhotoUrl || null}
             uploadingPhoto={uploadingPhoto}
             userInitial={userInitial}
             onPhotoUpload={handlePhotoUpload}

@@ -1,14 +1,23 @@
 // src/pages/Employees/components/EmployeeFormDialog.jsx
 import React from 'react';
-import { Grid, Box, Avatar, Typography, IconButton } from '@mui/material';
-import { FiCamera, FiX } from 'react-icons/fi';
+import {
+  Grid,
+  Box,
+  Avatar,
+  Typography,
+  IconButton,
+  CircularProgress,
+} from '@mui/material';
+import { FiCamera, FiX, FiTrash2 } from 'react-icons/fi';
 import CrudModal from '../../../components/molecules/CrudModal/CrudModal';
 import FormSection from '../../../components/atoms/FormSection/FormSection';
 import Input from '../../../components/atoms/Input/Input';
 import Select from '../../../components/atoms/Select/Select';
 import DatePickerInput from '../../../components/atoms/Input/DatePickerInput';
 import FileUploader from '../../../components/molecules/FileUploader/FileUploader';
+import AttachmentList from '../../../components/molecules/AttachmentList';
 import { getFieldErrorProps } from '../../../core/utils/validation.utils';
+import { useFileBlob } from '../../../hooks/useFileBlob';
 
 const EmployeeFormDialog = ({
   isOpen,
@@ -26,6 +35,8 @@ const EmployeeFormDialog = ({
   photoPreview,
   handlePhotoChange,
   handleRemovePhoto,
+  onDeletePhoto,
+  deletingPhoto,
   attachmentFiles,
   existingAttachments,
   handleFilesChange,
@@ -38,6 +49,22 @@ const EmployeeFormDialog = ({
 }) => {
   const showPhotoSection = isEditMode && currentEmployeeId;
   const showFileUploads = isEditMode && currentEmployeeId && !isViewMode;
+
+  // formData.photoProfileUrl is the raw backend path
+  // ("/api/Employee/5/photo") or "". useFileBlob performs the authenticated
+  // fetch and returns a renderable blob URL (or null while loading / when
+  // no photo / on fetch error). photoPreview (a data URL from a just-staged
+  // File) takes precedence when the user has picked a new image but not saved.
+  const { blobUrl: fetchedPhotoUrl } = useFileBlob(formData.photoProfileUrl);
+
+  const effectivePhotoSrc = photoPreview || fetchedPhotoUrl || null;
+  const showAvatarImage = Boolean(effectivePhotoSrc);
+
+  // Delete button visible when a *backend* photo exists and no staged file
+  // is overriding it. When a staged file is present (photoPreview), the X
+  // button is shown instead — clicking X reverts to the backend photo.
+  const canDeleteBackendPhoto =
+    showAvatarImage && !photoPreview && !isViewMode && Boolean(onDeletePhoto);
 
   return (
     <CrudModal
@@ -72,11 +99,7 @@ const EmployeeFormDialog = ({
         >
           <Box sx={{ position: 'relative' }}>
             <Avatar
-              src={
-                photoPreview ||
-                editingEmployee?.photoProfileUrl ||
-                undefined
-              }
+              src={showAvatarImage ? effectivePhotoSrc : undefined}
               sx={{
                 width: 100,
                 height: 100,
@@ -86,12 +109,18 @@ const EmployeeFormDialog = ({
                 border: '3px solid var(--border)',
               }}
             >
-              {!photoPreview &&
-                !editingEmployee?.photoProfileUrl &&
-                (formData.fullName?.charAt(0) || 'E')}
+              {!showAvatarImage && (formData.fullName?.charAt(0) || 'E')}
             </Avatar>
             {!isViewMode && (
-              <Box sx={{ position: 'absolute', bottom: -4, right: -4 }}>
+              <Box
+                sx={{
+                  position: 'absolute',
+                  bottom: -4,
+                  right: -4,
+                  display: 'flex',
+                  gap: 1,
+                }}
+              >
                 <label
                   htmlFor="employee-photo-upload"
                   style={{ cursor: 'pointer' }}
@@ -117,19 +146,41 @@ const EmployeeFormDialog = ({
                     onChange={handlePhotoChange}
                   />
                 </label>
+                {canDeleteBackendPhoto && (
+                  <IconButton
+                    size="small"
+                    onClick={onDeletePhoto}
+                    disabled={deletingPhoto}
+                    aria-label="Delete profile photo"
+                    title="Delete profile photo"
+                    sx={{
+                      bgcolor: 'var(--error)',
+                      color: 'white',
+                      '&:hover': { opacity: 0.9 },
+                      '&.Mui-disabled': { bgcolor: 'var(--error)', opacity: 0.6 },
+                      width: 32,
+                      height: 32,
+                    }}
+                  >
+                    {deletingPhoto ? (
+                      <CircularProgress size={14} sx={{ color: 'white' }} />
+                    ) : (
+                      <FiTrash2 size={14} />
+                    )}
+                  </IconButton>
+                )}
                 {photoPreview && (
                   <IconButton
                     size="small"
                     onClick={handleRemovePhoto}
+                    aria-label="Discard staged photo"
+                    title="Discard staged photo"
                     sx={{
-                      position: 'absolute',
-                      top: -8,
-                      right: -8,
                       bgcolor: 'var(--error)',
                       color: 'white',
                       '&:hover': { bgcolor: 'var(--error-dark)' },
-                      width: 24,
-                      height: 24,
+                      width: 32,
+                      height: 32,
                     }}
                   >
                     <FiX size={14} />
@@ -144,7 +195,8 @@ const EmployeeFormDialog = ({
             </Typography>
             {!isViewMode && (
               <Typography variant="caption" color="text.secondary">
-                Click the camera icon to upload or change photo. Max 5MB.
+                Click the camera icon to upload or change photo. Click the trash
+                icon to remove the current photo. Max 5MB.
               </Typography>
             )}
           </Box>
@@ -320,20 +372,7 @@ const EmployeeFormDialog = ({
 
           {isViewMode && existingAttachments.length > 0 && (
             <Grid item xs={12}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Attachments ({existingAttachments.length})
-              </Typography>
-              {existingAttachments.map((att, idx) => (
-                <div key={att.fileAttachmentId || idx} style={{ padding: '4px 0' }}>
-                  <a
-                    href={att.fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {att.originalFileName || att.fileName || 'File'}
-                  </a>
-                </div>
-              ))}
+              <AttachmentList attachments={existingAttachments} />
             </Grid>
           )}
         </Grid>

@@ -27,12 +27,6 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
     // ============================================================
     // LOOKUP
     // ============================================================
-    //
-    // P3-4: extended to include Position, EmploymentStatus, JoinDate and
-    // ResignDate so GetSummaryAsync no longer issues four separate queries for
-    // those fields. The extra columns are additive; existing callers of
-    // GetEmployeeDataAsync (EmployeeSummaryService.GetEmployeeDataAsync) see a
-    // superset of the previous shape.
 
     public async Task<EmployeeSummaryGetDataDto?> GetEmployeeDataAsync(int employeeId)
     {
@@ -187,6 +181,7 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
         }
 
         var whereClause = GridQueryBuilder.BuildWhereClause(conditions, parameters);
+        // No GROUP BY in this query — ORDER BY at.TransactionDate is valid.
         var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "at.TransactionDate", true);
         var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
@@ -248,6 +243,13 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
     // ============================================================
     // ASSETS HISTORY
     // ============================================================
+    //
+    // BUG FIX: this query has a GROUP BY clause, so the ORDER BY cannot
+    // reference "at.TransactionDate" (not grouped / not aggregated). The
+    // default sort is now MAX(at.TransactionDate) — the same aggregate that
+    // produces the LastHeldDate column, so the SQL is valid. This mirrors
+    // AssetTrackingReps.GetEmployeeHistoryAsync, which already used the
+    // aggregate as its default sort.
 
     public async Task<PaginatedResult<EmployeeAssetsHistoryDto>> GetAssetsHistoryAsync(EmployeeSummaryGridRequest request)
     {
@@ -273,7 +275,8 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
         }
 
         var whereClause = GridQueryBuilder.BuildWhereClause(conditions, parameters);
-        var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "at.TransactionDate", true);
+        // FIX: use the aggregate as default sort — GROUP BY makes "at.TransactionDate" invalid.
+        var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "MAX(at.TransactionDate)", true);
         var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 
         var countSql = $@"
@@ -348,6 +351,7 @@ public class EmployeeSummaryReps : IEmployeeSummaryReps
         }
 
         var whereClause = GridQueryBuilder.BuildWhereClause(conditions, parameters);
+        // No GROUP BY in this query — ORDER BY at.TransactionDate is valid.
         var orderBy = GridQueryBuilder.BuildOrderByClause(request.SortBy, request.SortDescending, "at.TransactionDate", true);
         var pagination = GridQueryBuilder.BuildPaginationClause(request.Page, request.PageSize, parameters);
 

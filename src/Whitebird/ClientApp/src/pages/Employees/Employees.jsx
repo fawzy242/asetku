@@ -56,6 +56,7 @@ const Employees = () => {
 
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [deletingPhoto, setDeletingPhoto] = useState(false);
   const [attachmentFiles, setAttachmentFiles] = useState([]);
   const [existingAttachments, setExistingAttachments] = useState([]);
 
@@ -182,6 +183,43 @@ const Employees = () => {
     setPhotoPreview(null);
   }, []);
 
+  // Delete the *backend* photo (separate from removing a staged file).
+  // Matches User Profile's behavior: confirm → API call → on success,
+  // clear photoProfileUrl from form state (which triggers useFileBlob to
+  // disable and revert the avatar to initials) → invalidate all cached
+  // file blobs → toast.
+  const handleDeletePhoto = useCallback(async () => {
+    if (!currentEmployeeId) return;
+
+    const confirmed = await confirm({
+      title: 'Delete Profile Photo',
+      text: "Are you sure you want to remove this employee's profile photo?",
+      icon: 'warning',
+      confirmButtonText: 'Yes, Delete',
+      confirmButtonColor: '#ef4444',
+    });
+    if (!confirmed) return;
+
+    setDeletingPhoto(true);
+    try {
+      const r = await employeesData.deletePhoto(currentEmployeeId);
+      if (r.success && isMountedRef.current) {
+        // Clear from form state — avatar falls back to initials immediately.
+        setValue('photoProfileUrl', '');
+        // Drop any cached file blobs (this entity's photo, plus anything
+        // else keyed by ['file-blob', ...] — cheap, correct).
+        queryClient.invalidateQueries({ queryKey: ['file-blob'] });
+        toast.success('Profile photo removed');
+      } else if (r.error && r.error !== 'canceled') {
+        toast.error(r.error);
+      }
+    } catch (error) {
+      toast.error(error?.message || 'Failed to delete photo');
+    } finally {
+      if (isMountedRef.current) setDeletingPhoto(false);
+    }
+  }, [currentEmployeeId, setValue, queryClient, toast, confirm]);
+
   const handleCreate = useCallback(() => {
     reset(getEmployeeDefaultValues());
     setIsEditMode(false);
@@ -191,6 +229,7 @@ const Employees = () => {
     setExistingAttachments([]);
     setPhotoFile(null);
     setPhotoPreview(null);
+    setDeletingPhoto(false);
     setEditingEmployee(null);
     setShowModal(true);
   }, [reset]);
@@ -204,6 +243,7 @@ const Employees = () => {
       setCurrentEmployeeId(recordId);
       setPhotoFile(null);
       setPhotoPreview(null);
+      setDeletingPhoto(false);
       setEditingEmployee(record);
 
       try {
@@ -212,12 +252,21 @@ const Employees = () => {
           const data = result.data;
           const defaults = getEmployeeDefaultValues();
           Object.keys(defaults).forEach((key) => {
+            if (key === 'isActive' || key === 'photoProfileUrl') return;
             if (data[key] !== undefined && data[key] !== null) {
               setValue(key, data[key]);
             } else {
               setValue(key, '');
             }
           });
+
+          setValue('photoProfileUrl', data.photoProfileUrl || '');
+          setValue(
+            'isActive',
+            data.isActive === true ||
+              data.isActive === 'true' ||
+              data.isActive === 1
+          );
 
           if (data.attachments && Array.isArray(data.attachments)) {
             setExistingAttachments(data.attachments);
@@ -239,7 +288,7 @@ const Employees = () => {
   );
 
   const handleClose = useCallback(() => {
-    if (!isSubmitting) {
+    if (!isSubmitting && !deletingPhoto) {
       setShowModal(false);
       setIsEditMode(false);
       setIsViewMode(false);
@@ -248,14 +297,17 @@ const Employees = () => {
       reset(getEmployeeDefaultValues());
       setPhotoFile(null);
       setPhotoPreview(null);
+      setDeletingPhoto(false);
       setAttachmentFiles([]);
       setExistingAttachments([]);
     }
-  }, [isSubmitting, reset]);
+  }, [isSubmitting, deletingPhoto, reset]);
 
   const onSubmit = useCallback(
     async (data) => {
       if (isSubmitting || isViewMode) return;
+
+      const hadPhotoUpload = Boolean(photoFile);
 
       const submitData = {
         ...data,
@@ -270,7 +322,10 @@ const Employees = () => {
       try {
         let result;
         if (isEditMode && editingEmployee) {
-          result = await employeesData.update(editingEmployee.employeeId, submitData);
+          result = await employeesData.update(
+            editingEmployee.employeeId,
+            submitData
+          );
         } else {
           result = await employeesData.create(submitData);
         }
@@ -287,7 +342,13 @@ const Employees = () => {
           setShowModal(false);
           reset(getEmployeeDefaultValues());
 
-          queryClient.invalidateQueries({ queryKey: ['reference', 'employees'] });
+          if (hadPhotoUpload) {
+            queryClient.invalidateQueries({ queryKey: ['file-blob'] });
+          }
+
+          queryClient.invalidateQueries({
+            queryKey: ['reference', 'employees'],
+          });
           reload();
           clearSelection();
 
@@ -491,6 +552,7 @@ const Employees = () => {
         setExistingAttachments([]);
         setPhotoFile(null);
         setPhotoPreview(null);
+        setDeletingPhoto(false);
         handleEdit(row);
       } else if (actionType === ACTION_TYPES.DELETE) {
         handleDelete(row);
@@ -660,6 +722,8 @@ const Employees = () => {
         photoPreview={photoPreview}
         handlePhotoChange={handlePhotoChange}
         handleRemovePhoto={handleRemovePhoto}
+        onDeletePhoto={handleDeletePhoto}
+        deletingPhoto={deletingPhoto}
         attachmentFiles={attachmentFiles}
         existingAttachments={existingAttachments}
         handleFilesChange={handleFilesChange}

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using Whitebird.Domain.Features.Common;
 
 namespace Whitebird.Domain.Features.AssetTransaction;
@@ -123,6 +124,17 @@ public class AssetTransactionCreateViewModel
     [Required(ErrorMessage = "TransactionDate is required")]
     public DateTime TransactionDate { get; set; }
 
+    /// <summary>
+    /// Required for LOAN; unused for HANDOVER / TRANSFER / MAINTENANCE /
+    /// DISPOSAL / OPERATIONAL_OFFICE.
+    ///
+    /// Tolerates "" (empty HTML date input) as null so a form that renders
+    /// this optional field for all types deserializes cleanly regardless of
+    /// the chosen TransactionType. The LOAN-only requirement is enforced by
+    /// AssetTransactionService.ValidateTransactionReferencesAsync after
+    /// deserialization.
+    /// </summary>
+    [JsonConverter(typeof(NullableDateTimeConverter))]
     public DateTime? ExpectedLoanReturnDate { get; set; }
 
     [StringLength(500, ErrorMessage = "Notes cannot exceed 500 characters")]

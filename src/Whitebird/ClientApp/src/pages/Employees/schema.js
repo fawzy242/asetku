@@ -19,7 +19,12 @@ const dateField = () => {
 };
 
 const emailField = () => {
-  return z.string().email('Invalid email format').optional().or(z.literal('')).or(z.null());
+  return z
+    .string()
+    .email('Invalid email format')
+    .optional()
+    .or(z.literal(''))
+    .or(z.null());
 };
 
 export const employeeSchema = z.object({
@@ -34,6 +39,11 @@ export const employeeSchema = z.object({
   officeId: numberField(),
   joinDate: dateField(),
   resignDate: dateField(),
+  // Read-only display field — resolved photo URL, never sent to backend.
+  photoProfileUrl: z.string().nullable().optional(),
+  // Backend requires isActive on update. Defaulted to true for safety;
+  // handleEdit overrides with the fetched record's actual state.
+  isActive: z.boolean().default(true),
 });
 
 export const getEmployeeDefaultValues = () => ({
@@ -48,6 +58,8 @@ export const getEmployeeDefaultValues = () => ({
   officeId: '',
   joinDate: '',
   resignDate: '',
+  photoProfileUrl: '',
+  isActive: true,
 });
 
 export default employeeSchema;

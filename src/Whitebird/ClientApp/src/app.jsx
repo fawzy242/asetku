@@ -19,7 +19,8 @@ import Login from './pages/Login/Login';
 import Dashboard from './pages/Dashboard/Dashboard';
 
 // Lazy loaded pages
-const Assets = lazy(() => import('./pages/Assets/Assets'));
+const AssetMonitoring = lazy(() => import('./pages/Assets/AssetMonitoring'));
+const AssetManagement = lazy(() => import('./pages/Assets/AssetManagement'));
 const AssetTransactionsMonitoring = lazy(() =>
   import('./pages/AssetTransactions/AssetTransactionsMonitoring')
 );
@@ -103,7 +104,18 @@ const AppRoutes = () => (
     >
       <Route index element={<Navigate to="/dashboard" replace />} />
       <Route path="dashboard" element={<LazyPage><Dashboard /></LazyPage>} />
-      <Route path="assets" element={<LazyPage><Assets /></LazyPage>} />
+
+      {/* Assets — split into Monitoring + Management (matches Asset Transactions) */}
+      <Route path="assets" element={<Navigate to="/assets/monitoring" replace />} />
+      <Route
+        path="assets/monitoring"
+        element={<LazyPage><AssetMonitoring /></LazyPage>}
+      />
+      <Route
+        path="assets/management"
+        element={<LazyPage><AssetManagement /></LazyPage>}
+      />
+
       <Route
         path="transactions/monitoring"
         element={<LazyPage><AssetTransactionsMonitoring /></LazyPage>}

@@ -8,6 +8,13 @@ class UserRolesData extends BaseData {
     this.setEntityName('userRole');
   }
 
+  // NOTE: The backend exposes no /activate or /deactivate endpoints for
+  // UserRoles (verified in Swagger), and the parent `BaseData.bulkActivate`
+  // would throw at call time. That method is intentionally NOT overridden
+  // here. The UserRoles page has no bulk-activate UI, so it is never
+  // invoked. Also, there is no /bulk-delete endpoint for UserRoles — the
+  // `BaseData.bulkDelete` guard correctly returns an error if called.
+
   // `fetchGridData` from BaseData works because userRolesApi.getGrid exists
   // and the response envelope matches the shared shape.
 

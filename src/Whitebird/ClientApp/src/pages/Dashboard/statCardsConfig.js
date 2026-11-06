@@ -22,8 +22,19 @@ import { formatCurrency } from '../../core/utils/number.utils';
  * Builds the 16-card configuration used by the Summary tab.
  * All derivations (this-month count, utilization rate, damaged count, etc.)
  * happen here so the page stays focused on orchestration.
+ *
+ * Drilldown policy:
+ *   A card is clickable only if its `endpoint` + `params` produce a list
+ *   that EXACTLY matches the value shown on the card. Cards where the
+ *   backend does not offer a matching filtered list are marked
+ *   `noDrilldown: true` — showing the value is fine, drilling into an
+ *   unrelated list is misleading.
  */
-export const buildStatCardsConfig = ({ stats = {}, scheduleStats = {}, monthlyStats = [] }) => {
+export const buildStatCardsConfig = ({
+  stats = {},
+  scheduleStats = {},
+  monthlyStats = [],
+}) => {
   const currentMonth = new Date().getMonth();
   const thisMonthTransactions = monthlyStats.find(
     (item) => item.month === currentMonth + 1
@@ -96,11 +107,14 @@ export const buildStatCardsConfig = ({ stats = {}, scheduleStats = {}, monthlySt
       bg: 'rgba(239, 68, 68, 0.1)',
     },
     {
+      // B25 fix: the backend does not expose a "pending approvals only"
+      // list endpoint. `/AssetTransaction/grid-uncomplete` returns ALL
+      // uncomplete transactions (including rejected), which does not
+      // match this card's value (stats.pendingApprovals). Drilldown removed.
       icon: FiClock,
       label: 'Pending Approvals',
       value: pendingApprovalsCount,
-      endpoint: '/AssetTransaction/grid-uncomplete',
-      params: {},
+      noDrilldown: true,
       color: '#f59e0b',
       bg: 'rgba(245, 158, 11, 0.1)',
     },
@@ -130,11 +144,14 @@ export const buildStatCardsConfig = ({ stats = {}, scheduleStats = {}, monthlySt
       bg: 'rgba(6, 182, 212, 0.1)',
     },
     {
+      // B24 fix: "This Month" is a filtered count (monthlyStats), but
+      // `/AssetTransaction/grid-add` with empty params returns ALL
+      // transactions — not just this month's. The drilldown does not match
+      // the displayed value. Card remains display-only.
       icon: FiBarChart2,
       label: 'This Month',
       value: thisMonthCount,
-      endpoint: '/AssetTransaction/grid-add',
-      params: {},
+      noDrilldown: true,
       color: '#6366f1',
       bg: 'rgba(99, 102, 241, 0.1)',
     },

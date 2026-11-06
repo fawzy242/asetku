@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
+using Whitebird.Domain.Features.Common;
 
 namespace Whitebird.App.Features.AssetTransaction;
 
@@ -21,6 +23,13 @@ public class AssetTransactionUpdateApprovalFormDto
     [Required(ErrorMessage = "TransactionDate is required")]
     public DateTime TransactionDate { get; set; }
 
+    /// <summary>
+    /// Required for LOAN; unused for HANDOVER / TRANSFER / MAINTENANCE /
+    /// DISPOSAL / OPERATIONAL_OFFICE. Tolerates "" as null so a form that
+    /// renders this optional field for all types deserializes cleanly
+    /// regardless of the chosen TransactionType.
+    /// </summary>
+    [JsonConverter(typeof(NullableDateTimeConverter))]
     public DateTime? ExpectedLoanReturnDate { get; set; }
 
     [StringLength(500, ErrorMessage = "Notes cannot exceed 500 characters")]

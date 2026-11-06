@@ -13,7 +13,6 @@ import {
   setStorage,
   removeStorage,
 } from '../core/utils/storage.utils';
-import { getProfilePhotoUrl } from '../core/utils/photoUrl.utils';
 
 const AuthContext = createContext(null);
 
@@ -55,11 +54,9 @@ export const AuthProvider = ({ children }) => {
     try {
       const result = await userData.getMe();
       if (result.success && result.data) {
-        const userDataResult = result.data;
-        const updatedUser = {
-          ...userDataResult,
-          profilePhotoUrl: getProfilePhotoUrl(userDataResult.userId),
-        };
+        // Backend is the source of truth for profilePhotoUrl (relative,
+        // or null when no photo exists). Pass through unchanged.
+        const updatedUser = { ...result.data };
 
         setStorage(STORAGE_KEYS.USER, updatedUser);
         if (mountedRef.current) {
@@ -119,10 +116,9 @@ export const AuthProvider = ({ children }) => {
       if (result.success) {
         const { sessionToken, user: userDataResult } = result.data;
 
-        const userWithPhoto = {
-          ...userDataResult,
-          profilePhotoUrl: getProfilePhotoUrl(userDataResult.userId),
-        };
+        // Backend login response carries a relative profilePhotoUrl
+        // (or null when no photo). Do NOT construct a URL client-side.
+        const userWithPhoto = { ...userDataResult };
 
         localStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, sessionToken);
         setStorage(STORAGE_KEYS.USER, userWithPhoto);

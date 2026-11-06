@@ -1,6 +1,18 @@
 // src/pages/Dashboard/chartConfigs.js
 import { ASSET_STATUS_CHART_COLORS } from './constants';
 
+// ============================================================
+// DOUGHNUT — Asset Distribution by Status
+// ============================================================
+//
+// Renders one slice per asset lifecycle status. Fields not returned by
+// the backend stats endpoint resolve to 0 (slice hidden by Chart.js),
+// so newly supported statuses appear automatically once the API includes
+// them — no frontend change required.
+//
+// Inactive is not in the ASSET_STATUS_CHART_COLORS palette and falls back
+// to gray (#6b7280) — visually neutral, matching the semantics of "not
+// actively in the asset pool".
 export const buildDoughnutChartData = (stats = {}) => {
   const statusLabels = [
     'Available',
@@ -8,6 +20,9 @@ export const buildDoughnutChartData = (stats = {}) => {
     'On Loan',
     'In Maintenance',
     'Damaged',
+    'Retired',
+    'Disposed',
+    'Inactive',
   ];
   const statusDataValues = [
     stats.availableAssets || 0,
@@ -15,6 +30,9 @@ export const buildDoughnutChartData = (stats = {}) => {
     stats.assetsOnLoan || 0,
     stats.assetsInMaintenance || 0,
     stats.damagedAssets || 0,
+    stats.retiredAssets || 0,
+    stats.disposedAssets || 0,
+    stats.inactiveAssets || 0,
   ];
   const statusBackgroundColors = statusLabels.map(
     (s) => ASSET_STATUS_CHART_COLORS[s] || '#6b7280'
@@ -34,6 +52,9 @@ export const buildDoughnutChartData = (stats = {}) => {
   };
 };
 
+// ============================================================
+// DOUGHNUT — Options
+// ============================================================
 export const buildDoughnutChartOptions = ({ isDark, textColor }) => ({
   responsive: true,
   maintainAspectRatio: false,
@@ -65,7 +86,8 @@ export const buildDoughnutChartOptions = ({ isDark, textColor }) => ({
           const label = context.label || '';
           const value = context.raw || 0;
           const total = context.dataset.data.reduce((a, b) => a + b, 0);
-          const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+          const percentage =
+            total > 0 ? ((value / total) * 100).toFixed(1) : 0;
           return `${label}: ${value} (${percentage}%)`;
         },
       },
@@ -73,6 +95,9 @@ export const buildDoughnutChartOptions = ({ isDark, textColor }) => ({
   },
 });
 
+// ============================================================
+// LINE — Monthly Transaction Trend
+// ============================================================
 export const buildLineChartData = (monthlyLabels, monthlyChartData) => ({
   labels: monthlyLabels,
   datasets: [
@@ -135,7 +160,14 @@ export const buildLineChartOptions = ({
   },
 });
 
-export const buildBarChartData = ({ categoryLabels, categoryValues, categoryColors }) => ({
+// ============================================================
+// BAR — Asset Value by Category
+// ============================================================
+export const buildBarChartData = ({
+  categoryLabels,
+  categoryValues,
+  categoryColors,
+}) => ({
   labels: categoryLabels,
   datasets: [
     {
@@ -150,7 +182,12 @@ export const buildBarChartData = ({ categoryLabels, categoryValues, categoryColo
   ],
 });
 
-export const buildBarChartOptions = ({ isDark, textColor, gridColor, formatCurrency }) => ({
+export const buildBarChartOptions = ({
+  isDark,
+  textColor,
+  gridColor,
+  formatCurrency,
+}) => ({
   responsive: true,
   maintainAspectRatio: false,
   plugins: {

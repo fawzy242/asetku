@@ -42,7 +42,6 @@ const AssetTracking = () => {
   // ============================================================
   // QUERIES
   // ============================================================
-
   const { data: assets = [], isLoading: loading } = useQuery({
     queryKey: ['asset-tracking-assets'],
     queryFn: async () => {
@@ -296,10 +295,12 @@ const AssetTracking = () => {
         {/* Detail content */}
         {selectedAssetId && !loadingData && currentAsset && (
           <>
+            {/* Row 2: Profile card */}
             <Grid item xs={12}>
               <TrackingProfileCard currentAsset={currentAsset} />
             </Grid>
 
+            {/* Row 3: Stats grid */}
             <Grid item xs={12}>
               <TrackingStatsGrid
                 currentAsset={currentAsset}
@@ -307,13 +308,37 @@ const AssetTracking = () => {
               />
             </Grid>
 
+            {/* Row 4: Chart + Employee History (both "summary context") */}
             <Grid item xs={12} md={4}>
               <TrackingChartCard
                 transactionTypeChartData={transactionTypeChartData}
               />
             </Grid>
-
             <Grid item xs={12} md={8}>
+              <Card
+                title="Employee History"
+                subtitle={`${employeeTotal} employee(s) have handled this asset`}
+              >
+                <DataTable
+                  rows={employeeHistory}
+                  columns={employeeHistoryColumns}
+                  loading={employeeLoading}
+                  pageSize={employeePageSize}
+                  page={employeePage}
+                  totalRowCount={employeeTotal}
+                  onPageChange={handleEmployeePageChange}
+                  onPageSizeChange={handleEmployeePageSizeChange}
+                  getRowId={(row) => row.employeeId || `emp-${Math.random()}`}
+                  hideFooter={false}
+                  ariaLabel="Employee history table"
+                  paginationMode="server"
+                  autoHeight={false}
+                />
+              </Card>
+            </Grid>
+
+            {/* Row 5: Schedule Stats (temporal context) */}
+            <Grid item xs={12}>
               <Card
                 title="Schedule Stats"
                 subtitle="Upcoming and completed schedules"
@@ -338,29 +363,7 @@ const AssetTracking = () => {
               </Card>
             </Grid>
 
-            <Grid item xs={12}>
-              <Card
-                title="Employee History"
-                subtitle={`${employeeTotal} employee(s) have handled this asset`}
-              >
-                <DataTable
-                  rows={employeeHistory}
-                  columns={employeeHistoryColumns}
-                  loading={employeeLoading}
-                  pageSize={employeePageSize}
-                  page={employeePage}
-                  totalRowCount={employeeTotal}
-                  onPageChange={handleEmployeePageChange}
-                  onPageSizeChange={handleEmployeePageSizeChange}
-                  getRowId={(row) => row.employeeId || `emp-${Math.random()}`}
-                  hideFooter={false}
-                  ariaLabel="Employee history table"
-                  paginationMode="server"
-                  autoHeight={false}
-                />
-              </Card>
-            </Grid>
-
+            {/* Row 6: Timeline (chronological events, closes the page) */}
             <Grid item xs={12}>
               <TrackingTimelineCard timelineData={timelineData} />
             </Grid>

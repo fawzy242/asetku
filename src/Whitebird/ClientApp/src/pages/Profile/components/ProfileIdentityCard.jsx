@@ -25,6 +25,7 @@ import Button from '../../../components/atoms/Button/Button';
 import Input from '../../../components/atoms/Input/Input';
 import InfoRow from '../../../components/molecules/InfoRow/InfoRow';
 import { formatDate } from '../../../core/utils/date.utils';
+import { useFileBlob } from '../../../hooks/useFileBlob';
 
 const ProfileIdentityCard = ({
   profile,
@@ -41,6 +42,12 @@ const ProfileIdentityCard = ({
   onProfileUpdate,
   onCancelEdit,
 }) => {
+  // profilePhotoUrl is the raw backend path ("/api/User/profile-photo") or
+  // null. useFileBlob performs the authenticated fetch and returns a
+  // renderable blob URL (or null when no photo / while loading / on error).
+  const { blobUrl } = useFileBlob(profilePhotoUrl);
+  const showPhoto = Boolean(blobUrl);
+
   return (
     <Card>
       <Box
@@ -55,7 +62,7 @@ const ProfileIdentityCard = ({
       >
         <Box sx={{ position: 'relative' }}>
           <Avatar
-            src={profilePhotoUrl || undefined}
+            src={showPhoto ? blobUrl : undefined}
             sx={{
               width: 100,
               height: 100,
@@ -64,7 +71,7 @@ const ProfileIdentityCard = ({
               fontWeight: 600,
             }}
           >
-            {!profilePhotoUrl && userInitial}
+            {!showPhoto && userInitial}
           </Avatar>
           {uploadingPhoto && (
             <Box
@@ -110,7 +117,7 @@ const ProfileIdentityCard = ({
                 onChange={onPhotoUpload}
               />
             </IconButton>
-            {profilePhotoUrl && (
+            {showPhoto && (
               <IconButton
                 size="small"
                 onClick={onDeletePhoto}
@@ -230,11 +237,7 @@ const ProfileIdentityCard = ({
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  startIcon={<FiCheck />}
-                >
+                <Button type="submit" variant="primary" startIcon={<FiCheck />}>
                   Save Changes
                 </Button>
               </Box>
